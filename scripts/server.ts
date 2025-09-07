@@ -261,11 +261,28 @@ async function startPocketBase(binPath: string): Promise<void> {
 	});
 }
 
+async function upsertSuperuser(binPath: string): Promise<void> {
+	const email = process.env.PB_SUPERUSER_EMAIL || 'superadmin@example.com';
+	const password = process.env.PB_SUPERUSER_PASSWORD || '123qweasdzxc';
+
+	// Always upsert to guarantee existence and ensure known credentials in dev.
+	log('Ensuring superuser account exists (idempotent upsert)...');
+	const res = spawnSync(binPath, ['superuser', 'upsert', email, password], {
+		cwd: pbDir,
+		encoding: 'utf8'
+	});
+	if (res.status !== 0) {
+		const out = `${res.stdout ?? ''}${res.stderr ?? ''}`.trim();
+		throw new Error(`Failed to upsert superuser. ${out ? 'Details: ' + out : ''}`);
+	}
+}
+
 (async () => {
 	try {
 		// Helpful environment note
 		log(`Host: ${os.platform()} ${os.arch()}`);
 		const binPath = await ensurePocketBase();
+		await upsertSuperuser(binPath);
 		await startPocketBase(binPath);
 	} catch (e) {
 		error((e as Error).message);
