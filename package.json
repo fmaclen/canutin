@@ -13,9 +13,11 @@
 		"format": "prettier --write .",
 		"lint": "prettier --check . && eslint .",
 		"test": "playwright test",
-		"quality": "bun run format && bun run lint && bun run check"
+		"quality": "bun run format && bun run lint && bun run check",
+		"pb": "bun scripts/server.ts"
 	},
 	"devDependencies": {
+		"@types/node": "^22.9.0",
 		"@eslint/compat": "^1.2.5",
 		"@eslint/js": "^9.18.0",
 		"@ianvs/prettier-plugin-sort-imports": "^4.7.0",
