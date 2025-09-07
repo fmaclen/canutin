@@ -4,6 +4,11 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@theme {
+	--font-inter: 'Inter', ui-sans-serif, system-ui, sans-serif;
+	--font-jetbrains-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
 :root {
 	--radius: 0.625rem;
 	--background: oklch(1 0 0);
