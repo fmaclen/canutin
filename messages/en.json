@@ -1,4 +1,7 @@
 {
-	"$schema": "https://inlang.com/schema/inlang-message-format",
-	"hello_world": "Hello, {name} from en!"
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "app_name": "Canutin",
+  "app_tagline": "Personal finance platform",
+  "language_english": "English",
+  "language_spanish": "Español"
 }

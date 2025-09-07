@@ -1,12 +1,16 @@
 <script lang="ts">
-	import '../app.css';
-	import favicon from '$lib/assets/favicon.svg';
+	import { initLocaleFromStorageOrAPI } from '$lib/i18n';
+	import { type Snippet } from 'svelte';
 
-	let { children } = $props();
+	interface Props {
+		children: Snippet;
+	}
+
+	let { children }: Props = $props();
+
+	$effect(() => {
+		initLocaleFromStorageOrAPI();
+	});
 </script>
 
-<svelte:head>
-	<link rel="icon" href={favicon} />
-</svelte:head>
-
-{@render children?.()}
+{@render children()}
