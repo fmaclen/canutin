@@ -13,9 +13,9 @@
 
 	const auth = getAuthContext();
 
-	const email = $state('');
-	const password = $state('');
-	const password2 = $state('');
+	let email = $state('');
+	let password = $state('');
+	let passwordConfirm = $state('');
 
 	const title = $derived(mode === 'signup' ? m.auth_signup_title() : m.auth_login_title());
 	const description = $derived(
@@ -30,14 +30,15 @@
 	const altCtaHref = $derived(mode === 'signup' ? '/auth' : '/auth/sign-up');
 	const altCtaLinkText = $derived(mode === 'signup' ? m.auth_link_login() : m.auth_link_signup());
 
-	async function handleSubmit() {
+	async function handleSubmit(event: Event) {
+		event.preventDefault();
+
 		if (auth.isLoading) return;
 		if (mode === 'signup') {
-			if (password !== password2) {
-				// FIXME: show localized error for password mismatch
+			if (password !== passwordConfirm) {
 				return;
 			}
-			await auth.signup(email, password);
+			await auth.signup(email, password, passwordConfirm);
 		} else {
 			await auth.login(email, password);
 		}
@@ -51,27 +52,27 @@
 		<Card.Description>{description}</Card.Description>
 	</Card.Header>
 	<Card.Content>
-		<form class="grid gap-4" method="post" onsubmit={(e) => (e.preventDefault(), handleSubmit())}>
+		<form class="grid gap-4" method="post" onsubmit={handleSubmit}>
 			<div class="grid gap-2">
 				<Label for="email-{id}">{m.auth_email_label()}</Label>
 				<Input
 					id="email-{id}"
 					type="email"
 					placeholder={m.auth_email_placeholder()}
-					value={email}
+					bind:value={email}
 					required
 				/>
 			</div>
 
 			<div class="grid gap-2">
 				<Label for="password-{id}">{m.auth_password_label()}</Label>
-				<Input id="password-{id}" type="password" value={password} required />
+				<Input id="password-{id}" type="password" bind:value={password} required />
 			</div>
 
 			{#if mode === 'signup'}
 				<div class="grid gap-2">
 					<Label for="password2-{id}">{m.auth_password_confirm_label()}</Label>
-					<Input id="password2-{id}" type="password" value={password2} required />
+					<Input id="password2-{id}" type="password" bind:value={passwordConfirm} required />
 				</div>
 			{/if}
 

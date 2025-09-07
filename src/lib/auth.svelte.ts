@@ -2,7 +2,7 @@ import PocketBase, { type RecordAuthResponse, type RecordModel } from 'pocketbas
 import { getContext, setContext } from 'svelte';
 
 export class AuthContext {
-	session: RecordAuthResponse<RecordModel> | null = $state(null);
+	authStore: RecordAuthResponse<RecordModel> | null = $state(null); // FIXME: migrate to PocketBase authStore shape if needed
 	isLoading: boolean = $state(false);
 	error: string | null = $state(null);
 
@@ -13,12 +13,27 @@ export class AuthContext {
 	}
 
 	get isAuthenticated() {
-		return !!this.session;
+		return !!this.authStore; // FIXME: consider using this._pb?.authStore.isValid
 	}
 
 	async login(email: string, password: string) {}
 
-	async signup(email: string, password: string) {}
+	async signup(email: string, password: string, passwordConfirm: string) {
+		this.error = null;
+		this.isLoading = true;
+		try {
+			await this._pb!.collection('users').create({ email, password, passwordConfirm }); // FIXME: configurable collection name
+			const auth = await this._pb!.collection('users').authWithPassword(email, password); // FIXME: configurable collection name
+			this.authStore = auth;
+			return { success: true } as const;
+		} catch (e: any) {
+			const message = e?.response?.message || e?.message || 'Sign up failed'; // FIXME: localize errors
+			this.error = message;
+			return { success: false, error: message } as const;
+		} finally {
+			this.isLoading = false;
+		}
+	}
 
 	async logout() {}
 }
