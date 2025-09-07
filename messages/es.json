@@ -3,5 +3,21 @@
 	"app_name": "Canutin",
 	"app_tagline": "Plataforma de finanzas personales",
 	"language_english": "English",
-	"language_spanish": "Español"
+	"language_spanish": "Español",
+
+	"auth_login_title": "Iniciar sesión",
+	"auth_signup_title": "Crear cuenta",
+	"auth_login_description": "Ingresa tu correo para acceder a tu cuenta",
+	"auth_signup_description": "Ingresa tu correo para crear tu cuenta",
+	"auth_email_label": "Correo electrónico",
+	"auth_email_placeholder": "m@ejemplo.com",
+	"auth_password_label": "Contraseña",
+	"auth_password_confirm_label": "Confirmar contraseña",
+	"auth_primary_login": "Iniciar sesión",
+	"auth_primary_signup": "Crear cuenta",
+	"auth_alt_have_account": "¿Ya tienes una cuenta?",
+	"auth_alt_no_account": "¿No tienes una cuenta?",
+	"auth_link_login": "Iniciar sesión",
+	"auth_link_signup": "Regístrate",
+	"auth_forgot_password": "¿Olvidaste tu contraseña?"
 }

@@ -4,20 +4,24 @@
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import { m } from '$lib/paraglide/messages.js';
 
-  let { mode = 'login' }: { mode?: 'login' | 'signup' } = $props();
+	let { mode = 'login' }: { mode?: 'login' | 'signup' } = $props();
 
 	const id = $props.id();
 
-	const title = $derived(mode === 'signup' ? 'Create account' : 'Login');
-	const description =
-		$derived(mode === 'signup'
-			? 'Enter your email below to create your account'
-			: 'Enter your email below to login to your account');
-	const primaryText = $derived(mode === 'signup' ? 'Create account' : 'Login');
-	const altCtaText = $derived(mode === 'signup' ? 'Already have an account?' : "Don't have an account?");
-  const altCtaHref = $derived(mode === 'signup' ? '/auth' : '/auth/sign-up');
-	const altCtaLinkText = $derived(mode === 'signup' ? ' Login' : ' Sign up');
+	const title = $derived(mode === 'signup' ? m.auth_signup_title() : m.auth_login_title());
+	const description = $derived(
+		mode === 'signup' ? m.auth_signup_description() : m.auth_login_description()
+	);
+	const primaryText = $derived(
+		mode === 'signup' ? m.auth_primary_signup() : m.auth_primary_login()
+	);
+	const altCtaText = $derived(
+		mode === 'signup' ? m.auth_alt_have_account() : m.auth_alt_no_account()
+	);
+	const altCtaHref = $derived(mode === 'signup' ? '/auth' : '/auth/sign-up');
+	const altCtaLinkText = $derived(mode === 'signup' ? m.auth_link_login() : m.auth_link_signup());
 </script>
 
 <Card.Root class="mx-auto w-full max-w-sm">
@@ -28,18 +32,18 @@
 	<Card.Content>
 		<form class="grid gap-4" method="post" onsubmit={(e) => e.preventDefault()}>
 			<div class="grid gap-2">
-				<Label for="email-{id}">Email</Label>
-				<Input id="email-{id}" type="email" placeholder="m@example.com" required />
+				<Label for="email-{id}">{m.auth_email_label()}</Label>
+				<Input id="email-{id}" type="email" placeholder={m.auth_email_placeholder()} required />
 			</div>
 
 			<div class="grid gap-2">
-				<Label for="password-{id}">Password</Label>
+				<Label for="password-{id}">{m.auth_password_label()}</Label>
 				<Input id="password-{id}" type="password" required />
 			</div>
 
 			{#if mode === 'signup'}
 				<div class="grid gap-2">
-					<Label for="password2-{id}">Confirm password</Label>
+					<Label for="password2-{id}">{m.auth_password_confirm_label()}</Label>
 					<Input id="password2-{id}" type="password" required />
 				</div>
 			{/if}

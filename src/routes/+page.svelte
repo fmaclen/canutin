@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { resolveRoute } from '$app/paths';
+	import { resolve } from '$app/paths';
 
-	const authUrl = resolveRoute('/auth');
+	const authUrl = resolve('/auth');
 
 	$effect.pre(() => {
 		goto(authUrl);
