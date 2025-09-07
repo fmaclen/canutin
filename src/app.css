@@ -118,9 +118,15 @@
 
 @layer base {
 	* {
-		@apply border-border outline-ring/50;
+		@apply border-border outline-ring/50 font-inter;
 	}
 	body {
 		@apply bg-background text-foreground;
+	}
+}
+
+@layer utilities {
+	.font-mono {
+		@apply font-jetbrains-mono;
 	}
 }
