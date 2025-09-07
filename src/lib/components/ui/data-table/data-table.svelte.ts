@@ -1,9 +1,9 @@
 import {
+	createTable,
 	type RowData,
 	type TableOptions,
 	type TableOptionsResolved,
-	type TableState,
-	createTable
+	type TableState
 } from '@tanstack/table-core';
 
 /**

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import * as FormPrimitive from 'formsnap';
+
 	import { cn, type WithoutChild } from '$lib/utils.js';
 
 	let {
@@ -15,7 +16,7 @@
 
 <FormPrimitive.FieldErrors
 	bind:ref
-	class={cn('text-sm font-medium text-destructive', className)}
+	class={cn('text-destructive text-sm font-medium', className)}
 	{...restProps}
 >
 	{#snippet children({ errors, errorProps })}

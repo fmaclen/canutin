@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { ToggleGroup as ToggleGroupPrimitive } from 'bits-ui';
-	import { getToggleGroupCtx } from './toggle-group.svelte';
+
+	import { toggleVariants, type ToggleVariants } from '$lib/components/ui/toggle/index.js';
 	import { cn } from '$lib/utils.js';
-	import { type ToggleVariants, toggleVariants } from '$lib/components/ui/toggle/index.js';
+
+	import { getToggleGroupCtx } from './toggle-group.svelte';
 
 	let {
 		ref = $bindable(null),

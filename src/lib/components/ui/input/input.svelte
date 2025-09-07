@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { HTMLInputAttributes, HTMLInputTypeAttribute } from 'svelte/elements';
+
 	import { cn, type WithElementRef } from '$lib/utils.js';
 
 	type InputType = Exclude<HTMLInputTypeAttribute, 'file'>;
@@ -24,8 +25,8 @@
 		bind:this={ref}
 		data-slot="input"
 		class={cn(
-			'flex h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 pt-1.5 text-sm font-medium shadow-xs ring-offset-background transition-[color,box-shadow] outline-none selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30',
-			'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
+			'border-input ring-offset-background selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground dark:bg-input/30 flex h-9 w-full min-w-0 rounded-md border bg-transparent px-3 pt-1.5 text-sm font-medium shadow-xs transition-[color,box-shadow] outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
+			'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
 			'aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40',
 			className
 		)}
@@ -39,8 +40,8 @@
 		bind:this={ref}
 		data-slot="input"
 		class={cn(
-			'flex h-9 w-full min-w-0 rounded-md border border-input bg-background px-3 py-1 text-base shadow-xs ring-offset-background transition-[color,box-shadow] outline-none selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30',
-			'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
+			'border-input bg-background ring-offset-background selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground dark:bg-input/30 flex h-9 w-full min-w-0 rounded-md border px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
+			'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
 			'aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40',
 			className
 		)}

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { setLocale } from '$lib/paraglide/runtime';
 	import { m } from '$lib/paraglide/messages.js';
+	import { setLocale } from '$lib/paraglide/runtime';
 </script>
 
 <h1>{m.app_tagline()}</h1>

@@ -1,11 +1,12 @@
 <script lang="ts">
+	import { cn, type WithElementRef } from '$lib/utils.js';
+
 	import {
+		setEmblaContext,
 		type CarouselAPI,
 		type CarouselProps,
-		type EmblaContext,
-		setEmblaContext
+		type EmblaContext
 	} from './context.js';
-	import { cn, type WithElementRef } from '$lib/utils.js';
 
 	let {
 		ref = $bindable(null),

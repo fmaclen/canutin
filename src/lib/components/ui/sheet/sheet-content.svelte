@@ -1,5 +1,6 @@
 <script lang="ts" module>
 	import { tv, type VariantProps } from 'tailwind-variants';
+
 	export const sheetVariants = tv({
 		base: 'bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 flex flex-col gap-4 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500',
 		variants: {
@@ -21,11 +22,13 @@
 </script>
 
 <script lang="ts">
-	import { Dialog as SheetPrimitive } from 'bits-ui';
 	import XIcon from '@lucide/svelte/icons/x';
+	import { Dialog as SheetPrimitive } from 'bits-ui';
 	import type { Snippet } from 'svelte';
-	import SheetOverlay from './sheet-overlay.svelte';
+
 	import { cn, type WithoutChildrenOrChild } from '$lib/utils.js';
+
+	import SheetOverlay from './sheet-overlay.svelte';
 
 	let {
 		ref = $bindable(null),
@@ -51,7 +54,7 @@
 	>
 		{@render children?.()}
 		<SheetPrimitive.Close
-			class="absolute top-4 right-4 rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:pointer-events-none"
+			class="ring-offset-background focus-visible:ring-ring absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:pointer-events-none"
 		>
 			<XIcon class="size-4" />
 			<span class="sr-only">Close</span>

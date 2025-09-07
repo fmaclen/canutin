@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { initLocaleFromStorageOrAPI } from '$lib/i18n';
 	import { type Snippet } from 'svelte';
+
+	import { initLocaleFromStorageOrAPI } from '$lib/i18n';
 
 	interface Props {
 		children: Snippet;

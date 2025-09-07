@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { Command as CommandPrimitive } from 'bits-ui';
 	import SearchIcon from '@lucide/svelte/icons/search';
+	import { Command as CommandPrimitive } from 'bits-ui';
+
 	import { cn } from '$lib/utils.js';
 
 	let {
@@ -16,7 +17,7 @@
 	<CommandPrimitive.Input
 		data-slot="command-input"
 		class={cn(
-			'flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-hidden placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50',
+			'placeholder:text-muted-foreground flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50',
 			className
 		)}
 		bind:ref

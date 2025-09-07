@@ -1,9 +1,11 @@
 <script lang="ts">
-	import { cn, type WithElementRef, type WithoutChildren } from '$lib/utils.js';
-	import type { HTMLAttributes } from 'svelte/elements';
-	import { getPayloadConfigFromPayload, useChart, type TooltipPayload } from './chart-utils.js';
 	import { getTooltipContext, Tooltip as TooltipPrimitive } from 'layerchart';
 	import type { Snippet } from 'svelte';
+	import type { HTMLAttributes } from 'svelte/elements';
+
+	import { cn, type WithElementRef, type WithoutChildren } from '$lib/utils.js';
+
+	import { getPayloadConfigFromPayload, useChart, type TooltipPayload } from './chart-utils.js';
 
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	function defaultFormatter(value: any, _payload: TooltipPayload[]) {
@@ -86,7 +88,7 @@
 <TooltipPrimitive.Root variant="none">
 	<div
 		class={cn(
-			'grid min-w-[9rem] items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl',
+			'border-border/50 bg-background grid min-w-[9rem] items-start gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs shadow-xl',
 			className
 		)}
 		{...restProps}
@@ -101,7 +103,7 @@
 				{@const indicatorColor = color || item.payload?.color || item.color}
 				<div
 					class={cn(
-						'flex w-full flex-wrap items-stretch gap-2 [&>svg]:size-2.5 [&>svg]:text-muted-foreground',
+						'[&>svg]:text-muted-foreground flex w-full flex-wrap items-stretch gap-2 [&>svg]:size-2.5',
 						indicator === 'dot' && 'items-center'
 					)}
 				>
@@ -142,7 +144,7 @@
 								</span>
 							</div>
 							{#if item.value !== undefined}
-								<span class="font-mono font-medium text-foreground tabular-nums">
+								<span class="text-foreground font-mono font-medium tabular-nums">
 									{item.value.toLocaleString()}
 								</span>
 							{/if}

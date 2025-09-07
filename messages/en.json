@@ -1,7 +1,7 @@
 {
-  "$schema": "https://inlang.com/schema/inlang-message-format",
-  "app_name": "Canutin",
-  "app_tagline": "Personal finance platform",
-  "language_english": "English",
-  "language_spanish": "Español"
+	"$schema": "https://inlang.com/schema/inlang-message-format",
+	"app_name": "Canutin",
+	"app_tagline": "Personal finance platform",
+	"language_english": "English",
+	"language_spanish": "Español"
 }
