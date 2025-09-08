@@ -41,8 +41,8 @@
 		if (mode === 'signup') {
 			const result = await auth.signup(email, password, passwordConfirm);
 			if (result.success) {
-				toast.success('Your account has been created, you can now log in');
-				goto('/auth');
+				toast.success(m.auth_signup_success());
+				goto(resolve('/auth'));
 			}
 		} else {
 			await auth.login(email, password);

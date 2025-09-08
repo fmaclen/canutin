@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('user can sign up, login and logout', async ({ page, context }) => {
+test('user can sign up, login and logout', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
 	await expect(page.getByText('Failed to authenticate')).not.toBeVisible();

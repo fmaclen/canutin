@@ -3,6 +3,7 @@
 	import type { ComponentProps } from 'svelte';
 
 	import { Button } from '$lib/components/ui/button/index.js';
+	import { m } from '$lib/paraglide/messages.js';
 	import { cn } from '$lib/utils.js';
 
 	import { useSidebar } from './context.svelte.js';
@@ -33,5 +34,5 @@
 	{...restProps}
 >
 	<PanelLeftIcon />
-	<span class="sr-only">Toggle Sidebar</span>
+	<span class="sr-only">{m.ui_toggle_sidebar()}</span>
 </Button>

@@ -8,6 +8,7 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { useSidebar } from '$lib/components/ui/sidebar/index.js';
+	import { m } from '$lib/paraglide/messages.js';
 
 	const sidebar = useSidebar();
 	const auth = getAuthContext();
@@ -75,13 +76,13 @@
 				<DropdownMenu.Group>
 					<DropdownMenu.Item>
 						<SettingsIcon />
-						Settings
+						{m.user_settings()}
 					</DropdownMenu.Item>
 				</DropdownMenu.Group>
 				<DropdownMenu.Separator />
 				<DropdownMenu.Item onclick={handleLogout}>
 					<LogOutIcon />
-					Log out
+					{m.user_logout()}
 				</DropdownMenu.Item>
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>

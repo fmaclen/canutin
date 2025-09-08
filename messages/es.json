@@ -29,5 +29,10 @@
 	"sidebar_trends": "Tendencias",
 	"sidebar_assets": "Activos",
 	"sidebar_accounts": "Cuentas",
-	"sidebar_transactions": "Transacciones"
+	"sidebar_transactions": "Transacciones",
+	"auth_signup_success": "Tu cuenta ha sido creada, ahora puedes iniciar sesión",
+	"ui_toggle_sidebar": "Alternar barra lateral",
+	"ui_close": "Cerrar",
+	"user_settings": "Configuración",
+	"user_logout": "Cerrar sesión"
 }

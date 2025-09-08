@@ -29,5 +29,10 @@
 	"sidebar_trends": "Trends",
 	"sidebar_assets": "Assets",
 	"sidebar_accounts": "Accounts",
-	"sidebar_transactions": "Transactions"
+	"sidebar_transactions": "Transactions",
+	"auth_signup_success": "Your account has been created, you can now log in",
+	"ui_toggle_sidebar": "Toggle Sidebar",
+	"ui_close": "Close",
+	"user_settings": "Settings",
+	"user_logout": "Log out"
 }
