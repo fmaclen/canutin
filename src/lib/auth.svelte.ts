@@ -3,6 +3,7 @@ import { getContext, setContext } from 'svelte';
 
 export class AuthContext {
 	currentUser: BaseAuthStore | null = $state(null);
+	auth: { token: string; record: any } | null = $state(null);
 	isLoading: boolean = $state(false);
 	error: string | null = $state(null);
 
@@ -10,6 +11,12 @@ export class AuthContext {
 
 	constructor(pb: PocketBase) {
 		this._pb = pb;
+		this.currentUser = pb.authStore;
+		this.auth = pb.authStore.record ? { token: pb.authStore.token, record: pb.authStore.record } : null;
+		pb.authStore.onChange((token, record) => {
+			this.auth = record ? { token, record } : null;
+		});
+		this.isLoading = false;
 	}
 
 	async login(email: string, password: string) {
@@ -18,9 +25,12 @@ export class AuthContext {
 		try {
 			await this._pb.collection('users').authWithPassword(email, password);
 			this.currentUser = this._pb.authStore;
+			this.auth = this._pb.authStore.record
+				? { token: this._pb.authStore.token, record: this._pb.authStore.record }
+				: null;
 			return { success: true } as const;
 		} catch (e: any) {
-			const message = e?.response?.message || e?.message || 'Login failed'; // FIXME: localize errors
+			const message = e?.response?.message || e?.message || 'Login failed';
 			this.error = message;
 			return { success: false, error: message } as const;
 		} finally {
@@ -34,9 +44,12 @@ export class AuthContext {
 		try {
 			await this._pb.collection('users').create({ email, password, passwordConfirm });
 			this.currentUser = this._pb.authStore;
+			this.auth = this._pb.authStore.record
+				? { token: this._pb.authStore.token, record: this._pb.authStore.record }
+				: null;
 			return { success: true } as const;
 		} catch (e: any) {
-			const message = e?.response?.message || e?.message || 'Sign up failed'; // FIXME: localize errors
+			const message = e?.response?.message || e?.message || 'Sign up failed';
 			this.error = message;
 			return { success: false, error: message } as const;
 		} finally {
@@ -50,6 +63,7 @@ export class AuthContext {
 			this._pb.authStore.clear();
 		} finally {
 			this.currentUser = null;
+			this.auth = null;
 		}
 	}
 }

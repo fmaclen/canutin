@@ -140,7 +140,6 @@
 
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 
-	import NavMain from './nav-main.svelte';
 	import NavProjects from './nav-projects.svelte';
 	import NavUser from './nav-user.svelte';
 
@@ -173,6 +172,6 @@
 		<NavProjects projects={data.projects} />
 	</Sidebar.Content>
 	<Sidebar.Footer>
-		<NavUser user={data.user} />
+		<NavUser />
 	</Sidebar.Footer>
 </Sidebar.Root>
