@@ -1,10 +1,7 @@
 <script lang="ts">
-	import BadgeCheckIcon from '@lucide/svelte/icons/badge-check';
-	import BellIcon from '@lucide/svelte/icons/bell';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
-	import CreditCardIcon from '@lucide/svelte/icons/credit-card';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
-	import SparklesIcon from '@lucide/svelte/icons/sparkles';
+	import SettingsIcon from '@lucide/svelte/icons/settings';
 
 	import { getAuthContext } from '$lib/auth.svelte';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
@@ -51,7 +48,6 @@
 						</Avatar.Root>
 						<div class="grid flex-1 text-left text-sm leading-tight">
 							<span class="truncate font-medium">{name}</span>
-							<span class="truncate text-xs">{email}</span>
 						</div>
 						<ChevronsUpDownIcon class="ml-auto size-4" />
 					</Sidebar.MenuButton>
@@ -78,23 +74,8 @@
 				<DropdownMenu.Separator />
 				<DropdownMenu.Group>
 					<DropdownMenu.Item>
-						<SparklesIcon />
-						Upgrade to Pro
-					</DropdownMenu.Item>
-				</DropdownMenu.Group>
-				<DropdownMenu.Separator />
-				<DropdownMenu.Group>
-					<DropdownMenu.Item>
-						<BadgeCheckIcon />
-						Account
-					</DropdownMenu.Item>
-					<DropdownMenu.Item>
-						<CreditCardIcon />
-						Billing
-					</DropdownMenu.Item>
-					<DropdownMenu.Item>
-						<BellIcon />
-						Notifications
+						<SettingsIcon />
+						Settings
 					</DropdownMenu.Item>
 				</DropdownMenu.Group>
 				<DropdownMenu.Separator />

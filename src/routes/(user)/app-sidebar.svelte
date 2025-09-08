@@ -1,146 +1,57 @@
 <script lang="ts" module>
-	import BookOpenIcon from '@lucide/svelte/icons/book-open';
-	import BotIcon from '@lucide/svelte/icons/bot';
-	import ChartPieIcon from '@lucide/svelte/icons/chart-pie';
-	import FrameIcon from '@lucide/svelte/icons/frame';
-	import LifeBuoyIcon from '@lucide/svelte/icons/life-buoy';
-	import MapIcon from '@lucide/svelte/icons/map';
-	import SendIcon from '@lucide/svelte/icons/send';
-	import Settings2Icon from '@lucide/svelte/icons/settings-2';
-	import SquareTerminalIcon from '@lucide/svelte/icons/square-terminal';
+	import ArrowLeftRightIcon from '@lucide/svelte/icons/arrow-left-right';
+	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
+	import LandmarkIcon from '@lucide/svelte/icons/landmark';
+	import LayoutListIcon from '@lucide/svelte/icons/layout-list';
+	import PlusIcon from '@lucide/svelte/icons/plus';
+	import PresentationIcon from '@lucide/svelte/icons/presentation';
+	import WalletCardsIcon from '@lucide/svelte/icons/wallet-cards';
 
-	const data = {
-		user: {
-			name: 'shadcn',
-			email: 'm@example.com',
-			avatar: '/avatars/shadcn.jpg'
+	import CanutinIcon from '$lib/components/canutin-icon.svelte';
+
+	const insights = [
+		{
+			name: 'The big picture',
+			url: '/big-picture',
+			icon: PresentationIcon
 		},
-		navMain: [
-			{
-				title: 'Playground',
-				url: '/404',
-				icon: SquareTerminalIcon,
-				isActive: true,
-				items: [
-					{
-						title: 'History',
-						url: '#'
-					},
-					{
-						title: 'Starred',
-						url: '#'
-					},
-					{
-						title: 'Settings',
-						url: '#'
-					}
-				]
-			},
-			{
-				title: 'Models',
-				url: '#',
-				icon: BotIcon,
-				items: [
-					{
-						title: 'Genesis',
-						url: '#'
-					},
-					{
-						title: 'Explorer',
-						url: '#'
-					},
-					{
-						title: 'Quantum',
-						url: '#'
-					}
-				]
-			},
-			{
-				title: 'Documentation',
-				url: '#',
-				icon: BookOpenIcon,
-				items: [
-					{
-						title: 'Introduction',
-						url: '#'
-					},
-					{
-						title: 'Get Started',
-						url: '#'
-					},
-					{
-						title: 'Tutorials',
-						url: '#'
-					},
-					{
-						title: 'Changelog',
-						url: '#'
-					}
-				]
-			},
-			{
-				title: 'Settings',
-				url: '#',
-				icon: Settings2Icon,
-				items: [
-					{
-						title: 'General',
-						url: '#'
-					},
-					{
-						title: 'Team',
-						url: '#'
-					},
-					{
-						title: 'Billing',
-						url: '#'
-					},
-					{
-						title: 'Limits',
-						url: '#'
-					}
-				]
-			}
-		],
-		navSecondary: [
-			{
-				title: 'Support',
-				url: '#',
-				icon: LifeBuoyIcon
-			},
-			{
-				title: 'Feedback',
-				url: '#',
-				icon: SendIcon
-			}
-		],
-		projects: [
-			{
-				name: 'Design Engineering',
-				url: '/404',
-				icon: FrameIcon
-			},
-			{
-				name: 'Sales & Marketing',
-				url: '#',
-				icon: ChartPieIcon
-			},
-			{
-				name: 'Travel',
-				url: '#',
-				icon: MapIcon
-			}
-		]
-	};
+		{
+			name: 'Balance sheet',
+			url: '/balance-sheet',
+			icon: LayoutListIcon
+		},
+		{
+			name: 'Trends',
+			url: '/trends',
+			icon: ChartLineIcon
+		}
+	];
+
+	const dataSources = [
+		{
+			name: 'Assets',
+			url: '/assets',
+			icon: LandmarkIcon
+		},
+		{
+			name: 'Accounts',
+			url: '/accounts',
+			icon: WalletCardsIcon
+		},
+		{
+			name: 'Transactions',
+			url: '/transactions',
+			icon: ArrowLeftRightIcon
+		}
+	];
 </script>
 
 <script lang="ts">
-	import CommandIcon from '@lucide/svelte/icons/command';
 	import type { ComponentProps } from 'svelte';
 
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 
-	import NavProjects from './nav-projects.svelte';
+	import NavGroup from './nav-group.svelte';
 	import NavUser from './nav-user.svelte';
 
 	let { ref = $bindable(null), ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
@@ -154,13 +65,12 @@
 					{#snippet child({ props })}
 						<a href="##" {...props}>
 							<div
-								class="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg"
+								class="bg-brand text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded"
 							>
-								<CommandIcon class="size-4" />
+								<CanutinIcon class="size-4" />
 							</div>
 							<div class="grid flex-1 text-left text-sm leading-tight">
-								<span class="truncate font-medium">Acme Inc</span>
-								<span class="truncate text-xs">Enterprise</span>
+								<span class="truncate font-medium">Canutin</span>
 							</div>
 						</a>
 					{/snippet}
@@ -169,7 +79,8 @@
 		</Sidebar.Menu>
 	</Sidebar.Header>
 	<Sidebar.Content>
-		<NavProjects projects={data.projects} />
+		<NavGroup links={insights} label="Insights" />
+		<NavGroup links={dataSources} label="Data sources" />
 	</Sidebar.Content>
 	<Sidebar.Footer>
 		<NavUser />
