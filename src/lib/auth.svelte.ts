@@ -1,8 +1,8 @@
 import PocketBase, { BaseAuthStore } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
-import { m } from '$lib/paraglide/messages.js';
 
 import { env } from '$env/dynamic/public';
+import { m } from '$lib/paraglide/messages.js';
 
 export class AuthContext {
 	currentUser: BaseAuthStore | null = $state(null);

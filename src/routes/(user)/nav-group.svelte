@@ -24,10 +24,12 @@
 			<Sidebar.MenuItem>
 				<Sidebar.MenuButton>
 					{#snippet child({ props })}
+						<!-- eslint-disable svelte/no-navigation-without-resolve -->
 						<a href={item.url} {...props}>
 							<item.icon />
 							<span>{item.name}</span>
 						</a>
+						<!-- eslint-enable svelte/no-navigation-without-resolve -->
 					{/snippet}
 				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
