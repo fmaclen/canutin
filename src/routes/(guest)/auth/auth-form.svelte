@@ -1,4 +1,8 @@
 <script lang="ts">
+	import { toast } from 'svelte-sonner';
+
+	import { dev } from '$app/environment';
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { getAuthContext } from '$lib/auth.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -13,9 +17,9 @@
 
 	const auth = getAuthContext();
 
-	let email = $state('test@example.com');
-	let password = $state('123qweasdzxc');
-	let passwordConfirm = $state('123qweasdzxc');
+	let email = $state(dev ? 'test@example.com' : '');
+	let password = $state(dev ? '123qweasdzxc' : '');
+	let passwordConfirm = $state(dev ? '123qweasdzxc' : '');
 
 	const title = $derived(mode === 'signup' ? m.auth_signup_title() : m.auth_login_title());
 	const description = $derived(
@@ -35,14 +39,14 @@
 
 		if (auth.isLoading) return;
 		if (mode === 'signup') {
-			if (password !== passwordConfirm) {
-				return;
+			const result = await auth.signup(email, password, passwordConfirm);
+			if (result.success) {
+				toast.success('Your account has been created, you can now log in');
+				goto('/auth');
 			}
-			await auth.signup(email, password, passwordConfirm);
 		} else {
 			await auth.login(email, password);
 		}
-		// FIXME: redirect on success
 	}
 </script>
 
