@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 
-	import favicon from '$lib/assets/favicon.svg';
+	import favicon from '$lib/assets/favicon.png';
 	import { setAuthContext } from '$lib/auth.svelte';
 
 	import AuthGuard from './auth-guard.svelte';
@@ -13,6 +13,7 @@
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
+	<title>Canutin</title>
 </svelte:head>
 
 <AuthGuard>
