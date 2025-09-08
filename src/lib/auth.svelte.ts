@@ -1,30 +1,39 @@
-import PocketBase, { type RecordAuthResponse, type RecordModel } from 'pocketbase';
+import PocketBase, { BaseAuthStore } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 
 export class AuthContext {
-	authStore: RecordAuthResponse<RecordModel> | null = $state(null); // FIXME: migrate to PocketBase authStore shape if needed
+	currentUser: BaseAuthStore | null = $state(null);
 	isLoading: boolean = $state(false);
 	error: string | null = $state(null);
 
-	private _pb: PocketBase | null = null;
+	private _pb: PocketBase;
 
 	constructor(pb: PocketBase) {
 		this._pb = pb;
 	}
 
-	get isAuthenticated() {
-		return !!this.authStore; // FIXME: consider using this._pb?.authStore.isValid
+	async login(email: string, password: string) {
+		this.error = null;
+		this.isLoading = true;
+		try {
+			await this._pb.collection('users').authWithPassword(email, password);
+			this.currentUser = this._pb.authStore;
+			return { success: true } as const;
+		} catch (e: any) {
+			const message = e?.response?.message || e?.message || 'Login failed'; // FIXME: localize errors
+			this.error = message;
+			return { success: false, error: message } as const;
+		} finally {
+			this.isLoading = false;
+		}
 	}
-
-	async login(email: string, password: string) {}
 
 	async signup(email: string, password: string, passwordConfirm: string) {
 		this.error = null;
 		this.isLoading = true;
 		try {
-			await this._pb!.collection('users').create({ email, password, passwordConfirm }); // FIXME: configurable collection name
-			const auth = await this._pb!.collection('users').authWithPassword(email, password); // FIXME: configurable collection name
-			this.authStore = auth;
+			await this._pb.collection('users').create({ email, password, passwordConfirm });
+			this.currentUser = this._pb.authStore;
 			return { success: true } as const;
 		} catch (e: any) {
 			const message = e?.response?.message || e?.message || 'Sign up failed'; // FIXME: localize errors
@@ -35,7 +44,14 @@ export class AuthContext {
 		}
 	}
 
-	async logout() {}
+	async logout() {
+		this.error = null;
+		try {
+			this._pb.authStore.clear();
+		} finally {
+			this.currentUser = null;
+		}
+	}
 }
 
 const CONTEXT_KEY = 'auth-store';
