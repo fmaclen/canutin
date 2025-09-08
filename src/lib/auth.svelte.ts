@@ -5,7 +5,7 @@ import { env } from '$env/dynamic/public';
 
 export class AuthContext {
 	currentUser: BaseAuthStore | null = $state(null);
-	isLoading: boolean = $state(false);
+	isLoading: boolean = $state(true);
 	error: string | null = $state(null);
 
 	private _pb: PocketBase;
