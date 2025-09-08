@@ -1,4 +1,4 @@
-import PocketBase, { BaseAuthStore } from 'pocketbase';
+import PocketBase, { type BaseAuthStore } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 
 import { env } from '$env/dynamic/public';
