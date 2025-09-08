@@ -15,10 +15,19 @@
 	const sidebar = useSidebar();
 	const auth = getAuthContext();
 
-	const record = $derived(auth.auth?.record);
+	const record = $derived(auth.currentUser?.record);
 	const name: string = $derived(record?.name || (record?.email?.split('@')[0] ?? ''));
 	const email: string = $derived(record?.email || '');
-	const initials = $derived(name ? name.split(' ').map((s) => s[0]).join('').slice(0, 2).toUpperCase() : 'U');
+	const initials = $derived(
+		name
+			? name
+					.split(' ')
+					.map((s) => s[0])
+					.join('')
+					.slice(0, 2)
+					.toUpperCase()
+			: 'U'
+	);
 	const avatarUrl = $derived(record?.avatar ? record.avatar : '');
 
 	async function handleLogout() {
@@ -89,7 +98,7 @@
 					</DropdownMenu.Item>
 				</DropdownMenu.Group>
 				<DropdownMenu.Separator />
-				<DropdownMenu.Item on:click={handleLogout}>
+				<DropdownMenu.Item onclick={handleLogout}>
 					<LogOutIcon />
 					Log out
 				</DropdownMenu.Item>

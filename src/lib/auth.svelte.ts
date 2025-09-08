@@ -1,21 +1,18 @@
 import PocketBase, { BaseAuthStore } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 
+import { env } from '$env/dynamic/public';
+
 export class AuthContext {
 	currentUser: BaseAuthStore | null = $state(null);
-	auth: { token: string; record: any } | null = $state(null);
 	isLoading: boolean = $state(false);
 	error: string | null = $state(null);
 
 	private _pb: PocketBase;
 
-	constructor(pb: PocketBase) {
-		this._pb = pb;
-		this.currentUser = pb.authStore;
-		this.auth = pb.authStore.record ? { token: pb.authStore.token, record: pb.authStore.record } : null;
-		pb.authStore.onChange((token, record) => {
-			this.auth = record ? { token, record } : null;
-		});
+	constructor() {
+		this._pb = new PocketBase(env.PUBLIC_PB_URL || 'http://127.0.0.1:42070');
+		this.currentUser = this._pb.authStore;
 		this.isLoading = false;
 	}
 
@@ -25,9 +22,6 @@ export class AuthContext {
 		try {
 			await this._pb.collection('users').authWithPassword(email, password);
 			this.currentUser = this._pb.authStore;
-			this.auth = this._pb.authStore.record
-				? { token: this._pb.authStore.token, record: this._pb.authStore.record }
-				: null;
 			return { success: true } as const;
 		} catch (e: any) {
 			const message = e?.response?.message || e?.message || 'Login failed';
@@ -44,9 +38,9 @@ export class AuthContext {
 		try {
 			await this._pb.collection('users').create({ email, password, passwordConfirm });
 			this.currentUser = this._pb.authStore;
-			this.auth = this._pb.authStore.record
-				? { token: this._pb.authStore.token, record: this._pb.authStore.record }
-				: null;
+			console.warn("signup this.currentUser", this.currentUser);
+			console.warn("signup this.currentUser.record", this.currentUser.record);
+			console.warn("signup this.currentUser.record.isValid", this.currentUser.isValid);
 			return { success: true } as const;
 		} catch (e: any) {
 			const message = e?.response?.message || e?.message || 'Sign up failed';
@@ -63,15 +57,14 @@ export class AuthContext {
 			this._pb.authStore.clear();
 		} finally {
 			this.currentUser = null;
-			this.auth = null;
 		}
 	}
 }
 
 const CONTEXT_KEY = 'auth-store';
 
-export function setAuthContext(pb: PocketBase) {
-	const store = new AuthContext(pb);
+export function setAuthContext() {
+	const store = new AuthContext();
 	setContext(CONTEXT_KEY, store);
 	return store;
 }

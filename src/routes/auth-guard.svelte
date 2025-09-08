@@ -7,11 +7,9 @@
 
 	const auth = getAuthContext();
 
-  const isAuthed = $derived(!!auth.auth?.record);
-
 	$effect(() => {
 		if (auth.isLoading) return;
-		if (isAuthed) goto(resolve('/big-picture'));
+		if (auth.currentUser?.isValid) goto(resolve('/big-picture'));
 		else goto(resolve('/auth'));
 	});
 </script>
