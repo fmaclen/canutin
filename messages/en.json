@@ -19,5 +19,15 @@
 	"auth_alt_no_account": "Don't have an account?",
 	"auth_link_login": "Login",
 	"auth_link_signup": "Sign up",
-	"auth_forgot_password": "Forgot your password?"
+	"auth_forgot_password": "Forgot your password?",
+	"auth_login_failed": "Login failed",
+	"auth_signup_failed": "Sign up failed",
+	"sidebar_insights": "Insights",
+	"sidebar_data_sources": "Data sources",
+	"sidebar_big_picture": "The big picture",
+	"sidebar_balance_sheet": "Balance sheet",
+	"sidebar_trends": "Trends",
+	"sidebar_assets": "Assets",
+	"sidebar_accounts": "Accounts",
+	"sidebar_transactions": "Transactions"
 }

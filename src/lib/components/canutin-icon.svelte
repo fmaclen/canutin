@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { cn } from "$lib/utils";
+	import { cn } from '$lib/utils';
 
 	let {
-    class: className,
+		class: className,
 		fill = 'white'
 	}: {
-    class: string
+		class: string;
 		fill?: 'white' | 'black' | 'brand';
 	} = $props();
 </script>

@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { getAuthContext } from '$lib/auth.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { getAuthContext } from '$lib/auth.svelte';
 
-  let { children } = $props();
+	let { children } = $props();
 
 	const auth = getAuthContext();
 

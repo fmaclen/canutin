@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Component } from 'svelte';
 
+	import type { ResolvedPathname } from '$app/types';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 
 	let {
@@ -10,7 +11,7 @@
 		label: string;
 		links: {
 			name: string;
-			url: string; // FIXME: should be type of resolve
+			url: ResolvedPathname;
 			icon: Component;
 		}[];
 	} = $props();

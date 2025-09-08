@@ -19,5 +19,15 @@
 	"auth_alt_no_account": "¿No tienes una cuenta?",
 	"auth_link_login": "Iniciar sesión",
 	"auth_link_signup": "Regístrate",
-	"auth_forgot_password": "¿Olvidaste tu contraseña?"
+	"auth_forgot_password": "¿Olvidaste tu contraseña?",
+	"auth_login_failed": "Error al iniciar sesión",
+	"auth_signup_failed": "Error al crear la cuenta",
+	"sidebar_insights": "Perspectivas",
+	"sidebar_data_sources": "Fuentes de datos",
+	"sidebar_big_picture": "Panorama",
+	"sidebar_balance_sheet": "Balances",
+	"sidebar_trends": "Tendencias",
+	"sidebar_assets": "Activos",
+	"sidebar_accounts": "Cuentas",
+	"sidebar_transactions": "Transacciones"
 }

@@ -1,5 +1,6 @@
 import PocketBase, { BaseAuthStore } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
+import { m } from '$lib/paraglide/messages.js';
 
 import { env } from '$env/dynamic/public';
 
@@ -16,6 +17,17 @@ export class AuthContext {
 		this.isLoading = false;
 	}
 
+	private getErrorMessage(err: unknown, fallback: string): string {
+		if (typeof err === 'string') return err;
+		if (err && typeof err === 'object') {
+			const maybe = err as { message?: unknown; response?: { message?: unknown } };
+			if (maybe.response && typeof maybe.response.message === 'string')
+				return maybe.response.message;
+			if (typeof maybe.message === 'string') return maybe.message;
+		}
+		return fallback;
+	}
+
 	async login(email: string, password: string) {
 		this.error = null;
 		this.isLoading = true;
@@ -23,10 +35,9 @@ export class AuthContext {
 			await this._pb.collection('users').authWithPassword(email, password);
 			this.currentUser = this._pb.authStore;
 			return { success: true } as const;
-		} catch (e: any) {
-			const message = e?.response?.message || e?.message || 'Login failed';
-			this.error = message;
-			return { success: false, error: message } as const;
+		} catch (e: unknown) {
+			this.error = this.getErrorMessage(e, m.auth_login_failed());
+			return { success: false, error: this.error } as const;
 		} finally {
 			this.isLoading = false;
 		}
@@ -38,14 +49,10 @@ export class AuthContext {
 		try {
 			await this._pb.collection('users').create({ email, password, passwordConfirm });
 			this.currentUser = this._pb.authStore;
-			console.warn("signup this.currentUser", this.currentUser);
-			console.warn("signup this.currentUser.record", this.currentUser.record);
-			console.warn("signup this.currentUser.record.isValid", this.currentUser.isValid);
 			return { success: true } as const;
-		} catch (e: any) {
-			const message = e?.response?.message || e?.message || 'Sign up failed';
-			this.error = message;
-			return { success: false, error: message } as const;
+		} catch (e: unknown) {
+			this.error = this.getErrorMessage(e, m.auth_signup_failed());
+			return { success: false, error: this.error } as const;
 		} finally {
 			this.isLoading = false;
 		}
