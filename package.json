@@ -14,7 +14,7 @@
 		"lint": "prettier --check . && eslint .",
 		"test": "playwright test",
 		"quality": "bun run format && bun run lint && bun run check",
-		"pb": "bun scripts/server.ts",
+		"pb": "bun scripts/pb-server.ts",
 		"pb:import": "bun scripts/pb-import.ts",
 		"pb:reset": "bun scripts/pb-reset.ts"
 	},
