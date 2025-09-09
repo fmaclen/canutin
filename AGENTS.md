@@ -8,17 +8,22 @@
 - `scripts/` — Dev utilities (e.g., `scripts/server.ts` for PocketBase).
 - `pocketbase/` — Downloaded runtime assets created by the PocketBase script.
 
-## Build, Test, and Development Commands
+## Commands
 
-- `bun run dev` — Start Vite dev server.
-- `bun run build` — Production build via Vite/SvelteKit.
-- `bun run preview` — Preview the built app.
-- `bun run check` — Type-check with `svelte-check`.
-- `bun run lint` — Prettier check + ESLint.
-- `bun run format` — Auto-format with Prettier.
-- `bun run quality` — Format, lint, and type-check.
-- `bun run test` — Run Playwright e2e tests.
-- `bun run pb` — Ensure and start PocketBase locally.
+| Command                                     | Description                                    |
+| ------------------------------------------- | ---------------------------------------------- |
+| `bun run dev`                               | Start Vite dev server                          |
+| `bun run build`                             | Production build via Vite/SvelteKit            |
+| `bun run preview`                           | Preview the built app                          |
+| `bun run check`                             | Type-check with svelte-check                   |
+| `bun run check:watch`                       | Type-check in watch mode                       |
+| `bun run lint`                              | Prettier check + ESLint                        |
+| `bun run format`                            | Auto-format with Prettier                      |
+| `bun run quality`                           | Format, lint, and type-check                   |
+| `bun run test`                              | Run Playwright e2e tests                       |
+| `bun run pb`                                | Ensure and start PocketBase locally (dev)      |
+| `bun run pb:import temp/Canutin.demo.vault` | Import Canutin v1 vault into PocketBase dev DB |
+| `bun run pb:reset`                          | Reset (delete) the PocketBase dev database     |
 
 ## Coding Style & Naming Conventions
 
@@ -45,3 +50,10 @@
 
 - PocketBase dev defaults: `PB_HOST=127.0.0.1`, `PB_PORT=42070`, superuser from `PB_SUPERUSER_EMAIL`/`PB_SUPERUSER_PASSWORD` (see `scripts/server.ts`).
 - Do not commit secrets. Use environment variables for local overrides.
+
+## Data Import (for agents)
+
+- Start PB in another terminal: `bun run pb`.
+- Import: `bun run pb:import <path-to-old>.vault` (e.g., `temp/Canutin.demo.vault`).
+- Creates accounts/assets/balances/transactions; upserts balanceTypes and transactionLabels only when referenced.
+- Intended for dev; use `bun run pb:reset` to reset.

@@ -3,7 +3,7 @@
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
-  "scripts": {
+	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
@@ -15,7 +15,8 @@
 		"test": "playwright test",
 		"quality": "bun run format && bun run lint && bun run check",
 		"pb": "bun scripts/server.ts",
-		"pb:import": "bun scripts/pb-import.ts"
+		"pb:import": "bun scripts/pb-import.ts",
+		"pb:reset": "bun scripts/pb-reset.ts"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^1.2.5",
@@ -30,6 +31,7 @@
 		"@sveltejs/vite-plugin-svelte": "^6.0.0",
 		"@tailwindcss/vite": "^4.0.0",
 		"@tanstack/table-core": "^8.20.5",
+		"@types/bun": "^1.2.21",
 		"@types/node": "^22.9.0",
 		"bits-ui": "^2.8.6",
 		"clsx": "^2.1.1",
