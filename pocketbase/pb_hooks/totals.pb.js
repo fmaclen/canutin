@@ -132,6 +132,3 @@ routerAdd(
   },
   $apis.requireAuth()
 );
-
-// Debug endpoint: inspect an account's balances and transactions
-// (removed) debug endpoint
