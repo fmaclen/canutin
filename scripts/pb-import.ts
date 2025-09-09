@@ -52,14 +52,19 @@ function toISODate(d: unknown): string | undefined {
 	if (!d) return undefined;
 	// handle values like '2021-03-01 00:00:00' or ISO strings
 	try {
-		const s = String(d);
-		// If it looks like a date only, let PB accept as date (yyyy-mm-dd)
-		if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-		const iso = new Date(s).toISOString();
+		const s = String(d).trim();
+		if (!s) return undefined;
+		// Normalize to RFC3339 with milliseconds and Z
+		if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return `${s} 00:00:00.000Z`;
+		const iso = new Date(s).toISOString().replace('T', ' ').replace('Z', 'Z');
 		return iso;
 	} catch {
 		return undefined;
 	}
+}
+
+function normalizeDateOr(primary: unknown, fallback?: unknown): string | undefined {
+	return toISODate(primary) ?? toISODate(fallback ?? '') ?? undefined;
 }
 
 async function main() {
@@ -227,11 +232,12 @@ async function main() {
 		isPending: number;
 		categoryId: number | null;
 		accountId: number;
+		createdAt?: string;
 		updatedAt?: string;
 	};
 	const transactions = db
 		.query(
-			'SELECT id,description,date,value,isExcluded,isPending,categoryId,accountId,updatedAt FROM "Transaction" ORDER BY id'
+			'SELECT id,description,date,value,isExcluded,isPending,categoryId,accountId,createdAt,updatedAt FROM "Transaction" ORDER BY id'
 		)
 		.all() as TxRow[];
 
@@ -244,18 +250,50 @@ async function main() {
 	const pbAssetIdByOldId = new Map<number, string>();
 
 	for (const a of accounts) {
+		const autoDate = a.isAutoCalculated
+			? (normalizeDateOr(a.updatedAt, a.createdAt) ?? toISODate(new Date().toISOString()))
+			: undefined;
+
 		const data: Record<string, unknown> = {
 			name: a.name,
 			institution: a.institution ?? undefined,
 			balanceGroup: mapBalanceGroup(a.balanceGroup),
-			closed: a.isClosed ? toISODate(a.updatedAt) : undefined,
-			autoCalculated: a.isAutoCalculated ? toISODate(a.updatedAt) : undefined,
-			excluded: a.isExcludedFromNetWorth ? toISODate(a.updatedAt) : undefined
+			closed: a.isClosed ? normalizeDateOr(a.updatedAt, a.createdAt) : undefined,
+			// For auto-calculated accounts, ensure a truthy RFC date even if updatedAt is null
+			autoCalculated: autoDate,
+			excluded: a.isExcludedFromNetWorth ? normalizeDateOr(a.updatedAt, a.createdAt) : undefined,
+			created: toISODate(a.createdAt),
+			updated: toISODate(a.updatedAt)
 		};
+
+		// BalanceType in PB is used to indicate computation mode such as "Auto-calculated".
+		// If the legacy account is marked auto-calculated, set BalanceType to "Auto-calculated".
+		// Otherwise, fallback to the legacy account type name if present.
 		const typeName = a.accountTypeId ? accountTypeNameById.get(a.accountTypeId) : undefined;
-		if (typeName) data.balanceType = await upsertBalanceType(typeName);
+		if (a.isAutoCalculated) {
+			data.balanceType = await upsertBalanceType('Auto-calculated');
+		} else if (typeName) {
+			data.balanceType = await upsertBalanceType(typeName);
+		}
+
+		// Debug log to verify mapping
+		log(
+			`[account] name='${a.name}' isAuto=${!!a.isAutoCalculated} autoDate='${autoDate ?? ''}' closed='${data.closed ?? ''}' excluded='${data.excluded ?? ''}' type='${typeName ?? ''}' balanceType='${(data.balanceType as string) ?? ''}'`
+		);
 
 		const created = await pb.collection('accounts').create(data);
+
+		// Verify persisted fields for auto-calculated accounts
+		if (a.isAutoCalculated) {
+			try {
+				const saved = await pb.collection('accounts').getOne(created.id);
+				log(
+					`[account:saved] name='${saved.name}' created='${(saved as any).created ?? ''}' updated='${(saved as any).updated ?? ''}' autoCalculated='${(saved as any).autoCalculated ?? ''}' balanceType='${(saved as any).balanceType ?? ''}'`
+				);
+			} catch (e) {
+				error(`[account:saved] fetch failed for ${a.name}: ${(e as Error).message}`);
+			}
+		}
 		pbAccountIdByOldId.set(a.id, created.id);
 	}
 
@@ -265,7 +303,9 @@ async function main() {
 			symbol: a.symbol ?? undefined,
 			balanceGroup: mapBalanceGroup(a.balanceGroup),
 			sold: a.isSold ? toISODate(a.updatedAt) : undefined,
-			excluded: a.isExcludedFromNetWorth ? toISODate(a.updatedAt) : undefined
+			excluded: a.isExcludedFromNetWorth ? toISODate(a.updatedAt) : undefined,
+			created: toISODate(a.createdAt),
+			updated: toISODate(a.updatedAt)
 		};
 		const typeName = a.assetTypeId ? assetTypeNameById.get(a.assetTypeId) : undefined;
 		if (typeName) data.balanceType = await upsertBalanceType(typeName);
@@ -279,7 +319,9 @@ async function main() {
 	for (const s of accountBalances) {
 		const pbAccountId = pbAccountIdByOldId.get(s.accountId);
 		if (!pbAccountId) continue;
-		const bal = await pb.collection('accountBalances').create({ value: s.value });
+		const bal = await pb
+			.collection('accountBalances')
+			.create({ value: s.value, created: toISODate(s.createdAt), updated: toISODate(s.updatedAt) });
 		const list = balancesByPbAccountId.get(pbAccountId) || [];
 		list.push(bal.id);
 		balancesByPbAccountId.set(pbAccountId, list);
@@ -289,9 +331,13 @@ async function main() {
 	for (const s of assetBalances) {
 		const pbAssetId = pbAssetIdByOldId.get(s.assetId);
 		if (!pbAssetId) continue;
-		const bal = await pb
-			.collection('assetBalances')
-			.create({ value: s.value, quantity: s.quantity ?? undefined, cost: s.cost ?? undefined });
+		const bal = await pb.collection('assetBalances').create({
+			value: s.value,
+			quantity: s.quantity ?? undefined,
+			cost: s.cost ?? undefined,
+			created: toISODate(s.createdAt),
+			updated: toISODate(s.updatedAt)
+		});
 		const list = balancesByPbAssetId.get(pbAssetId) || [];
 		list.push(bal.id);
 		balancesByPbAssetId.set(pbAssetId, list);
@@ -314,15 +360,29 @@ async function main() {
 			}
 		}
 
+		const exDate = t.isExcluded
+			? (normalizeDateOr(t.updatedAt, t.date) ?? toISODate(new Date().toISOString()))
+			: undefined;
+		const pendDate = t.isPending
+			? (normalizeDateOr(t.updatedAt, t.date) ?? toISODate(new Date().toISOString()))
+			: undefined;
+
 		const data: Record<string, unknown> = {
 			description: t.description,
 			date: toISODate(t.date),
 			value: t.value,
-			excluded: t.isExcluded ? toISODate(t.updatedAt) : undefined,
-			pending: t.isPending ? toISODate(t.updatedAt) : undefined,
+			excluded: exDate,
+			pending: pendDate,
+			created: toISODate(t.createdAt ?? t.date),
+			updated: toISODate(t.updatedAt ?? t.date),
 			labels
 		};
 		const created = await pb.collection('transactions').create(data);
+		if (exDate || pendDate) {
+			log(
+				`[tx] id=${t.id} acct=${t.accountId} date='${data.date}' value=${t.value} excluded='${exDate ?? ''}' pending='${pendDate ?? ''}'`
+			);
+		}
 		const list = txIdsByPbAccountId.get(pbAccountId) || [];
 		list.push(created.id);
 		txIdsByPbAccountId.set(pbAccountId, list);
