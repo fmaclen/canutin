@@ -15,7 +15,8 @@ export enum Collections {
 	Accounts = "accounts",
 	AssetBalances = "assetBalances",
 	Assets = "assets",
-	Labels = "labels",
+	BalanceTypes = "balanceTypes",
+	TransactionLabels = "transactionLabels",
 	Transactions = "transactions",
 	Users = "users",
 }
@@ -112,6 +113,7 @@ export enum AccountsBalanceGroupOptions {
 export type AccountsRecord = {
 	autoCalculated?: IsoDateString
 	balanceGroup: AccountsBalanceGroupOptions
+	balanceType?: RecordIdString
 	balances?: RecordIdString[]
 	closed?: IsoDateString
 	created?: IsoDateString
@@ -140,6 +142,7 @@ export enum AssetsBalanceGroupOptions {
 }
 export type AssetsRecord = {
 	balanceGroup: AssetsBalanceGroupOptions
+	balanceType?: RecordIdString
 	balances?: RecordIdString[]
 	created?: IsoDateString
 	excluded?: IsoDateString
@@ -150,7 +153,14 @@ export type AssetsRecord = {
 	updated?: IsoDateString
 }
 
-export type LabelsRecord = {
+export type BalanceTypesRecord = {
+	created?: IsoDateString
+	id: string
+	name?: string
+	updated?: IsoDateString
+}
+
+export type TransactionLabelsRecord = {
 	created?: IsoDateString
 	id: string
 	name: string
@@ -192,7 +202,8 @@ export type AccountBalancesResponse<Texpand = unknown> = Required<AccountBalance
 export type AccountsResponse<Texpand = unknown> = Required<AccountsRecord> & BaseSystemFields<Texpand>
 export type AssetBalancesResponse<Texpand = unknown> = Required<AssetBalancesRecord> & BaseSystemFields<Texpand>
 export type AssetsResponse<Texpand = unknown> = Required<AssetsRecord> & BaseSystemFields<Texpand>
-export type LabelsResponse<Texpand = unknown> = Required<LabelsRecord> & BaseSystemFields<Texpand>
+export type BalanceTypesResponse<Texpand = unknown> = Required<BalanceTypesRecord> & BaseSystemFields<Texpand>
+export type TransactionLabelsResponse<Texpand = unknown> = Required<TransactionLabelsRecord> & BaseSystemFields<Texpand>
 export type TransactionsResponse<Texpand = unknown> = Required<TransactionsRecord> & BaseSystemFields<Texpand>
 export type UsersResponse<Texpand = unknown> = Required<UsersRecord> & AuthSystemFields<Texpand>
 
@@ -208,7 +219,8 @@ export type CollectionRecords = {
 	accounts: AccountsRecord
 	assetBalances: AssetBalancesRecord
 	assets: AssetsRecord
-	labels: LabelsRecord
+	balanceTypes: BalanceTypesRecord
+	transactionLabels: TransactionLabelsRecord
 	transactions: TransactionsRecord
 	users: UsersRecord
 }
@@ -223,7 +235,8 @@ export type CollectionResponses = {
 	accounts: AccountsResponse
 	assetBalances: AssetBalancesResponse
 	assets: AssetsResponse
-	labels: LabelsResponse
+	balanceTypes: BalanceTypesResponse
+	transactionLabels: TransactionLabelsResponse
 	transactions: TransactionsResponse
 	users: UsersResponse
 }
@@ -241,7 +254,8 @@ export type TypedPocketBase = PocketBase & {
 	collection(idOrName: 'accounts'): RecordService<AccountsResponse>
 	collection(idOrName: 'assetBalances'): RecordService<AssetBalancesResponse>
 	collection(idOrName: 'assets'): RecordService<AssetsResponse>
-	collection(idOrName: 'labels'): RecordService<LabelsResponse>
+	collection(idOrName: 'balanceTypes'): RecordService<BalanceTypesResponse>
+	collection(idOrName: 'transactionLabels'): RecordService<TransactionLabelsResponse>
 	collection(idOrName: 'transactions'): RecordService<TransactionsResponse>
 	collection(idOrName: 'users'): RecordService<UsersResponse>
 }
