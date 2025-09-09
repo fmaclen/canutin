@@ -1,21 +1,8 @@
-/*
-  Import old Prisma SQLite vault into current PocketBase schema.
-
-  Usage:
-    bun pb:import /absolute/or/relative/path/to/file.vault
-
-  Dev defaults (edit here if needed):
-    host: 127.0.0.1
-    port: 42070
-    superuser: superadmin@example.com / 123qweasdzxc
-*/
-
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Database } from 'bun:sqlite';
 import PocketBase from 'pocketbase';
 
-// PocketBase dev connection (adjust if needed)
 const PB_HOST = '127.0.0.1';
 const PB_PORT = 42070;
 const PB_SUPERUSER_EMAIL = 'superadmin@example.com';
@@ -148,9 +135,6 @@ async function main() {
 		`Found: ${accountTypes.length} AccountType, ${assetTypes.length} AssetType, ${txGroups.length} Tx Groups, ${txCategories.length} Tx Categories`
 	);
 
-	// No bulk upserts: create only the types/labels that are actually used
-
-	// Build quick lookup maps
 	const accountTypeNameById = new Map<number, string>(accountTypes.map((r) => [r.id, r.name]));
 	const assetTypeNameById = new Map<number, string>(assetTypes.map((r) => [r.id, r.name]));
 	const txGroupNameById = new Map<number, string>(txGroups.map((r) => [r.id, r.name]));
@@ -159,7 +143,6 @@ async function main() {
 		txCategories.map((r) => [r.id, r.transactionCategoryId])
 	);
 
-	// Load main entities
 	type AccountRow = {
 		id: number;
 		name: string;
@@ -276,24 +259,7 @@ async function main() {
 			data.balanceType = await upsertBalanceType(typeName);
 		}
 
-		// Debug log to verify mapping
-		log(
-			`[account] name='${a.name}' isAuto=${!!a.isAutoCalculated} autoDate='${autoDate ?? ''}' closed='${data.closed ?? ''}' excluded='${data.excluded ?? ''}' type='${typeName ?? ''}' balanceType='${(data.balanceType as string) ?? ''}'`
-		);
-
 		const created = await pb.collection('accounts').create(data);
-
-		// Verify persisted fields for auto-calculated accounts
-		if (a.isAutoCalculated) {
-			try {
-				const saved = await pb.collection('accounts').getOne(created.id);
-				log(
-					`[account:saved] name='${saved.name}' created='${(saved as any).created ?? ''}' updated='${(saved as any).updated ?? ''}' autoCalculated='${(saved as any).autoCalculated ?? ''}' balanceType='${(saved as any).balanceType ?? ''}'`
-				);
-			} catch (e) {
-				error(`[account:saved] fetch failed for ${a.name}: ${(e as Error).message}`);
-			}
-		}
 		pbAccountIdByOldId.set(a.id, created.id);
 	}
 
@@ -378,11 +344,6 @@ async function main() {
 			labels
 		};
 		const created = await pb.collection('transactions').create(data);
-		if (exDate || pendDate) {
-			log(
-				`[tx] id=${t.id} acct=${t.accountId} date='${data.date}' value=${t.value} excluded='${exDate ?? ''}' pending='${pendDate ?? ''}'`
-			);
-		}
 		const list = txIdsByPbAccountId.get(pbAccountId) || [];
 		list.push(created.id);
 		txIdsByPbAccountId.set(pbAccountId, list);
