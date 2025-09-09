@@ -1,7 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-
-	import { getAuthContext } from '$lib/auth.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import Checkbox from '$lib/components/ui/checkbox/checkbox.svelte';
 	import Label from '$lib/components/ui/label/label.svelte';
@@ -27,23 +24,6 @@
 			maximumFractionDigits: 0
 		}).format(n ?? 0);
 	}
-
-	onMount(async () => {
-		try {
-			const auth = getAuthContext();
-			if (!auth.currentUser?.isValid) return;
-			// Explicitly attach Authorization header to be safe
-			const token: string | undefined = auth.pb.authStore?.token;
-			const res = (await auth.pb.send('/api/totals', {
-				method: 'GET',
-				headers: token ? { Authorization: `Bearer ${token}` } : undefined
-			})) as TotalsResponse;
-			totals = res;
-		} catch (e) {
-			// Silently keep zeros; optionally log in dev
-			console.error('Failed to load totals', e);
-		}
-	});
 </script>
 
 <header class="flex h-16 shrink-0 items-center gap-2 border-b">
