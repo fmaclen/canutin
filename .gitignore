@@ -8,7 +8,10 @@ node_modules
 .wrangler
 /.svelte-kit
 /build
-pocketbase
+pocketbase/pb_data
+pocketbase/CHANGELOG.md
+pocketbase/LICENSE.md
+pocketbase/pocketbase
 
 # OS
 .DS_Store
