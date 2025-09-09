@@ -1,7 +1,7 @@
 // PocketBase setup and server launcher
 
 import { spawn, spawnSync } from 'node:child_process';
-import { createWriteStream, existsSync } from 'node:fs';
+import fscore, { createWriteStream, existsSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import https from 'node:https';
 import os from 'node:os';
@@ -12,6 +12,9 @@ const POCKETBASE_TAG = `v${POCKETBASE_VERSION}`; // GitHub release tag
 
 const projectRoot = process.cwd();
 const pbDir = path.join(projectRoot, 'pocketbase');
+const migrationsDir = path.join(pbDir, 'pb_migrations');
+const TYPEGEN_OUT = path.join(projectRoot, 'src', 'lib', 'pocketbase.types.ts');
+const DB_PATH = path.join(pbDir, 'pb_data', 'data.db');
 
 function log(msg: string) {
 	console.log(`[pocketbase] ${msg}`);
@@ -277,6 +280,101 @@ async function upsertSuperuser(binPath: string): Promise<void> {
 	}
 }
 
+function getTypegenBin(): string {
+	const bin = process.platform === 'win32' ? 'pocketbase-typegen.cmd' : 'pocketbase-typegen';
+	const candidate = path.join(projectRoot, 'node_modules', '.bin', bin);
+	if (!existsSync(candidate)) {
+		throw new Error(
+			'pocketbase-typegen binary not found. Ensure it is installed in devDependencies.'
+		);
+	}
+	return candidate;
+}
+
+function generateTypesFromServer(): number {
+	const typegen = getTypegenBin();
+	const host = process.env.PB_HOST || '127.0.0.1';
+	const port = Number(process.env.PB_PORT || 42070);
+	const baseUrl = `http://${host}:${port}`;
+	const email = process.env.PB_SUPERUSER_EMAIL || 'superadmin@example.com';
+	const password = process.env.PB_SUPERUSER_PASSWORD || '123qweasdzxc';
+
+	log(`Generating types from ${baseUrl} -> ${path.relative(projectRoot, TYPEGEN_OUT)}`);
+	const res = spawnSync(
+		typegen,
+		['--url', baseUrl, '--email', email, '--password', password, '--out', TYPEGEN_OUT],
+		{ stdio: 'inherit' }
+	);
+	return res.status ?? 1;
+}
+
+async function generateTypesWithRetry(retries = 20, delayMs = 750): Promise<void> {
+	for (let i = 0; i < retries; i++) {
+		const status = generateTypesFromServer();
+		if (status === 0) return;
+		await new Promise((r) => setTimeout(r, delayMs));
+	}
+	throw new Error('Failed to generate PocketBase types after multiple attempts.');
+}
+
+function watchMigrationsAndTypegen(): void {
+	if (!existsSync(migrationsDir)) {
+		log('No migrations directory found to watch for typegen updates.');
+		return;
+	}
+	log(`Watching migrations for schema changes: ${path.relative(projectRoot, migrationsDir)}`);
+	let timer: NodeJS.Timeout | null = null;
+	const debounce = () => {
+		if (timer) clearTimeout(timer);
+		timer = setTimeout(async () => {
+			try {
+				await generateTypesWithRetry(5, 500);
+			} catch (e) {
+				error(`Typegen on change failed: ${(e as Error).message}`);
+			}
+		}, 300);
+	};
+	try {
+		// Use non-recursive watch for portability; most changes are file writes/renames inside this dir.
+		fscore.watch(migrationsDir, { persistent: true }, () => {
+			debounce();
+		});
+	} catch (e) {
+		error(`Failed to watch migrations: ${(e as Error).message}`);
+	}
+}
+
+function watchDbAndTypegen(): void {
+	if (!existsSync(DB_PATH)) {
+		// DB may not exist on first run; skip quietly
+		return;
+	}
+	log(`Watching database for changes: ${path.relative(projectRoot, DB_PATH)}`);
+	let idleTimer: NodeJS.Timeout | null = null;
+	let lastRun = 0;
+	const minIntervalMs = 10_000; // avoid thrashing on active dev DB
+	const schedule = () => {
+		const now = Date.now();
+		if (now - lastRun < minIntervalMs) return; // too soon since last run
+		if (idleTimer) clearTimeout(idleTimer);
+		idleTimer = setTimeout(async () => {
+			lastRun = Date.now();
+			try {
+				await generateTypesWithRetry(5, 500);
+			} catch (e) {
+				error(`Typegen (db change) failed: ${(e as Error).message}`);
+			}
+		}, 1500);
+	};
+	try {
+		fscore.watch(DB_PATH, { persistent: true }, () => {
+			schedule();
+		});
+	} catch (e) {
+		error(`Failed to watch database file: ${(e as Error).message}`);
+	}
+}
+
 (async () => {
 	try {
 		// Helpful environment note
@@ -284,6 +382,18 @@ async function upsertSuperuser(binPath: string): Promise<void> {
 		const binPath = await ensurePocketBase();
 		await upsertSuperuser(binPath);
 		await startPocketBase(binPath);
+
+		// Kick off an initial type generation (retry until the HTTP server is ready)
+		try {
+			await generateTypesWithRetry();
+		} catch (e) {
+			error((e as Error).message);
+		}
+
+		// Watch migrations to keep types fresh during development
+		watchMigrationsAndTypegen();
+		// Also watch the local database for schema changes made via Admin UI
+		watchDbAndTypegen();
 	} catch (e) {
 		error((e as Error).message);
 		process.exit(1);
