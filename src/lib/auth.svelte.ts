@@ -17,6 +17,11 @@ export class AuthContext {
 		this.isLoading = false;
 	}
 
+	// Expose the PocketBase client for custom API calls
+	get pb(): PocketBase {
+		return this._pb;
+	}
+
 	private getErrorMessage(err: unknown, fallback: string): string {
 		if (typeof err === 'string') return err;
 		if (err && typeof err === 'object') {

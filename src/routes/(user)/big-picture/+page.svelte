@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+
+	import { getAuthContext } from '$lib/auth.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import Checkbox from '$lib/components/ui/checkbox/checkbox.svelte';
 	import Label from '$lib/components/ui/label/label.svelte';
@@ -6,6 +9,60 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import { m } from '$lib/paraglide/messages';
+
+	type TotalsResponse = {
+		totalsByGroup: Record<'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER', number>;
+		netWorth: number;
+	};
+
+	let totals: TotalsResponse = $state({
+		totalsByGroup: { CASH: 0, DEBT: 0, INVESTMENT: 0, OTHER: 0 },
+		netWorth: 0
+	});
+
+	function fmt(n: number) {
+		return new Intl.NumberFormat('en-US', {
+			style: 'currency',
+			currency: 'USD',
+			maximumFractionDigits: 0
+		}).format(n ?? 0);
+	}
+
+	onMount(async () => {
+		try {
+			const auth = getAuthContext();
+			if (!auth.currentUser?.isValid) return;
+			// Explicitly attach Authorization header to be safe
+			const token = (auth.pb.authStore as any)?.token as string | undefined;
+			const res = (await auth.pb.send('/api/totals', {
+				method: 'GET',
+				headers: token ? { Authorization: `Bearer ${token}` } : undefined
+			})) as TotalsResponse;
+			totals = res;
+
+			// Optional throwaway debug: query balances/tx for a named account
+			try {
+				const params = new URLSearchParams(window.location.search);
+				const debugName = params.get('debug_account');
+				const limit = params.get('debug_limit') || '40';
+				if (debugName) {
+					const dbg = await auth.pb.send(
+						`/api/debug/account-balances?name=${encodeURIComponent(debugName)}&limit=${encodeURIComponent(limit)}`,
+						{
+							method: 'GET',
+							headers: token ? { Authorization: `Bearer ${token}` } : undefined
+						}
+					);
+					console.log('DEBUG account-balances', debugName, dbg);
+				}
+			} catch (e) {
+				console.warn('Debug account-balances fetch failed', e);
+			}
+		} catch (e) {
+			// Silently keep zeros; optionally log in dev
+			console.error('Failed to load totals', e);
+		}
+	});
 </script>
 
 <header class="flex h-16 shrink-0 items-center gap-2 border-b">
@@ -46,12 +103,12 @@
 		<div class="text-background grid gap-2 lg:grid-cols-[1.3fr_1fr_1fr]">
 			<div class="flex flex-col justify-between rounded-sm bg-black p-5 shadow-md md:row-span-2">
 				<div class="text-base font-semibold tracking-tight">Net worth</div>
-				<div class="font-mono text-xl">$100,000</div>
+				<div class="font-mono text-xl">{fmt(totals.netWorth)}</div>
 			</div>
-			{@render card('Cash', '$50,000', 'bg-cash')}
-			{@render card('Investments', '$25,000', 'bg-investment')}
-			{@render card('Debt', '-$50,000', 'bg-debt')}
-			{@render card('Other assets', '$25,000', 'bg-other')}
+			{@render card('Cash', fmt(totals.totalsByGroup.CASH), 'bg-cash')}
+			{@render card('Investments', fmt(totals.totalsByGroup.INVESTMENT), 'bg-investment')}
+			{@render card('Debt', fmt(totals.totalsByGroup.DEBT), 'bg-debt')}
+			{@render card('Other assets', fmt(totals.totalsByGroup.OTHER), 'bg-other')}
 		</div>
 	</section>
 
