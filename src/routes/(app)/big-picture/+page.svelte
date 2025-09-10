@@ -1,15 +1,17 @@
 <script lang="ts">
 	import { getAccountsContext } from '$lib/accounts.svelte';
+	import { getAssetsContext } from '$lib/assets.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
-	import Checkbox from '$lib/components/ui/checkbox/checkbox.svelte';
-	import Label from '$lib/components/ui/label/label.svelte';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import { m } from '$lib/paraglide/messages';
 
 	const accountsContext = getAccountsContext();
-	// const { assets } = getAssetsContext();
+	const assetsContext = getAssetsContext();
+
+	$inspect(assetsContext.assets);
+	$inspect(accountsContext.accounts);
 </script>
 
 <header class="flex h-16 shrink-0 items-center gap-2 border-b">
@@ -64,19 +66,13 @@
 			<nav class="flex items-center justify-between">
 				{@render sectionTitle('Trailing cashflow')}
 
-				<div class="flex items-center space-x-2">
-					<div class="flex items-center space-x-2 rounded border p-2">
-						<Checkbox id="terms" />
-						<Label for="terms">Include current month</Label>
-					</div>
-					<Tabs.List>
-						<Tabs.Trigger value="three-months">3M</Tabs.Trigger>
-						<Tabs.Trigger value="six-months">6M</Tabs.Trigger>
-						<Tabs.Trigger value="nine-months">YTD</Tabs.Trigger>
-						<Tabs.Trigger value="one-year">1Y</Tabs.Trigger>
-						<Tabs.Trigger value="two-years">2Y</Tabs.Trigger>
-					</Tabs.List>
-				</div>
+				<Tabs.List>
+					<Tabs.Trigger value="three-months">3M</Tabs.Trigger>
+					<Tabs.Trigger value="six-months">6M</Tabs.Trigger>
+					<Tabs.Trigger value="nine-months">YTD</Tabs.Trigger>
+					<Tabs.Trigger value="one-year">1Y</Tabs.Trigger>
+					<Tabs.Trigger value="two-years">2Y</Tabs.Trigger>
+				</Tabs.List>
 			</nav>
 			<Tabs.Content value="three-months">
 				<div class="grid gap-2 lg:grid-cols-[1.3fr_1fr_1fr]">

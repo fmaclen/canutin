@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { setAccountsContext } from '$lib/accounts.svelte';
+	import { setAssetsContext } from '$lib/assets.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { getPocketBaseClientContext } from '$lib/pocketbase.svelte';
 
@@ -9,6 +10,7 @@
 
 	const pocketBaseClient = getPocketBaseClientContext();
 	setAccountsContext(pocketBaseClient.client);
+	setAssetsContext(pocketBaseClient.client);
 </script>
 
 <Sidebar.Provider>
