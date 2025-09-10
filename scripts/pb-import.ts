@@ -7,6 +7,9 @@ const PB_HOST = '127.0.0.1';
 const PB_PORT = 42070;
 const PB_SUPERUSER_EMAIL = 'superadmin@example.com';
 const PB_SUPERUSER_PASSWORD = '123qweasdzxc';
+// Temporary import user; records will be owned by this user
+const IMPORT_EMAIL = 'import@example.com';
+const IMPORT_PASSWORD = '123qweasdzxc';
 const PB_BASE_URL = `http://${PB_HOST}:${PB_PORT}`;
 
 function log(msg: string) {
@@ -84,7 +87,32 @@ async function main() {
 		process.exit(1);
 	}
 
-	// Helpers: upsert by name and cache ids
+	// Ensure/import user exists, then authenticate as that user to own imported data
+	let importUserId: string | null = null;
+	try {
+		const existing = await pb
+			.collection('users')
+			.getFirstListItem(`email = ${JSON.stringify(IMPORT_EMAIL)}`);
+		importUserId = existing.id;
+		log(`Found import user: ${IMPORT_EMAIL} (${importUserId})`);
+	} catch {
+		log(`Creating import user: ${IMPORT_EMAIL}`);
+		const created = await pb.collection('users').create({
+			email: IMPORT_EMAIL,
+			password: IMPORT_PASSWORD,
+			passwordConfirm: IMPORT_PASSWORD
+		});
+		importUserId = created.id;
+	}
+
+	// Authenticate as import user so create/update rules using @request.auth.id pass
+	await pb.collection('users').authWithPassword(IMPORT_EMAIL, IMPORT_PASSWORD);
+	if (!pb.authStore.model) {
+		throw new Error('Failed to authenticate as import user');
+	}
+	log(`Authenticated as import user (${pb.authStore.model.id})`);
+
+	// Helpers: upsert by name and cache ids (per-user scope)
 	const balanceTypeIdByName = new Map<string, string>();
 	const txLabelIdByName = new Map<string, string>();
 
@@ -98,7 +126,7 @@ async function main() {
 			balanceTypeIdByName.set(key, existing.id);
 			return existing.id;
 		} catch {
-			const created = await pb.collection('balanceTypes').create({ name: key });
+			const created = await pb.collection('balanceTypes').create({ name: key, owner: importUserId });
 			balanceTypeIdByName.set(key, created.id);
 			return created.id;
 		}
@@ -114,7 +142,7 @@ async function main() {
 			txLabelIdByName.set(key, existing.id);
 			return existing.id;
 		} catch {
-			const created = await pb.collection('transactionLabels').create({ name: key });
+			const created = await pb.collection('transactionLabels').create({ name: key, owner: importUserId });
 			txLabelIdByName.set(key, created.id);
 			return created.id;
 		}
@@ -246,7 +274,8 @@ async function main() {
 			autoCalculated: autoDate,
 			excluded: a.isExcludedFromNetWorth ? normalizeDateOr(a.updatedAt, a.createdAt) : undefined,
 			created: toISODate(a.createdAt),
-			updated: toISODate(a.updatedAt)
+			updated: toISODate(a.updatedAt),
+			owner: importUserId
 		};
 
 		// BalanceType in PB is used to indicate computation mode such as "Auto-calculated".
@@ -271,7 +300,8 @@ async function main() {
 			sold: a.isSold ? toISODate(a.updatedAt) : undefined,
 			excluded: a.isExcludedFromNetWorth ? toISODate(a.updatedAt) : undefined,
 			created: toISODate(a.createdAt),
-			updated: toISODate(a.updatedAt)
+			updated: toISODate(a.updatedAt),
+			owner: importUserId
 		};
 		const typeName = a.assetTypeId ? assetTypeNameById.get(a.assetTypeId) : undefined;
 		if (typeName) data.balanceType = await upsertBalanceType(typeName);
@@ -287,7 +317,7 @@ async function main() {
 		if (!pbAccountId) continue;
 		const bal = await pb
 			.collection('accountBalances')
-			.create({ value: s.value, created: toISODate(s.createdAt), updated: toISODate(s.updatedAt) });
+			.create({ value: s.value, created: toISODate(s.createdAt), updated: toISODate(s.updatedAt), owner: importUserId });
 		const list = balancesByPbAccountId.get(pbAccountId) || [];
 		list.push(bal.id);
 		balancesByPbAccountId.set(pbAccountId, list);
@@ -302,7 +332,8 @@ async function main() {
 			quantity: s.quantity ?? undefined,
 			cost: s.cost ?? undefined,
 			created: toISODate(s.createdAt),
-			updated: toISODate(s.updatedAt)
+			updated: toISODate(s.updatedAt),
+			owner: importUserId
 		});
 		const list = balancesByPbAssetId.get(pbAssetId) || [];
 		list.push(bal.id);
@@ -341,7 +372,8 @@ async function main() {
 			pending: pendDate,
 			created: toISODate(t.createdAt ?? t.date),
 			updated: toISODate(t.updatedAt ?? t.date),
-			labels
+			labels,
+			owner: importUserId
 		};
 		const created = await pb.collection('transactions').create(data);
 		const list = txIdsByPbAccountId.get(pbAccountId) || [];
