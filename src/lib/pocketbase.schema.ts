@@ -182,7 +182,6 @@ export type TransactionsRecord = {
 	id: string
 	labels?: RecordIdString[]
 	owner?: RecordIdString
-	pending?: IsoDateString
 	updated?: IsoDateString
 	value?: number
 }
