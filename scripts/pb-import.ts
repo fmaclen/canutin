@@ -269,6 +269,10 @@ async function main() {
 			? (normalizeDateOr(a.updatedAt, a.createdAt) ?? toISODate(new Date().toISOString()))
 			: undefined;
 
+		const excludedDate = a.isExcludedFromNetWorth
+			? (normalizeDateOr(a.createdAt, a.updatedAt) ?? toISODate(new Date().toISOString()))
+			: undefined;
+
 		const data: Record<string, unknown> = {
 			name: a.name,
 			institution: a.institution ?? undefined,
@@ -276,7 +280,8 @@ async function main() {
 			closed: a.isClosed ? normalizeDateOr(a.updatedAt, a.createdAt) : undefined,
 			// For auto-calculated accounts, ensure a truthy RFC date even if updatedAt is null
 			autoCalculated: autoDate,
-			excluded: a.isExcludedFromNetWorth ? normalizeDateOr(a.updatedAt, a.createdAt) : undefined,
+			// Legacy flag maps to datetime; prefer creation, fallback update, then now
+			excluded: excludedDate,
 			created: toISODate(a.createdAt),
 			updated: toISODate(a.updatedAt),
 			owner: importUserId
