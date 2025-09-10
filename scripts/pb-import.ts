@@ -310,24 +310,26 @@ async function main() {
 		pbAssetIdByOldId.set(a.id, created.id);
 	}
 
-	// Create balance records and group per parent for a single patch later
-	const balancesByPbAccountId = new Map<string, string[]>();
+	// Create balance records with direct relations to parent
 	for (const s of accountBalances) {
 		const pbAccountId = pbAccountIdByOldId.get(s.accountId);
 		if (!pbAccountId) continue;
-		const bal = await pb
+		await pb
 			.collection('accountBalances')
-			.create({ value: s.value, created: toISODate(s.createdAt), updated: toISODate(s.updatedAt), owner: importUserId });
-		const list = balancesByPbAccountId.get(pbAccountId) || [];
-		list.push(bal.id);
-		balancesByPbAccountId.set(pbAccountId, list);
+			.create({
+				account: pbAccountId,
+				value: s.value,
+				created: toISODate(s.createdAt),
+				updated: toISODate(s.updatedAt),
+				owner: importUserId
+			});
 	}
 
-	const balancesByPbAssetId = new Map<string, string[]>();
 	for (const s of assetBalances) {
 		const pbAssetId = pbAssetIdByOldId.get(s.assetId);
 		if (!pbAssetId) continue;
-		const bal = await pb.collection('assetBalances').create({
+		await pb.collection('assetBalances').create({
+			asset: pbAssetId,
 			value: s.value,
 			quantity: s.quantity ?? undefined,
 			cost: s.cost ?? undefined,
@@ -335,13 +337,9 @@ async function main() {
 			updated: toISODate(s.updatedAt),
 			owner: importUserId
 		});
-		const list = balancesByPbAssetId.get(pbAssetId) || [];
-		list.push(bal.id);
-		balancesByPbAssetId.set(pbAssetId, list);
 	}
 
-	// Create transactions and collect per-account
-	const txIdsByPbAccountId = new Map<string, string[]>();
+	// Create transactions with direct account relation
 	for (const t of transactions) {
 		const pbAccountId = pbAccountIdByOldId.get(t.accountId);
 		if (!pbAccountId) continue;
@@ -365,6 +363,7 @@ async function main() {
 			: undefined;
 
 		const data: Record<string, unknown> = {
+			account: pbAccountId,
 			description: t.description,
 			date: toISODate(t.date),
 			value: t.value,
@@ -375,30 +374,7 @@ async function main() {
 			labels,
 			owner: importUserId
 		};
-		const created = await pb.collection('transactions').create(data);
-		const list = txIdsByPbAccountId.get(pbAccountId) || [];
-		list.push(created.id);
-		txIdsByPbAccountId.set(pbAccountId, list);
-	}
-
-	// Patch accounts with relations
-	const updatedAccounts = new Set<string>();
-	for (const [pbId, ids] of balancesByPbAccountId) {
-		const payload: Record<string, unknown> = { balances: ids };
-		const txIds = txIdsByPbAccountId.get(pbId);
-		if (txIds && txIds.length) payload.transactions = txIds;
-		await pb.collection('accounts').update(pbId, payload);
-		updatedAccounts.add(pbId);
-	}
-	// Ensure accounts with only transactions (no balances) get updated too
-	for (const [pbId, txIds] of txIdsByPbAccountId) {
-		if (updatedAccounts.has(pbId)) continue;
-		await pb.collection('accounts').update(pbId, { transactions: txIds });
-	}
-
-	// Patch assets with relations
-	for (const [pbId, ids] of balancesByPbAssetId) {
-		await pb.collection('assets').update(pbId, { balances: ids });
+		await pb.collection('transactions').create(data);
 	}
 
 	log('Import complete.');
