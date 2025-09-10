@@ -1,7 +1,6 @@
 import PocketBase, { type BaseAuthStore } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 
-import { env } from '$env/dynamic/public';
 import { m } from '$lib/paraglide/messages.js';
 
 export class AuthContext {
@@ -11,15 +10,10 @@ export class AuthContext {
 
 	private _pb: PocketBase;
 
-	constructor() {
-		this._pb = new PocketBase(env.PUBLIC_PB_URL || 'http://127.0.0.1:42070');
+	constructor(pb: PocketBase) {
+		this._pb = pb;
 		this.currentUser = this._pb.authStore;
 		this.isLoading = false;
-	}
-
-	// Expose the PocketBase client for custom API calls
-	get pb(): PocketBase {
-		return this._pb;
 	}
 
 	private getErrorMessage(err: unknown, fallback: string): string {
@@ -75,8 +69,8 @@ export class AuthContext {
 
 const CONTEXT_KEY = 'auth-store';
 
-export function setAuthContext() {
-	const store = new AuthContext();
+export function setAuthContext(pb: PocketBase) {
+	const store = new AuthContext(pb);
 	setContext(CONTEXT_KEY, store);
 	return store;
 }

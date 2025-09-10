@@ -6,10 +6,14 @@
 	import Sonner from '$lib/components/ui/sonner/sonner.svelte';
 
 	import AuthGuard from './auth-guard.svelte';
+	import { getPocketBaseClientContext, setPocketBaseClientContext } from '$lib/pocketbase.svelte';
 
 	let { children } = $props();
 
-	setAuthContext();
+	setPocketBaseClientContext();
+
+	const pocketBaseClient = getPocketBaseClientContext();
+	setAuthContext(pocketBaseClient.client);
 </script>
 
 <svelte:head>
