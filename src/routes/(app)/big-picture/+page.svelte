@@ -36,9 +36,7 @@
 </header>
 
 {#snippet sectionTitle(title: string)}
-	<div
-		class="text-muted-foreground flex h-8 items-center font-mono text-xs leading-none tracking-wider uppercase"
-	>
+	<div class="h-8px-2 text-muted-foreground flex text-xs font-medium bg-muted rounded px-2 py-1 w-full h-9 items-center">
 		{title}
 	</div>
 {/snippet}
@@ -74,7 +72,7 @@
 
 	<section class="mx-auto flex w-full flex-col space-y-2">
 		<Tabs.Root value="six-months">
-			<nav class="flex items-center justify-between">
+			<nav class="flex items-center justify-between space-x-2">
 				{@render sectionTitle('Trailing cashflow')}
 
 				<Tabs.List>
