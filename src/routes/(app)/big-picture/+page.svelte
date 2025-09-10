@@ -14,11 +14,15 @@
 	type Groups = { CASH: number; DEBT: number; INVESTMENT: number; OTHER: number };
 	const totals = $derived.by(() => {
 		const g: Groups = { CASH: 0, DEBT: 0, INVESTMENT: 0, OTHER: 0 };
-		for (const a of accountsContext.accounts) g[a.balanceGroup] += a.balance ?? 0;
-		for (const a of assetsContext.assets) g[a.balanceGroup] += a.balance ?? 0;
-		const netWorth = g.CASH + g.INVESTMENT + g.OTHER - g.DEBT;
+		for (const a of accountsContext.accounts)
+			if (!a.excluded && !a.closed) g[a.balanceGroup] += a.balance ?? 0;
+		for (const a of assetsContext.assets)
+			if (!a.excluded && !a.sold) g[a.balanceGroup] += a.balance ?? 0;
+		const netWorth = g.CASH + g.INVESTMENT + g.OTHER + g.DEBT;
 		return { totalsByGroup: g, netWorth } as const;
 	});
+
+
 </script>
 
 <header class="flex h-16 shrink-0 items-center gap-2 border-b">
