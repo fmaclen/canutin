@@ -11,8 +11,8 @@
 	let { children } = $props();
 
 	setPocketBaseClientContext();
-
 	const pocketBaseClient = getPocketBaseClientContext();
+
 	setAuthContext(pocketBaseClient.client);
 </script>
 

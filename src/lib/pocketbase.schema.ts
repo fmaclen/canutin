@@ -98,6 +98,7 @@ export type SuperusersRecord = {
 }
 
 export type AccountBalancesRecord = {
+	account?: RecordIdString
 	created?: IsoDateString
 	id: string
 	owner?: RecordIdString
@@ -112,10 +113,10 @@ export enum AccountsBalanceGroupOptions {
 	"OTHER" = "OTHER",
 }
 export type AccountsRecord = {
+	account?: RecordIdString
 	autoCalculated?: IsoDateString
 	balanceGroup: AccountsBalanceGroupOptions
 	balanceType?: RecordIdString
-	balances?: RecordIdString[]
 	closed?: IsoDateString
 	created?: IsoDateString
 	excluded?: IsoDateString
@@ -123,11 +124,11 @@ export type AccountsRecord = {
 	institution?: string
 	name: string
 	owner?: RecordIdString
-	transactions?: RecordIdString[]
 	updated?: IsoDateString
 }
 
 export type AssetBalancesRecord = {
+	asset?: RecordIdString
 	cost?: number
 	created?: IsoDateString
 	id: string
@@ -146,7 +147,6 @@ export enum AssetsBalanceGroupOptions {
 export type AssetsRecord = {
 	balanceGroup: AssetsBalanceGroupOptions
 	balanceType?: RecordIdString
-	balances?: RecordIdString[]
 	created?: IsoDateString
 	excluded?: IsoDateString
 	id: string
@@ -174,6 +174,7 @@ export type TransactionLabelsRecord = {
 }
 
 export type TransactionsRecord = {
+	account?: RecordIdString
 	created?: IsoDateString
 	date?: IsoDateString
 	description?: string

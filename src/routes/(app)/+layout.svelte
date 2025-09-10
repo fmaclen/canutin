@@ -1,9 +1,14 @@
 <script lang="ts">
+	import { setAccountsContext } from '$lib/accounts.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import { getPocketBaseClientContext } from '$lib/pocketbase.svelte';
 
 	import AppSidebar from './app-sidebar.svelte';
 
 	let { children } = $props();
+
+	const pocketBaseClient = getPocketBaseClientContext();
+	setAccountsContext(pocketBaseClient.client);
 </script>
 
 <Sidebar.Provider>
