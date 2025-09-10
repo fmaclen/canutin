@@ -8,4 +8,4 @@ bun.lockb
 # Miscellaneous
 /static/
 pocketbase
-src/lib/pocketbase.types.ts
+src/lib/pocketbase.schema.ts

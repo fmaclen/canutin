@@ -13,7 +13,7 @@ const POCKETBASE_TAG = `v${POCKETBASE_VERSION}`; // GitHub release tag
 const projectRoot = process.cwd();
 const pbDir = path.join(projectRoot, 'pocketbase');
 const migrationsDir = path.join(pbDir, 'pb_migrations');
-const TYPEGEN_OUT = path.join(projectRoot, 'src', 'lib', 'pocketbase.types.ts');
+const TYPEGEN_OUT = path.join(projectRoot, 'src', 'lib', 'pocketbase.schema.ts');
 const DB_PATH = path.join(pbDir, 'pb_data', 'data.db');
 
 function log(msg: string) {
