@@ -277,7 +277,10 @@ async function main() {
 			name: a.name,
 			institution: a.institution ?? undefined,
 			balanceGroup: mapBalanceGroup(a.balanceGroup),
-			closed: a.isClosed ? normalizeDateOr(a.updatedAt, a.createdAt) : undefined,
+			// If closed, prefer updatedAt then createdAt; fallback to now for determinism
+			closed: a.isClosed
+				? (normalizeDateOr(a.updatedAt, a.createdAt) ?? toISODate(new Date().toISOString()))
+				: undefined,
 			// For auto-calculated accounts, ensure a truthy RFC date even if updatedAt is null
 			autoCalculated: autoDate,
 			// Legacy flag maps to datetime; prefer creation, fallback update, then now
@@ -306,7 +309,10 @@ async function main() {
 			name: a.name,
 			symbol: a.symbol ?? undefined,
 			balanceGroup: mapBalanceGroup(a.balanceGroup),
-			sold: a.isSold ? toISODate(a.updatedAt) : undefined,
+			// If sold, prefer updatedAt then createdAt; fallback to now for determinism
+			sold: a.isSold
+				? (normalizeDateOr(a.updatedAt, a.createdAt) ?? toISODate(new Date().toISOString()))
+				: undefined,
 			excluded: a.isExcludedFromNetWorth ? toISODate(a.updatedAt) : undefined,
 			created: toISODate(a.createdAt),
 			updated: toISODate(a.updatedAt),
