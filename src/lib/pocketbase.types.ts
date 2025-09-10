@@ -100,6 +100,7 @@ export type SuperusersRecord = {
 export type AccountBalancesRecord = {
 	created?: IsoDateString
 	id: string
+	owner?: RecordIdString
 	updated?: IsoDateString
 	value?: number
 }
@@ -121,6 +122,7 @@ export type AccountsRecord = {
 	id: string
 	institution?: string
 	name: string
+	owner?: RecordIdString
 	transactions?: RecordIdString[]
 	updated?: IsoDateString
 }
@@ -129,6 +131,7 @@ export type AssetBalancesRecord = {
 	cost?: number
 	created?: IsoDateString
 	id: string
+	owner?: RecordIdString
 	quantity?: number
 	updated?: IsoDateString
 	value?: number
@@ -148,6 +151,7 @@ export type AssetsRecord = {
 	excluded?: IsoDateString
 	id: string
 	name: string
+	owner?: RecordIdString
 	sold?: IsoDateString
 	symbol?: string
 	updated?: IsoDateString
@@ -157,6 +161,7 @@ export type BalanceTypesRecord = {
 	created?: IsoDateString
 	id: string
 	name?: string
+	owner?: RecordIdString
 	updated?: IsoDateString
 }
 
@@ -164,6 +169,7 @@ export type TransactionLabelsRecord = {
 	created?: IsoDateString
 	id: string
 	name: string
+	owner?: RecordIdString
 	updated?: IsoDateString
 }
 
@@ -174,6 +180,7 @@ export type TransactionsRecord = {
 	excluded?: IsoDateString
 	id: string
 	labels?: RecordIdString[]
+	owner?: RecordIdString
 	pending?: IsoDateString
 	updated?: IsoDateString
 	value?: number

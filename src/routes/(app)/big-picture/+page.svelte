@@ -1,7 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-
-	import { getAuthContext } from '$lib/auth.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import Checkbox from '$lib/components/ui/checkbox/checkbox.svelte';
 	import Label from '$lib/components/ui/label/label.svelte';
@@ -27,42 +24,6 @@
 			maximumFractionDigits: 0
 		}).format(n ?? 0);
 	}
-
-	onMount(async () => {
-		try {
-			const auth = getAuthContext();
-			if (!auth.currentUser?.isValid) return;
-			// Explicitly attach Authorization header to be safe
-			const token = (auth.pb.authStore as any)?.token as string | undefined;
-			const res = (await auth.pb.send('/api/totals', {
-				method: 'GET',
-				headers: token ? { Authorization: `Bearer ${token}` } : undefined
-			})) as TotalsResponse;
-			totals = res;
-
-			// Optional throwaway debug: query balances/tx for a named account
-			try {
-				const params = new URLSearchParams(window.location.search);
-				const debugName = params.get('debug_account');
-				const limit = params.get('debug_limit') || '40';
-				if (debugName) {
-					const dbg = await auth.pb.send(
-						`/api/debug/account-balances?name=${encodeURIComponent(debugName)}&limit=${encodeURIComponent(limit)}`,
-						{
-							method: 'GET',
-							headers: token ? { Authorization: `Bearer ${token}` } : undefined
-						}
-					);
-					console.log('DEBUG account-balances', debugName, dbg);
-				}
-			} catch (e) {
-				console.warn('Debug account-balances fetch failed', e);
-			}
-		} catch (e) {
-			// Silently keep zeros; optionally log in dev
-			console.error('Failed to load totals', e);
-		}
-	});
 </script>
 
 <header class="flex h-16 shrink-0 items-center gap-2 border-b">
