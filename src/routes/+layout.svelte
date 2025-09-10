@@ -4,9 +4,9 @@
 	import favicon from '$lib/assets/favicon.png';
 	import { setAuthContext } from '$lib/auth.svelte';
 	import Sonner from '$lib/components/ui/sonner/sonner.svelte';
+	import { getPocketBaseClientContext, setPocketBaseClientContext } from '$lib/pocketbase.svelte';
 
 	import AuthGuard from './auth-guard.svelte';
-	import { getPocketBaseClientContext, setPocketBaseClientContext } from '$lib/pocketbase.svelte';
 
 	let { children } = $props();
 

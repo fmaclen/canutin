@@ -1,4 +1,4 @@
-import PocketBase, { type BaseAuthStore } from 'pocketbase';
+import PocketBase from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 
 import { env } from '$env/dynamic/public';
@@ -21,6 +21,9 @@ export function setPocketBaseClientContext() {
 
 export function getPocketBaseClientContext() {
 	const store = getContext<PocketBaseClientContext>(CONTEXT_KEY);
-	if (!store) throw new Error('PocketBase client context not found. Call setPocketBaseClientContext() first.');
+	if (!store)
+		throw new Error(
+			'PocketBase client context not found. Call setPocketBaseClientContext() first.'
+		);
 	return store;
 }

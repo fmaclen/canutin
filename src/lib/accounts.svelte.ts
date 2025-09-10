@@ -18,7 +18,7 @@ class AccountsContext {
 
 	private async getAll() {
 		const list = await this._pb.collection('accounts').getFullList<AccountsResponse>();
-    
+
 		const withBalances: AccountWithBalance[] = [];
 		for (const a of list) {
 			const res = await this._pb
@@ -33,10 +33,13 @@ class AccountsContext {
 	private realtimeSubscribe() {
 		this._pb.collection('accounts').subscribe('*', () => this.getAll());
 		this._pb.collection('accountBalances').subscribe('*', async (e) => {
-			const accountId = (e as any).record.account as string;
+			const accountId = e.record.account as string;
 			const res = await this._pb
 				.collection('accountBalances')
-				.getList<AccountBalancesResponse>(1, 1, { filter: `account='${accountId}'`, sort: '-created' });
+				.getList<AccountBalancesResponse>(1, 1, {
+					filter: `account='${accountId}'`,
+					sort: '-created'
+				});
 			const value = res.items[0]?.value ?? 0;
 			this.accounts = this.accounts.map((x) => (x.id === accountId ? { ...x, balance: value } : x));
 		});

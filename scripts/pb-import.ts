@@ -126,7 +126,9 @@ async function main() {
 			balanceTypeIdByName.set(key, existing.id);
 			return existing.id;
 		} catch {
-			const created = await pb.collection('balanceTypes').create({ name: key, owner: importUserId });
+			const created = await pb
+				.collection('balanceTypes')
+				.create({ name: key, owner: importUserId });
 			balanceTypeIdByName.set(key, created.id);
 			return created.id;
 		}
@@ -142,7 +144,9 @@ async function main() {
 			txLabelIdByName.set(key, existing.id);
 			return existing.id;
 		} catch {
-			const created = await pb.collection('transactionLabels').create({ name: key, owner: importUserId });
+			const created = await pb
+				.collection('transactionLabels')
+				.create({ name: key, owner: importUserId });
 			txLabelIdByName.set(key, created.id);
 			return created.id;
 		}
@@ -314,15 +318,13 @@ async function main() {
 	for (const s of accountBalances) {
 		const pbAccountId = pbAccountIdByOldId.get(s.accountId);
 		if (!pbAccountId) continue;
-		await pb
-			.collection('accountBalances')
-			.create({
-				account: pbAccountId,
-				value: s.value,
-				created: toISODate(s.createdAt),
-				updated: toISODate(s.updatedAt),
-				owner: importUserId
-			});
+		await pb.collection('accountBalances').create({
+			account: pbAccountId,
+			value: s.value,
+			created: toISODate(s.createdAt),
+			updated: toISODate(s.updatedAt),
+			owner: importUserId
+		});
 	}
 
 	for (const s of assetBalances) {
