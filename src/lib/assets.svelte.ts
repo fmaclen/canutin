@@ -49,12 +49,10 @@ class AssetsContext {
 	}
 
 	private async getLatestAssetBalance(assetId: string) {
-		const res = await this._pb
-			.collection('assetBalances')
-			.getList<AssetBalancesResponse>(1, 1, {
-				filter: `asset='${assetId}'`,
-				sort: '-asOf,-created,-id'
-			});
+		const res = await this._pb.collection('assetBalances').getList<AssetBalancesResponse>(1, 1, {
+			filter: `asset='${assetId}'`,
+			sort: '-asOf,-created,-id'
+		});
 		return res.items[0]?.value ?? 0;
 	}
 

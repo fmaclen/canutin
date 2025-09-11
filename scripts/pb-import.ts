@@ -39,47 +39,47 @@ function mapBalanceGroup(
 }
 
 function toISODate(d: unknown): string | undefined {
-    if (d === null || d === undefined) return undefined;
-    try {
-        // Handle numeric epoch (seconds or ms) and numeric-like strings
-        if (typeof d === 'number' && Number.isFinite(d)) {
-            const ms = d > 1e12 ? d : d * 1000; // seconds vs ms
-            return formatDateTimeZ(new Date(ms));
-        }
-        const s = String(d).trim();
-        if (!s) return undefined;
-        if (/^\d+$/.test(s)) {
-            const n = Number(s);
-            if (Number.isFinite(n)) {
-                const ms = s.length >= 13 ? n : n * 1000; // 13+ digits -> ms
-                return formatDateTimeZ(new Date(ms));
-            }
-        }
-        // 'YYYY-MM-DD'
-        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return `${s} 00:00:00.000Z`;
-        // 'YYYY-MM-DD HH:MM:SS' or other parseable strings
-        const dt = new Date(s);
-        if (!isNaN(dt.getTime())) return formatDateTimeZ(dt);
-        return undefined;
-    } catch {
-        return undefined;
-    }
+	if (d === null || d === undefined) return undefined;
+	try {
+		// Handle numeric epoch (seconds or ms) and numeric-like strings
+		if (typeof d === 'number' && Number.isFinite(d)) {
+			const ms = d > 1e12 ? d : d * 1000; // seconds vs ms
+			return formatDateTimeZ(new Date(ms));
+		}
+		const s = String(d).trim();
+		if (!s) return undefined;
+		if (/^\d+$/.test(s)) {
+			const n = Number(s);
+			if (Number.isFinite(n)) {
+				const ms = s.length >= 13 ? n : n * 1000; // 13+ digits -> ms
+				return formatDateTimeZ(new Date(ms));
+			}
+		}
+		// 'YYYY-MM-DD'
+		if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return `${s} 00:00:00.000Z`;
+		// 'YYYY-MM-DD HH:MM:SS' or other parseable strings
+		const dt = new Date(s);
+		if (!isNaN(dt.getTime())) return formatDateTimeZ(dt);
+		return undefined;
+	} catch {
+		return undefined;
+	}
 }
 
 function pad(n: number, w = 2) {
-    return String(n).padStart(w, '0');
+	return String(n).padStart(w, '0');
 }
 
 function formatDateTimeZ(d: Date): string {
-    // Always format as 'YYYY-MM-DD HH:MM:SS.mmmZ' in UTC
-    const y = d.getUTCFullYear();
-    const m = pad(d.getUTCMonth() + 1);
-    const day = pad(d.getUTCDate());
-    const hh = pad(d.getUTCHours());
-    const mm = pad(d.getUTCMinutes());
-    const ss = pad(d.getUTCSeconds());
-    const ms = pad(d.getUTCMilliseconds(), 3);
-    return `${y}-${m}-${day} ${hh}:${mm}:${ss}.${ms}Z`;
+	// Always format as 'YYYY-MM-DD HH:MM:SS.mmmZ' in UTC
+	const y = d.getUTCFullYear();
+	const m = pad(d.getUTCMonth() + 1);
+	const day = pad(d.getUTCDate());
+	const hh = pad(d.getUTCHours());
+	const mm = pad(d.getUTCMinutes());
+	const ss = pad(d.getUTCSeconds());
+	const ms = pad(d.getUTCMilliseconds(), 3);
+	return `${y}-${m}-${day} ${hh}:${mm}:${ss}.${ms}Z`;
 }
 
 function normalizeDateOr(primary: unknown, fallback?: unknown): string | undefined {
