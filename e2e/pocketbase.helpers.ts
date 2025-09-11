@@ -25,10 +25,11 @@ async function getAdminPB(): Promise<TypedPocketBase> {
 export async function resetDatabase() {
 	const pbAdmin = await getAdminPB();
 	try {
+		// Deleting the users collection will cascade delete all other collections
 		await pbAdmin.collections.truncate('users');
-    } catch {
+	} catch {
 		// HACK: PB may 400 during cascade but deletions still apply; ignore.
-    }
+	}
 }
 
 export async function seedUser(name: string) {

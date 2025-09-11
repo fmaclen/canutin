@@ -17,7 +17,6 @@
 		"pb": "bun scripts/pb-server.ts",
 		"pb:import": "bun scripts/pb-import.ts",
 		"pb:reset": "bun scripts/pb-reset.ts"
-		,"pb:verify:cascade": "bun scripts/pb-verify-cascade.ts"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^1.2.5",
