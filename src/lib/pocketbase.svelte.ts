@@ -3,8 +3,10 @@ import { getContext, setContext } from 'svelte';
 
 import { env } from '$env/dynamic/public';
 
+import type { TypedPocketBase } from './pocketbase.schema';
+
 export class PocketBaseClientContext {
-	client: PocketBase;
+	client: TypedPocketBase;
 
 	constructor() {
 		this.client = new PocketBase(env.PUBLIC_PB_URL || 'http://127.0.0.1:42070');
