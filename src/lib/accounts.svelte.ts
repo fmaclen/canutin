@@ -55,7 +55,7 @@ class AccountsContext {
 			.collection('accountBalances')
 			.getList<AccountBalancesResponse>(1, 1, {
 				filter: `account='${accountId}'`,
-				sort: '-created'
+				sort: '-asOf,-created,-id'
 			});
 		return res.items[0]?.value ?? 0;
 	}
