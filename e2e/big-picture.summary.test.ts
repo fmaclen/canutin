@@ -123,7 +123,37 @@ test('big picture summary', async ({ page }) => {
 		account: closedAccount.id,
 		owner: user.id,
 		asOf: new Date().toISOString(),
-		value: 1000
+		value: 1234
+	});
+
+	const soldAsset = await seedAsset({
+		name: 'Decorative Sculpture',
+		balanceGroup: AssetsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Other asset',
+		sold: new Date().toISOString()
+	});
+
+	await seedAssetBalance({
+		asset: soldAsset.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 1234
+	});
+
+	const excludedAsset = await seedAsset({
+		name: 'Decorative Sculpture',
+		balanceGroup: AssetsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Other asset',
+		excluded: new Date().toISOString()
+	});
+
+	await seedAssetBalance({
+		asset: excludedAsset.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 1234
 	});
 
 	await expect(netWorth).toContainText('$2,000');

@@ -93,8 +93,10 @@ export async function seedAccountBalance(accountBalanceInput: {
 export async function seedAsset(assetInput: {
 	name: AssetsRecord['name'];
 	balanceGroup: AssetsRecord['balanceGroup'];
-	owner: UsersRecord['id'];
 	balanceType: BalanceTypesRecord['name'];
+	owner: UsersRecord['id'];
+	sold?: AssetsRecord['sold'];
+	excluded?: AssetsRecord['excluded'];
 }) {
 	const pbAdmin = await getAdminPB();
 	const balanceType = await getOrCreateBalanceType(
