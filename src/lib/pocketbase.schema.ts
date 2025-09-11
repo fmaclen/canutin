@@ -99,6 +99,7 @@ export type SuperusersRecord = {
 
 export type AccountBalancesRecord = {
 	account?: RecordIdString
+	asOf: IsoDateString
 	created?: IsoDateString
 	id: string
 	owner?: RecordIdString
@@ -128,6 +129,7 @@ export type AccountsRecord = {
 }
 
 export type AssetBalancesRecord = {
+	asOf: IsoDateString
 	asset?: RecordIdString
 	cost?: number
 	created?: IsoDateString

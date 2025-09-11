@@ -39,18 +39,47 @@ function mapBalanceGroup(
 }
 
 function toISODate(d: unknown): string | undefined {
-	if (!d) return undefined;
-	// handle values like '2021-03-01 00:00:00' or ISO strings
-	try {
-		const s = String(d).trim();
-		if (!s) return undefined;
-		// Normalize to RFC3339 with milliseconds and Z
-		if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return `${s} 00:00:00.000Z`;
-		const iso = new Date(s).toISOString().replace('T', ' ').replace('Z', 'Z');
-		return iso;
-	} catch {
-		return undefined;
-	}
+    if (d === null || d === undefined) return undefined;
+    try {
+        // Handle numeric epoch (seconds or ms) and numeric-like strings
+        if (typeof d === 'number' && Number.isFinite(d)) {
+            const ms = d > 1e12 ? d : d * 1000; // seconds vs ms
+            return formatDateTimeZ(new Date(ms));
+        }
+        const s = String(d).trim();
+        if (!s) return undefined;
+        if (/^\d+$/.test(s)) {
+            const n = Number(s);
+            if (Number.isFinite(n)) {
+                const ms = s.length >= 13 ? n : n * 1000; // 13+ digits -> ms
+                return formatDateTimeZ(new Date(ms));
+            }
+        }
+        // 'YYYY-MM-DD'
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return `${s} 00:00:00.000Z`;
+        // 'YYYY-MM-DD HH:MM:SS' or other parseable strings
+        const dt = new Date(s);
+        if (!isNaN(dt.getTime())) return formatDateTimeZ(dt);
+        return undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+function pad(n: number, w = 2) {
+    return String(n).padStart(w, '0');
+}
+
+function formatDateTimeZ(d: Date): string {
+    // Always format as 'YYYY-MM-DD HH:MM:SS.mmmZ' in UTC
+    const y = d.getUTCFullYear();
+    const m = pad(d.getUTCMonth() + 1);
+    const day = pad(d.getUTCDate());
+    const hh = pad(d.getUTCHours());
+    const mm = pad(d.getUTCMinutes());
+    const ss = pad(d.getUTCSeconds());
+    const ms = pad(d.getUTCMilliseconds(), 3);
+    return `${y}-${m}-${day} ${hh}:${mm}:${ss}.${ms}Z`;
 }
 
 function normalizeDateOr(primary: unknown, fallback?: unknown): string | undefined {
@@ -285,8 +314,6 @@ async function main() {
 			autoCalculated: autoDate,
 			// Legacy flag maps to datetime; prefer creation, fallback update, then now
 			excluded: excludedDate,
-			created: toISODate(a.createdAt),
-			updated: toISODate(a.updatedAt),
 			owner: importUserId
 		};
 
@@ -314,8 +341,6 @@ async function main() {
 				? (normalizeDateOr(a.updatedAt, a.createdAt) ?? toISODate(new Date().toISOString()))
 				: undefined,
 			excluded: a.isExcludedFromNetWorth ? toISODate(a.updatedAt) : undefined,
-			created: toISODate(a.createdAt),
-			updated: toISODate(a.updatedAt),
 			owner: importUserId
 		};
 		const typeName = a.assetTypeId ? assetTypeNameById.get(a.assetTypeId) : undefined;
@@ -332,8 +357,7 @@ async function main() {
 		await pb.collection('accountBalances').create({
 			account: pbAccountId,
 			value: s.value,
-			created: toISODate(s.createdAt),
-			updated: toISODate(s.updatedAt),
+			asOf: toISODate(s.createdAt),
 			owner: importUserId
 		});
 	}
@@ -346,8 +370,7 @@ async function main() {
 			value: s.value,
 			quantity: s.quantity ?? undefined,
 			cost: s.cost ?? undefined,
-			created: toISODate(s.createdAt),
-			updated: toISODate(s.updatedAt),
+			asOf: toISODate(s.createdAt),
 			owner: importUserId
 		});
 	}
@@ -378,12 +401,10 @@ async function main() {
 		const data: Record<string, unknown> = {
 			account: pbAccountId,
 			description: t.description,
-			date: toISODate(t.date),
+			date: normalizeDateOr(t.date, t.createdAt ?? t.updatedAt),
 			value: t.value,
 			excluded: exDate,
 			pending: pendDate,
-			created: toISODate(t.createdAt ?? t.date),
-			updated: toISODate(t.updatedAt ?? t.date),
 			labels,
 			owner: importUserId
 		};
