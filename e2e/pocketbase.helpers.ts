@@ -3,32 +3,38 @@ import PocketBase from 'pocketbase';
 import type {
 	AccountBalancesRecord,
 	AccountsRecord,
+	AssetBalancesRecord,
+	AssetsRecord,
 	BalanceTypesRecord,
+	TransactionsRecord,
 	TypedPocketBase,
 	UsersRecord
 } from '../src/lib/pocketbase.schema';
 
 export const DEFAULT_PASSWORD = '123qweasdzxc';
+
 const PB_URL = 'http://127.0.0.1:42070';
 const SUPERADMIN_EMAIL = 'superadmin@example.com';
 
-const pb = new PocketBase(PB_URL) as TypedPocketBase;
-
-export async function adminLogin(): Promise<void> {
+async function getAdminPB(): Promise<TypedPocketBase> {
+	const pb = new PocketBase(PB_URL) as TypedPocketBase;
 	await pb.collection('_superusers').authWithPassword(SUPERADMIN_EMAIL, DEFAULT_PASSWORD);
+	return pb;
 }
 
 export async function resetDatabase() {
-	const collections = await pb.collections.getFullList();
-	const targets = collections.filter((c) => c.type !== 'view' && c.name !== '_superusers');
-	for (const c of targets) {
-		await pb.collections.truncate(c.name);
-	}
+	const pbAdmin = await getAdminPB();
+	try {
+		await pbAdmin.collections.truncate('users');
+    } catch {
+		// HACK: PB may 400 during cascade but deletions still apply; ignore.
+    }
 }
 
 export async function seedUser(name: string) {
+	const pbAdmin = await getAdminPB();
 	const uniqueEmail = `${name}.${Date.now()}@example.com`;
-	return await pb.collection('users').create({
+	return await pbAdmin.collection('users').create({
 		email: uniqueEmail,
 		password: DEFAULT_PASSWORD,
 		passwordConfirm: DEFAULT_PASSWORD,
@@ -36,17 +42,21 @@ export async function seedUser(name: string) {
 	});
 }
 
-async function getOrCreateBalanceType(name: BalanceTypesRecord['name'], owner: UsersRecord['id']) {
+async function getOrCreateBalanceType(
+	pbAdmin: TypedPocketBase,
+	name: BalanceTypesRecord['name'],
+	owner: UsersRecord['id']
+) {
 	let balanceType: BalanceTypesRecord | null;
 	try {
-		balanceType = await pb
+		balanceType = await pbAdmin
 			.collection('balanceTypes')
 			.getFirstListItem(`name='${name}' && owner='${owner}'`);
 	} catch {
 		balanceType = null;
 	}
 	if (balanceType) return balanceType;
-	return await pb.collection('balanceTypes').create({ name, owner });
+	return await pbAdmin.collection('balanceTypes').create({ name, owner });
 }
 
 export async function seedAccount(accountInput: {
@@ -59,9 +69,14 @@ export async function seedAccount(accountInput: {
 	autoCalculated?: AccountsRecord['autoCalculated'];
 	excluded?: AccountsRecord['excluded'];
 }) {
-	const balanceType = await getOrCreateBalanceType(accountInput.balanceType, accountInput.owner);
+	const pbAdmin = await getAdminPB();
+	const balanceType = await getOrCreateBalanceType(
+		pbAdmin,
+		accountInput.balanceType,
+		accountInput.owner
+	);
 	accountInput.balanceType = balanceType.id;
-	return await pb.collection('accounts').create(accountInput);
+	return await pbAdmin.collection('accounts').create(accountInput);
 }
 
 export async function seedAccountBalance(accountBalanceInput: {
@@ -70,8 +85,47 @@ export async function seedAccountBalance(accountBalanceInput: {
 	asOf: AccountBalancesRecord['asOf'];
 	value?: AccountBalancesRecord['value'];
 }) {
+	const pb = await getAdminPB();
 	return await pb.collection('accountBalances').create(accountBalanceInput);
 }
-export async function seedAsset() {}
-export async function seedAssetBalance() {}
-export async function seedTransaction() {}
+
+export async function seedAsset(assetInput: {
+	name: AssetsRecord['name'];
+	balanceGroup: AssetsRecord['balanceGroup'];
+	owner: UsersRecord['id'];
+	balanceType: BalanceTypesRecord['name'];
+}) {
+	const pbAdmin = await getAdminPB();
+	const balanceType = await getOrCreateBalanceType(
+		pbAdmin,
+		assetInput.balanceType,
+		assetInput.owner
+	);
+	assetInput.balanceType = balanceType.id;
+	return await pbAdmin.collection('assets').create(assetInput);
+}
+
+export async function seedAssetBalance(assetBalanceInput: {
+	asset: AssetBalancesRecord['asset'];
+	owner: AssetBalancesRecord['owner'];
+	asOf: AssetBalancesRecord['asOf'];
+	value?: AssetBalancesRecord['value'];
+	quantity?: AssetBalancesRecord['quantity'];
+	cost?: AssetBalancesRecord['cost'];
+}) {
+	const pb = await getAdminPB();
+	return await pb.collection('assetBalances').create(assetBalanceInput);
+}
+
+export async function seedTransaction(transactionInput: {
+	account: TransactionsRecord['account'];
+	owner: TransactionsRecord['owner'];
+	date: TransactionsRecord['date'];
+	description: TransactionsRecord['description'];
+	value: TransactionsRecord['value'];
+	excluded?: TransactionsRecord['excluded'];
+	labels?: TransactionsRecord['labels'];
+}) {
+	const pb = await getAdminPB();
+	return await pb.collection('transactions').create(transactionInput);
+}
