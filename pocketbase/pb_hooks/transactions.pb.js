@@ -11,7 +11,13 @@ function onTxCreate(e) {
   if (!autoCalculated || autoCalculated.isZero()) return
   const txs = $app.findRecordsByFilter('transactions', 'account={:aid}', '', 0, 0, { aid: accountId })
   let sum = 0
-  for (const tx of txs) { if (tx) { const v = tx.getFloat('value'); sum += v || 0 } }
+  for (const tx of txs) {
+    if (!tx) continue
+    const excluded = tx.getDateTime('excluded')
+    if (excluded && !excluded.isZero()) continue
+    const v = tx.getFloat('value')
+    sum += v || 0
+  }
   const coll = $app.findCollectionByNameOrId('accountBalances')
   const rec = new Record(coll)
   rec.set('account', accountId)
@@ -34,7 +40,13 @@ function onTxUpdate(e) {
     if (autoCalculated && !autoCalculated.isZero()) {
       const txs = $app.findRecordsByFilter('transactions', 'account={:aid}', '', 0, 0, { aid: oldAcc })
       let sum = 0
-      for (const tx of txs) { if (tx) { const v = tx.getFloat('value'); sum += v || 0 } }
+      for (const tx of txs) {
+        if (!tx) continue
+        const excluded = tx.getDateTime('excluded')
+        if (excluded && !excluded.isZero()) continue
+        const v = tx.getFloat('value')
+        sum += v || 0
+      }
       const coll = $app.findCollectionByNameOrId('accountBalances')
       const rec = new Record(coll)
       rec.set('account', oldAcc)
@@ -51,7 +63,13 @@ function onTxUpdate(e) {
     if (autoCalculated && !autoCalculated.isZero()) {
       const txs = $app.findRecordsByFilter('transactions', 'account={:aid}', '', 0, 0, { aid: newAcc })
       let sum = 0
-      for (const tx of txs) { if (tx) { const v = tx.getFloat('value'); sum += v || 0 } }
+      for (const tx of txs) {
+        if (!tx) continue
+        const excluded = tx.getDateTime('excluded')
+        if (excluded && !excluded.isZero()) continue
+        const v = tx.getFloat('value')
+        sum += v || 0
+      }
       const coll = $app.findCollectionByNameOrId('accountBalances')
       const rec = new Record(coll)
       rec.set('account', newAcc)
@@ -75,7 +93,13 @@ function onTxDelete(e) {
   if (!autoCalculated || autoCalculated.isZero()) return
   const txs = $app.findRecordsByFilter('transactions', 'account={:aid}', '', 0, 0, { aid: accountId })
   let sum = 0
-  for (const tx of txs) { if (tx) { const v = tx.getFloat('value'); sum += v || 0 } }
+  for (const tx of txs) {
+    if (!tx) continue
+    const excluded = tx.getDateTime('excluded')
+    if (excluded && !excluded.isZero()) continue
+    const v = tx.getFloat('value')
+    sum += v || 0
+  }
   const coll = $app.findCollectionByNameOrId('accountBalances')
   const rec = new Record(coll)
   rec.set('account', accountId)

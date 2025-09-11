@@ -144,8 +144,23 @@ test('big picture summary', async ({ page }) => {
 		account: autoCalculatedAccount.id,
 		owner: user.id,
 		date: new Date().toISOString(),
-		description: 'Payroll Deposit',
+		description: 'Payroll',
 		value: 1000
+	});
+
+	await expect(netWorth).toContainText('$3,000');
+	await expect(cash).toContainText('$2,000');
+	await expect(investments).toContainText('$1,000');
+	await expect(debt).toContainText('-$1,000');
+	await expect(other).toContainText('$1,000');
+
+	await seedTransaction({
+		account: autoCalculatedAccount.id,
+		owner: user.id,
+		date: new Date().toISOString(),
+		description: 'Transfer',
+		value: 1234,
+		excluded: new Date().toISOString()
 	});
 
 	await expect(netWorth).toContainText('$3,000');
