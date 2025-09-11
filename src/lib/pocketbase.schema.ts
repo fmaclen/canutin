@@ -114,7 +114,6 @@ export enum AccountsBalanceGroupOptions {
 	"OTHER" = "OTHER",
 }
 export type AccountsRecord = {
-	account?: RecordIdString
 	autoCalculated?: IsoDateString
 	balanceGroup: AccountsBalanceGroupOptions
 	balanceType?: RecordIdString
