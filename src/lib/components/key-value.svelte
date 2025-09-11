@@ -10,6 +10,8 @@
 
 <div
 	class="flex items-center justify-between rounded-sm p-4 shadow-md {className ?? 'bg-background'}"
+	role="region"
+	aria-label={title}
 >
 	<div class="text-sm font-semibold tracking-tight">{title}</div>
 	<div class="font-mono text-sm tabular-nums">
