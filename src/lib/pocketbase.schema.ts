@@ -98,11 +98,11 @@ export type SuperusersRecord = {
 }
 
 export type AccountBalancesRecord = {
-	account?: RecordIdString
+	account: RecordIdString
 	asOf: IsoDateString
 	created?: IsoDateString
 	id: string
-	owner?: RecordIdString
+	owner: RecordIdString
 	updated?: IsoDateString
 	value?: number
 }
@@ -116,24 +116,24 @@ export enum AccountsBalanceGroupOptions {
 export type AccountsRecord = {
 	autoCalculated?: IsoDateString
 	balanceGroup: AccountsBalanceGroupOptions
-	balanceType?: RecordIdString
+	balanceType: RecordIdString
 	closed?: IsoDateString
 	created?: IsoDateString
 	excluded?: IsoDateString
 	id: string
 	institution?: string
 	name: string
-	owner?: RecordIdString
+	owner: RecordIdString
 	updated?: IsoDateString
 }
 
 export type AssetBalancesRecord = {
 	asOf: IsoDateString
-	asset?: RecordIdString
+	asset: RecordIdString
 	cost?: number
 	created?: IsoDateString
 	id: string
-	owner?: RecordIdString
+	owner: RecordIdString
 	quantity?: number
 	updated?: IsoDateString
 	value?: number
@@ -147,12 +147,12 @@ export enum AssetsBalanceGroupOptions {
 }
 export type AssetsRecord = {
 	balanceGroup: AssetsBalanceGroupOptions
-	balanceType?: RecordIdString
+	balanceType: RecordIdString
 	created?: IsoDateString
 	excluded?: IsoDateString
 	id: string
 	name: string
-	owner?: RecordIdString
+	owner: RecordIdString
 	sold?: IsoDateString
 	symbol?: string
 	updated?: IsoDateString
@@ -161,8 +161,8 @@ export type AssetsRecord = {
 export type BalanceTypesRecord = {
 	created?: IsoDateString
 	id: string
-	name?: string
-	owner?: RecordIdString
+	name: string
+	owner: RecordIdString
 	updated?: IsoDateString
 }
 
@@ -170,19 +170,19 @@ export type TransactionLabelsRecord = {
 	created?: IsoDateString
 	id: string
 	name: string
-	owner?: RecordIdString
+	owner: RecordIdString
 	updated?: IsoDateString
 }
 
 export type TransactionsRecord = {
-	account?: RecordIdString
+	account: RecordIdString
 	created?: IsoDateString
 	date?: IsoDateString
 	description?: string
 	excluded?: IsoDateString
 	id: string
 	labels?: RecordIdString[]
-	owner?: RecordIdString
+	owner: RecordIdString
 	updated?: IsoDateString
 	value?: number
 }
