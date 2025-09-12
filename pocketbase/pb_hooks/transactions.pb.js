@@ -5,7 +5,7 @@
  */
 function onTxCreate(e) {
   const accountId = e.record.getString('account')
-  if (!accountId) return
+  if (!accountId) throw new Error('Account ID is required')
   const account = $app.findRecordById('accounts', accountId)
   const autoCalculated = account.getDateTime('autoCalculated')
   if (!autoCalculated || autoCalculated.isZero()) return e.next()
@@ -26,6 +26,7 @@ function onTxCreate(e) {
   const ownerId = account.getString('owner')
   if (ownerId) rec.set('owner', ownerId)
   $app.save(rec)
+  e.next()
 }
 
 /**
@@ -108,6 +109,7 @@ function onTxDelete(e) {
   const ownerId = account.getString('owner')
   if (ownerId) rec.set('owner', ownerId)
   $app.save(rec)
+  e.next()
 }
 
 onRecordAfterCreateSuccess(onTxCreate, 'transactions')

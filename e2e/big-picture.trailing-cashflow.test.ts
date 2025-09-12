@@ -30,11 +30,18 @@ test('big picture trailing cashflow', async ({ page }) => {
 	await expect(surplus).toContainText('$0');
 
 	// Seed a cash account and transactions across different trailing windows
-	const account = await seedAccount({
+	const creditCardAccount = await seedAccount({
+		name: 'Crescent Classic',
+		balanceGroup: AccountsBalanceGroupOptions.DEBT,
+		owner: user.id,
+		balanceType: 'Credit card'
+	});
+	const autoCalculatedAccount = await seedAccount({
 		name: 'Everyday',
 		balanceGroup: AccountsBalanceGroupOptions.CASH,
 		owner: user.id,
-		balanceType: 'Checking'
+		balanceType: 'Checking',
+		autoCalculated: new Date().toISOString()
 	});
 
 	const when1M = isoMidOfMonthMonthsAgo(1);
@@ -43,14 +50,14 @@ test('big picture trailing cashflow', async ({ page }) => {
 
 	// In last month (counts in 3M/6M/1Y): income 1200, expense -600
 	await seedTransaction({
-		account: account.id,
+		account: creditCardAccount.id,
 		owner: user.id,
 		date: when1M,
 		description: 'Paycheck M-1',
 		value: 1200
 	});
 	await seedTransaction({
-		account: account.id,
+		account: creditCardAccount.id,
 		owner: user.id,
 		date: when1M,
 		description: 'Groceries M-1',
@@ -59,14 +66,14 @@ test('big picture trailing cashflow', async ({ page }) => {
 
 	// In 5 months ago (counts in 6M/1Y only): income 300, expense -150
 	await seedTransaction({
-		account: account.id,
+		account: autoCalculatedAccount.id,
 		owner: user.id,
 		date: when5M,
 		description: 'Paycheck M-5',
 		value: 300
 	});
 	await seedTransaction({
-		account: account.id,
+		account: creditCardAccount.id,
 		owner: user.id,
 		date: when5M,
 		description: 'Groceries M-5',
@@ -75,14 +82,14 @@ test('big picture trailing cashflow', async ({ page }) => {
 
 	// In 11 months ago (counts in 1Y only): income 600, expense -300
 	await seedTransaction({
-		account: account.id,
+		account: autoCalculatedAccount.id,
 		owner: user.id,
 		date: when11M,
 		description: 'Paycheck M-11',
 		value: 600
 	});
 	await seedTransaction({
-		account: account.id,
+		account: creditCardAccount.id,
 		owner: user.id,
 		date: when11M,
 		description: 'Groceries M-11',
