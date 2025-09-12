@@ -11,6 +11,8 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { m } from '$lib/paraglide/messages.js';
 
+	import DevAuthShortcuts from './dev-auth-shortcuts.svelte';
+
 	let { mode = 'login' }: { mode?: 'login' | 'signup' } = $props();
 
 	const id = $props.id();
@@ -85,6 +87,10 @@
 			{/if}
 
 			<Button type="submit" class="w-full" disabled={auth.isLoading}>{primaryText}</Button>
+
+			{#if dev}
+				<DevAuthShortcuts />
+			{/if}
 		</form>
 		<div class="mt-4 text-center text-sm">
 			{altCtaText}

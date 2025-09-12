@@ -7,7 +7,7 @@ test('user can sign up, login and logout', async ({ page }) => {
 	await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
 	await expect(page.getByText('Failed to authenticate')).not.toBeVisible();
 
-	const uniqueEmail = `alice+${Date.now()}@example.com`;
+	const uniqueEmail = `bob.${Date.now()}@example.com`;
 
 	// Try to login before signing up
 	await page.getByLabel('Email').fill(uniqueEmail);
@@ -46,7 +46,7 @@ test('user can sign up, login and logout', async ({ page }) => {
 	await expect(page.getByRole('menuitem', { name: 'Log out' })).not.toBeVisible();
 
 	// Logout
-	const userButton = page.getByRole('button', { name: 'alice' });
+	const userButton = page.getByRole('button', { name: 'bob' });
 	if (!(await userButton.isVisible())) {
 		// On mobile the sidebar is collapsed; open it first
 		await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
