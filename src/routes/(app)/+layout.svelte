@@ -2,15 +2,15 @@
 	import { setAccountsContext } from '$lib/accounts.svelte';
 	import { setAssetsContext } from '$lib/assets.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import { getPocketBaseClientContext } from '$lib/pocketbase.svelte';
+	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 
 	import AppSidebar from './app-sidebar.svelte';
 
 	let { children } = $props();
 
-	const pocketBaseClient = getPocketBaseClientContext();
-	setAccountsContext(pocketBaseClient.client);
-	setAssetsContext(pocketBaseClient.client);
+	const pb = getPocketBaseContext();
+	setAccountsContext(pb.authedClient);
+	setAssetsContext(pb.authedClient);
 </script>
 
 <Sidebar.Provider>

@@ -5,13 +5,13 @@
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { m } from '$lib/paraglide/messages';
-	import { getPocketBaseClientContext } from '$lib/pocketbase.svelte';
+	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 
 	import Summary from './summary.svelte';
 	import TrailingCashflow from './trailing-cashflow.svelte';
 
-	const pocketBaseClient = getPocketBaseClientContext();
-	setCashflowContext(pocketBaseClient.client);
+	const pb = getPocketBaseContext();
+	setCashflowContext(pb.authedClient);
 </script>
 
 <header class="flex h-16 shrink-0 items-center gap-2 border-b">

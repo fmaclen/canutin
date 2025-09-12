@@ -4,16 +4,16 @@
 	import favicon from '$lib/assets/favicon.png';
 	import { setAuthContext } from '$lib/auth.svelte';
 	import Sonner from '$lib/components/ui/sonner/sonner.svelte';
-	import { getPocketBaseClientContext, setPocketBaseClientContext } from '$lib/pocketbase.svelte';
+	import { getPocketBaseContext, setPocketBaseContext } from '$lib/pocketbase.svelte';
 
 	import AuthGuard from './auth-guard.svelte';
 
 	let { children } = $props();
 
-	setPocketBaseClientContext();
-	const pocketBaseClient = getPocketBaseClientContext();
+	setPocketBaseContext();
 
-	setAuthContext(pocketBaseClient.client);
+	const pb = getPocketBaseContext();
+	setAuthContext(pb.authedClient);
 </script>
 
 <svelte:head>
