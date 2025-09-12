@@ -24,8 +24,6 @@ export function setPocketBaseContext() {
 export function getPocketBaseContext() {
 	const store = getContext<PocketBaseContext>(CONTEXT_KEY);
 	if (!store)
-		throw new Error(
-			'PocketBase client context not found. Call setPocketBaseContext() first.'
-		);
+		throw new Error('PocketBase client context not found. Call setPocketBaseContext() first.');
 	return store;
 }
