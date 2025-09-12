@@ -1,8 +1,6 @@
 import PocketBase, { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 
-import { createKeyedBatchQueue } from '$lib/pocketbase.utils';
-
 import type { AccountBalancesResponse, AccountsResponse } from './pocketbase.schema';
 
 type AccountWithBalance = AccountsResponse & { balance: number };
@@ -11,10 +9,6 @@ class AccountsContext {
 	accounts: AccountWithBalance[] = $state([]);
 
 	private _pb: PocketBase;
-	private _balanceQueue = createKeyedBatchQueue<string>(async (accountId) => {
-		const value = await this.getLatestAccountBalance(accountId);
-		this.accounts = this.accounts.map((x) => (x.id === accountId ? { ...x, balance: value } : x));
-	});
 
 	constructor(pb: PocketBase) {
 		this._pb = pb;
@@ -24,7 +18,10 @@ class AccountsContext {
 	private async init() {
 		const list = await this._pb.collection('accounts').getFullList<AccountsResponse>();
 		this.accounts = list.map((a) => ({ ...a, balance: 0 }));
-		for (const a of this.accounts) this._balanceQueue.enqueue(a.id);
+		for (const a of this.accounts) {
+			const value = await this.getLatestAccountBalance(a.id);
+			this.accounts = this.accounts.map((x) => (x.id === a.id ? { ...x, balance: value } : x));
+		}
 		this.realtimeSubscribe();
 	}
 
@@ -47,7 +44,10 @@ class AccountsContext {
 	}
 
 	private async onAccountBalanceEvent(e: RecordSubscription<AccountBalancesResponse>) {
-		this._balanceQueue.enqueue(e.record.account);
+		if (!e.action) return;
+		const accountId = e.record.account;
+		const value = await this.getLatestAccountBalance(accountId);
+		this.accounts = this.accounts.map((x) => (x.id === accountId ? { ...x, balance: value } : x));
 	}
 
 	private async getLatestAccountBalance(accountId: string) {

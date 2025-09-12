@@ -24,7 +24,6 @@ class CashflowContext {
 	}
 
 	private realtimeSubscribe() {
-		this._pb.collection('accountBalances').subscribe('*', this.onTransactionEvent.bind(this));
 		this._pb.collection('transactions').subscribe('*', this.onTransactionEvent.bind(this));
 	}
 
@@ -46,7 +45,6 @@ class CashflowContext {
 	}
 
 	private async recomputeAll() {
-		console.log('[cashflow] recomputeAll');
 		const startOfThisMonth = this.monthStartUtcNow();
 		const start12m = this.addMonthsUtc(startOfThisMonth, -11);
 		const start6m = this.addMonthsUtc(startOfThisMonth, -5);
