@@ -1,12 +1,14 @@
 <script lang="ts">
-	import KeyValue from "$lib/components/key-value.svelte";
-	import SectionTitle from "$lib/components/section-title.svelte";
-	import * as Tabs from "$lib/components/ui/tabs/index";
+	import { getCashflowContext } from '$lib/cashflow.svelte';
+	import KeyValue from '$lib/components/key-value.svelte';
+	import SectionTitle from '$lib/components/section-title.svelte';
+	import * as Tabs from '$lib/components/ui/tabs/index';
 
-	const avg3m = { income: 0, expenses: 0, surplus: 0 };
-	const avg6m = { income: 0, expenses: 0, surplus: 0 };
-	const avgYtd = { income: 0, expenses: 0, surplus: 0 };
-	const avg1y = { income: 0, expenses: 0, surplus: 0 };
+	const cashflow = getCashflowContext();
+	const avg3m = $derived.by(() => cashflow.avg3m);
+	const avg6m = $derived.by(() => cashflow.avg6m);
+	const avgYtd = $derived.by(() => cashflow.avgYtd);
+	const avg1y = $derived.by(() => cashflow.avg1y);
 </script>
 
 <Tabs.Root value="six-months">

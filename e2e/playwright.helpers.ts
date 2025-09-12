@@ -1,4 +1,4 @@
-import { expect, Page } from '@playwright/test';
+import { Page } from '@playwright/test';
 
 import { DEFAULT_PASSWORD } from './pocketbase.helpers';
 
