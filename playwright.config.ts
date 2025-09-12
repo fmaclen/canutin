@@ -10,7 +10,6 @@ export enum Projects {
 }
 
 export default defineConfig({
-	globalSetup: 'e2e/global.setup.ts',
 	webServer: [
 		{
 			command: 'npm run pb',
