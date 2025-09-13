@@ -1,10 +1,10 @@
 <script lang="ts">
-	import TrendingUpIcon from '@lucide/svelte/icons/trending-up';
+	// import TrendingUpIcon from '@lucide/svelte/icons/trending-up';
 	import { scaleUtc } from 'd3-scale';
 	import { curveNatural } from 'd3-shape';
 	import { LineChart } from 'layerchart';
 
-	import * as Card from '$lib/components/ui/card/index.js';
+	// import * as Card from '$lib/components/ui/card/index.js';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 
 	const chartData = [

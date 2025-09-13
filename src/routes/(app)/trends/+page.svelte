@@ -2,6 +2,7 @@
 	import { scaleUtc } from 'd3-scale';
 	import { curveNatural } from 'd3-shape';
 	import { LineChart } from 'layerchart';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
@@ -29,17 +30,9 @@
 		return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 	}
 
-	function weeksBack(count: number): Date[] {
-		const out: Date[] = [];
-		const today = utcMidnight(new Date());
-		for (let i = count - 1; i >= 0; i--) {
-			const d = new Date(today);
-			d.setUTCDate(d.getUTCDate() - i * 7);
-			out.push(d);
-		}
-		return out;
-	}
+	// (removed) weekly step generator
 
+	// Sequence of x-axis dates for the selected range
 	let dates: Date[] = $state([]);
 
 	type Row = {
@@ -197,14 +190,14 @@
 		}
 		dates = ds;
 
-		const acctMap = new Map<string, AccountBalancesResponse[]>();
+		const acctMap = new SvelteMap<string, AccountBalancesResponse[]>();
 		for (const b of rawAccountBalances) {
 			if (!rawAccounts.find((a) => a.id === b.account)) continue;
 			const arr = acctMap.get(b.account) || [];
 			arr.push(b);
 			acctMap.set(b.account, arr);
 		}
-		const assetMap = new Map<string, AssetBalancesResponse[]>();
+		const assetMap = new SvelteMap<string, AssetBalancesResponse[]>();
 		for (const b of rawAssetBalances) {
 			if (!rawAssets.find((a) => a.id === b.asset)) continue;
 			const arr = assetMap.get(b.asset) || [];
@@ -215,9 +208,9 @@
 		const accountById = new Map(rawAccounts.map((a) => [a.id, a] as const));
 		const assetById = new Map(rawAssets.map((a) => [a.id, a] as const));
 
-		const acctPtr = new Map<string, number>();
+		const acctPtr = new SvelteMap<string, number>();
 		for (const [id, arr] of acctMap) acctPtr.set(id, latestIndexBeforeOrEqual(arr, ds[0], -1));
-		const assetPtr = new Map<string, number>();
+		const assetPtr = new SvelteMap<string, number>();
 		for (const [id, arr] of assetMap) assetPtr.set(id, latestIndexBeforeOrEqual(arr, ds[0], -1));
 
 		const rows: Row[] = [];
@@ -263,7 +256,8 @@
 	}
 
 	$effect(() => {
-		period;
+		// Rerun computation when period changes
+		const _p = period;
 		void recomputeSeries();
 	});
 </script>
