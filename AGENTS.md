@@ -22,6 +22,7 @@
 ## Coding Style & Naming Conventions
 
 - Formatting via Prettier: tabs, single quotes, width 100, no trailing commas. Run `bun run format`.
+- Indentation uses tabs with size 2 (tab width 2).
 - Linting via ESLint (Svelte/TS configs). Run `bun run lint`.
 - TypeScript: strict mode. Explicit types required (params/exports); `any` is forbidden. Omit explicit return types—use inference.
 - Files follow SvelteKit conventions (`+page.svelte`, `+layout.ts`). Components in `src/lib/components` use kebab-case (e.g., `card-title.svelte`).
