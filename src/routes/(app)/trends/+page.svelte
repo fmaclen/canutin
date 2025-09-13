@@ -73,6 +73,36 @@
 		other: { label: 'Other assets', color: '#5255ac' }
 	} satisfies Chart.ChartConfig;
 
+	// Format and dynamic left padding for Y axis
+	function formatY(v: number) {
+		return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(v);
+	}
+
+	let _measureCanvas: HTMLCanvasElement | null = null;
+	function textWidthMono(text: string) {
+		if (typeof document === 'undefined') return text.length * 8;
+		if (!_measureCanvas) _measureCanvas = document.createElement('canvas');
+		const ctx = _measureCanvas.getContext('2d');
+		if (!ctx) return text.length * 8;
+		ctx.font = '12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+		return ctx.measureText(text).width;
+	}
+
+	const yTickValues = $derived.by(() => {
+		if (!yDomain) return [] as number[];
+		const [min, max] = yDomain;
+		const ticks = [min, max];
+		if (min < 0 && max > 0) ticks.splice(1, 0, 0);
+		return ticks;
+	});
+
+	const leftPadding = $derived.by(() => {
+		const labels = yTickValues.map((v) => formatY(Math.round(v)));
+		const maxW = labels.reduce((m, s) => Math.max(m, textWidthMono(s)), 0);
+		// label width + gutter; minimum to keep visuals stable
+		return Math.max(48, Math.ceil(maxW) + 16);
+	});
+
 	function latestIndexBeforeOrEqual<T extends { asOf: string }>(arr: T[], t: Date, start = -1) {
 		let i = start;
 		while (i + 1 < arr.length && new Date(arr[i + 1].asOf) <= t) i++;
@@ -292,18 +322,17 @@
 			</Tabs.List>
 		</nav>
 		{#if series.length}
-			<div class="bg-background overflow-hidden rounded-sm shadow-md">
+			<div class="bg-background overflow-visible rounded-sm shadow-md">
 				<Chart.Container
 					config={chartConfig}
-					class="h-128 w-full"
+					class="h-128 w-full [&_.lc-axis-x_.lc-axis-tick-label]:font-mono [&_.lc-axis-y_.lc-axis-tick-label]:font-mono [&_.lc-axis-x_.lc-axis-tick:first-child_.lc-axis-tick-label]:hidden"
 				>
 					<LineChart
 						data={series}
 						x="date"
 						xScale={scaleUtc()}
-						axis="x"
 						yDomain={yDomain ?? undefined}
-						padding={{ top: 16, right: 16, bottom: 24, left: 16 }}
+						padding={{ top: 16, right: 16, bottom: 24, left: leftPadding }}
 						series={[
 							{ key: 'net', label: 'Net worth', color: chartConfig.net.color },
 							{ key: 'cash', label: 'Cash', color: chartConfig.cash.color },
@@ -313,9 +342,18 @@
 						]}
 						legend={{ placement: 'top' }}
 						props={{
-							spline: { curve: curveNatural, motion: 'tween', strokeWidth: 1.33 },
+							spline: { curve: curveNatural, motion: 'none', strokeWidth: 1.33 },
 							xAxis: {
 								format: (v: Date) => v.toISOString().slice(0, 10)
+							},
+							yAxis: {
+								format: (v: number) => formatY(Math.round(v)),
+								ticks: (scale) => {
+									const [min, max] = scale.domain();
+									const ticks = [min, max];
+									if (min < 0 && max > 0) ticks.splice(1, 0, 0);
+									return ticks;
+								}
 							},
 							highlight: { points: { r: 3 } }
 						}}
