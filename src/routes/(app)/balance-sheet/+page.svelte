@@ -30,6 +30,8 @@
 		init();
 	});
 
+	const balanceGroups: BalanceGroup[] = ['CASH', 'DEBT', 'INVESTMENT', 'OTHER'];
+
 	function groupTitle(group: BalanceGroup) {
 		return group === 'CASH'
 			? 'Cash'
@@ -128,28 +130,36 @@
 	</div>
 </header>
 
-<div class="flex flex-col space-y-8 p-8">
+<div class="flex flex-col space-y-2 p-8">
 	<SectionTitle title="Balances" />
-	<div class="grid gap-2 lg:grid-cols-4">
-		{#each ['CASH', 'DEBT', 'INVESTMENT', 'OTHER'] as BalanceGroup[] as g}
-			<div class="flex flex-col gap-4">
+	<div
+		class="grid gap-x-4 gap-y-6 md:grid-cols-[1fr_auto_1fr_auto] xl:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr]"
+	>
+		{#each balanceGroups as balanceGroup, index (balanceGroup)}
+			{#if index > 0}
+				<Separator orientation="horizontal" class="block lg:hidden" />
+				<Separator orientation="vertical" class="hidden lg:block" />
+			{/if}
+			<div class="flex w-full flex-col gap-4">
 				<KeyValue
-					title={groupTitle(g)}
-					value={grouped[g].total}
-					className={`${groupClass(g)} text-background`}
+					title={groupTitle(balanceGroup)}
+					value={grouped[balanceGroup].total}
+					className={`${groupClass(balanceGroup)} text-background`}
 				/>
-				{#each grouped[g].types as t (t.id)}
+				{#each grouped[balanceGroup].types as balanceType (balanceType.id)}
 					<div class="bg-background overflow-hidden rounded-sm shadow-md">
 						<div class="flex items-center justify-between border-b p-4">
-							<div class="text-sm font-medium">{t.name}</div>
+							<div class="text-sm font-medium">{balanceType.name}</div>
 							<div class="font-mono text-sm tabular-nums">
-								<Currency value={t.total} />
+								<Currency value={balanceType.total} />
 							</div>
 						</div>
 						<ul>
-							{#each t.items as item (item.id)}
-								<li class="flex items-center justify-between border-b px-4 py-3 last:border-b-0 odd:bg-sidebar">
-									<span class="text-foreground/90 text-sm">{item.name}</span>
+							{#each balanceType.items as item (item.id)}
+								<li
+									class="odd:bg-sidebar text-foreground flex items-center justify-between border-b px-4 py-3 last:border-b-0"
+								>
+									<span class="text-sm">{item.name}</span>
 									<span class="font-mono text-xs tabular-nums">
 										<Currency value={item.balance} />
 									</span>
