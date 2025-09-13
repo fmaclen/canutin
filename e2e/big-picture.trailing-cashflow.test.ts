@@ -15,7 +15,7 @@ function isoMidOfMonthMonthsAgo(monthsAgo: number) {
 }
 
 test('big picture trailing cashflow', async ({ page }) => {
-	const user = await seedUser('alice');
+	const user = await seedUser('daphne');
 
 	await page.goto('/');
 	await signIn(page, user.email);
