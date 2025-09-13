@@ -18,16 +18,17 @@
 	const pb = getPocketBaseContext();
 
 	let balanceTypesById: Record<string, string> = $state({});
+	let balanceTypes = $state<BalanceTypesResponse[]>([]);
 
-	async function init() {
-		const list = await pb.authedClient
+	async function getBalanceTypes() {
+		balanceTypes = await pb.authedClient
 			.collection('balanceTypes')
 			.getFullList<BalanceTypesResponse>();
-		balanceTypesById = Object.fromEntries(list.map((bt) => [bt.id, bt.name]));
+		balanceTypesById = Object.fromEntries(balanceTypes.map((bt) => [bt.id, bt.name]));
 	}
 
 	$effect(() => {
-		init();
+		if (assetsContext.assets || accountsContext.accounts) getBalanceTypes();
 	});
 
 	const balanceGroups: BalanceGroup[] = ['CASH', 'DEBT', 'INVESTMENT', 'OTHER'];
@@ -61,7 +62,7 @@
 					id: string;
 					name: string;
 					total: number;
-					items: Array<{ id: string; name: string; balance: number }>;
+					items: Array<{ id: string; name: string; balance: number; excluded: boolean }>;
 				}>;
 			}
 		> = {
@@ -89,21 +90,27 @@
 		}
 
 		for (const a of accountsContext.accounts) {
-			if (a.excluded || a.closed) continue;
+			if (a.closed) continue;
 			const group = a.balanceGroup as BalanceGroup;
-			groups[group].total += a.balance ?? 0;
+			if (!a.excluded) groups[group].total += a.balance ?? 0;
 			const type = upsert(group, a.balanceType, balanceTypesById[a.balanceType] ?? '(Unknown)');
-			type.total += a.balance ?? 0;
-			type.items = [...type.items, { id: a.id, name: a.name, balance: a.balance ?? 0 }];
+			if (!a.excluded) type.total += a.balance ?? 0;
+			type.items = [
+				...type.items,
+				{ id: a.id, name: a.name, balance: a.balance ?? 0, excluded: Boolean(a.excluded) }
+			];
 		}
 
 		for (const a of assetsContext.assets) {
-			if (a.excluded || a.sold) continue;
+			if (a.sold) continue;
 			const group = a.balanceGroup as BalanceGroup;
-			groups[group].total += a.balance ?? 0;
+			if (!a.excluded) groups[group].total += a.balance ?? 0;
 			const type = upsert(group, a.balanceType, balanceTypesById[a.balanceType] ?? '(Unknown)');
-			type.total += a.balance ?? 0;
-			type.items = [...type.items, { id: a.id, name: a.name, balance: a.balance ?? 0 }];
+			if (!a.excluded) type.total += a.balance ?? 0;
+			type.items = [
+				...type.items,
+				{ id: a.id, name: a.name, balance: a.balance ?? 0, excluded: Boolean(a.excluded) }
+			];
 		}
 
 		for (const g of Object.keys(typeMaps) as BalanceGroup[]) {
@@ -137,17 +144,17 @@
 	>
 		{#each balanceGroups as balanceGroup, index (balanceGroup)}
 			{#if index > 0}
-				<Separator orientation="horizontal" class="block lg:hidden" />
-				<Separator orientation="vertical" class="hidden lg:block" />
+				<Separator orientation="horizontal" class="block md:hidden" />
+				<Separator orientation="vertical" class="hidden md:block" />
 			{/if}
-			<div class="flex w-full flex-col gap-4">
+			<div class="flex w-full flex-col gap-4" data-testid={balanceGroup}>
 				<KeyValue
 					title={groupTitle(balanceGroup)}
 					value={grouped[balanceGroup].total}
 					className={`${groupClass(balanceGroup)} text-background`}
 				/>
 				{#each grouped[balanceGroup].types as balanceType (balanceType.id)}
-					<div class="bg-background overflow-hidden rounded-sm shadow-md">
+					<div class="bg-background overflow-hidden rounded-sm shadow-md" role="region" aria-label={balanceType.name}>
 						<div class="flex items-center justify-between border-b p-4">
 							<div class="text-sm font-medium">{balanceType.name}</div>
 							<div class="font-mono text-sm tabular-nums">
@@ -157,10 +164,18 @@
 						<ul>
 							{#each balanceType.items as item (item.id)}
 								<li
-									class="odd:bg-sidebar text-foreground flex items-center justify-between border-b px-4 py-3 last:border-b-0"
+									class="odd:bg-sidebar flex items-center justify-between border-b px-4 py-3 last:border-b-0 gap-2 text-balance"
 								>
-									<span class="text-sm">{item.name}</span>
-									<span class="font-mono text-xs tabular-nums">
+									<span
+										class={'text-sm ' +
+											(item.excluded ? 'text-muted-foreground' : 'text-foreground/90')}
+									>
+										{item.name}
+									</span>
+									<span
+										class={'font-mono text-xs tabular-nums ' +
+											(item.excluded ? 'text-muted-foreground' : '')}
+									>
 										<Currency value={item.balance} />
 									</span>
 								</li>
