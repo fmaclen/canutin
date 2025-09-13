@@ -29,12 +29,12 @@
 		},
 		{
 			name: m.sidebar_balance_sheet(),
-			url: resolve('/big-picture'),
+			url: resolve('/balance-sheet'),
 			icon: LayoutListIcon
 		},
 		{
 			name: m.sidebar_trends(),
-			url: resolve('/big-picture'),
+			url: resolve('/trends'),
 			icon: ChartLineIcon
 		}
 	]);
@@ -42,23 +42,23 @@
 	const dataSources = $derived([
 		{
 			name: m.sidebar_assets(),
-			url: resolve('/big-picture'),
+			url: resolve('/assets'),
 			icon: LandmarkIcon
 		},
 		{
 			name: m.sidebar_accounts(),
-			url: resolve('/big-picture'),
+			url: resolve('/accounts'),
 			icon: WalletCardsIcon
 		},
 		{
 			name: m.sidebar_transactions(),
-			url: resolve('/big-picture'),
+			url: resolve('/transactions'),
 			icon: ArrowLeftRightIcon
 		}
 	]);
 </script>
 
-<Sidebar.Root bind:ref variant="inset" {...restProps}>
+<Sidebar.Root bind:ref variant="sidebar" {...restProps}>
 	<Sidebar.Header>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
@@ -80,8 +80,8 @@
 		</Sidebar.Menu>
 	</Sidebar.Header>
 	<Sidebar.Content>
-		<NavGroup links={insights} label={m.sidebar_insights()} />
-		<NavGroup links={dataSources} label={m.sidebar_data_sources()} />
+		<NavGroup links={insights} />
+		<NavGroup links={dataSources} />
 	</Sidebar.Content>
 	<Sidebar.Footer>
 		<NavUser />

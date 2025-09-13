@@ -13,7 +13,7 @@
 	role="region"
 	aria-label={title}
 >
-	<div class="text-sm font-semibold tracking-tight">{title}</div>
+	<div class="text-sm font-semibold tracking-tight text-balance">{title}</div>
 	<div class="font-mono text-sm tabular-nums">
 		<Currency {value} />
 	</div>

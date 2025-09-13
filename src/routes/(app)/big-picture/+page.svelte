@@ -14,13 +14,13 @@
 	setCashflowContext(pb.authedClient);
 </script>
 
-<header class="flex h-16 shrink-0 items-center gap-2 border-b">
+<header class="bg-background flex h-16 shrink-0 items-center gap-2 border-b">
 	<div class="flex items-center gap-2 px-4">
 		<Sidebar.Trigger class="-ml-1" />
 		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
 		<Breadcrumb.Root>
 			<Breadcrumb.List>
-				<Breadcrumb.Item class="hidden md:block">
+				<Breadcrumb.Item>
 					<Breadcrumb.Page>{m.sidebar_big_picture()}</Breadcrumb.Page>
 				</Breadcrumb.Item>
 			</Breadcrumb.List>
@@ -28,7 +28,7 @@
 	</div>
 </header>
 
-<div class="flex flex-col space-y-10 px-6 py-8">
+<div class="flex flex-col space-y-8 p-8">
 	<section class="mx-auto flex w-full flex-col space-y-2">
 		<SectionTitle title="Summary" />
 		<Summary />

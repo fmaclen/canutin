@@ -5,10 +5,10 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 
 	let {
-		label,
+		// label,
 		links
 	}: {
-		label: string;
+		// label: string;
 		links: {
 			name: string;
 			url: ResolvedPathname;
@@ -17,8 +17,10 @@
 	} = $props();
 </script>
 
-<Sidebar.Group class="group-data-[collapsible=icon]:hidden">
-	<Sidebar.GroupLabel>{label}</Sidebar.GroupLabel>
+<Sidebar.Group
+	class="border-t pt-6 pb-0 group-data-[collapsible=icon]:hidden first:border-t-0 first:pt-4"
+>
+	<!-- <Sidebar.GroupLabel>{label}</Sidebar.GroupLabel> -->
 	<Sidebar.Menu>
 		{#each links as item (item.name)}
 			<Sidebar.MenuItem>
