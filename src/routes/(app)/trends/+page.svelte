@@ -86,13 +86,15 @@
 				.collection('accountBalances')
 				.getFullList<AccountBalancesResponse<{ account: AccountsResponse }>>({
 					sort: 'asOf,created,id',
-					expand: 'account'
+					expand: 'account',
+					requestKey: 'trends:accountBalances'
 				}),
 			pb.authedClient
 				.collection('assetBalances')
 				.getFullList<AssetBalancesResponse<{ asset: AssetsResponse }>>({
 					sort: 'asOf,created,id',
-					expand: 'asset'
+					expand: 'asset',
+					requestKey: 'trends:assetBalances'
 				})
 		]);
 
