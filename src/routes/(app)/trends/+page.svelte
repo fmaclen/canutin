@@ -15,8 +15,12 @@
 	import { LineChart } from 'layerchart';
 	import { scaleUtc } from 'd3-scale';
 	import { curveNatural } from 'd3-shape';
+    import * as Tabs from '$lib/components/ui/tabs/index';
 
-	const pb = getPocketBaseContext();
+const pb = getPocketBaseContext();
+
+// Period selector
+let period: '1w' | '1m' | '6m' | 'ytd' | '1y' | '5y' | 'max' = $state('1y');
 
 	type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
 
@@ -35,10 +39,16 @@
 		return out;
 	}
 
-	let dates: Date[] = $state([]);
+let dates: Date[] = $state([]);
 
 	type Row = { date: Date; net: number; cash: number; debt: number; investment: number; other: number };
-	let series: Row[] = $state([]);
+let series: Row[] = $state([]);
+
+// Raw data caches (single fetch, recompute client-side per period)
+let rawAccounts: AccountsResponse[] = $state([]);
+let rawAssets: AssetsResponse[] = $state([]);
+let rawAccountBalances: AccountBalancesResponse[] = $state([]);
+let rawAssetBalances: AssetBalancesResponse[] = $state([]);
 
 	// Add a small headroom so lines don't appear clipped at the top
 	const yDomain = $derived.by(() => {
@@ -69,7 +79,7 @@
 	}
 
 	// Quick & dirty: 2 queries with expand, then filter client-side.
-	async function loadAndLogAll(): Promise<void> {
+async function loadAndLogAll(): Promise<void> {
 		const [accountBalancesAll, assetBalancesAll] = await Promise.all([
 			pb.authedClient
 				.collection('accountBalances')
@@ -109,112 +119,127 @@
 			if (as) assetsMap.set(as.id, as);
 		}
 
-		const accounts = Array.from(accountsMap.values());
-		const assets = Array.from(assetsMap.values());
+    const accounts = Array.from(accountsMap.values());
+    const assets = Array.from(assetsMap.values());
 
-		console.log('[trends quick]', {
-			accounts,
-			assets,
-			accountBalances,
-			assetBalances
-		});
+    // Data fetched and filtered; cached below for recomputation
 
-		// Compute weekly series for the last 12 months
-		dates = weeksBack(52);
-		const acctMap = new Map<string, AccountBalancesResponse[]>();
-		for (const b of accountBalances) {
-			const arr = acctMap.get(b.account) || [];
-			arr.push(b);
-			acctMap.set(b.account, arr);
-		}
-		const assetMap = new Map<string, AssetBalancesResponse[]>();
-		for (const b of assetBalances) {
-			const arr = assetMap.get(b.asset) || [];
-			arr.push(b);
-			assetMap.set(b.asset, arr);
-		}
+    // Cache raw data for recompute, then compute the current period
+    rawAccounts = accounts;
+    rawAssets = assets;
+    rawAccountBalances = accountBalances;
+    rawAssetBalances = assetBalances;
 
-		// Precompute metadata lookups
-		const accountById = new Map(accounts.map((a) => [a.id, a] as const));
-		const assetById = new Map(assets.map((a) => [a.id, a] as const));
+    await recomputeSeries();
+}
 
-		// Initialize pointers at the latest record <= start
-		const start = dates[0];
-		const acctPtr = new Map<string, number>();
-		for (const [id, arr] of acctMap) {
-			acctPtr.set(id, latestIndexBeforeOrEqual(arr, start, -1));
-		}
-		const assetPtr = new Map<string, number>();
-		for (const [id, arr] of assetMap) {
-			assetPtr.set(id, latestIndexBeforeOrEqual(arr, start, -1));
-		}
+if (typeof window !== 'undefined') {
+    void loadAndLogAll();
+}
 
-		const rows: Row[] = [];
-		for (const t of dates) {
-			let cash = 0;
-			let debt = 0;
-			let investment = 0;
-			let other = 0;
+function computeRangeForPeriod(p: typeof period) {
+    const now = utcMidnight(new Date());
+    if (p === '1w') return { start: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 7)), end: now };
+    if (p === '1m') return { start: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, now.getUTCDate())), end: now };
+    if (p === '6m') return { start: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 6, now.getUTCDate())), end: now };
+    if (p === 'ytd') return { start: new Date(Date.UTC(now.getUTCFullYear(), 0, 1)), end: now };
+    if (p === '1y') return { start: new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth(), now.getUTCDate())), end: now };
+    if (p === '5y') return { start: new Date(Date.UTC(now.getUTCFullYear() - 5, now.getUTCMonth(), now.getUTCDate())), end: now };
+    // max
+    let earliest: Date | null = null;
+    for (const b of rawAccountBalances) {
+        const d = new Date(b.asOf);
+        if (!earliest || d < earliest) earliest = d;
+    }
+    for (const b of rawAssetBalances) {
+        const d = new Date(b.asOf);
+        if (!earliest || d < earliest) earliest = d;
+    }
+    const start = earliest ? utcMidnight(earliest) : new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth(), now.getUTCDate()));
+    return { start, end: now };
+}
 
-			for (const [id, arr] of acctMap) {
-				const meta = accountById.get(id);
-				if (!meta) continue;
-				const prev = acctPtr.get(id) ?? -1;
-				const idx = latestIndexBeforeOrEqual(arr, t, prev);
-				acctPtr.set(id, idx);
-				const val = idx >= 0 ? arr[idx].value ?? 0 : 0;
-				const g = meta.balanceGroup as BalanceGroup;
-				if (g === 'CASH') cash += val;
-				else if (g === 'DEBT') debt += val;
-				else if (g === 'INVESTMENT') investment += val;
-				else other += val;
-			}
+async function recomputeSeries() {
+    if (!rawAccounts.length && !rawAssets.length) return;
+    const { start, end } = computeRangeForPeriod(period);
 
-			for (const [id, arr] of assetMap) {
-				const meta = assetById.get(id);
-				if (!meta) continue;
-				const prev = assetPtr.get(id) ?? -1;
-				const idx = latestIndexBeforeOrEqual(arr, t, prev);
-				assetPtr.set(id, idx);
-				const val = idx >= 0 ? arr[idx].value ?? 0 : 0;
-				const g = meta.balanceGroup as BalanceGroup;
-				if (g === 'CASH') cash += val;
-				else if (g === 'DEBT') debt += val;
-				else if (g === 'INVESTMENT') investment += val;
-				else other += val;
-			}
+    const ds: Date[] = [];
+    let d = new Date(start);
+    while (d <= end) {
+        ds.push(new Date(d));
+        d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 7));
+    }
+    dates = ds;
 
-			const net = cash + debt + investment + other;
-			rows.push({ date: t, net, cash, debt, investment, other });
-		}
+    const acctMap = new Map<string, AccountBalancesResponse[]>();
+    for (const b of rawAccountBalances) {
+        if (!rawAccounts.find((a) => a.id === b.account)) continue;
+        const arr = acctMap.get(b.account) || [];
+        arr.push(b);
+        acctMap.set(b.account, arr);
+    }
+    const assetMap = new Map<string, AssetBalancesResponse[]>();
+    for (const b of rawAssetBalances) {
+        if (!rawAssets.find((a) => a.id === b.asset)) continue;
+        const arr = assetMap.get(b.asset) || [];
+        arr.push(b);
+        assetMap.set(b.asset, arr);
+    }
 
-		series = rows;
-		console.log('[trends series]', series);
-		const stats = series.reduce(
-			(acc, r) => {
-				acc.cash.min = Math.min(acc.cash.min, r.cash);
-				acc.cash.max = Math.max(acc.cash.max, r.cash);
-				acc.debt.min = Math.min(acc.debt.min, r.debt);
-				acc.debt.max = Math.max(acc.debt.max, r.debt);
-				acc.investment.min = Math.min(acc.investment.min, r.investment);
-				acc.investment.max = Math.max(acc.investment.max, r.investment);
-				acc.other.min = Math.min(acc.other.min, r.other);
-				acc.other.max = Math.max(acc.other.max, r.other);
-				return acc;
-			},
-			{
-				cash: { min: Number.POSITIVE_INFINITY, max: Number.NEGATIVE_INFINITY },
-				debt: { min: Number.POSITIVE_INFINITY, max: Number.NEGATIVE_INFINITY },
-				investment: { min: Number.POSITIVE_INFINITY, max: Number.NEGATIVE_INFINITY },
-				other: { min: Number.POSITIVE_INFINITY, max: Number.NEGATIVE_INFINITY }
-			}
-		);
-		console.log('[trends stats]', stats);
-	}
+    const accountById = new Map(rawAccounts.map((a) => [a.id, a] as const));
+    const assetById = new Map(rawAssets.map((a) => [a.id, a] as const));
 
-	if (typeof window !== 'undefined') {
-		void loadAndLogAll();
-	}
+    const acctPtr = new Map<string, number>();
+    for (const [id, arr] of acctMap) acctPtr.set(id, latestIndexBeforeOrEqual(arr, ds[0], -1));
+    const assetPtr = new Map<string, number>();
+    for (const [id, arr] of assetMap) assetPtr.set(id, latestIndexBeforeOrEqual(arr, ds[0], -1));
+
+    const rows: Row[] = [];
+    for (const t of ds) {
+        let cash = 0;
+        let debt = 0;
+        let investment = 0;
+        let other = 0;
+
+        for (const [id, arr] of acctMap) {
+            const meta = accountById.get(id);
+            if (!meta) continue;
+            const prev = acctPtr.get(id) ?? -1;
+            const idx = latestIndexBeforeOrEqual(arr, t, prev);
+            acctPtr.set(id, idx);
+            const val = idx >= 0 ? arr[idx].value ?? 0 : 0;
+            const g = meta.balanceGroup as BalanceGroup;
+            if (g === 'CASH') cash += val;
+            else if (g === 'DEBT') debt += val;
+            else if (g === 'INVESTMENT') investment += val;
+            else other += val;
+        }
+
+        for (const [id, arr] of assetMap) {
+            const meta = assetById.get(id);
+            if (!meta) continue;
+            const prev = assetPtr.get(id) ?? -1;
+            const idx = latestIndexBeforeOrEqual(arr, t, prev);
+            assetPtr.set(id, idx);
+            const val = idx >= 0 ? arr[idx].value ?? 0 : 0;
+            const g = meta.balanceGroup as BalanceGroup;
+            if (g === 'CASH') cash += val;
+            else if (g === 'DEBT') debt += val;
+            else if (g === 'INVESTMENT') investment += val;
+            else other += val;
+        }
+
+        const net = cash + debt + investment + other;
+        rows.push({ date: t, net, cash, debt, investment, other });
+    }
+
+    series = rows;
+}
+
+$effect(() => {
+    period;
+    void recomputeSeries();
+});
 </script>
 
 <header class="bg-background flex h-16 shrink-0 items-center gap-2 border-b">
@@ -232,7 +257,19 @@
 </header>
 
 <div class="flex flex-col space-y-4 p-8">
-	<SectionTitle title="Net worth" />
+    <Tabs.Root bind:value={period}>
+        <nav class="flex items-center justify-between space-x-2">
+            <SectionTitle title="Net worth" />
+            <Tabs.List>
+                <Tabs.Trigger value="1w">1W</Tabs.Trigger>
+                <Tabs.Trigger value="1m">1M</Tabs.Trigger>
+                <Tabs.Trigger value="6m">6M</Tabs.Trigger>
+                <Tabs.Trigger value="ytd">YTD</Tabs.Trigger>
+                <Tabs.Trigger value="1y">1Y</Tabs.Trigger>
+                <Tabs.Trigger value="5y">5Y</Tabs.Trigger>
+                <Tabs.Trigger value="max">MAX</Tabs.Trigger>
+            </Tabs.List>
+        </nav>
 	{#if series.length}
 		<div class="bg-background overflow-hidden rounded-sm shadow-md">
 			<Chart.Container config={chartConfig} class="h-[420px] w-full">
@@ -265,4 +302,5 @@
 	{:else}
 		<div class="text-muted-foreground text-sm">Loading…</div>
 	{/if}
+	</Tabs.Root>
 </div>
