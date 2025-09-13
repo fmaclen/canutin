@@ -1,24 +1,25 @@
 import PocketBase, { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
-import { getOrCreateBalanceTypesContext } from './balance-types.svelte';
 
+import { setBalanceTypesContext } from './balance-types.svelte';
 import type { AssetBalancesResponse, AssetsResponse } from './pocketbase.schema';
 
 type AssetWithBalance = AssetsResponse & { balance: number };
 
 class AssetsContext {
 	assets: AssetWithBalance[] = $state([]);
-	assetsView = $derived.by(() =>
-		this.assets.map((a) => ({ ...a, balanceTypeName: this._bt.getName(a.balanceType) }))
-	);
 
 	private _pb: PocketBase;
-    private _bt: ReturnType<typeof getOrCreateBalanceTypesContext>;
+	private balanceTypesContext: ReturnType<typeof setBalanceTypesContext>;
 
-	constructor(pb: PocketBase) {
+	constructor(pb: PocketBase, balanceTypesContext: ReturnType<typeof setBalanceTypesContext>) {
 		this._pb = pb;
-		this._bt = getOrCreateBalanceTypesContext(pb);
+		this.balanceTypesContext = balanceTypesContext;
 		this.init();
+	}
+
+	getTypeName(id: string) {
+		return this.balanceTypesContext.getName(id);
 	}
 
 	private async init() {
@@ -38,11 +39,11 @@ class AssetsContext {
 
 	private async onAssetEvent(e: RecordSubscription<AssetsResponse>) {
 		if (e.action === 'create') {
-			await this._bt.ensureLoaded(e.record.balanceType);
+			await this.balanceTypesContext.ensureLoaded(e.record.balanceType);
 			this.assets = [...this.assets, { ...e.record, balance: 0 }];
 		} else if (e.action === 'update') {
 			const balance = this.assets.find((a) => a.id === e.record.id)?.balance ?? 0;
-			await this._bt.ensureLoaded(e.record.balanceType);
+			await this.balanceTypesContext.ensureLoaded(e.record.balanceType);
 			this.assets = this.assets.map((x) => (x.id === e.record.id ? { ...e.record, balance } : x));
 		} else if (e.action === 'delete') {
 			this.assets = this.assets.filter((x) => x.id !== e.record.id);
@@ -72,8 +73,11 @@ class AssetsContext {
 
 export const CONTEXT_KEY_ASSETS = 'assets';
 
-export function setAssetsContext(pb: PocketBase) {
-	return setContext(CONTEXT_KEY_ASSETS, new AssetsContext(pb));
+export function setAssetsContext(
+	pb: PocketBase,
+	balanceTypesContext: ReturnType<typeof setBalanceTypesContext>
+) {
+	return setContext(CONTEXT_KEY_ASSETS, new AssetsContext(pb, balanceTypesContext));
 }
 
 export function getAssetsContext() {

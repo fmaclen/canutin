@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { setAccountsContext } from '$lib/accounts.svelte';
 	import { setAssetsContext } from '$lib/assets.svelte';
+	import { setBalanceTypesContext } from '$lib/balance-types.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 
@@ -9,8 +10,9 @@
 	let { children } = $props();
 
 	const pb = getPocketBaseContext();
-	setAccountsContext(pb.authedClient);
-	setAssetsContext(pb.authedClient);
+	const balanceTypesContext = setBalanceTypesContext(pb.authedClient);
+	setAccountsContext(pb.authedClient, balanceTypesContext);
+	setAssetsContext(pb.authedClient, balanceTypesContext);
 </script>
 
 <Sidebar.Provider>

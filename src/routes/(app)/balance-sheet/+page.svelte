@@ -72,11 +72,11 @@
 			return entry;
 		}
 
-		for (const a of accountsContext.accountsView) {
+		for (const a of accountsContext.accounts) {
 			if (a.closed) continue;
 			const group = a.balanceGroup as BalanceGroup;
 			if (!a.excluded) groups[group].total += a.balance ?? 0;
-			const type = upsert(group, a.balanceType, a.balanceTypeName);
+			const type = upsert(group, a.balanceType, accountsContext.getTypeName(a.balanceType));
 			if (!a.excluded) type.total += a.balance ?? 0;
 			type.items = [
 				...type.items,
@@ -84,11 +84,11 @@
 			];
 		}
 
-		for (const a of assetsContext.assetsView) {
+		for (const a of assetsContext.assets) {
 			if (a.sold) continue;
 			const group = a.balanceGroup as BalanceGroup;
 			if (!a.excluded) groups[group].total += a.balance ?? 0;
-			const type = upsert(group, a.balanceType, a.balanceTypeName);
+			const type = upsert(group, a.balanceType, assetsContext.getTypeName(a.balanceType));
 			if (!a.excluded) type.total += a.balance ?? 0;
 			type.items = [
 				...type.items,
