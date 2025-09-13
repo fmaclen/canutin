@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAssetsContext } from '$lib/assets.svelte';
+	import { getBalanceTypesContext, setBalanceTypesContext } from '$lib/balance-types.svelte';
 	import Currency from '$lib/components/currency.svelte';
 	import KeyValue from '$lib/components/key-value.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
@@ -8,28 +9,16 @@
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { m } from '$lib/paraglide/messages';
-	import type { BalanceTypesResponse } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 
 	type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
 
+	const pb = getPocketBaseContext();
+	setBalanceTypesContext(pb.authedClient);
+
 	const accountsContext = getAccountsContext();
 	const assetsContext = getAssetsContext();
-	const pb = getPocketBaseContext();
-
-	let balanceTypesById: Record<string, string> = $state({});
-	let balanceTypes = $state<BalanceTypesResponse[]>([]);
-
-	async function getBalanceTypes() {
-		balanceTypes = await pb.authedClient
-			.collection('balanceTypes')
-			.getFullList<BalanceTypesResponse>();
-		balanceTypesById = Object.fromEntries(balanceTypes.map((bt) => [bt.id, bt.name]));
-	}
-
-	$effect(() => {
-		if (assetsContext.assets || accountsContext.accounts) getBalanceTypes();
-	});
+	const balanceTypesContext = getBalanceTypesContext();
 
 	const balanceGroups: BalanceGroup[] = ['CASH', 'DEBT', 'INVESTMENT', 'OTHER'];
 
@@ -93,7 +82,7 @@
 			if (a.closed) continue;
 			const group = a.balanceGroup as BalanceGroup;
 			if (!a.excluded) groups[group].total += a.balance ?? 0;
-			const type = upsert(group, a.balanceType, balanceTypesById[a.balanceType] ?? '(Unknown)');
+			const type = upsert(group, a.balanceType, balanceTypesContext.getName(a.balanceType));
 			if (!a.excluded) type.total += a.balance ?? 0;
 			type.items = [
 				...type.items,
@@ -105,7 +94,7 @@
 			if (a.sold) continue;
 			const group = a.balanceGroup as BalanceGroup;
 			if (!a.excluded) groups[group].total += a.balance ?? 0;
-			const type = upsert(group, a.balanceType, balanceTypesById[a.balanceType] ?? '(Unknown)');
+			const type = upsert(group, a.balanceType, balanceTypesContext.getName(a.balanceType));
 			if (!a.excluded) type.total += a.balance ?? 0;
 			type.items = [
 				...type.items,
@@ -154,7 +143,11 @@
 					className={`${groupClass(balanceGroup)} text-background`}
 				/>
 				{#each grouped[balanceGroup].types as balanceType (balanceType.id)}
-					<div class="bg-background overflow-hidden rounded-sm shadow-md" role="region" aria-label={balanceType.name}>
+					<div
+						class="bg-background overflow-hidden rounded-sm shadow-md"
+						role="region"
+						aria-label={balanceType.name}
+					>
 						<div class="flex items-center justify-between border-b p-4">
 							<div class="text-sm font-medium">{balanceType.name}</div>
 							<div class="font-mono text-sm tabular-nums">
@@ -164,7 +157,7 @@
 						<ul>
 							{#each balanceType.items as item (item.id)}
 								<li
-									class="odd:bg-sidebar flex items-center justify-between border-b px-4 py-3 last:border-b-0 gap-2 text-balance"
+									class="odd:bg-sidebar flex items-center justify-between gap-2 border-b px-4 py-3 text-balance last:border-b-0"
 								>
 									<span
 										class={'text-sm ' +
