@@ -29,14 +29,25 @@ class BalanceTypesContext {
 		if (e.action === 'create' || e.action === 'update') {
 			this.byId = { ...this.byId, [e.record.id]: e.record };
 		} else if (e.action === 'delete') {
-			const { [e.record.id]: _, ...rest } = this.byId;
-			this.byId = rest;
+			const next = { ...this.byId };
+			delete next[e.record.id];
+			this.byId = next;
 		}
 	}
 
 	getName(id: string | undefined | null) {
 		if (!id) return '(Unknown)';
 		return this.byId[id]?.name ?? '(Unknown)';
+	}
+
+	async ensureLoaded(id: string) {
+		if (!id || this.byId[id]) return;
+		try {
+			const bt = await this._pb.collection('balanceTypes').getOne<BalanceTypesResponse>(id);
+			this.byId = { ...this.byId, [bt.id]: bt };
+		} catch {
+			// ignore
+		}
 	}
 
 	dispose() {
@@ -52,4 +63,10 @@ export function setBalanceTypesContext(pb: PocketBase) {
 
 export function getBalanceTypesContext() {
 	return getContext<ReturnType<typeof setBalanceTypesContext>>(CONTEXT_KEY_BALANCE_TYPES);
+}
+
+export function getOrCreateBalanceTypesContext(pb: PocketBase) {
+	let ctx = getContext<ReturnType<typeof setBalanceTypesContext>>(CONTEXT_KEY_BALANCE_TYPES);
+	if (!ctx) ctx = setBalanceTypesContext(pb);
+	return ctx;
 }

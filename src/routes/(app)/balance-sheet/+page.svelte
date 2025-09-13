@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAssetsContext } from '$lib/assets.svelte';
-	import { getBalanceTypesContext, setBalanceTypesContext } from '$lib/balance-types.svelte';
 	import Currency from '$lib/components/currency.svelte';
 	import KeyValue from '$lib/components/key-value.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
@@ -9,16 +8,11 @@
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { m } from '$lib/paraglide/messages';
-	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 
 	type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
 
-	const pb = getPocketBaseContext();
-	setBalanceTypesContext(pb.authedClient);
-
 	const accountsContext = getAccountsContext();
 	const assetsContext = getAssetsContext();
-	const balanceTypesContext = getBalanceTypesContext();
 
 	const balanceGroups: BalanceGroup[] = ['CASH', 'DEBT', 'INVESTMENT', 'OTHER'];
 
@@ -78,11 +72,11 @@
 			return entry;
 		}
 
-		for (const a of accountsContext.accounts) {
+		for (const a of accountsContext.accountsView) {
 			if (a.closed) continue;
 			const group = a.balanceGroup as BalanceGroup;
 			if (!a.excluded) groups[group].total += a.balance ?? 0;
-			const type = upsert(group, a.balanceType, balanceTypesContext.getName(a.balanceType));
+			const type = upsert(group, a.balanceType, a.balanceTypeName);
 			if (!a.excluded) type.total += a.balance ?? 0;
 			type.items = [
 				...type.items,
@@ -90,11 +84,11 @@
 			];
 		}
 
-		for (const a of assetsContext.assets) {
+		for (const a of assetsContext.assetsView) {
 			if (a.sold) continue;
 			const group = a.balanceGroup as BalanceGroup;
 			if (!a.excluded) groups[group].total += a.balance ?? 0;
-			const type = upsert(group, a.balanceType, balanceTypesContext.getName(a.balanceType));
+			const type = upsert(group, a.balanceType, a.balanceTypeName);
 			if (!a.excluded) type.total += a.balance ?? 0;
 			type.items = [
 				...type.items,

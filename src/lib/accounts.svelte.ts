@@ -1,17 +1,23 @@
 import PocketBase, { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 
+import { getOrCreateBalanceTypesContext } from './balance-types.svelte';
 import type { AccountBalancesResponse, AccountsResponse } from './pocketbase.schema';
 
 type AccountWithBalance = AccountsResponse & { balance: number };
 
 class AccountsContext {
 	accounts: AccountWithBalance[] = $state([]);
+	accountsView = $derived.by(() =>
+		this.accounts.map((a) => ({ ...a, balanceTypeName: this._bt.getName(a.balanceType) }))
+	);
 
 	private _pb: PocketBase;
+	private _bt: ReturnType<typeof getOrCreateBalanceTypesContext>;
 
 	constructor(pb: PocketBase) {
 		this._pb = pb;
+		this._bt = getOrCreateBalanceTypesContext(pb);
 		this.init();
 	}
 
@@ -30,11 +36,14 @@ class AccountsContext {
 		this._pb.collection('accountBalances').subscribe('*', this.onAccountBalanceEvent.bind(this));
 	}
 
-	private onAccountEvent(e: RecordSubscription<AccountsResponse>) {
+	private async onAccountEvent(e: RecordSubscription<AccountsResponse>) {
 		if (e.action === 'create') {
+			// ensure the balance type is known in the shared cache
+			await this._bt.ensureLoaded(e.record.balanceType);
 			this.accounts = [...this.accounts, { ...e.record, balance: 0 }];
 		} else if (e.action === 'update') {
 			const balance = this.accounts.find((a) => a.id === e.record.id)?.balance ?? 0;
+			await this._bt.ensureLoaded(e.record.balanceType);
 			this.accounts = this.accounts.map((x) =>
 				x.id === e.record.id ? { ...e.record, balance } : x
 			);
