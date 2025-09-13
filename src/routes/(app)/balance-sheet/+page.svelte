@@ -122,15 +122,9 @@
 
 <div class="flex flex-col space-y-2 p-8">
 	<SectionTitle title="Balances" />
-	<div
-		class="grid gap-x-4 gap-y-6 md:grid-cols-[1fr_auto_1fr_auto] xl:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr]"
-	>
-		{#each balanceGroups as balanceGroup, index (balanceGroup)}
-			{#if index > 0}
-				<Separator orientation="horizontal" class="block md:hidden" />
-				<Separator orientation="vertical" class="hidden md:block" />
-			{/if}
-			<div class="flex w-full flex-col gap-4" data-testid={balanceGroup}>
+	<div class="grid gap-x-6 gap-y-8 md:grid-cols-2 xl:grid-cols-4">
+		{#each balanceGroups as balanceGroup (balanceGroup)}
+			<div class="balances-cell flex w-full flex-col gap-3" data-testid={balanceGroup}>
 				<KeyValue
 					title={groupTitle(balanceGroup)}
 					value={grouped[balanceGroup].total}
