@@ -293,7 +293,10 @@
 		</nav>
 		{#if series.length}
 			<div class="bg-background overflow-hidden rounded-sm shadow-md">
-				<Chart.Container config={chartConfig} class="h-[420px] w-full">
+				<Chart.Container
+					config={chartConfig}
+					class="h-128 w-full"
+				>
 					<LineChart
 						data={series}
 						x="date"
@@ -311,6 +314,9 @@
 						legend={{ placement: 'top' }}
 						props={{
 							spline: { curve: curveNatural, motion: 'tween', strokeWidth: 1.33 },
+							xAxis: {
+								format: (v: Date) => v.toISOString().slice(0, 10)
+							},
 							highlight: { points: { r: 3 } }
 						}}
 					>
