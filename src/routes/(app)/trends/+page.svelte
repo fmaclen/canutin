@@ -155,6 +155,7 @@
 		rawAssetBalances = assetBalances;
 
 		await recomputeSeries();
+		bootstrapped = true;
 	}
 
 	function computeRangeForPeriod(p: typeof period) {
@@ -339,14 +340,32 @@
 		await recomputeSeries();
 	}
 
-	let recomputeScheduled = false;
-	function scheduleRecomputeFromBalances() {
-		if (recomputeScheduled) return;
-		recomputeScheduled = true;
-		queueMicrotask(() => {
-			recomputeScheduled = false;
-			void refreshBalances();
-		});
+	let refreshTimer: number | null = null;
+	let refreshInFlight = false;
+	let pendingRefresh = false;
+	let bootstrapped = false;
+
+	async function doRefresh() {
+		refreshInFlight = true;
+		await refreshBalances();
+		refreshInFlight = false;
+		if (pendingRefresh) {
+			pendingRefresh = false;
+			void doRefresh();
+		}
+	}
+
+	function scheduleRefresh() {
+		if (!bootstrapped) return;
+		if (refreshTimer) clearTimeout(refreshTimer);
+		refreshTimer = window.setTimeout(() => {
+			refreshTimer = null;
+			if (refreshInFlight) {
+				pendingRefresh = true;
+				return;
+			}
+			void doRefresh();
+		}, 180);
 	}
 
 	$effect(() => void loadAndLogAll());
@@ -356,11 +375,11 @@
 	});
 
 	$effect(() => {
-		if (accountsCtx?.lastBalanceEvent) scheduleRecomputeFromBalances();
+		if (accountsCtx?.lastBalanceEvent) scheduleRefresh();
 	});
 
 	$effect(() => {
-		if (assetsCtx?.lastBalanceEvent) scheduleRecomputeFromBalances();
+		if (assetsCtx?.lastBalanceEvent) scheduleRefresh();
 	});
 </script>
 
