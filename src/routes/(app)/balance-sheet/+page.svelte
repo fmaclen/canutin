@@ -3,7 +3,9 @@
 	import { getAssetsContext } from '$lib/assets.svelte';
 	import Currency from '$lib/components/currency.svelte';
 	import KeyValue from '$lib/components/key-value.svelte';
+	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
+	import Section from '$lib/components/section.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
@@ -120,51 +122,53 @@
 	</div>
 </header>
 
-<div class="flex flex-col space-y-2 p-8">
-	<SectionTitle title="Balances" />
-	<div class="grid gap-x-6 gap-y-8 md:grid-cols-2 xl:grid-cols-4">
-		{#each balanceGroups as balanceGroup (balanceGroup)}
-			<div class="balances-cell flex w-full flex-col gap-3" data-testid={balanceGroup}>
-				<KeyValue
-					title={groupTitle(balanceGroup)}
-					value={grouped[balanceGroup].total}
-					className={`${groupClass(balanceGroup)} text-background`}
-				/>
-				{#each grouped[balanceGroup].types as balanceType (balanceType.id)}
-					<div
-						class="bg-background overflow-hidden rounded-sm shadow-md"
-						role="region"
-						aria-label={balanceType.name}
-					>
-						<div class="flex items-center justify-between border-b p-4">
-							<div class="text-sm font-medium">{balanceType.name}</div>
-							<div class="font-mono text-sm tabular-nums">
-								<Currency value={balanceType.total} />
+<Page pageTitle="Balance sheet">
+	<Section>
+		<SectionTitle title="Balances" />
+		<div class="grid gap-x-6 gap-y-8 md:grid-cols-2 xl:grid-cols-4">
+			{#each balanceGroups as balanceGroup (balanceGroup)}
+				<div class="balances-cell flex w-full flex-col gap-3" data-testid={balanceGroup}>
+					<KeyValue
+						title={groupTitle(balanceGroup)}
+						value={grouped[balanceGroup].total}
+						className={`${groupClass(balanceGroup)} text-background`}
+					/>
+					{#each grouped[balanceGroup].types as balanceType (balanceType.id)}
+						<div
+							class="bg-background overflow-hidden rounded-sm shadow-md"
+							role="region"
+							aria-label={balanceType.name}
+						>
+							<div class="flex items-center justify-between border-b p-4">
+								<div class="text-sm font-medium">{balanceType.name}</div>
+								<div class="font-mono text-sm tabular-nums">
+									<Currency value={balanceType.total} />
+								</div>
 							</div>
+							<ul>
+								{#each balanceType.items as item (item.id)}
+									<li
+										class="odd:bg-sidebar flex items-center justify-between gap-2 border-b px-4 py-3 text-balance last:border-b-0"
+									>
+										<span
+											class={'text-sm ' +
+												(item.excluded ? 'text-muted-foreground' : 'text-foreground/90')}
+										>
+											{item.name}
+										</span>
+										<span
+											class={'font-mono text-xs tabular-nums ' +
+												(item.excluded ? 'text-muted-foreground' : '')}
+										>
+											<Currency value={item.balance} />
+										</span>
+									</li>
+								{/each}
+							</ul>
 						</div>
-						<ul>
-							{#each balanceType.items as item (item.id)}
-								<li
-									class="odd:bg-sidebar flex items-center justify-between gap-2 border-b px-4 py-3 text-balance last:border-b-0"
-								>
-									<span
-										class={'text-sm ' +
-											(item.excluded ? 'text-muted-foreground' : 'text-foreground/90')}
-									>
-										{item.name}
-									</span>
-									<span
-										class={'font-mono text-xs tabular-nums ' +
-											(item.excluded ? 'text-muted-foreground' : '')}
-									>
-										<Currency value={item.balance} />
-									</span>
-								</li>
-							{/each}
-						</ul>
-					</div>
-				{/each}
-			</div>
-		{/each}
-	</div>
-</div>
+					{/each}
+				</div>
+			{/each}
+		</div>
+	</Section>
+</Page>

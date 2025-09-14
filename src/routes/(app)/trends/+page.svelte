@@ -148,7 +148,7 @@
 	</div>
 </header>
 
-<Page>
+<Page pageTitle="Trends">
 	<Tabs.Root bind:value={period}>
 		<Section>
 			<nav class="flex items-center justify-between space-x-2">

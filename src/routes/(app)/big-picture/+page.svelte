@@ -30,7 +30,7 @@
 	</div>
 </header>
 
-<Page>
+<Page pageTitle="The big picture">
 	<Section>
 		<SectionTitle title="Summary" />
 		<Summary />
