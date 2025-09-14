@@ -396,9 +396,10 @@
 						]}
 						legend={{ placement: 'top' }}
 						props={{
-							spline: { curve: curveNatural, motion: 'tween', strokeWidth: 1.25 },
+							spline: { curve: curveNatural, motion: 'none', strokeWidth: 1.25 },
 							xAxis: {
-								format: (v: Date) => v.toISOString().slice(0, 10)
+								format: (v: Date) => v.toISOString().slice(0, 10),
+								ticks: 6
 							},
 							yAxis: {
 								format: (v: number) => formatY(Math.round(v)),
@@ -409,6 +410,7 @@
 									return ticks;
 								}
 							},
+							grid: { x: true, y: true, xTicks: 6, yTicks: [0] },
 							highlight: { points: { r: 3 } }
 						}}
 					>

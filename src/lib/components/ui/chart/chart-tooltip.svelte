@@ -3,10 +3,10 @@
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 
+	import Currency from '$lib/components/currency.svelte';
 	import { cn, type WithElementRef, type WithoutChildren } from '$lib/utils.js';
 
 	import { getPayloadConfigFromPayload, useChart, type TooltipPayload } from './chart-utils.js';
-	import Currency from '$lib/components/currency.svelte';
 
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
 	function defaultFormatter(value: any, _payload: TooltipPayload[]) {
@@ -77,7 +77,7 @@
 
 {#snippet TooltipLabel()}
 	{#if formattedLabel}
-		<div class={cn('font-medium', labelClassName)}>
+		<div class={cn('text-muted-foreground border-b px-3 pb-1 mb-1 -mx-3', labelClassName)}>
 			{#if typeof formattedLabel === 'function'}
 				{@render formattedLabel()}
 			{:else}
@@ -133,7 +133,7 @@
 						{/if}
 						<div
 							class={cn(
-								'flex flex-1 shrink-0 justify-between leading-none gap-4',
+								'flex flex-1 shrink-0 justify-between gap-4 leading-none',
 								nestLabel ? 'items-end' : 'items-center'
 							)}
 						>
