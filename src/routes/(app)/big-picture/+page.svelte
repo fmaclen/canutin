@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { setCashflowContext } from '$lib/cashflow.svelte';
+	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
+	import Section from '$lib/components/section.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
@@ -28,13 +30,13 @@
 	</div>
 </header>
 
-<div class="flex flex-col space-y-8 p-8">
-	<section class="mx-auto flex w-full flex-col space-y-2">
+<Page>
+	<Section>
 		<SectionTitle title="Summary" />
 		<Summary />
-	</section>
+	</Section>
 
-	<section class="mx-auto flex w-full flex-col space-y-2">
+	<Section>
 		<TrailingCashflow />
-	</section>
-</div>
+	</Section>
+</Page>

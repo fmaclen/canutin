@@ -2,7 +2,9 @@
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAssetsContext } from '$lib/assets.svelte';
 	import ChartNetWorth from '$lib/components/charts/chart-net-worth.svelte';
+	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
+	import Section from '$lib/components/section.svelte';
 	import TablePerformance from '$lib/components/tables/table-performance.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
@@ -146,21 +148,21 @@
 	</div>
 </header>
 
-<div class="flex flex-col space-y-4 p-8">
+<Page>
 	<Tabs.Root bind:value={period}>
-		<nav class="flex items-center justify-between space-x-2">
-			<SectionTitle title="Growth" />
-			<Tabs.List>
-				<Tabs.Trigger value="3m">3M</Tabs.Trigger>
-				<Tabs.Trigger value="6m">6M</Tabs.Trigger>
-				<Tabs.Trigger value="ytd">YTD</Tabs.Trigger>
-				<Tabs.Trigger value="1y">1Y</Tabs.Trigger>
-				<Tabs.Trigger value="5y">5Y</Tabs.Trigger>
-				<Tabs.Trigger value="max">MAX</Tabs.Trigger>
-			</Tabs.List>
-		</nav>
+		<Section>
+			<nav class="flex items-center justify-between space-x-2">
+				<SectionTitle title="Growth" />
+				<Tabs.List>
+					<Tabs.Trigger value="3m">3M</Tabs.Trigger>
+					<Tabs.Trigger value="6m">6M</Tabs.Trigger>
+					<Tabs.Trigger value="ytd">YTD</Tabs.Trigger>
+					<Tabs.Trigger value="1y">1Y</Tabs.Trigger>
+					<Tabs.Trigger value="5y">5Y</Tabs.Trigger>
+					<Tabs.Trigger value="max">MAX</Tabs.Trigger>
+				</Tabs.List>
+			</nav>
 
-		<div class="space-y-2">
 			<div class="bg-background overflow-visible rounded-sm shadow-md">
 				<ChartNetWorth
 					bind:period
@@ -170,11 +172,11 @@
 					{rawAssetBalances}
 				/>
 			</div>
-		</div>
+		</Section>
 	</Tabs.Root>
 
-	<div class="space-y-2">
+	<Section>
 		<SectionTitle title="Performance" />
 		<TablePerformance {rawAccounts} {rawAssets} {rawAccountBalances} {rawAssetBalances} />
-	</div>
-</div>
+	</Section>
+</Page>
