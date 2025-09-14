@@ -31,7 +31,6 @@
 		return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 	}
 
-	// Sequence of x-axis dates for the selected range
 	let dates: Date[] = $state([]);
 
 	type Row = {
@@ -44,14 +43,12 @@
 	};
 	let series: Row[] = $state([]);
 
-	// Raw data caches (single fetch, recompute client-side per period)
 	let period: '3m' | '6m' | 'ytd' | '1y' | '5y' | 'max' = $state('1y');
 	let rawAccounts: AccountsResponse[] = $state([]);
 	let rawAssets: AssetsResponse[] = $state([]);
 	let rawAccountBalances: AccountBalancesResponse[] = $state([]);
 	let rawAssetBalances: AssetBalancesResponse[] = $state([]);
 
-	// Add a small headroom so lines don't appear clipped at the top
 	const yDomain = $derived.by(() => {
 		if (!series.length) return null as [number, number] | null;
 		let min = Number.POSITIVE_INFINITY;
@@ -66,7 +63,6 @@
 
 	const chartConfig = {
 		net: { label: 'Net worth', color: '#45403C' },
-		// Use explicit hex to avoid any unexpected CSS overrides
 		cash: { label: 'Cash', color: '#00a36f' },
 		debt: { label: 'Debt', color: '#e75258' },
 		investment: { label: 'Investments', color: '#b19b70' },
@@ -108,7 +104,6 @@
 		return i;
 	}
 
-	// Quick & dirty: 2 queries with expand, then filter client-side.
 	async function loadAndLogAll(): Promise<void> {
 		const [accountBalancesAll, assetBalancesAll] = await Promise.all([
 			pb.authedClient
@@ -129,7 +124,6 @@
 				})
 		]);
 
-		// Active accounts/assets: exclude flagged
 		const accountBalances = accountBalancesAll.filter((b) => {
 			const acc = (b.expand?.account ?? null) as AccountsResponse | null;
 			if (!acc) return false;
@@ -141,7 +135,6 @@
 			return !as.excluded && !as.sold;
 		});
 
-		// Derive unique active accounts/assets from the expanded balances
 		const accountsMap = new Map<string, AccountsResponse>();
 		for (const b of accountBalances) {
 			const acc = b.expand?.account as AccountsResponse | undefined;
@@ -156,19 +149,12 @@
 		const accounts = Array.from(accountsMap.values());
 		const assets = Array.from(assetsMap.values());
 
-		// Data fetched and filtered; cached below for recomputation
-
-		// Cache raw data for recompute, then compute the current period
 		rawAccounts = accounts;
 		rawAssets = assets;
 		rawAccountBalances = accountBalances;
 		rawAssetBalances = assetBalances;
 
 		await recomputeSeries();
-	}
-
-	if (typeof window !== 'undefined') {
-		void loadAndLogAll();
 	}
 
 	function computeRangeForPeriod(p: typeof period) {
@@ -194,7 +180,6 @@
 				start: new Date(Date.UTC(now.getUTCFullYear() - 5, now.getUTCMonth(), now.getUTCDate())),
 				end: now
 			};
-		// max
 		let earliest: Date | null = null;
 		for (const b of rawAccountBalances) {
 			const d = new Date(b.asOf);
@@ -360,27 +345,22 @@
 		recomputeScheduled = true;
 		queueMicrotask(() => {
 			recomputeScheduled = false;
-			console.debug('[trends] coalesced balance event → refresh balances');
 			void refreshBalances();
 		});
 	}
 
+	$effect(() => void loadAndLogAll());
+
 	$effect(() => {
-		// Rerun computation when period changes
-		const _p = period;
-		void recomputeSeries();
+		if (period) void recomputeSeries();
 	});
 
 	$effect(() => {
-		if (accountsCtx?.lastBalanceEvent) {
-			scheduleRecomputeFromBalances();
-		}
+		if (accountsCtx?.lastBalanceEvent) scheduleRecomputeFromBalances();
 	});
 
 	$effect(() => {
-		if (assetsCtx?.lastBalanceEvent) {
-			scheduleRecomputeFromBalances();
-		}
+		if (assetsCtx?.lastBalanceEvent) scheduleRecomputeFromBalances();
 	});
 </script>
 
