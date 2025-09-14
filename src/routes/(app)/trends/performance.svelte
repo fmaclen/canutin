@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { SvelteMap } from 'svelte/reactivity';
 
+	import { formatCurrency } from '$lib/components/currency';
 	import { Skeleton } from '$lib/components/ui/skeleton/index';
 	import * as Table from '$lib/components/ui/table/index';
+	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import type {
 		AccountBalancesResponse,
 		AccountsResponse,
@@ -154,11 +156,15 @@
 				label: p.label,
 				at: atDates[i],
 				values: {
-					net: pctDiff(current.net, past.net),
-					cash: pctDiff(current.cash, past.cash),
-					debt: pctDiff(current.debt, past.debt),
-					investment: pctDiff(current.investment, past.investment),
-					other: pctDiff(current.other, past.other)
+					net: { pct: pctDiff(current.net, past.net), cur: current.net, prev: past.net },
+					cash: { pct: pctDiff(current.cash, past.cash), cur: current.cash, prev: past.cash },
+					debt: { pct: pctDiff(current.debt, past.debt), cur: current.debt, prev: past.debt },
+					investment: {
+						pct: pctDiff(current.investment, past.investment),
+						cur: current.investment,
+						prev: past.investment
+					},
+					other: { pct: pctDiff(current.other, past.other), cur: current.other, prev: past.other }
 				}
 			};
 		});
@@ -196,80 +202,253 @@
 {#if table}
 	<div class="bg-background rounded-sm shadow-md">
 		<div class="overflow-x-auto">
-			<Table.Root>
-				<Table.Header>
-					<Table.Row>
-						<Table.Head class="text-left">Group</Table.Head>
-						{#each table.cols as c (c.key)}
-							<Table.Head class="text-right whitespace-nowrap">{c.label}</Table.Head>
-						{/each}
-						<Table.Head class="text-right whitespace-nowrap">Allocation</Table.Head>
-					</Table.Row>
-				</Table.Header>
-				<Table.Body>
-					<Table.Row>
-						<Table.Cell class="font-medium">Net worth</Table.Cell>
-						{#each table.cols as c (c.key)}
-							<Table.Cell
-								class={'font-jetbrains-mono text-right text-xs ' + pctClass(c.values.net, 'net')}
-								>{fmtPct(c.values.net)}</Table.Cell
-							>
-						{/each}
-						<Table.Cell class="font-jetbrains-mono text-muted-foreground text-right text-xs"
-							>{fmtPct(table.allocation.net)}</Table.Cell
-						>
-					</Table.Row>
-					<Table.Row>
-						<Table.Cell class="font-medium">Cash</Table.Cell>
-						{#each table.cols as c (c.key)}
-							<Table.Cell
-								class={'font-jetbrains-mono text-right text-xs ' + pctClass(c.values.cash, 'cash')}
-								>{fmtPct(c.values.cash)}</Table.Cell
-							>
-						{/each}
-						<Table.Cell class="font-jetbrains-mono text-right text-xs"
-							>{fmtPct(table.allocation.cash)}</Table.Cell
-						>
-					</Table.Row>
-					<Table.Row>
-						<Table.Cell class="font-medium">Debt</Table.Cell>
-						{#each table.cols as c (c.key)}
-							<Table.Cell
-								class={'font-jetbrains-mono text-right text-xs ' + pctClass(c.values.debt, 'debt')}
-								>{fmtPct(c.values.debt)}</Table.Cell
-							>
-						{/each}
-						<Table.Cell class="font-jetbrains-mono text-right text-xs"
-							>{fmtPct(table.allocation.debt)}</Table.Cell
-						>
-					</Table.Row>
-					<Table.Row>
-						<Table.Cell class="font-medium">Investments</Table.Cell>
-						{#each table.cols as c (c.key)}
-							<Table.Cell
-								class={'font-jetbrains-mono text-right text-xs ' +
-									pctClass(c.values.investment, 'investment')}
-								>{fmtPct(c.values.investment)}</Table.Cell
-							>
-						{/each}
-						<Table.Cell class="font-jetbrains-mono text-right text-xs"
-							>{fmtPct(table.allocation.investment)}</Table.Cell
-						>
-					</Table.Row>
-					<Table.Row>
-						<Table.Cell class="font-medium">Other assets</Table.Cell>
-						{#each table.cols as c (c.key)}
-							<Table.Cell
-								class={'font-jetbrains-mono text-right text-xs ' +
-									pctClass(c.values.other, 'other')}>{fmtPct(c.values.other)}</Table.Cell
-							>
-						{/each}
-						<Table.Cell class="font-jetbrains-mono text-right text-xs"
-							>{fmtPct(table.allocation.other)}</Table.Cell
-						>
-					</Table.Row>
-				</Table.Body>
-			</Table.Root>
+			<Tooltip.Provider delayDuration={150}>
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							<Table.Head class="text-left">Group</Table.Head>
+							{#each table.cols as c (c.key)}
+								<Table.Head class="text-right whitespace-nowrap">{c.label}</Table.Head>
+							{/each}
+							<Table.Head class="text-right whitespace-nowrap">Allocation</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						<Table.Row>
+							<Table.Cell class="font-medium">Net worth</Table.Cell>
+							{#each table.cols as c (c.key)}
+								<Table.Cell
+									class={'font-jetbrains-mono text-right text-xs ' +
+										pctClass(c.values.net.pct, 'net')}
+								>
+									{#if c.values.net.pct === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<Tooltip.Root>
+											<Tooltip.Trigger
+												class="border-border inline-block border-b border-dashed hover:border-current"
+												>{fmtPct(c.values.net.pct)}</Tooltip.Trigger
+											>
+											<Tooltip.Content sideOffset={6}>
+												<p class="font-normal">
+													From <span class="font-jetbrains-mono tabular-nums"
+														>{formatCurrency(c.values.net.prev, { maximumFractionDigits: 2 })}</span
+													>
+													to
+													<span class="font-jetbrains-mono tabular-nums"
+														>{formatCurrency(c.values.net.cur, { maximumFractionDigits: 2 })}</span
+													>
+												</p>
+											</Tooltip.Content>
+										</Tooltip.Root>
+									{/if}
+								</Table.Cell>
+							{/each}
+							<Table.Cell class="font-jetbrains-mono text-muted-foreground text-right text-xs">
+								<Tooltip.Root>
+									<Tooltip.Trigger
+										class="border-border inline-block border-b border-dashed hover:border-current"
+										>{fmtPct(table.allocation.net)}</Tooltip.Trigger
+									>
+									<Tooltip.Content sideOffset={6}>
+										<p class="font-normal">
+											{formatCurrency(table.current.net, { maximumFractionDigits: 2 })}
+										</p>
+									</Tooltip.Content>
+								</Tooltip.Root>
+							</Table.Cell>
+						</Table.Row>
+						<Table.Row>
+							<Table.Cell class="font-medium">Cash</Table.Cell>
+							{#each table.cols as c (c.key)}
+								<Table.Cell
+									class={'font-jetbrains-mono text-right text-xs ' +
+										pctClass(c.values.cash.pct, 'cash')}
+								>
+									{#if c.values.cash.pct === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<Tooltip.Root>
+											<Tooltip.Trigger
+												class="border-border inline-block border-b border-dashed hover:border-current"
+												>{fmtPct(c.values.cash.pct)}</Tooltip.Trigger
+											>
+											<Tooltip.Content sideOffset={6}>
+												<p class="font-normal">
+													From <span class="font-jetbrains-mono tabular-nums"
+														>{formatCurrency(c.values.cash.prev, {
+															maximumFractionDigits: 2
+														})}</span
+													>
+													to
+													<span class="font-jetbrains-mono tabular-nums"
+														>{formatCurrency(c.values.cash.cur, { maximumFractionDigits: 2 })}</span
+													>
+												</p>
+											</Tooltip.Content>
+										</Tooltip.Root>
+									{/if}
+								</Table.Cell>
+							{/each}
+							<Table.Cell class="font-jetbrains-mono text-right text-xs">
+								<Tooltip.Root>
+									<Tooltip.Trigger
+										class="border-border inline-block border-b border-dashed hover:border-current"
+										>{fmtPct(table.allocation.cash)}</Tooltip.Trigger
+									>
+									<Tooltip.Content sideOffset={6}>
+										<p class="font-normal">
+											{formatCurrency(table.current.cash, { maximumFractionDigits: 2 })}
+										</p>
+									</Tooltip.Content>
+								</Tooltip.Root>
+							</Table.Cell>
+						</Table.Row>
+						<Table.Row>
+							<Table.Cell class="font-medium">Debt</Table.Cell>
+							{#each table.cols as c (c.key)}
+								<Table.Cell
+									class={'font-jetbrains-mono text-right text-xs ' +
+										pctClass(c.values.debt.pct, 'debt')}
+								>
+									{#if c.values.debt.pct === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<Tooltip.Root>
+											<Tooltip.Trigger
+												class="border-border inline-block border-b border-dashed hover:border-current"
+												>{fmtPct(c.values.debt.pct)}</Tooltip.Trigger
+											>
+											<Tooltip.Content sideOffset={6}>
+												<p class="font-normal">
+													From <span class="font-jetbrains-mono tabular-nums"
+														>{formatCurrency(c.values.debt.prev, {
+															maximumFractionDigits: 2
+														})}</span
+													>
+													to
+													<span class="font-jetbrains-mono tabular-nums"
+														>{formatCurrency(c.values.debt.cur, { maximumFractionDigits: 2 })}</span
+													>
+												</p>
+											</Tooltip.Content>
+										</Tooltip.Root>
+									{/if}
+								</Table.Cell>
+							{/each}
+							<Table.Cell class="font-jetbrains-mono text-right text-xs">
+								<Tooltip.Root>
+									<Tooltip.Trigger
+										class="border-border inline-block border-b border-dashed hover:border-current"
+										>{fmtPct(table.allocation.debt)}</Tooltip.Trigger
+									>
+									<Tooltip.Content sideOffset={6}>
+										<p class="font-normal">
+											{formatCurrency(table.current.debt, { maximumFractionDigits: 2 })}
+										</p>
+									</Tooltip.Content>
+								</Tooltip.Root>
+							</Table.Cell>
+						</Table.Row>
+						<Table.Row>
+							<Table.Cell class="font-medium">Investments</Table.Cell>
+							{#each table.cols as c (c.key)}
+								<Table.Cell
+									class={'font-jetbrains-mono text-right text-xs ' +
+										pctClass(c.values.investment.pct, 'investment')}
+								>
+									{#if c.values.investment.pct === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<Tooltip.Root>
+											<Tooltip.Trigger
+												class="border-border inline-block border-b border-dashed hover:border-current"
+												>{fmtPct(c.values.investment.pct)}</Tooltip.Trigger
+											>
+											<Tooltip.Content sideOffset={6}>
+												<p class="font-normal">
+													From <span class="font-jetbrains-mono tabular-nums"
+														>{formatCurrency(c.values.investment.prev, {
+															maximumFractionDigits: 2
+														})}</span
+													>
+													to
+													<span class="font-jetbrains-mono tabular-nums"
+														>{formatCurrency(c.values.investment.cur, {
+															maximumFractionDigits: 2
+														})}</span
+													>
+												</p>
+											</Tooltip.Content>
+										</Tooltip.Root>
+									{/if}
+								</Table.Cell>
+							{/each}
+							<Table.Cell class="font-jetbrains-mono text-right text-xs">
+								<Tooltip.Root>
+									<Tooltip.Trigger
+										class="border-border inline-block border-b border-dashed hover:border-current"
+										>{fmtPct(table.allocation.investment)}</Tooltip.Trigger
+									>
+									<Tooltip.Content sideOffset={6}>
+										<p class="font-normal">
+											{formatCurrency(table.current.investment, { maximumFractionDigits: 2 })}
+										</p>
+									</Tooltip.Content>
+								</Tooltip.Root>
+							</Table.Cell>
+						</Table.Row>
+						<Table.Row>
+							<Table.Cell class="font-medium">Other assets</Table.Cell>
+							{#each table.cols as c (c.key)}
+								<Table.Cell
+									class={'font-jetbrains-mono text-right text-xs ' +
+										pctClass(c.values.other.pct, 'other')}
+								>
+									{#if c.values.other.pct === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<Tooltip.Root>
+											<Tooltip.Trigger
+												class="border-border inline-block border-b border-dashed hover:border-current"
+												>{fmtPct(c.values.other.pct)}</Tooltip.Trigger
+											>
+											<Tooltip.Content sideOffset={6}>
+												<p class="font-normal">
+													From <span class="font-jetbrains-mono tabular-nums"
+														>{formatCurrency(c.values.other.prev, {
+															maximumFractionDigits: 2
+														})}</span
+													>
+													to
+													<span class="font-jetbrains-mono tabular-nums"
+														>{formatCurrency(c.values.other.cur, {
+															maximumFractionDigits: 2
+														})}</span
+													>
+												</p>
+											</Tooltip.Content>
+										</Tooltip.Root>
+									{/if}
+								</Table.Cell>
+							{/each}
+							<Table.Cell class="font-jetbrains-mono text-right text-xs">
+								<Tooltip.Root>
+									<Tooltip.Trigger
+										class="border-border inline-block border-b border-dashed hover:border-current"
+										>{fmtPct(table.allocation.other)}</Tooltip.Trigger
+									>
+									<Tooltip.Content sideOffset={6}>
+										<p class="font-normal">
+											{formatCurrency(table.current.other, { maximumFractionDigits: 2 })}
+										</p>
+									</Tooltip.Content>
+								</Tooltip.Root>
+							</Table.Cell>
+						</Table.Row>
+					</Table.Body>
+				</Table.Root>
+			</Tooltip.Provider>
 		</div>
 	</div>
 {:else}
