@@ -12,4 +12,3 @@ export function formatCurrency(value: number | null | undefined, options?: Curre
 		maximumFractionDigits
 	}).format(value ?? 0);
 }
-

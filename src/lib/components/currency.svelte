@@ -1,6 +1,6 @@
 <script lang="ts">
-	import Number from './number.svelte';
 	import { formatCurrency } from './currency';
+	import Number from './number.svelte';
 
 	interface Props {
 		value?: number | null;

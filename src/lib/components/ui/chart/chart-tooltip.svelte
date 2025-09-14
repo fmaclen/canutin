@@ -77,7 +77,7 @@
 
 {#snippet TooltipLabel()}
 	{#if formattedLabel}
-		<div class={cn('text-muted-foreground border-b px-3 pb-1 mb-1 -mx-3', labelClassName)}>
+		<div class={cn('text-muted-foreground -mx-3 mb-1 border-b px-3 pb-1', labelClassName)}>
 			{#if typeof formattedLabel === 'function'}
 				{@render formattedLabel()}
 			{:else}

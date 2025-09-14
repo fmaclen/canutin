@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { scaleUtc } from 'd3-scale';
 	import { curveNatural } from 'd3-shape';
-	import { Grid, LineChart } from 'layerchart';
-	import { SvelteMap } from 'svelte/reactivity';
+	import { LineChart } from 'layerchart';
+	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAssetsContext } from '$lib/assets.svelte';
+	import { formatCurrency } from '$lib/components/currency';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import * as Chart from '$lib/components/ui/chart/index.js';
@@ -20,7 +21,6 @@
 		AssetsResponse
 	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
-	import { formatCurrency } from '$lib/components/currency';
 
 	const pb = getPocketBaseContext();
 	const accountsCtx = getAccountsContext();
@@ -31,8 +31,6 @@
 	function utcMidnight(d: Date) {
 		return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 	}
-
-	let dates: Date[] = $state([]);
 
 	type Row = {
 		date: Date;
@@ -182,7 +180,7 @@
 		if (!rawAccounts.length && !rawAssets.length) return;
 		const { start, end } = computeRangeForPeriod(period);
 
-		const dateSet = new Set<number>();
+		const dateSet = new SvelteSet<number>();
 		const startUTC = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
 		const endUTC = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
 
@@ -205,7 +203,6 @@
 		const ds = Array.from(dateSet)
 			.sort((a, b) => a - b)
 			.map((u) => new Date(u));
-		dates = ds;
 
 		const acctMap = new SvelteMap<string, AccountBalancesResponse[]>();
 		for (const b of rawAccountBalances) {
