@@ -50,13 +50,8 @@
 		);
 	}
 
-	function latestIndexBeforeOrEqual<T extends { asOf: string }>(arr: T[], t: Date, start = -1) {
-		let i = start;
-		while (i + 1 < arr.length && new Date(arr[i + 1].asOf) <= t) i++;
-		return i;
-	}
-
-	function buildMaps() {
+	// Build grouped maps once; arrays are already sorted by asOf from fetch
+	const prepared = $derived.by(() => {
 		const acctMap = new SvelteMap<string, AccountBalancesResponse[]>();
 		for (const b of rawAccountBalances) {
 			if (!rawAccounts.find((a) => a.id === b.account)) continue;
@@ -71,45 +66,55 @@
 			arr.push(b);
 			assetMap.set(b.asset, arr);
 		}
-		return { acctMap, assetMap };
-	}
+		return {
+			acctMap,
+			assetMap,
+			accountById: new Map(rawAccounts.map((a) => [a.id, a] as const)),
+			assetById: new Map(rawAssets.map((a) => [a.id, a] as const))
+		};
+	});
 
-	function snapshotTotals(at: Date) {
-		const { acctMap, assetMap } = buildMaps();
-		const accountById = new Map(rawAccounts.map((a) => [a.id, a] as const));
-		const assetById = new Map(rawAssets.map((a) => [a.id, a] as const));
-
-		let cash = 0;
-		let debt = 0;
-		let investment = 0;
-		let other = 0;
+	function computeTotals(atDates: Date[]) {
+		const { acctMap, assetMap, accountById, assetById } = prepared;
+		const asc = [...atDates].sort((a, b) => a.getTime() - b.getTime());
+		const ascIndex = new Map(asc.map((d, i) => [d.getTime(), i] as const));
+		const sumsAsc = asc.map(() => ({ net: 0, cash: 0, debt: 0, investment: 0, other: 0 }));
 
 		for (const [id, arr] of acctMap) {
 			const meta = accountById.get(id);
 			if (!meta) continue;
-			const idx = latestIndexBeforeOrEqual(arr, at, -1);
-			const val = idx >= 0 ? (arr[idx].value ?? 0) : 0;
-			const g = meta.balanceGroup as BalanceGroup;
-			if (g === 'CASH') cash += val;
-			else if (g === 'DEBT') debt += val;
-			else if (g === 'INVESTMENT') investment += val;
-			else other += val;
+			let p = -1;
+			for (let j = 0; j < asc.length; j++) {
+				const t = asc[j];
+				while (p + 1 < arr.length && new Date(arr[p + 1].asOf) <= t) p++;
+				const val = p >= 0 ? (arr[p].value ?? 0) : 0;
+				const g = meta.balanceGroup as BalanceGroup;
+				if (g === 'CASH') sumsAsc[j].cash += val;
+				else if (g === 'DEBT') sumsAsc[j].debt += val;
+				else if (g === 'INVESTMENT') sumsAsc[j].investment += val;
+				else sumsAsc[j].other += val;
+				sumsAsc[j].net += val;
+			}
 		}
-
 		for (const [id, arr] of assetMap) {
 			const meta = assetById.get(id);
 			if (!meta) continue;
-			const idx = latestIndexBeforeOrEqual(arr, at, -1);
-			const val = idx >= 0 ? (arr[idx].value ?? 0) : 0;
-			const g = meta.balanceGroup as BalanceGroup;
-			if (g === 'CASH') cash += val;
-			else if (g === 'DEBT') debt += val;
-			else if (g === 'INVESTMENT') investment += val;
-			else other += val;
+			let p = -1;
+			for (let j = 0; j < asc.length; j++) {
+				const t = asc[j];
+				while (p + 1 < arr.length && new Date(arr[p + 1].asOf) <= t) p++;
+				const val = p >= 0 ? (arr[p].value ?? 0) : 0;
+				const g = meta.balanceGroup as BalanceGroup;
+				if (g === 'CASH') sumsAsc[j].cash += val;
+				else if (g === 'DEBT') sumsAsc[j].debt += val;
+				else if (g === 'INVESTMENT') sumsAsc[j].investment += val;
+				else sumsAsc[j].other += val;
+				sumsAsc[j].net += val;
+			}
 		}
 
-		const net = cash + debt + investment + other;
-		return { net, cash, debt, investment, other } as const;
+		// map back to original order
+		return atDates.map((d) => sumsAsc[ascIndex.get(d.getTime())!]);
 	}
 
 	const table = $derived.by(() => {
@@ -126,13 +131,19 @@
 			if (!earliest || d < earliest) earliest = d;
 		}
 
-		const current = snapshotTotals(now);
-		const cols = periods.map((p) => {
-			let at: Date;
-			if (p.offset.max) at = earliest ? utcMidnight(earliest) : now;
-			else if (p.offset.ytd) at = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
-			else at = subDate(now, p.offset);
-			const past = snapshotTotals(at);
+		const atDates = periods.map((p) =>
+			p.offset.max
+				? earliest
+					? utcMidnight(earliest)
+					: now
+				: p.offset.ytd
+					? new Date(Date.UTC(now.getUTCFullYear(), 0, 1))
+					: subDate(now, p.offset)
+		);
+		const totals = computeTotals([...atDates, now]);
+		const current = totals[totals.length - 1];
+		const cols = periods.map((p, i) => {
+			const past = totals[i];
 
 			function pctDiff(cur: number, prev: number) {
 				if (!prev || prev === 0) return null as number | null;
@@ -142,7 +153,7 @@
 			return {
 				key: p.key,
 				label: p.label,
-				at,
+				at: atDates[i],
 				values: {
 					net: pctDiff(current.net, past.net),
 					cash: pctDiff(current.cash, past.cash),
