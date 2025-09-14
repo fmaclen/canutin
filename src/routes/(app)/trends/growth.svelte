@@ -3,7 +3,6 @@
 	import { curveNatural } from 'd3-shape';
 	import { LineChart } from 'layerchart';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-	import { fade } from 'svelte/transition';
 
 	import { formatCurrency } from '$lib/components/currency';
 	import * as Chart from '$lib/components/ui/chart/index.js';

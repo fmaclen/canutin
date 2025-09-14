@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { SvelteMap } from 'svelte/reactivity';
-	import { fade } from 'svelte/transition';
 
 	import { Skeleton } from '$lib/components/ui/skeleton/index';
 	import * as Table from '$lib/components/ui/table/index';
