@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { SvelteMap } from 'svelte/reactivity';
 
+	import * as Table from '$lib/components/ui/table/index';
 	import type {
 		AccountBalancesResponse,
 		AccountsResponse,
@@ -171,54 +172,54 @@
 
 {#if table}
 	<div class="overflow-x-auto">
-		<table class="w-full text-sm">
-			<thead>
-				<tr>
-					<th class="text-left">Group</th>
+		<Table.Root>
+			<Table.Header>
+				<Table.Row>
+					<Table.Head class="text-left">Group</Table.Head>
 					{#each table.cols as c (c.key)}
-						<th class="text-right whitespace-nowrap">{c.label}</th>
+						<Table.Head class="text-right whitespace-nowrap">{c.label}</Table.Head>
 					{/each}
-					<th class="text-right whitespace-nowrap">Allocation</th>
-				</tr>
-			</thead>
-			<tbody>
-				<tr>
-					<td>Net worth</td>
+					<Table.Head class="text-right whitespace-nowrap">Allocation</Table.Head>
+				</Table.Row>
+			</Table.Header>
+			<Table.Body>
+				<Table.Row>
+					<Table.Cell class="font-medium">Net worth</Table.Cell>
 					{#each table.cols as c (c.key)}
-						<td class="text-right">{fmtPct(c.values.net)}</td>
+						<Table.Cell class="text-right">{fmtPct(c.values.net)}</Table.Cell>
 					{/each}
-					<td class="text-right">{fmtPct(table.allocation.net)}</td>
-				</tr>
-				<tr>
-					<td>Cash</td>
+					<Table.Cell class="text-right">{fmtPct(table.allocation.net)}</Table.Cell>
+				</Table.Row>
+				<Table.Row>
+					<Table.Cell class="font-medium">Cash</Table.Cell>
 					{#each table.cols as c (c.key)}
-						<td class="text-right">{fmtPct(c.values.cash)}</td>
+						<Table.Cell class="text-right">{fmtPct(c.values.cash)}</Table.Cell>
 					{/each}
-					<td class="text-right">{fmtPct(table.allocation.cash)}</td>
-				</tr>
-				<tr>
-					<td>Debt</td>
+					<Table.Cell class="text-right">{fmtPct(table.allocation.cash)}</Table.Cell>
+				</Table.Row>
+				<Table.Row>
+					<Table.Cell class="font-medium">Debt</Table.Cell>
 					{#each table.cols as c (c.key)}
-						<td class="text-right">{fmtPct(c.values.debt)}</td>
+						<Table.Cell class="text-right">{fmtPct(c.values.debt)}</Table.Cell>
 					{/each}
-					<td class="text-right">{fmtPct(table.allocation.debt)}</td>
-				</tr>
-				<tr>
-					<td>Investments</td>
+					<Table.Cell class="text-right">{fmtPct(table.allocation.debt)}</Table.Cell>
+				</Table.Row>
+				<Table.Row>
+					<Table.Cell class="font-medium">Investments</Table.Cell>
 					{#each table.cols as c (c.key)}
-						<td class="text-right">{fmtPct(c.values.investment)}</td>
+						<Table.Cell class="text-right">{fmtPct(c.values.investment)}</Table.Cell>
 					{/each}
-					<td class="text-right">{fmtPct(table.allocation.investment)}</td>
-				</tr>
-				<tr>
-					<td>Other assets</td>
+					<Table.Cell class="text-right">{fmtPct(table.allocation.investment)}</Table.Cell>
+				</Table.Row>
+				<Table.Row>
+					<Table.Cell class="font-medium">Other assets</Table.Cell>
 					{#each table.cols as c (c.key)}
-						<td class="text-right">{fmtPct(c.values.other)}</td>
+						<Table.Cell class="text-right">{fmtPct(c.values.other)}</Table.Cell>
 					{/each}
-					<td class="text-right">{fmtPct(table.allocation.other)}</td>
-				</tr>
-			</tbody>
-		</table>
+					<Table.Cell class="text-right">{fmtPct(table.allocation.other)}</Table.Cell>
+				</Table.Row>
+			</Table.Body>
+		</Table.Root>
 	</div>
 {:else}
 	<div class="text-muted-foreground text-sm">Loading…</div>
