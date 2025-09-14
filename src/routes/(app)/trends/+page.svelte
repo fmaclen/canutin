@@ -116,6 +116,7 @@
 				.collection('accountBalances')
 				.getFullList<AccountBalancesResponse<{ account: AccountsResponse }>>({
 					sort: 'asOf,created,id',
+					fields: 'id,account,value,asOf,expand',
 					expand: 'account',
 					requestKey: 'trends:accountBalances'
 				}),
@@ -123,6 +124,7 @@
 				.collection('assetBalances')
 				.getFullList<AssetBalancesResponse<{ asset: AssetsResponse }>>({
 					sort: 'asOf,created,id',
+					fields: 'id,asset,value,asOf,expand',
 					expand: 'asset',
 					requestKey: 'trends:assetBalances'
 				})
