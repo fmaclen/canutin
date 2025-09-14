@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { scaleUtc } from 'd3-scale';
 	import { curveNatural } from 'd3-shape';
-	import { LineChart } from 'layerchart';
+	import { Grid, LineChart } from 'layerchart';
 	import { SvelteMap } from 'svelte/reactivity';
 
 	import { getAccountsContext } from '$lib/accounts.svelte';
@@ -396,7 +396,7 @@
 						]}
 						legend={{ placement: 'top' }}
 						props={{
-							spline: { curve: curveNatural, motion: 'none', strokeWidth: 1.33 },
+							spline: { curve: curveNatural, motion: 'tween', strokeWidth: 1.25 },
 							xAxis: {
 								format: (v: Date) => v.toISOString().slice(0, 10)
 							},
@@ -413,7 +413,7 @@
 						}}
 					>
 						{#snippet tooltip()}
-							<Chart.Tooltip hideLabel />
+							<Chart.Tooltip />
 						{/snippet}
 					</LineChart>
 				</Chart.Container>

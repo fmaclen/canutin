@@ -6,10 +6,12 @@
 	import { cn, type WithElementRef, type WithoutChildren } from '$lib/utils.js';
 
 	import { getPayloadConfigFromPayload, useChart, type TooltipPayload } from './chart-utils.js';
+	import Currency from '$lib/components/currency.svelte';
 
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
 	function defaultFormatter(value: any, _payload: TooltipPayload[]) {
-		return `${value}`;
+		if (value instanceof Date) return value.toISOString().slice(0, 10);
+		return value;
 	}
 
 	let {
@@ -121,7 +123,7 @@
 						{:else if !hideIndicator}
 							<div
 								style="--color-bg: {indicatorColor}; --color-border: {indicatorColor};"
-								class={cn('shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)', {
+								class={cn('shrink-0 rounded-lg border-(--color-border) bg-(--color-bg)', {
 									'size-2.5': indicator === 'dot',
 									'h-full w-1': indicator === 'line',
 									'w-0 border-[1.5px] border-dashed bg-transparent': indicator === 'dashed',
@@ -131,7 +133,7 @@
 						{/if}
 						<div
 							class={cn(
-								'flex flex-1 shrink-0 justify-between leading-none',
+								'flex flex-1 shrink-0 justify-between leading-none gap-4',
 								nestLabel ? 'items-end' : 'items-center'
 							)}
 						>
@@ -144,9 +146,7 @@
 								</span>
 							</div>
 							{#if item.value !== undefined}
-								<span class="text-foreground font-mono font-medium tabular-nums">
-									{item.value.toLocaleString()}
-								</span>
+								<Currency value={item.value} />
 							{/if}
 						</div>
 					{/if}
