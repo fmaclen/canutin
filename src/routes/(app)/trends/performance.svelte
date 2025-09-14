@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { SvelteMap } from 'svelte/reactivity';
+	import { fade } from 'svelte/transition';
 
+	import { Skeleton } from '$lib/components/ui/skeleton/index';
 	import * as Table from '$lib/components/ui/table/index';
 	import type {
 		AccountBalancesResponse,
@@ -8,8 +10,6 @@
 		AssetBalancesResponse,
 		AssetsResponse
 	} from '$lib/pocketbase.schema';
-
-	import Skeleton from '../ui/skeleton/skeleton.svelte';
 
 	type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
 
@@ -255,5 +255,5 @@
 		</div>
 	</div>
 {:else}
-	<Skeleton class="h-96 w-full" />
+	<Skeleton class="h-64 w-full" />
 {/if}

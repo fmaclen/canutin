@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAssetsContext } from '$lib/assets.svelte';
-	import ChartNetWorth from '$lib/components/charts/chart-net-worth.svelte';
+	import ChartNetWorth from './growth.svelte';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
-	import TablePerformance from '$lib/components/tables/table-performance.svelte';
+	import Performance from './performance.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
@@ -163,7 +163,6 @@
 				</Tabs.List>
 			</nav>
 
-			<div class="bg-background overflow-visible rounded-sm shadow-md">
 				<ChartNetWorth
 					bind:period
 					{rawAccounts}
@@ -171,12 +170,11 @@
 					{rawAccountBalances}
 					{rawAssetBalances}
 				/>
-			</div>
 		</Section>
 	</Tabs.Root>
 
 	<Section>
 		<SectionTitle title="Performance" />
-		<TablePerformance {rawAccounts} {rawAssets} {rawAccountBalances} {rawAssetBalances} />
+		<Performance {rawAccounts} {rawAssets} {rawAccountBalances} {rawAssetBalances} />
 	</Section>
 </Page>

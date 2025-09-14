@@ -3,9 +3,11 @@
 	import { curveNatural } from 'd3-shape';
 	import { LineChart } from 'layerchart';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+	import { fade } from 'svelte/transition';
 
 	import { formatCurrency } from '$lib/components/currency';
 	import * as Chart from '$lib/components/ui/chart/index.js';
+	import Skeleton from '$lib/components/ui/skeleton/skeleton.svelte';
 	import type {
 		AccountBalancesResponse,
 		AccountsResponse,
@@ -228,54 +230,56 @@
 </script>
 
 {#if series.length}
-	<Chart.Container
-		config={{
-			net: { label: 'Net worth', color: '#45403C' },
-			cash: { label: 'Cash', color: '#00a36f' },
-			debt: { label: 'Debt', color: '#e75258' },
-			investment: { label: 'Investments', color: '#b19b70' },
-			other: { label: 'Other assets', color: '#5255ac' }
-		}}
-		class="h-128 w-full"
-	>
-		<LineChart
-			data={series}
-			x="date"
-			xScale={scaleUtc()}
-			yDomain={yDomain ?? undefined}
-			padding={{ top: 16, right: 0, bottom: 24, left: leftPadding }}
-			series={[
-				{ key: 'net', label: 'Net worth', color: chartConfig.net.color },
-				{ key: 'cash', label: 'Cash', color: chartConfig.cash.color },
-				{ key: 'debt', label: 'Debt', color: chartConfig.debt.color },
-				{ key: 'investment', label: 'Investments', color: chartConfig.investment.color },
-				{ key: 'other', label: 'Other assets', color: chartConfig.other.color }
-			]}
-			legend={{ placement: 'top' }}
-			props={{
-				spline: { curve: curveNatural, motion: 'tween', strokeWidth: 1.25 },
-				xAxis: {
-					format: (v: Date) => v.toISOString().slice(0, 10),
-					ticks: 6
-				},
-				yAxis: {
-					format: (v: number) => formatY(Math.round(v)),
-					ticks: (scale) => {
-						const [min, max] = scale.domain();
-						const ticks = [min, max];
-						if (min < 0 && max > 0) ticks.splice(1, 0, 0);
-						return ticks;
-					}
-				},
-				grid: { x: true, y: true, xTicks: 6, yTicks: [0] },
-				highlight: { points: { r: 3 } }
+	<div class="bg-background overflow-visible rounded-sm shadow-md">
+		<Chart.Container
+			config={{
+				net: { label: 'Net worth', color: '#45403C' },
+				cash: { label: 'Cash', color: '#00a36f' },
+				debt: { label: 'Debt', color: '#e75258' },
+				investment: { label: 'Investments', color: '#b19b70' },
+				other: { label: 'Other assets', color: '#5255ac' }
 			}}
+			class="h-128 w-full"
 		>
-			{#snippet tooltip()}
-				<Chart.Tooltip />
-			{/snippet}
-		</LineChart>
-	</Chart.Container>
+			<LineChart
+				data={series}
+				x="date"
+				xScale={scaleUtc()}
+				yDomain={yDomain ?? undefined}
+				padding={{ top: 16, right: 0, bottom: 24, left: leftPadding }}
+				series={[
+					{ key: 'net', label: 'Net worth', color: chartConfig.net.color },
+					{ key: 'cash', label: 'Cash', color: chartConfig.cash.color },
+					{ key: 'debt', label: 'Debt', color: chartConfig.debt.color },
+					{ key: 'investment', label: 'Investments', color: chartConfig.investment.color },
+					{ key: 'other', label: 'Other assets', color: chartConfig.other.color }
+				]}
+				legend={{ placement: 'top' }}
+				props={{
+					spline: { curve: curveNatural, motion: 'tween', strokeWidth: 1.25 },
+					xAxis: {
+						format: (v: Date) => v.toISOString().slice(0, 10),
+						ticks: 6
+					},
+					yAxis: {
+						format: (v: number) => formatY(Math.round(v)),
+						ticks: (scale) => {
+							const [min, max] = scale.domain();
+							const ticks = [min, max];
+							if (min < 0 && max > 0) ticks.splice(1, 0, 0);
+							return ticks;
+						}
+					},
+					grid: { x: true, y: true, xTicks: 6, yTicks: [0] },
+					highlight: { points: { r: 3 } }
+				}}
+			>
+				{#snippet tooltip()}
+					<Chart.Tooltip />
+				{/snippet}
+			</LineChart>
+		</Chart.Container>
+	</div>
 {:else}
-	<div class="text-muted-foreground text-sm">Loading…</div>
+	<Skeleton class="h-128 w-full" />
 {/if}
