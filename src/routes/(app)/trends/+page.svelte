@@ -384,7 +384,7 @@
 						x="date"
 						xScale={scaleUtc()}
 						yDomain={yDomain ?? undefined}
-						padding={{ top: 24, right: 0, bottom: 24, left: leftPadding }}
+						padding={{ top: 32, right: 0, bottom: 24, left: leftPadding }}
 						series={[
 							{ key: 'net', label: 'Net worth', color: chartConfig.net.color },
 							{ key: 'cash', label: 'Cash', color: chartConfig.cash.color },
@@ -397,7 +397,7 @@
 							spline: { curve: curveNatural, motion: 'tween', strokeWidth: 1.25 },
 							xAxis: {
 								format: (v: Date) => v.toISOString().slice(0, 10),
-								ticks: 6
+								ticks: 4
 							},
 							yAxis: {
 								format: (v: number) => formatY(Math.round(v)),
@@ -408,7 +408,7 @@
 									return ticks;
 								}
 							},
-							grid: { x: true, y: true, xTicks: 6, yTicks: [0] },
+							grid: { x: true, y: true, xTicks: 8, yTicks: [0] },
 							highlight: { points: { r: 3 } }
 						}}
 					>
