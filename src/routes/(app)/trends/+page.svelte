@@ -1,6 +1,4 @@
 <script lang="ts">
-	//
-
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAssetsContext } from '$lib/assets.svelte';
 	import ChartNetWorth from '$lib/components/charts/chart-net-worth.svelte';
@@ -28,8 +26,6 @@
 	let rawAssets: AssetsResponse[] = $state([]);
 	let rawAccountBalances: AccountBalancesResponse[] = $state([]);
 	let rawAssetBalances: AssetBalancesResponse[] = $state([]);
-
-	// kept for reference; no longer used on the page
 
 	async function loadAndLogAll() {
 		const [accountBalancesAll, assetBalancesAll] = await Promise.all([
@@ -95,8 +91,6 @@
 		rawAssets = Array.from(activeAssets.values());
 		rawAccountBalances = accountBalances;
 		rawAssetBalances = assetBalances;
-
-		// recompute happens within the chart component based on props
 	}
 
 	let refreshTimer: number | null = null;
@@ -128,8 +122,6 @@
 	}
 
 	$effect(() => void loadAndLogAll());
-
-	// period is passed to chart component only
 
 	$effect(() => {
 		if (accountsCtx?.lastBalanceEvent) scheduleRefresh();

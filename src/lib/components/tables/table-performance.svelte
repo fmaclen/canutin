@@ -50,7 +50,6 @@
 		);
 	}
 
-	// Build grouped maps once; arrays are already sorted by asOf from fetch
 	const prepared = $derived.by(() => {
 		const acctMap = new SvelteMap<string, AccountBalancesResponse[]>();
 		for (const b of rawAccountBalances) {
@@ -113,7 +112,6 @@
 			}
 		}
 
-		// map back to original order
 		return atDates.map((d) => sumsAsc[ascIndex.get(d.getTime())!]);
 	}
 
