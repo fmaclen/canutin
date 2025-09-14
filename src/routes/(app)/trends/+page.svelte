@@ -4,6 +4,8 @@
 	import { LineChart } from 'layerchart';
 	import { SvelteMap } from 'svelte/reactivity';
 
+	import { getAccountsContext } from '$lib/accounts.svelte';
+	import { getAssetsContext } from '$lib/assets.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import * as Chart from '$lib/components/ui/chart/index.js';
@@ -20,17 +22,14 @@
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 
 	const pb = getPocketBaseContext();
-
-	// Period selector
-	let period: '3m' | '6m' | 'ytd' | '1y' | '5y' | 'max' = $state('1y');
+	const accountsCtx = getAccountsContext();
+	const assetsCtx = getAssetsContext();
 
 	type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
 
 	function utcMidnight(d: Date) {
 		return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 	}
-
-	// (removed) weekly step generator
 
 	// Sequence of x-axis dates for the selected range
 	let dates: Date[] = $state([]);
@@ -46,6 +45,7 @@
 	let series: Row[] = $state([]);
 
 	// Raw data caches (single fetch, recompute client-side per period)
+	let period: '3m' | '6m' | 'ytd' | '1y' | '5y' | 'max' = $state('1y');
 	let rawAccounts: AccountsResponse[] = $state([]);
 	let rawAssets: AssetsResponse[] = $state([]);
 	let rawAccountBalances: AccountBalancesResponse[] = $state([]);
@@ -73,7 +73,6 @@
 		other: { label: 'Other assets', color: '#5255ac' }
 	} satisfies Chart.ChartConfig;
 
-	// Format and dynamic left padding for Y axis
 	function formatY(v: number) {
 		return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(v);
 	}
@@ -84,7 +83,8 @@
 		if (!_measureCanvas) _measureCanvas = document.createElement('canvas');
 		const ctx = _measureCanvas.getContext('2d');
 		if (!ctx) return text.length * 8;
-		ctx.font = '12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+		ctx.font =
+			'12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
 		return ctx.measureText(text).width;
 	}
 
@@ -99,7 +99,6 @@
 	const leftPadding = $derived.by(() => {
 		const labels = yTickValues.map((v) => formatY(Math.round(v)));
 		const maxW = labels.reduce((m, s) => Math.max(m, textWidthMono(s)), 0);
-		// label width + gutter; minimum to keep visuals stable
 		return Math.max(48, Math.ceil(maxW) + 16);
 	});
 
@@ -215,7 +214,6 @@
 		if (!rawAccounts.length && !rawAssets.length) return;
 		const { start, end } = computeRangeForPeriod(period);
 
-		// Event-driven sampling: use only dates where any balance changes, plus start/end
 		const dateSet = new Set<number>();
 		const startUTC = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
 		const endUTC = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
@@ -233,7 +231,6 @@
 			if (u >= startUTC && u <= endUTC) dateSet.add(u);
 		}
 
-		// Always anchor the range
 		dateSet.add(startUTC);
 		dateSet.add(endUTC);
 
@@ -307,10 +304,83 @@
 		series = rows;
 	}
 
+	async function refreshBalances() {
+		const [accountBalancesAll, assetBalancesAll] = await Promise.all([
+			pb.authedClient
+				.collection('accountBalances')
+				.getFullList<AccountBalancesResponse<{ account: AccountsResponse }>>({
+					sort: 'asOf,created,id',
+					fields: 'id,account,value,asOf,expand',
+					expand: 'account',
+					requestKey: 'trends:accountBalances'
+				}),
+			pb.authedClient
+				.collection('assetBalances')
+				.getFullList<AssetBalancesResponse<{ asset: AssetsResponse }>>({
+					sort: 'asOf,created,id',
+					fields: 'id,asset,value,asOf,expand',
+					expand: 'asset',
+					requestKey: 'trends:assetBalances'
+				})
+		]);
+
+		const accountBalances = accountBalancesAll.filter((b) => {
+			const acc = (b.expand?.account ?? null) as AccountsResponse | null;
+			if (!acc) return false;
+			return !acc.excluded && !acc.closed;
+		});
+		const assetBalances = assetBalancesAll.filter((b) => {
+			const as = (b.expand?.asset ?? null) as AssetsResponse | null;
+			if (!as) return false;
+			return !as.excluded && !as.sold;
+		});
+
+		const accountsMap = new Map<string, AccountsResponse>();
+		for (const b of accountBalances) {
+			const acc = b.expand?.account as AccountsResponse | undefined;
+			if (acc) accountsMap.set(acc.id, acc);
+		}
+		const assetsMap = new Map<string, AssetsResponse>();
+		for (const b of assetBalances) {
+			const as = b.expand?.asset as AssetsResponse | undefined;
+			if (as) assetsMap.set(as.id, as);
+		}
+
+		rawAccounts = Array.from(accountsMap.values());
+		rawAssets = Array.from(assetsMap.values());
+		rawAccountBalances = accountBalances;
+		rawAssetBalances = assetBalances;
+
+		await recomputeSeries();
+	}
+
+	let recomputeScheduled = false;
+	function scheduleRecomputeFromBalances() {
+		if (recomputeScheduled) return;
+		recomputeScheduled = true;
+		queueMicrotask(() => {
+			recomputeScheduled = false;
+			console.debug('[trends] coalesced balance event → refresh balances');
+			void refreshBalances();
+		});
+	}
+
 	$effect(() => {
 		// Rerun computation when period changes
 		const _p = period;
 		void recomputeSeries();
+	});
+
+	$effect(() => {
+		if (accountsCtx?.lastBalanceEvent) {
+			scheduleRecomputeFromBalances();
+		}
+	});
+
+	$effect(() => {
+		if (assetsCtx?.lastBalanceEvent) {
+			scheduleRecomputeFromBalances();
+		}
 	});
 </script>
 
@@ -345,7 +415,7 @@
 			<div class="bg-background overflow-visible rounded-sm shadow-md">
 				<Chart.Container
 					config={chartConfig}
-					class="h-128 w-full [&_.lc-axis-x_.lc-axis-tick-label]:font-mono [&_.lc-axis-y_.lc-axis-tick-label]:font-mono [&_.lc-axis-x_.lc-axis-tick:first-child_.lc-axis-tick-label]:hidden"
+					class="h-128 w-full [&_.lc-axis-x_.lc-axis-tick-label]:font-mono [&_.lc-axis-x_.lc-axis-tick:first-child_.lc-axis-tick-label]:hidden [&_.lc-axis-y_.lc-axis-tick-label]:font-mono"
 				>
 					<LineChart
 						data={series}

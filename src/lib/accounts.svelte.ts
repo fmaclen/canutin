@@ -8,6 +8,7 @@ type AccountWithBalance = AccountsResponse & { balance: number };
 
 class AccountsContext {
 	accounts: AccountWithBalance[] = $state([]);
+	lastBalanceEvent: number = $state(0);
 
 	private _pb: PocketBase;
 	private balanceTypesContext: ReturnType<typeof setBalanceTypesContext>;
@@ -29,6 +30,7 @@ class AccountsContext {
 			const value = await this.getLatestAccountBalance(a.id);
 			this.accounts = this.accounts.map((x) => (x.id === a.id ? { ...x, balance: value } : x));
 		}
+		this.lastBalanceEvent = Date.now();
 		this.realtimeSubscribe();
 	}
 
@@ -57,6 +59,7 @@ class AccountsContext {
 		const accountId = e.record.account;
 		const value = await this.getLatestAccountBalance(accountId);
 		this.accounts = this.accounts.map((x) => (x.id === accountId ? { ...x, balance: value } : x));
+		this.lastBalanceEvent = Date.now();
 	}
 
 	private async getLatestAccountBalance(accountId: string) {
