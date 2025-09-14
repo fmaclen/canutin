@@ -149,7 +149,7 @@
 <div class="flex flex-col space-y-4 p-8">
 	<Tabs.Root bind:value={period}>
 		<nav class="flex items-center justify-between space-x-2">
-			<SectionTitle title="Net worth" />
+			<SectionTitle title="Growth" />
 			<Tabs.List>
 				<Tabs.Trigger value="3m">3M</Tabs.Trigger>
 				<Tabs.Trigger value="6m">6M</Tabs.Trigger>
@@ -159,18 +159,22 @@
 				<Tabs.Trigger value="max">MAX</Tabs.Trigger>
 			</Tabs.List>
 		</nav>
-		<div class="bg-background overflow-visible rounded-sm shadow-md">
-			<ChartNetWorth
-				bind:period
-				{rawAccounts}
-				{rawAssets}
-				{rawAccountBalances}
-				{rawAssetBalances}
-			/>
-		</div>
 
-		<div class="bg-background rounded-sm p-4 shadow-md">
-			<TablePerformance {rawAccounts} {rawAssets} {rawAccountBalances} {rawAssetBalances} />
+		<div class="space-y-2">
+			<div class="bg-background overflow-visible rounded-sm shadow-md">
+				<ChartNetWorth
+					bind:period
+					{rawAccounts}
+					{rawAssets}
+					{rawAccountBalances}
+					{rawAssetBalances}
+				/>
+			</div>
 		</div>
 	</Tabs.Root>
+
+	<div class="space-y-2">
+		<SectionTitle title="Performance" />
+		<TablePerformance {rawAccounts} {rawAssets} {rawAccountBalances} {rawAssetBalances} />
+	</div>
 </div>

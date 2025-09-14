@@ -9,6 +9,8 @@
 		AssetsResponse
 	} from '$lib/pocketbase.schema';
 
+	import Skeleton from '../ui/skeleton/skeleton.svelte';
+
 	type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
 
 	let {
@@ -180,56 +182,78 @@
 </script>
 
 {#if table}
-	<div class="overflow-x-auto">
-		<Table.Root>
-			<Table.Header>
-				<Table.Row>
-					<Table.Head class="text-left">Group</Table.Head>
-					{#each table.cols as c (c.key)}
-						<Table.Head class="text-right whitespace-nowrap">{c.label}</Table.Head>
-					{/each}
-					<Table.Head class="text-right whitespace-nowrap">Allocation</Table.Head>
-				</Table.Row>
-			</Table.Header>
-			<Table.Body>
-				<Table.Row>
-					<Table.Cell class="font-medium">Net worth</Table.Cell>
-					{#each table.cols as c (c.key)}
-						<Table.Cell class="text-right">{fmtPct(c.values.net)}</Table.Cell>
-					{/each}
-					<Table.Cell class="text-right">{fmtPct(table.allocation.net)}</Table.Cell>
-				</Table.Row>
-				<Table.Row>
-					<Table.Cell class="font-medium">Cash</Table.Cell>
-					{#each table.cols as c (c.key)}
-						<Table.Cell class="text-right">{fmtPct(c.values.cash)}</Table.Cell>
-					{/each}
-					<Table.Cell class="text-right">{fmtPct(table.allocation.cash)}</Table.Cell>
-				</Table.Row>
-				<Table.Row>
-					<Table.Cell class="font-medium">Debt</Table.Cell>
-					{#each table.cols as c (c.key)}
-						<Table.Cell class="text-right">{fmtPct(c.values.debt)}</Table.Cell>
-					{/each}
-					<Table.Cell class="text-right">{fmtPct(table.allocation.debt)}</Table.Cell>
-				</Table.Row>
-				<Table.Row>
-					<Table.Cell class="font-medium">Investments</Table.Cell>
-					{#each table.cols as c (c.key)}
-						<Table.Cell class="text-right">{fmtPct(c.values.investment)}</Table.Cell>
-					{/each}
-					<Table.Cell class="text-right">{fmtPct(table.allocation.investment)}</Table.Cell>
-				</Table.Row>
-				<Table.Row>
-					<Table.Cell class="font-medium">Other assets</Table.Cell>
-					{#each table.cols as c (c.key)}
-						<Table.Cell class="text-right">{fmtPct(c.values.other)}</Table.Cell>
-					{/each}
-					<Table.Cell class="text-right">{fmtPct(table.allocation.other)}</Table.Cell>
-				</Table.Row>
-			</Table.Body>
-		</Table.Root>
+	<div class="bg-background rounded-sm shadow-md">
+		<div class="overflow-x-auto">
+			<Table.Root>
+				<Table.Header>
+					<Table.Row>
+						<Table.Head class="text-left">Group</Table.Head>
+						{#each table.cols as c (c.key)}
+							<Table.Head class="text-right whitespace-nowrap">{c.label}</Table.Head>
+						{/each}
+						<Table.Head class="text-right whitespace-nowrap">Allocation</Table.Head>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					<Table.Row>
+						<Table.Cell class="font-medium">Net worth</Table.Cell>
+						{#each table.cols as c (c.key)}
+							<Table.Cell class="font-jetbrains-mono text-right text-xs"
+								>{fmtPct(c.values.net)}</Table.Cell
+							>
+						{/each}
+						<Table.Cell class="font-jetbrains-mono text-right text-xs"
+							>{fmtPct(table.allocation.net)}</Table.Cell
+						>
+					</Table.Row>
+					<Table.Row>
+						<Table.Cell class="font-medium">Cash</Table.Cell>
+						{#each table.cols as c (c.key)}
+							<Table.Cell class="font-jetbrains-mono text-right text-xs"
+								>{fmtPct(c.values.cash)}</Table.Cell
+							>
+						{/each}
+						<Table.Cell class="font-jetbrains-mono text-right text-xs"
+							>{fmtPct(table.allocation.cash)}</Table.Cell
+						>
+					</Table.Row>
+					<Table.Row>
+						<Table.Cell class="font-medium">Debt</Table.Cell>
+						{#each table.cols as c (c.key)}
+							<Table.Cell class="font-jetbrains-mono text-right text-xs"
+								>{fmtPct(c.values.debt)}</Table.Cell
+							>
+						{/each}
+						<Table.Cell class="font-jetbrains-mono text-right text-xs"
+							>{fmtPct(table.allocation.debt)}</Table.Cell
+						>
+					</Table.Row>
+					<Table.Row>
+						<Table.Cell class="font-medium">Investments</Table.Cell>
+						{#each table.cols as c (c.key)}
+							<Table.Cell class="font-jetbrains-mono text-right text-xs"
+								>{fmtPct(c.values.investment)}</Table.Cell
+							>
+						{/each}
+						<Table.Cell class="font-jetbrains-mono text-right text-xs"
+							>{fmtPct(table.allocation.investment)}</Table.Cell
+						>
+					</Table.Row>
+					<Table.Row>
+						<Table.Cell class="font-medium">Other assets</Table.Cell>
+						{#each table.cols as c (c.key)}
+							<Table.Cell class="font-jetbrains-mono text-right text-xs"
+								>{fmtPct(c.values.other)}</Table.Cell
+							>
+						{/each}
+						<Table.Cell class="font-jetbrains-mono text-right text-xs"
+							>{fmtPct(table.allocation.other)}</Table.Cell
+						>
+					</Table.Row>
+				</Table.Body>
+			</Table.Root>
+		</div>
 	</div>
 {:else}
-	<div class="text-muted-foreground text-sm">Loading…</div>
+	<Skeleton class="h-96 w-full" />
 {/if}

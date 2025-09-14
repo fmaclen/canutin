@@ -11,6 +11,7 @@
 
 :root {
 	--brand: oklch(0.627 0.265 251.78);
+	--brand-secondary: hsl(210, 100%, 97%);
 
 	--cash: #00a36f;
 	--debt: #e75258;
@@ -19,7 +20,7 @@
 
 	--radius: 0.625rem;
 	--background: oklch(1 0 0);
-	--foreground: oklch(0.145 0 0);
+	--foreground: oklch(0.33 0 0);
 	--card: oklch(1 0 0);
 	--card-foreground: oklch(0.145 0 0);
 	--popover: oklch(1 0 0);
@@ -87,6 +88,7 @@
 
 @theme inline {
 	--color-brand: var(--brand);
+	--color-brand-secondary: var(--brand-secondary);
 
 	--color-cash: var(--cash);
 	--color-debt: var(--debt);
