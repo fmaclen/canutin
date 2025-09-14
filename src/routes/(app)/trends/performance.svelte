@@ -43,6 +43,10 @@
 		return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 	}
 
+	function utcEndOfDay(d: Date) {
+		return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59, 999));
+	}
+
 	function subDate(now: Date, o: { days?: number; months?: number; years?: number }) {
 		return new Date(
 			Date.UTC(
@@ -120,7 +124,8 @@
 
 	const table = $derived.by(() => {
 		if (!rawAccounts.length && !rawAssets.length) return null;
-		const now = utcMidnight(new Date());
+		// Use a max future timestamp for "current" so we always pick the latest known value
+		const now = new Date(8640000000000000);
 
 		let earliest: Date | null = null;
 		for (const b of rawAccountBalances) {
@@ -132,15 +137,13 @@
 			if (!earliest || d < earliest) earliest = d;
 		}
 
-		const atDates = periods.map((p) =>
-			p.offset.max
-				? earliest
-					? utcMidnight(earliest)
-					: now
-				: p.offset.ytd
-					? new Date(Date.UTC(now.getUTCFullYear(), 0, 1))
-					: subDate(now, p.offset)
-		);
+		const atDates = periods.map((p) => {
+			if (p.offset.max) return earliest ? new Date(earliest) : now; // exact first record for MAX
+			if (p.offset.ytd) return utcEndOfDay(new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1)));
+			// For other offsets, use end-of-day of the computed anchor to include that day's changes
+			const anchor = subDate(new Date(), p.offset);
+			return utcEndOfDay(anchor);
+		});
 		const totals = computeTotals([...atDates, now]);
 		const current = totals[totals.length - 1];
 		const cols = periods.map((p, i) => {

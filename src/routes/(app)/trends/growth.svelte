@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { scaleUtc } from 'd3-scale';
-	import { curveNatural } from 'd3-shape';
+	import { curveBumpX } from 'd3-shape';
 	import { LineChart } from 'layerchart';
-	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	import { formatCurrency } from '$lib/components/currency';
 	import * as Chart from '$lib/components/ui/chart/index.js';
@@ -26,6 +26,10 @@
 
 	function utcMidnight(d: Date) {
 		return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+	}
+
+	function utcEndOfDay(d: Date) {
+		return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59, 999));
 	}
 
 	type Row = {
@@ -89,8 +93,10 @@
 	});
 
 	function latestIndexBeforeOrEqual<T extends { asOf: string }>(arr: T[], t: Date, start = -1) {
+		// Compare against end-of-day for the provided date to include all entries within that day
+		const cutoff = utcEndOfDay(t);
 		let i = start;
-		while (i + 1 < arr.length && new Date(arr[i + 1].asOf) <= t) i++;
+		while (i + 1 < arr.length && new Date(arr[i + 1].asOf) <= cutoff) i++;
 		return i;
 	}
 
@@ -136,29 +142,14 @@
 		if (!rawAccounts.length && !rawAssets.length) return;
 		const { start, end } = computeRangeForPeriod(period);
 
-		const dateSet = new SvelteSet<number>();
+		// Build a dense daily timeline from start to end (inclusive)
 		const startUTC = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
 		const endUTC = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
-
-		for (const b of rawAccountBalances) {
-			if (!rawAccounts.find((a) => a.id === b.account)) continue;
-			const t = new Date(b.asOf);
-			const u = Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate());
-			if (u >= startUTC && u <= endUTC) dateSet.add(u);
+		const DAY = 24 * 60 * 60 * 1000;
+		const ds: Date[] = [];
+		for (let u = startUTC; u <= endUTC; u += DAY) {
+			ds.push(new Date(u));
 		}
-		for (const b of rawAssetBalances) {
-			if (!rawAssets.find((a) => a.id === b.asset)) continue;
-			const t = new Date(b.asOf);
-			const u = Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate());
-			if (u >= startUTC && u <= endUTC) dateSet.add(u);
-		}
-
-		dateSet.add(startUTC);
-		dateSet.add(endUTC);
-
-		const ds = Array.from(dateSet)
-			.sort((a, b) => a - b)
-			.map((u) => new Date(u));
 
 		const acctMap = new SvelteMap<string, AccountBalancesResponse[]>();
 		for (const b of rawAccountBalances) {
@@ -255,7 +246,7 @@
 				]}
 				legend={{ placement: 'top' }}
 				props={{
-					spline: { curve: curveNatural, motion: 'tween', strokeWidth: 1.25 },
+					spline: { curve: curveBumpX, motion: 'tween', strokeWidth: 1.25 },
 					xAxis: {
 						format: (v: Date) => v.toISOString().slice(0, 10),
 						ticks: 6
