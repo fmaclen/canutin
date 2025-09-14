@@ -106,51 +106,32 @@
 
 	async function loadAndLogAll() {
 		const [accountBalancesAll, assetBalancesAll] = await Promise.all([
-			pb.authedClient
-				.collection('accountBalances')
-				.getFullList<AccountBalancesResponse<{ account: AccountsResponse }>>({
-					sort: 'asOf,created,id',
-					fields: 'id,account,value,asOf,expand',
-					expand: 'account',
-					requestKey: 'trends:accountBalances'
-				}),
-			pb.authedClient
-				.collection('assetBalances')
-				.getFullList<AssetBalancesResponse<{ asset: AssetsResponse }>>({
-					sort: 'asOf,created,id',
-					fields: 'id,asset,value,asOf,expand',
-					expand: 'asset',
-					requestKey: 'trends:assetBalances'
-				})
+			pb.authedClient.collection('accountBalances').getFullList<AccountBalancesResponse>({
+				sort: 'asOf,created,id',
+				fields: 'id,account,value,asOf',
+				requestKey: 'trends:accountBalances'
+			}),
+			pb.authedClient.collection('assetBalances').getFullList<AssetBalancesResponse>({
+				sort: 'asOf,created,id',
+				fields: 'id,asset,value,asOf',
+				requestKey: 'trends:assetBalances'
+			})
 		]);
 
-		const accountBalances = accountBalancesAll.filter((b) => {
-			const acc = (b.expand?.account ?? null) as AccountsResponse | null;
-			if (!acc) return false;
-			return !acc.excluded && !acc.closed;
-		});
-		const assetBalances = assetBalancesAll.filter((b) => {
-			const as = (b.expand?.asset ?? null) as AssetsResponse | null;
-			if (!as) return false;
-			return !as.excluded && !as.sold;
-		});
+		const activeAccounts = new Map(
+			(accountsCtx?.accounts ?? [])
+				.filter((a) => !a.excluded && !a.closed)
+				.map((a) => [a.id, a] as const)
+		);
+		const activeAssets = new Map(
+			(assetsCtx?.assets ?? []).filter((a) => !a.excluded && !a.sold).map((a) => [a.id, a] as const)
+		);
 
-		const accountsMap = new Map<string, AccountsResponse>();
-		for (const b of accountBalances) {
-			const acc = b.expand?.account as AccountsResponse | undefined;
-			if (acc) accountsMap.set(acc.id, acc);
-		}
-		const assetsMap = new Map<string, AssetsResponse>();
-		for (const b of assetBalances) {
-			const as = b.expand?.asset as AssetsResponse | undefined;
-			if (as) assetsMap.set(as.id, as);
-		}
+		const accountBalances = accountBalancesAll.filter((b) => activeAccounts.has(b.account));
+		const assetBalances = assetBalancesAll.filter((b) => activeAssets.has(b.asset));
 
-		const accounts = Array.from(accountsMap.values());
-		const assets = Array.from(assetsMap.values());
-
-		rawAccounts = accounts;
-		rawAssets = assets;
+		rawAccounts = Array.from(activeAccounts.values());
+		rawAssets = Array.from(activeAssets.values());
 		rawAccountBalances = accountBalances;
 		rawAssetBalances = assetBalances;
 
@@ -292,48 +273,32 @@
 
 	async function refreshBalances() {
 		const [accountBalancesAll, assetBalancesAll] = await Promise.all([
-			pb.authedClient
-				.collection('accountBalances')
-				.getFullList<AccountBalancesResponse<{ account: AccountsResponse }>>({
-					sort: 'asOf,created,id',
-					fields: 'id,account,value,asOf,expand',
-					expand: 'account',
-					requestKey: 'trends:accountBalances'
-				}),
-			pb.authedClient
-				.collection('assetBalances')
-				.getFullList<AssetBalancesResponse<{ asset: AssetsResponse }>>({
-					sort: 'asOf,created,id',
-					fields: 'id,asset,value,asOf,expand',
-					expand: 'asset',
-					requestKey: 'trends:assetBalances'
-				})
+			pb.authedClient.collection('accountBalances').getFullList<AccountBalancesResponse>({
+				sort: 'asOf,created,id',
+				fields: 'id,account,value,asOf',
+				requestKey: 'trends:accountBalances'
+			}),
+			pb.authedClient.collection('assetBalances').getFullList<AssetBalancesResponse>({
+				sort: 'asOf,created,id',
+				fields: 'id,asset,value,asOf',
+				requestKey: 'trends:assetBalances'
+			})
 		]);
 
-		const accountBalances = accountBalancesAll.filter((b) => {
-			const acc = (b.expand?.account ?? null) as AccountsResponse | null;
-			if (!acc) return false;
-			return !acc.excluded && !acc.closed;
-		});
-		const assetBalances = assetBalancesAll.filter((b) => {
-			const as = (b.expand?.asset ?? null) as AssetsResponse | null;
-			if (!as) return false;
-			return !as.excluded && !as.sold;
-		});
+		const activeAccounts = new Map(
+			(accountsCtx?.accounts ?? [])
+				.filter((a) => !a.excluded && !a.closed)
+				.map((a) => [a.id, a] as const)
+		);
+		const activeAssets = new Map(
+			(assetsCtx?.assets ?? []).filter((a) => !a.excluded && !a.sold).map((a) => [a.id, a] as const)
+		);
 
-		const accountsMap = new Map<string, AccountsResponse>();
-		for (const b of accountBalances) {
-			const acc = b.expand?.account as AccountsResponse | undefined;
-			if (acc) accountsMap.set(acc.id, acc);
-		}
-		const assetsMap = new Map<string, AssetsResponse>();
-		for (const b of assetBalances) {
-			const as = b.expand?.asset as AssetsResponse | undefined;
-			if (as) assetsMap.set(as.id, as);
-		}
+		const accountBalances = accountBalancesAll.filter((b) => activeAccounts.has(b.account));
+		const assetBalances = assetBalancesAll.filter((b) => activeAssets.has(b.asset));
 
-		rawAccounts = Array.from(accountsMap.values());
-		rawAssets = Array.from(assetsMap.values());
+		rawAccounts = Array.from(activeAccounts.values());
+		rawAssets = Array.from(activeAssets.values());
 		rawAccountBalances = accountBalances;
 		rawAssetBalances = assetBalances;
 
