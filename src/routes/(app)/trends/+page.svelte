@@ -20,6 +20,7 @@
 		AssetsResponse
 	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+	import { formatCurrency } from '$lib/components/currency';
 
 	const pb = getPocketBaseContext();
 	const accountsCtx = getAccountsContext();
@@ -70,7 +71,7 @@
 	} satisfies Chart.ChartConfig;
 
 	function formatY(v: number) {
-		return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(v);
+		return formatCurrency(v);
 	}
 
 	let _measureCanvas: HTMLCanvasElement | null = null;
@@ -396,7 +397,7 @@
 						]}
 						legend={{ placement: 'top' }}
 						props={{
-							spline: { curve: curveNatural, motion: 'none', strokeWidth: 1.25 },
+							spline: { curve: curveNatural, motion: 'tween', strokeWidth: 1.25 },
 							xAxis: {
 								format: (v: Date) => v.toISOString().slice(0, 10),
 								ticks: 6

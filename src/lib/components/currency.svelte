@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Number from './number.svelte';
+	import { formatCurrency } from './currency';
 
 	interface Props {
 		value?: number | null;
@@ -12,11 +13,7 @@
 
 	// Format: $1,523.00 || -$1,523.00
 	const formattedValue = $derived(
-		new Intl.NumberFormat(locale, {
-			currency,
-			style: 'currency',
-			maximumFractionDigits
-		}).format(value ?? 0)
+		formatCurrency(value ?? 0, { currency, locale, maximumFractionDigits })
 	);
 </script>
 
