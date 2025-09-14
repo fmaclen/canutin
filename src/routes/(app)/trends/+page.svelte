@@ -213,13 +213,31 @@
 		if (!rawAccounts.length && !rawAssets.length) return;
 		const { start, end } = computeRangeForPeriod(period);
 
-		const ds: Date[] = [];
-		let d = new Date(start);
-		while (d <= end) {
-			ds.push(new Date(d));
-			// daily steps
-			d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1));
+		// Event-driven sampling: use only dates where any balance changes, plus start/end
+		const dateSet = new Set<number>();
+		const startUTC = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
+		const endUTC = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
+
+		for (const b of rawAccountBalances) {
+			if (!rawAccounts.find((a) => a.id === b.account)) continue;
+			const t = new Date(b.asOf);
+			const u = Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate());
+			if (u >= startUTC && u <= endUTC) dateSet.add(u);
 		}
+		for (const b of rawAssetBalances) {
+			if (!rawAssets.find((a) => a.id === b.asset)) continue;
+			const t = new Date(b.asOf);
+			const u = Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate());
+			if (u >= startUTC && u <= endUTC) dateSet.add(u);
+		}
+
+		// Always anchor the range
+		dateSet.add(startUTC);
+		dateSet.add(endUTC);
+
+		const ds = Array.from(dateSet)
+			.sort((a, b) => a - b)
+			.map((u) => new Date(u));
 		dates = ds;
 
 		const acctMap = new SvelteMap<string, AccountBalancesResponse[]>();
