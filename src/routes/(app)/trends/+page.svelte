@@ -1,11 +1,9 @@
 <script lang="ts">
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAssetsContext } from '$lib/assets.svelte';
-	import ChartNetWorth from './growth.svelte';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
-	import Performance from './performance.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
@@ -18,6 +16,9 @@
 		AssetsResponse
 	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+
+	import ChartNetWorth from './growth.svelte';
+	import Performance from './performance.svelte';
 
 	const pb = getPocketBaseContext();
 	const accountsCtx = getAccountsContext();
@@ -163,13 +164,13 @@
 				</Tabs.List>
 			</nav>
 
-				<ChartNetWorth
-					bind:period
-					{rawAccounts}
-					{rawAssets}
-					{rawAccountBalances}
-					{rawAssetBalances}
-				/>
+			<ChartNetWorth
+				bind:period
+				{rawAccounts}
+				{rawAssets}
+				{rawAccountBalances}
+				{rawAssetBalances}
+			/>
 		</Section>
 	</Tabs.Root>
 

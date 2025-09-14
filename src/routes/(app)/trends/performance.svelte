@@ -176,8 +176,21 @@
 	});
 
 	function fmtPct(v: number | null) {
-		if (v === null) return '—';
-		return new Intl.NumberFormat('en-US', { style: 'percent', maximumFractionDigits: 1 }).format(v);
+		if (v === null) return '~';
+		return new Intl.NumberFormat('en-US', {
+			style: 'percent',
+			maximumFractionDigits: 1,
+			signDisplay: 'exceptZero'
+		}).format(v);
+	}
+
+	function pctClass(v: number | null, group: 'net' | 'cash' | 'debt' | 'investment' | 'other') {
+		if (v === null) return 'text-muted-foreground';
+		if (v === 0) return '';
+		const reversed = group === 'debt';
+		const positive = v > 0;
+		if (reversed) return positive ? 'text-debt' : 'text-cash';
+		return positive ? 'text-cash' : 'text-debt';
 	}
 </script>
 
@@ -198,18 +211,20 @@
 					<Table.Row>
 						<Table.Cell class="font-medium">Net worth</Table.Cell>
 						{#each table.cols as c (c.key)}
-							<Table.Cell class="font-jetbrains-mono text-right text-xs"
+							<Table.Cell
+								class={'font-jetbrains-mono text-right text-xs ' + pctClass(c.values.net, 'net')}
 								>{fmtPct(c.values.net)}</Table.Cell
 							>
 						{/each}
-						<Table.Cell class="font-jetbrains-mono text-right text-xs"
+						<Table.Cell class="font-jetbrains-mono text-muted-foreground text-right text-xs"
 							>{fmtPct(table.allocation.net)}</Table.Cell
 						>
 					</Table.Row>
 					<Table.Row>
 						<Table.Cell class="font-medium">Cash</Table.Cell>
 						{#each table.cols as c (c.key)}
-							<Table.Cell class="font-jetbrains-mono text-right text-xs"
+							<Table.Cell
+								class={'font-jetbrains-mono text-right text-xs ' + pctClass(c.values.cash, 'cash')}
 								>{fmtPct(c.values.cash)}</Table.Cell
 							>
 						{/each}
@@ -220,7 +235,8 @@
 					<Table.Row>
 						<Table.Cell class="font-medium">Debt</Table.Cell>
 						{#each table.cols as c (c.key)}
-							<Table.Cell class="font-jetbrains-mono text-right text-xs"
+							<Table.Cell
+								class={'font-jetbrains-mono text-right text-xs ' + pctClass(c.values.debt, 'debt')}
 								>{fmtPct(c.values.debt)}</Table.Cell
 							>
 						{/each}
@@ -231,7 +247,9 @@
 					<Table.Row>
 						<Table.Cell class="font-medium">Investments</Table.Cell>
 						{#each table.cols as c (c.key)}
-							<Table.Cell class="font-jetbrains-mono text-right text-xs"
+							<Table.Cell
+								class={'font-jetbrains-mono text-right text-xs ' +
+									pctClass(c.values.investment, 'investment')}
 								>{fmtPct(c.values.investment)}</Table.Cell
 							>
 						{/each}
@@ -242,8 +260,9 @@
 					<Table.Row>
 						<Table.Cell class="font-medium">Other assets</Table.Cell>
 						{#each table.cols as c (c.key)}
-							<Table.Cell class="font-jetbrains-mono text-right text-xs"
-								>{fmtPct(c.values.other)}</Table.Cell
+							<Table.Cell
+								class={'font-jetbrains-mono text-right text-xs ' +
+									pctClass(c.values.other, 'other')}>{fmtPct(c.values.other)}</Table.Cell
 							>
 						{/each}
 						<Table.Cell class="font-jetbrains-mono text-right text-xs"

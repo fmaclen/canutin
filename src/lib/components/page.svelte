@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+
 	import { getPageTitle } from './page';
 
 	let { pageTitle, children }: { pageTitle: string; children: Snippet } = $props();
