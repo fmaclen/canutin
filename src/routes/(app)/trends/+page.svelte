@@ -104,7 +104,7 @@
 		return i;
 	}
 
-	async function loadAndLogAll(): Promise<void> {
+    async function loadAndLogAll() {
 		const [accountBalancesAll, assetBalancesAll] = await Promise.all([
 			pb.authedClient
 				.collection('accountBalances')
