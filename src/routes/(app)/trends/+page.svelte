@@ -384,7 +384,7 @@
 						x="date"
 						xScale={scaleUtc()}
 						yDomain={yDomain ?? undefined}
-						padding={{ top: 16, right: 16, bottom: 24, left: leftPadding }}
+						padding={{ top: 16, right: 0, bottom: 24, left: leftPadding }}
 						series={[
 							{ key: 'net', label: 'Net worth', color: chartConfig.net.color },
 							{ key: 'cash', label: 'Cash', color: chartConfig.cash.color },
