@@ -175,6 +175,13 @@
 				return (cur - prev) / Math.abs(prev);
 			}
 
+			function pctDiffDebt(cur: number, prev: number) {
+				if (!prev || prev === 0) return null as number | null;
+				const curAbs = Math.abs(cur);
+				const prevAbs = Math.abs(prev);
+				return (curAbs - prevAbs) / prevAbs;
+			}
+
 			return {
 				key: p.key,
 				label: p.label,
@@ -192,7 +199,7 @@
 								prev: baseline.cash
 							},
 							debt: {
-								pct: pctDiff(current.debt, baseline.debt),
+								pct: pctDiffDebt(current.debt, baseline.debt),
 								cur: current.debt,
 								prev: baseline.debt
 							},
@@ -210,7 +217,7 @@
 					: {
 							net: { pct: pctDiff(current.net, past.net), cur: current.net, prev: past.net },
 							cash: { pct: pctDiff(current.cash, past.cash), cur: current.cash, prev: past.cash },
-							debt: { pct: pctDiff(current.debt, past.debt), cur: current.debt, prev: past.debt },
+							debt: { pct: pctDiffDebt(current.debt, past.debt), cur: current.debt, prev: past.debt },
 							investment: {
 								pct: pctDiff(current.investment, past.investment),
 								cur: current.investment,
