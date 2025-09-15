@@ -39,10 +39,6 @@
 		{ key: 'max', label: 'MAX', offset: { max: true } }
 	];
 
-	function utcMidnight(d: Date) {
-		return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-	}
-
 	function utcEndOfDay(d: Date) {
 		return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59, 999));
 	}
@@ -146,6 +142,31 @@
 		});
 		const totals = computeTotals([...atDates, now]);
 		const current = totals[totals.length - 1];
+
+		// For MAX, compute each group's baseline as the first non-zero total for that group
+		const allTimes = [
+			...rawAccountBalances.map((b) => new Date(b.asOf).getTime()),
+			...rawAssetBalances.map((b) => new Date(b.asOf).getTime())
+		];
+		const uniqueAscTimes = Array.from(new Set(allTimes)).sort((a, b) => a - b);
+		const totalsAll = computeTotals(uniqueAscTimes.map((t) => new Date(t)));
+		let baseline = { net: 0, cash: 0, debt: 0, investment: 0, other: 0 };
+		for (const row of totalsAll) {
+			if (baseline.net === 0 && row.net !== 0) baseline.net = row.net;
+			if (baseline.cash === 0 && row.cash !== 0) baseline.cash = row.cash;
+			if (baseline.debt === 0 && row.debt !== 0) baseline.debt = row.debt;
+			if (baseline.investment === 0 && row.investment !== 0) baseline.investment = row.investment;
+			if (baseline.other === 0 && row.other !== 0) baseline.other = row.other;
+			if (
+				baseline.net !== 0 &&
+				baseline.cash !== 0 &&
+				baseline.debt !== 0 &&
+				baseline.investment !== 0 &&
+				baseline.other !== 0
+			)
+				break;
+		}
+
 		const cols = periods.map((p, i) => {
 			const past = totals[i];
 
@@ -158,17 +179,49 @@
 				key: p.key,
 				label: p.label,
 				at: atDates[i],
-				values: {
-					net: { pct: pctDiff(current.net, past.net), cur: current.net, prev: past.net },
-					cash: { pct: pctDiff(current.cash, past.cash), cur: current.cash, prev: past.cash },
-					debt: { pct: pctDiff(current.debt, past.debt), cur: current.debt, prev: past.debt },
-					investment: {
-						pct: pctDiff(current.investment, past.investment),
-						cur: current.investment,
-						prev: past.investment
-					},
-					other: { pct: pctDiff(current.other, past.other), cur: current.other, prev: past.other }
-				}
+				values: p.offset.max
+					? {
+							net: {
+								pct: pctDiff(current.net, baseline.net),
+								cur: current.net,
+								prev: baseline.net
+							},
+							cash: {
+								pct: pctDiff(current.cash, baseline.cash),
+								cur: current.cash,
+								prev: baseline.cash
+							},
+							debt: {
+								pct: pctDiff(current.debt, baseline.debt),
+								cur: current.debt,
+								prev: baseline.debt
+							},
+							investment: {
+								pct: pctDiff(current.investment, baseline.investment),
+								cur: current.investment,
+								prev: baseline.investment
+							},
+							other: {
+								pct: pctDiff(current.other, baseline.other),
+								cur: current.other,
+								prev: baseline.other
+							}
+						}
+					: {
+							net: { pct: pctDiff(current.net, past.net), cur: current.net, prev: past.net },
+							cash: { pct: pctDiff(current.cash, past.cash), cur: current.cash, prev: past.cash },
+							debt: { pct: pctDiff(current.debt, past.debt), cur: current.debt, prev: past.debt },
+							investment: {
+								pct: pctDiff(current.investment, past.investment),
+								cur: current.investment,
+								prev: past.investment
+							},
+							other: {
+								pct: pctDiff(current.other, past.other),
+								cur: current.other,
+								prev: past.other
+							}
+						}
 			};
 		});
 
