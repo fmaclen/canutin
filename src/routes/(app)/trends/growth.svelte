@@ -24,11 +24,11 @@
 		rawAssetBalances = $bindable<AssetBalancesResponse[]>([])
 	} = $props();
 
-	function utcMidnight(d: Date) {
+	function startOfDayUTC(d: Date) {
 		return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 	}
 
-	function utcEndOfDay(d: Date) {
+	function endOfDayUTC(d: Date) {
 		return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59, 999));
 	}
 
@@ -93,15 +93,14 @@
 	});
 
 	function latestIndexBeforeOrEqual<T extends { asOf: string }>(arr: T[], t: Date, start = -1) {
-		// Compare against end-of-day for the provided date to include all entries within that day
-		const cutoff = utcEndOfDay(t);
+		const cutoff = endOfDayUTC(t);
 		let i = start;
 		while (i + 1 < arr.length && new Date(arr[i + 1].asOf) <= cutoff) i++;
 		return i;
 	}
 
 	function computeRangeForPeriod(p: typeof period) {
-		const now = utcMidnight(new Date());
+		const now = startOfDayUTC(new Date());
 		if (p === '3m')
 			return {
 				start: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 3, now.getUTCDate())),
@@ -133,7 +132,7 @@
 			if (!earliest || d < earliest) earliest = d;
 		}
 		const start = earliest
-			? utcMidnight(earliest)
+			? startOfDayUTC(earliest)
 			: new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth(), now.getUTCDate()));
 		return { start, end: now };
 	}
@@ -142,13 +141,12 @@
 		if (!rawAccounts.length && !rawAssets.length) return;
 		const { start, end } = computeRangeForPeriod(period);
 
-		// Build a dense daily timeline from start to end (inclusive)
 		const startUTC = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
 		const endUTC = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
 		const DAY = 24 * 60 * 60 * 1000;
-		const ds: Date[] = [];
+		const datePoints: Date[] = [];
 		for (let u = startUTC; u <= endUTC; u += DAY) {
-			ds.push(new Date(u));
+			datePoints.push(new Date(u));
 		}
 
 		const acctMap = new SvelteMap<string, AccountBalancesResponse[]>();
@@ -170,12 +168,14 @@
 		const assetById = new Map(rawAssets.map((a) => [a.id, a] as const));
 
 		const acctPtr = new SvelteMap<string, number>();
-		for (const [id, arr] of acctMap) acctPtr.set(id, latestIndexBeforeOrEqual(arr, ds[0], -1));
+		for (const [id, arr] of acctMap)
+			acctPtr.set(id, latestIndexBeforeOrEqual(arr, datePoints[0], -1));
 		const assetPtr = new SvelteMap<string, number>();
-		for (const [id, arr] of assetMap) assetPtr.set(id, latestIndexBeforeOrEqual(arr, ds[0], -1));
+		for (const [id, arr] of assetMap)
+			assetPtr.set(id, latestIndexBeforeOrEqual(arr, datePoints[0], -1));
 
 		const rows: Row[] = [];
-		for (const t of ds) {
+		for (const t of datePoints) {
 			let cash = 0;
 			let debt = 0;
 			let investment = 0;

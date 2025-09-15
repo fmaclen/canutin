@@ -39,11 +39,11 @@
 		{ key: 'max', label: 'MAX', offset: { max: true } }
 	];
 
-	function utcEndOfDay(d: Date) {
+	function endOfDayUTC(d: Date) {
 		return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59, 999));
 	}
 
-	function subDate(now: Date, o: { days?: number; months?: number; years?: number }) {
+	function subtractFromDate(now: Date, o: { days?: number; months?: number; years?: number }) {
 		return new Date(
 			Date.UTC(
 				now.getUTCFullYear() - (o.years ?? 0),
@@ -51,6 +51,18 @@
 				now.getUTCDate() - (o.days ?? 0)
 			)
 		);
+	}
+
+	function percentChange(currentValue: number, previousValue: number): number | null {
+		if (!previousValue || previousValue === 0) return null;
+		return (currentValue - previousValue) / Math.abs(previousValue);
+	}
+
+	function percentChangeDebtMagnitude(currentValue: number, previousValue: number): number | null {
+		if (!previousValue || previousValue === 0) return null;
+		const currentAbs = Math.abs(currentValue);
+		const previousAbs = Math.abs(previousValue);
+		return (currentAbs - previousAbs) / previousAbs;
 	}
 
 	const prepared = $derived.by(() => {
@@ -120,8 +132,8 @@
 
 	const table = $derived.by(() => {
 		if (!rawAccounts.length && !rawAssets.length) return null;
-		// Use a max future timestamp for "current" so we always pick the latest known value
-		const now = new Date(8640000000000000);
+		const END_OF_TIME = new Date('9999-12-31T23:59:59.999Z');
+		const now = END_OF_TIME;
 
 		let earliest: Date | null = null;
 		for (const b of rawAccountBalances) {
@@ -134,16 +146,14 @@
 		}
 
 		const atDates = periods.map((p) => {
-			if (p.offset.max) return earliest ? new Date(earliest) : now; // exact first record for MAX
-			if (p.offset.ytd) return utcEndOfDay(new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1)));
-			// For other offsets, use end-of-day of the computed anchor to include that day's changes
-			const anchor = subDate(new Date(), p.offset);
-			return utcEndOfDay(anchor);
+			if (p.offset.max) return earliest ? new Date(earliest) : now;
+			if (p.offset.ytd) return endOfDayUTC(new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1)));
+			const anchor = subtractFromDate(new Date(), p.offset);
+			return endOfDayUTC(anchor);
 		});
 		const totals = computeTotals([...atDates, now]);
 		const current = totals[totals.length - 1];
 
-		// For MAX, compute each group's baseline as the first non-zero total for that group
 		const allTimes = [
 			...rawAccountBalances.map((b) => new Date(b.asOf).getTime()),
 			...rawAssetBalances.map((b) => new Date(b.asOf).getTime())
@@ -167,13 +177,8 @@
 				break;
 		}
 
-		const cols = periods.map((p, i) => {
+		const columns = periods.map((p, i) => {
 			const past = totals[i];
-
-			function pctDiff(cur: number, prev: number) {
-				if (!prev || prev === 0) return null as number | null;
-				return (cur - prev) / Math.abs(prev);
-			}
 
 			function pctDiffDebt(cur: number, prev: number) {
 				if (!prev || prev === 0) return null as number | null;
@@ -189,42 +194,50 @@
 				values: p.offset.max
 					? {
 							net: {
-								pct: pctDiff(current.net, baseline.net),
+								pct: percentChange(current.net, baseline.net),
 								cur: current.net,
 								prev: baseline.net
 							},
 							cash: {
-								pct: pctDiff(current.cash, baseline.cash),
+								pct: percentChange(current.cash, baseline.cash),
 								cur: current.cash,
 								prev: baseline.cash
 							},
 							debt: {
-								pct: pctDiffDebt(current.debt, baseline.debt),
+								pct: percentChangeDebtMagnitude(current.debt, baseline.debt),
 								cur: current.debt,
 								prev: baseline.debt
 							},
 							investment: {
-								pct: pctDiff(current.investment, baseline.investment),
+								pct: percentChange(current.investment, baseline.investment),
 								cur: current.investment,
 								prev: baseline.investment
 							},
 							other: {
-								pct: pctDiff(current.other, baseline.other),
+								pct: percentChange(current.other, baseline.other),
 								cur: current.other,
 								prev: baseline.other
 							}
 						}
 					: {
-							net: { pct: pctDiff(current.net, past.net), cur: current.net, prev: past.net },
-							cash: { pct: pctDiff(current.cash, past.cash), cur: current.cash, prev: past.cash },
-							debt: { pct: pctDiffDebt(current.debt, past.debt), cur: current.debt, prev: past.debt },
+							net: { pct: percentChange(current.net, past.net), cur: current.net, prev: past.net },
+							cash: {
+								pct: percentChange(current.cash, past.cash),
+								cur: current.cash,
+								prev: past.cash
+							},
+							debt: {
+								pct: pctDiffDebt(current.debt, past.debt),
+								cur: current.debt,
+								prev: past.debt
+							},
 							investment: {
-								pct: pctDiff(current.investment, past.investment),
+								pct: percentChange(current.investment, past.investment),
 								cur: current.investment,
 								prev: past.investment
 							},
 							other: {
-								pct: pctDiff(current.other, past.other),
+								pct: percentChange(current.other, past.other),
 								cur: current.other,
 								prev: past.other
 							}
@@ -240,10 +253,10 @@
 			other: current.net !== 0 ? current.other / current.net : 0
 		};
 
-		return { cols, current, allocation };
+		return { columns, current, allocation };
 	});
 
-	function fmtPct(v: number | null) {
+	function formatPercent(v: number | null) {
 		if (v === null) return '~';
 		return new Intl.NumberFormat('en-US', {
 			style: 'percent',
@@ -252,7 +265,10 @@
 		}).format(v);
 	}
 
-	function pctClass(v: number | null, group: 'net' | 'cash' | 'debt' | 'investment' | 'other') {
+	function percentClassName(
+		v: number | null,
+		group: 'net' | 'cash' | 'debt' | 'investment' | 'other'
+	) {
 		if (v === null) return 'text-muted-foreground';
 		if (v === 0) return '';
 		const reversed = group === 'debt';
@@ -270,7 +286,7 @@
 					<Table.Header>
 						<Table.Row>
 							<Table.Head class="text-left">Group</Table.Head>
-							{#each table.cols as c (c.key)}
+							{#each table.columns as c (c.key)}
 								<Table.Head class="text-right whitespace-nowrap">{c.label}</Table.Head>
 							{/each}
 							<Table.Head class="text-right whitespace-nowrap">Allocation</Table.Head>
@@ -279,10 +295,10 @@
 					<Table.Body>
 						<Table.Row>
 							<Table.Cell class="font-medium">Net worth</Table.Cell>
-							{#each table.cols as c (c.key)}
+							{#each table.columns as c (c.key)}
 								<Table.Cell
 									class={'font-jetbrains-mono text-right text-xs ' +
-										pctClass(c.values.net.pct, 'net')}
+										percentClassName(c.values.net.pct, 'net')}
 								>
 									{#if c.values.net.pct === null}
 										<span class="text-muted-foreground">~</span>
@@ -290,7 +306,7 @@
 										<Tooltip.Root>
 											<Tooltip.Trigger
 												class="border-border inline-block border-b border-dashed hover:border-current"
-												>{fmtPct(c.values.net.pct)}</Tooltip.Trigger
+												>{formatPercent(c.values.net.pct)}</Tooltip.Trigger
 											>
 											<Tooltip.Content sideOffset={6}>
 												<p class="font-normal">
@@ -311,7 +327,7 @@
 								<Tooltip.Root>
 									<Tooltip.Trigger
 										class="border-border inline-block border-b border-dashed hover:border-current"
-										>{fmtPct(table.allocation.net)}</Tooltip.Trigger
+										>{formatPercent(table.allocation.net)}</Tooltip.Trigger
 									>
 									<Tooltip.Content sideOffset={6}>
 										<p class="font-normal">
@@ -323,10 +339,10 @@
 						</Table.Row>
 						<Table.Row>
 							<Table.Cell class="font-medium">Cash</Table.Cell>
-							{#each table.cols as c (c.key)}
+							{#each table.columns as c (c.key)}
 								<Table.Cell
 									class={'font-jetbrains-mono text-right text-xs ' +
-										pctClass(c.values.cash.pct, 'cash')}
+										percentClassName(c.values.cash.pct, 'cash')}
 								>
 									{#if c.values.cash.pct === null}
 										<span class="text-muted-foreground">~</span>
@@ -334,7 +350,7 @@
 										<Tooltip.Root>
 											<Tooltip.Trigger
 												class="border-border inline-block border-b border-dashed hover:border-current"
-												>{fmtPct(c.values.cash.pct)}</Tooltip.Trigger
+												>{formatPercent(c.values.cash.pct)}</Tooltip.Trigger
 											>
 											<Tooltip.Content sideOffset={6}>
 												<p class="font-normal">
@@ -357,7 +373,7 @@
 								<Tooltip.Root>
 									<Tooltip.Trigger
 										class="border-border inline-block border-b border-dashed hover:border-current"
-										>{fmtPct(table.allocation.cash)}</Tooltip.Trigger
+										>{formatPercent(table.allocation.cash)}</Tooltip.Trigger
 									>
 									<Tooltip.Content sideOffset={6}>
 										<p class="font-normal">
@@ -369,10 +385,10 @@
 						</Table.Row>
 						<Table.Row>
 							<Table.Cell class="font-medium">Debt</Table.Cell>
-							{#each table.cols as c (c.key)}
+							{#each table.columns as c (c.key)}
 								<Table.Cell
 									class={'font-jetbrains-mono text-right text-xs ' +
-										pctClass(c.values.debt.pct, 'debt')}
+										percentClassName(c.values.debt.pct, 'debt')}
 								>
 									{#if c.values.debt.pct === null}
 										<span class="text-muted-foreground">~</span>
@@ -380,7 +396,7 @@
 										<Tooltip.Root>
 											<Tooltip.Trigger
 												class="border-border inline-block border-b border-dashed hover:border-current"
-												>{fmtPct(c.values.debt.pct)}</Tooltip.Trigger
+												>{formatPercent(c.values.debt.pct)}</Tooltip.Trigger
 											>
 											<Tooltip.Content sideOffset={6}>
 												<p class="font-normal">
@@ -403,7 +419,7 @@
 								<Tooltip.Root>
 									<Tooltip.Trigger
 										class="border-border inline-block border-b border-dashed hover:border-current"
-										>{fmtPct(table.allocation.debt)}</Tooltip.Trigger
+										>{formatPercent(table.allocation.debt)}</Tooltip.Trigger
 									>
 									<Tooltip.Content sideOffset={6}>
 										<p class="font-normal">
@@ -415,10 +431,10 @@
 						</Table.Row>
 						<Table.Row>
 							<Table.Cell class="font-medium">Investments</Table.Cell>
-							{#each table.cols as c (c.key)}
+							{#each table.columns as c (c.key)}
 								<Table.Cell
 									class={'font-jetbrains-mono text-right text-xs ' +
-										pctClass(c.values.investment.pct, 'investment')}
+										percentClassName(c.values.investment.pct, 'investment')}
 								>
 									{#if c.values.investment.pct === null}
 										<span class="text-muted-foreground">~</span>
@@ -426,7 +442,7 @@
 										<Tooltip.Root>
 											<Tooltip.Trigger
 												class="border-border inline-block border-b border-dashed hover:border-current"
-												>{fmtPct(c.values.investment.pct)}</Tooltip.Trigger
+												>{formatPercent(c.values.investment.pct)}</Tooltip.Trigger
 											>
 											<Tooltip.Content sideOffset={6}>
 												<p class="font-normal">
@@ -451,7 +467,7 @@
 								<Tooltip.Root>
 									<Tooltip.Trigger
 										class="border-border inline-block border-b border-dashed hover:border-current"
-										>{fmtPct(table.allocation.investment)}</Tooltip.Trigger
+										>{formatPercent(table.allocation.investment)}</Tooltip.Trigger
 									>
 									<Tooltip.Content sideOffset={6}>
 										<p class="font-normal">
@@ -463,10 +479,10 @@
 						</Table.Row>
 						<Table.Row>
 							<Table.Cell class="font-medium">Other assets</Table.Cell>
-							{#each table.cols as c (c.key)}
+							{#each table.columns as c (c.key)}
 								<Table.Cell
 									class={'font-jetbrains-mono text-right text-xs ' +
-										pctClass(c.values.other.pct, 'other')}
+										percentClassName(c.values.other.pct, 'other')}
 								>
 									{#if c.values.other.pct === null}
 										<span class="text-muted-foreground">~</span>
@@ -474,7 +490,7 @@
 										<Tooltip.Root>
 											<Tooltip.Trigger
 												class="border-border inline-block border-b border-dashed hover:border-current"
-												>{fmtPct(c.values.other.pct)}</Tooltip.Trigger
+												>{formatPercent(c.values.other.pct)}</Tooltip.Trigger
 											>
 											<Tooltip.Content sideOffset={6}>
 												<p class="font-normal">
@@ -499,7 +515,7 @@
 								<Tooltip.Root>
 									<Tooltip.Trigger
 										class="border-border inline-block border-b border-dashed hover:border-current"
-										>{fmtPct(table.allocation.other)}</Tooltip.Trigger
+										>{formatPercent(table.allocation.other)}</Tooltip.Trigger
 									>
 									<Tooltip.Content sideOffset={6}>
 										<p class="font-normal">
