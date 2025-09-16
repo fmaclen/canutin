@@ -5,7 +5,7 @@ import {
 	AccountsBalanceGroupOptions,
 	AssetsBalanceGroupOptions
 } from '../src/lib/pocketbase.schema';
-import { signIn } from './playwright.helpers';
+import { goToPageViaSidebar, signIn } from './playwright.helpers';
 import {
 	seedAccount,
 	seedAccountBalance,
@@ -180,19 +180,13 @@ test('trends performance table', async ({ page }) => {
 		});
 	}
 
-	const trendsLink = page.getByRole('link', { name: 'Trends' });
-	if (!(await trendsLink.isVisible())) {
-		await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
-		await expect(trendsLink).toBeVisible();
-	}
-	await trendsLink.click();
+	await goToPageViaSidebar(page, 'Trends');
 	const netRow = page.getByRole('row', { name: /Net worth/ });
 	const cells = netRow.getByRole('cell');
-	await expect(cells).toHaveCount(9);
-	const firstCell = cells.nth(1).getByRole('button', { name: '+28.2%' });
-	// HACK: the reactive value changes is flaky in CI so we reload the page if it's not visible
-	if (!(await firstCell.isVisible())) await page.reload();
-	await expect(firstCell).toBeVisible();
+	await expect(cells).toHaveCount(9, { timeout: 10000 });
+	await expect(cells.nth(1).getByRole('button', { name: '+28.2%' })).toBeVisible({
+		timeout: 10000
+	});
 	await expect(cells.nth(2).getByRole('button', { name: '+78.6%' })).toBeVisible();
 	await expect(cells.nth(3).getByRole('button', { name: '+233.3%' })).toBeVisible();
 	await expect(cells.nth(4).getByRole('button', { name: '+400%' })).toBeVisible();

@@ -5,6 +5,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton/index';
 	import * as Table from '$lib/components/ui/table/index';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import { m } from '$lib/paraglide/messages';
 	import type {
 		AccountBalancesResponse,
 		AccountsResponse,
@@ -35,13 +36,13 @@
 	};
 	type PeriodDef = { key: string; label: string; offset: PeriodOffset };
 	const periods: PeriodDef[] = [
-		{ key: '1w', label: '1W', offset: { days: 7 } },
-		{ key: '1m', label: '1M', offset: { months: 1 } },
-		{ key: '6m', label: '6M', offset: { months: 6 } },
-		{ key: 'ytd', label: 'YTD', offset: { ytd: true } },
-		{ key: '1y', label: '1Y', offset: { years: 1 } },
-		{ key: '5y', label: '5Y', offset: { years: 5 } },
-		{ key: 'max', label: 'MAX', offset: { max: true } }
+		{ key: '1w', label: m.trends_performance_period_1w_label(), offset: { days: 7 } },
+		{ key: '1m', label: m.trends_performance_period_1m_label(), offset: { months: 1 } },
+		{ key: '6m', label: m.trends_period_6m_label(), offset: { months: 6 } },
+		{ key: 'ytd', label: m.trends_period_ytd_label(), offset: { ytd: true } },
+		{ key: '1y', label: m.trends_period_1y_label(), offset: { years: 1 } },
+		{ key: '5y', label: m.trends_period_5y_label(), offset: { years: 5 } },
+		{ key: 'max', label: m.trends_period_max_label(), offset: { max: true } }
 	];
 
 	function subtractFromDate(now: Date, o: { days?: number; months?: number; years?: number }) {
@@ -119,6 +120,14 @@
 
 		return anchorDates.map((date) => totalsAscending[indexByTime.get(date.getTime())!]);
 	}
+
+	const rowLabels = {
+		net: m.trends_series_net_label(),
+		cash: m.trends_series_cash_label(),
+		debt: m.trends_series_debt_label(),
+		investment: m.trends_series_investment_label(),
+		other: m.trends_series_other_label()
+	};
 
 	const table = $derived.by(() => {
 		if (!rawAccounts.length && !rawAssets.length) return null;
@@ -272,16 +281,18 @@
 				<Table.Root>
 					<Table.Header>
 						<Table.Row>
-							<Table.Head class="text-left">Group</Table.Head>
+							<Table.Head class="text-left">{m.trends_performance_header_group()}</Table.Head>
 							{#each table.columns as c (c.key)}
 								<Table.Head class="text-right whitespace-nowrap">{c.label}</Table.Head>
 							{/each}
-							<Table.Head class="text-right whitespace-nowrap">Allocation</Table.Head>
+							<Table.Head class="text-right whitespace-nowrap"
+								>{m.trends_performance_header_allocation()}</Table.Head
+							>
 						</Table.Row>
 					</Table.Header>
 					<Table.Body>
 						<Table.Row>
-							<Table.Cell class="font-medium">Net worth</Table.Cell>
+							<Table.Cell class="font-medium">{rowLabels.net}</Table.Cell>
 							{#each table.columns as c (c.key)}
 								<Table.Cell
 									class={'font-jetbrains-mono text-right text-xs ' +
@@ -297,10 +308,11 @@
 											>
 											<Tooltip.Content sideOffset={6}>
 												<p class="font-normal">
-													From <span class="font-jetbrains-mono tabular-nums"
+													{m.trends_performance_tooltip_from()}
+													<span class="font-jetbrains-mono tabular-nums"
 														>{formatCurrency(c.values.net.prev, { maximumFractionDigits: 2 })}</span
 													>
-													to
+													{m.trends_performance_tooltip_to()}
 													<span class="font-jetbrains-mono tabular-nums"
 														>{formatCurrency(c.values.net.cur, { maximumFractionDigits: 2 })}</span
 													>
@@ -325,7 +337,7 @@
 							</Table.Cell>
 						</Table.Row>
 						<Table.Row>
-							<Table.Cell class="font-medium">Cash</Table.Cell>
+							<Table.Cell class="font-medium">{rowLabels.cash}</Table.Cell>
 							{#each table.columns as c (c.key)}
 								<Table.Cell
 									class={'font-jetbrains-mono text-right text-xs ' +
@@ -341,7 +353,8 @@
 											>
 											<Tooltip.Content sideOffset={6}>
 												<p class="font-normal">
-													From <span class="font-jetbrains-mono tabular-nums"
+													{m.trends_performance_tooltip_from()}
+													<span class="font-jetbrains-mono tabular-nums"
 														>{formatCurrency(c.values.cash.prev, {
 															maximumFractionDigits: 2
 														})}</span
@@ -371,7 +384,7 @@
 							</Table.Cell>
 						</Table.Row>
 						<Table.Row>
-							<Table.Cell class="font-medium">Debt</Table.Cell>
+							<Table.Cell class="font-medium">{rowLabels.debt}</Table.Cell>
 							{#each table.columns as c (c.key)}
 								<Table.Cell
 									class={'font-jetbrains-mono text-right text-xs ' +
@@ -387,7 +400,8 @@
 											>
 											<Tooltip.Content sideOffset={6}>
 												<p class="font-normal">
-													From <span class="font-jetbrains-mono tabular-nums"
+													{m.trends_performance_tooltip_from()}
+													<span class="font-jetbrains-mono tabular-nums"
 														>{formatCurrency(c.values.debt.prev, {
 															maximumFractionDigits: 2
 														})}</span
@@ -417,7 +431,7 @@
 							</Table.Cell>
 						</Table.Row>
 						<Table.Row>
-							<Table.Cell class="font-medium">Investments</Table.Cell>
+							<Table.Cell class="font-medium">{rowLabels.investment}</Table.Cell>
 							{#each table.columns as c (c.key)}
 								<Table.Cell
 									class={'font-jetbrains-mono text-right text-xs ' +
@@ -433,7 +447,8 @@
 											>
 											<Tooltip.Content sideOffset={6}>
 												<p class="font-normal">
-													From <span class="font-jetbrains-mono tabular-nums"
+													{m.trends_performance_tooltip_from()}
+													<span class="font-jetbrains-mono tabular-nums"
 														>{formatCurrency(c.values.investment.prev, {
 															maximumFractionDigits: 2
 														})}</span
@@ -465,7 +480,7 @@
 							</Table.Cell>
 						</Table.Row>
 						<Table.Row>
-							<Table.Cell class="font-medium">Other assets</Table.Cell>
+							<Table.Cell class="font-medium">{rowLabels.other}</Table.Cell>
 							{#each table.columns as c (c.key)}
 								<Table.Cell
 									class={'font-jetbrains-mono text-right text-xs ' +
@@ -481,7 +496,8 @@
 											>
 											<Tooltip.Content sideOffset={6}>
 												<p class="font-normal">
-													From <span class="font-jetbrains-mono tabular-nums"
+													{m.trends_performance_tooltip_from()}
+													<span class="font-jetbrains-mono tabular-nums"
 														>{formatCurrency(c.values.other.prev, {
 															maximumFractionDigits: 2
 														})}</span

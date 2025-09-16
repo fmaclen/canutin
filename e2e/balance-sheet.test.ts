@@ -4,7 +4,7 @@ import {
 	AccountsBalanceGroupOptions,
 	AssetsBalanceGroupOptions
 } from '../src/lib/pocketbase.schema';
-import { signIn } from './playwright.helpers';
+import { goToPageViaSidebar, signIn } from './playwright.helpers';
 import {
 	seedAccount,
 	seedAccountBalance,
@@ -31,12 +31,7 @@ test('balance sheet', async ({ page }) => {
 	await expect(debt).toContainText('$0');
 	await expect(other).toContainText('$0');
 
-	const balanceSheetLink = page.getByRole('link', { name: 'Balance sheet' });
-	if (!(await balanceSheetLink.isVisible())) {
-		await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
-		await expect(balanceSheetLink).toBeVisible();
-	}
-	await balanceSheetLink.click();
+	await goToPageViaSidebar(page, 'Balance sheet');
 	await expect(netWorth).not.toBeVisible();
 	await expect(cash).toContainText('$0');
 	await expect(investments).toContainText('$0');

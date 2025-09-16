@@ -119,18 +119,18 @@
 	</div>
 </header>
 
-<Page pageTitle="Trends">
+<Page pageTitle={m.trends_page_title()}>
 	<Tabs.Root bind:value={period}>
 		<Section>
 			<nav class="flex items-center justify-between space-x-2">
-				<SectionTitle title="Growth" />
+				<SectionTitle title={m.trends_growth_section_title()} />
 				<Tabs.List>
-					<Tabs.Trigger value="3m">3M</Tabs.Trigger>
-					<Tabs.Trigger value="6m">6M</Tabs.Trigger>
-					<Tabs.Trigger value="ytd">YTD</Tabs.Trigger>
-					<Tabs.Trigger value="1y">1Y</Tabs.Trigger>
-					<Tabs.Trigger value="5y">5Y</Tabs.Trigger>
-					<Tabs.Trigger value="max">MAX</Tabs.Trigger>
+					<Tabs.Trigger value="3m">{m.trends_period_3m_label()}</Tabs.Trigger>
+					<Tabs.Trigger value="6m">{m.trends_period_6m_label()}</Tabs.Trigger>
+					<Tabs.Trigger value="ytd">{m.trends_period_ytd_label()}</Tabs.Trigger>
+					<Tabs.Trigger value="1y">{m.trends_period_1y_label()}</Tabs.Trigger>
+					<Tabs.Trigger value="5y">{m.trends_period_5y_label()}</Tabs.Trigger>
+					<Tabs.Trigger value="max">{m.trends_period_max_label()}</Tabs.Trigger>
 				</Tabs.List>
 			</nav>
 
@@ -145,7 +145,7 @@
 	</Tabs.Root>
 
 	<Section>
-		<SectionTitle title="Performance" />
+		<SectionTitle title={m.trends_performance_section_title()} />
 		<Performance {rawAccounts} {rawAssets} {rawAccountBalances} {rawAssetBalances} />
 	</Section>
 </Page>

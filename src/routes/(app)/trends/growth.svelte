@@ -7,6 +7,7 @@
 	import { formatCurrency } from '$lib/components/currency';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import Skeleton from '$lib/components/ui/skeleton/skeleton.svelte';
+	import { m } from '$lib/paraglide/messages';
 	import type {
 		AccountBalancesResponse,
 		AccountsResponse,
@@ -48,11 +49,11 @@
 	let series: Row[] = $state([]);
 
 	const chartConfig = {
-		net: { label: 'Net worth', color: '#45403C' },
-		cash: { label: 'Cash', color: '#00a36f' },
-		debt: { label: 'Debt', color: '#e75258' },
-		investment: { label: 'Investments', color: '#b19b70' },
-		other: { label: 'Other assets', color: '#5255ac' }
+		net: { label: m.trends_series_net_label(), color: '#45403C' },
+		cash: { label: m.trends_series_cash_label(), color: '#00a36f' },
+		debt: { label: m.trends_series_debt_label(), color: '#e75258' },
+		investment: { label: m.trends_series_investment_label(), color: '#b19b70' },
+		other: { label: m.trends_series_other_label(), color: '#5255ac' }
 	} satisfies Chart.ChartConfig;
 
 	const yDomain = $derived.by(() => {
@@ -173,11 +174,15 @@
 				yDomain={yDomain ?? undefined}
 				padding={{ top: 32, right: 0, bottom: 24, left: leftPadding }}
 				series={[
-					{ key: 'net', label: 'Net worth', color: chartConfig.net.color },
-					{ key: 'cash', label: 'Cash', color: chartConfig.cash.color },
-					{ key: 'debt', label: 'Debt', color: chartConfig.debt.color },
-					{ key: 'investment', label: 'Investments', color: chartConfig.investment.color },
-					{ key: 'other', label: 'Other assets', color: chartConfig.other.color }
+					{ key: 'net', label: chartConfig.net.label, color: chartConfig.net.color },
+					{ key: 'cash', label: chartConfig.cash.label, color: chartConfig.cash.color },
+					{ key: 'debt', label: chartConfig.debt.label, color: chartConfig.debt.color },
+					{
+						key: 'investment',
+						label: chartConfig.investment.label,
+						color: chartConfig.investment.color
+					},
+					{ key: 'other', label: chartConfig.other.label, color: chartConfig.other.color }
 				]}
 				legend={{ placement: 'top' }}
 				props={{
