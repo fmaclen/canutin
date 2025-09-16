@@ -30,40 +30,6 @@
 	let rawAccountBalances: AccountBalancesResponse[] = $state([]);
 	let rawAssetBalances: AssetBalancesResponse[] = $state([]);
 
-	async function loadAndLogAll() {
-		const [accountBalancesAll, assetBalancesAll] = await Promise.all([
-			pb.authedClient.collection('accountBalances').getFullList<AccountBalancesResponse>({
-				sort: 'asOf,created,id',
-				fields: 'id,account,value,asOf',
-				requestKey: 'trends:accountBalances'
-			}),
-			pb.authedClient.collection('assetBalances').getFullList<AssetBalancesResponse>({
-				sort: 'asOf,created,id',
-				fields: 'id,asset,value,asOf',
-				requestKey: 'trends:assetBalances'
-			})
-		]);
-
-		const activeAccounts = new Map(
-			(accountsCtx?.accounts ?? [])
-				.filter((a) => !a.excluded && !a.closed)
-				.map((a) => [a.id, a] as const)
-		);
-		const activeAssets = new Map(
-			(assetsCtx?.assets ?? []).filter((a) => !a.excluded && !a.sold).map((a) => [a.id, a] as const)
-		);
-
-		const accountBalances = accountBalancesAll.filter((b) => activeAccounts.has(b.account));
-		const assetBalances = assetBalancesAll.filter((b) => activeAssets.has(b.asset));
-
-		rawAccounts = Array.from(activeAccounts.values());
-		rawAssets = Array.from(activeAssets.values());
-		rawAccountBalances = accountBalances;
-		rawAssetBalances = assetBalances;
-
-		bootstrapped = true;
-	}
-
 	async function refreshBalances() {
 		const [accountBalancesAll, assetBalancesAll] = await Promise.all([
 			pb.authedClient.collection('accountBalances').getFullList<AccountBalancesResponse>({
@@ -124,7 +90,11 @@
 		}, 180);
 	}
 
-	$effect(() => void loadAndLogAll());
+	$effect(() => {
+		void refreshBalances().then(() => {
+			bootstrapped = true;
+		});
+	});
 
 	$effect(() => {
 		if (accountsCtx?.lastBalanceEvent) scheduleRefresh();

@@ -14,23 +14,27 @@
 		AssetsResponse
 	} from '$lib/pocketbase.schema';
 
-	type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
+	import {
+		buildPreparedMaps,
+		computeRangeForPeriod,
+		latestIndexBeforeOrEqual,
+		type BalanceGroup,
+		type PeriodKey
+	} from './trends';
 
 	let {
-		period = $bindable<'3m' | '6m' | 'ytd' | '1y' | '5y' | 'max'>('1y'),
-		rawAccounts = $bindable<AccountsResponse[]>([]),
-		rawAssets = $bindable<AssetsResponse[]>([]),
-		rawAccountBalances = $bindable<AccountBalancesResponse[]>([]),
-		rawAssetBalances = $bindable<AssetBalancesResponse[]>([])
+		period = $bindable(),
+		rawAccounts = $bindable(),
+		rawAssets = $bindable(),
+		rawAccountBalances = $bindable(),
+		rawAssetBalances = $bindable()
+	}: {
+		period: PeriodKey;
+		rawAccounts: AccountsResponse[];
+		rawAssets: AssetsResponse[];
+		rawAccountBalances: AccountBalancesResponse[];
+		rawAssetBalances: AssetBalancesResponse[];
 	} = $props();
-
-	function startOfDayUTC(d: Date) {
-		return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-	}
-
-	function endOfDayUTC(d: Date) {
-		return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59, 999));
-	}
 
 	type Row = {
 		date: Date;
@@ -92,125 +96,65 @@
 		return Math.max(48, Math.ceil(maxW) + 16);
 	});
 
-	function latestIndexBeforeOrEqual<T extends { asOf: string }>(arr: T[], t: Date, start = -1) {
-		const cutoff = endOfDayUTC(t);
-		let i = start;
-		while (i + 1 < arr.length && new Date(arr[i + 1].asOf) <= cutoff) i++;
-		return i;
-	}
-
-	function computeRangeForPeriod(p: typeof period) {
-		const now = startOfDayUTC(new Date());
-		if (p === '3m')
-			return {
-				start: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 3, now.getUTCDate())),
-				end: now
-			};
-		if (p === '6m')
-			return {
-				start: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 6, now.getUTCDate())),
-				end: now
-			};
-		if (p === 'ytd') return { start: new Date(Date.UTC(now.getUTCFullYear(), 0, 1)), end: now };
-		if (p === '1y')
-			return {
-				start: new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth(), now.getUTCDate())),
-				end: now
-			};
-		if (p === '5y')
-			return {
-				start: new Date(Date.UTC(now.getUTCFullYear() - 5, now.getUTCMonth(), now.getUTCDate())),
-				end: now
-			};
-		let earliest: Date | null = null;
-		for (const b of rawAccountBalances) {
-			const d = new Date(b.asOf);
-			if (!earliest || d < earliest) earliest = d;
-		}
-		for (const b of rawAssetBalances) {
-			const d = new Date(b.asOf);
-			if (!earliest || d < earliest) earliest = d;
-		}
-		const start = earliest
-			? startOfDayUTC(earliest)
-			: new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth(), now.getUTCDate()));
-		return { start, end: now };
-	}
-
 	async function recomputeSeries() {
 		if (!rawAccounts.length && !rawAssets.length) return;
-		const { start, end } = computeRangeForPeriod(period);
+		const { start, end } = computeRangeForPeriod(period, rawAccountBalances, rawAssetBalances);
 
 		const startUTC = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
 		const endUTC = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
-		const DAY = 24 * 60 * 60 * 1000;
+		const MS_PER_DAY = 24 * 60 * 60 * 1000;
 		const datePoints: Date[] = [];
-		for (let u = startUTC; u <= endUTC; u += DAY) {
-			datePoints.push(new Date(u));
+		for (let utcTime = startUTC; utcTime <= endUTC; utcTime += MS_PER_DAY) {
+			datePoints.push(new Date(utcTime));
 		}
 
-		const acctMap = new SvelteMap<string, AccountBalancesResponse[]>();
-		for (const b of rawAccountBalances) {
-			if (!rawAccounts.find((a) => a.id === b.account)) continue;
-			const arr = acctMap.get(b.account) || [];
-			arr.push(b);
-			acctMap.set(b.account, arr);
-		}
-		const assetMap = new SvelteMap<string, AssetBalancesResponse[]>();
-		for (const b of rawAssetBalances) {
-			if (!rawAssets.find((a) => a.id === b.asset)) continue;
-			const arr = assetMap.get(b.asset) || [];
-			arr.push(b);
-			assetMap.set(b.asset, arr);
-		}
+		const { accountBalancesByAccountId, assetBalancesByAssetId, accountById, assetById } =
+			buildPreparedMaps(rawAccounts, rawAssets, rawAccountBalances, rawAssetBalances);
 
-		const accountById = new Map(rawAccounts.map((a) => [a.id, a] as const));
-		const assetById = new Map(rawAssets.map((a) => [a.id, a] as const));
-
-		const acctPtr = new SvelteMap<string, number>();
-		for (const [id, arr] of acctMap)
-			acctPtr.set(id, latestIndexBeforeOrEqual(arr, datePoints[0], -1));
-		const assetPtr = new SvelteMap<string, number>();
-		for (const [id, arr] of assetMap)
-			assetPtr.set(id, latestIndexBeforeOrEqual(arr, datePoints[0], -1));
+		const accountIndexPointer = new SvelteMap<string, number>();
+		for (const [accountId, balances] of accountBalancesByAccountId)
+			accountIndexPointer.set(accountId, latestIndexBeforeOrEqual(balances, datePoints[0], -1));
+		const assetIndexPointer = new SvelteMap<string, number>();
+		for (const [assetId, balances] of assetBalancesByAssetId)
+			assetIndexPointer.set(assetId, latestIndexBeforeOrEqual(balances, datePoints[0], -1));
 
 		const rows: Row[] = [];
-		for (const t of datePoints) {
+		for (const datePoint of datePoints) {
 			let cash = 0;
 			let debt = 0;
 			let investment = 0;
 			let other = 0;
 
-			for (const [id, arr] of acctMap) {
-				const meta = accountById.get(id);
+			for (const [accountId, balances] of accountBalancesByAccountId) {
+				const meta = accountById.get(accountId);
 				if (!meta) continue;
-				const prev = acctPtr.get(id) ?? -1;
-				const idx = latestIndexBeforeOrEqual(arr, t, prev);
-				acctPtr.set(id, idx);
-				const val = idx >= 0 ? (arr[idx].value ?? 0) : 0;
-				const g = meta.balanceGroup as BalanceGroup;
-				if (g === 'CASH') cash += val;
-				else if (g === 'DEBT') debt += val;
-				else if (g === 'INVESTMENT') investment += val;
-				else other += val;
+				const previousIndex = accountIndexPointer.get(accountId) ?? -1;
+				const index = latestIndexBeforeOrEqual(balances, datePoint, previousIndex);
+				accountIndexPointer.set(accountId, index);
+				const value = index >= 0 ? (balances[index].value ?? 0) : 0;
+				const group = meta.balanceGroup as BalanceGroup;
+				if (group === 'CASH') cash += value;
+				else if (group === 'DEBT') debt += value;
+				else if (group === 'INVESTMENT') investment += value;
+				else other += value;
 			}
 
-			for (const [id, arr] of assetMap) {
-				const meta = assetById.get(id);
+			for (const [assetId, balances] of assetBalancesByAssetId) {
+				const meta = assetById.get(assetId);
 				if (!meta) continue;
-				const prev = assetPtr.get(id) ?? -1;
-				const idx = latestIndexBeforeOrEqual(arr, t, prev);
-				assetPtr.set(id, idx);
-				const val = idx >= 0 ? (arr[idx].value ?? 0) : 0;
-				const g = meta.balanceGroup as BalanceGroup;
-				if (g === 'CASH') cash += val;
-				else if (g === 'DEBT') debt += val;
-				else if (g === 'INVESTMENT') investment += val;
-				else other += val;
+				const previousIndex = assetIndexPointer.get(assetId) ?? -1;
+				const index = latestIndexBeforeOrEqual(balances, datePoint, previousIndex);
+				assetIndexPointer.set(assetId, index);
+				const value = index >= 0 ? (balances[index].value ?? 0) : 0;
+				const group = meta.balanceGroup as BalanceGroup;
+				if (group === 'CASH') cash += value;
+				else if (group === 'DEBT') debt += value;
+				else if (group === 'INVESTMENT') investment += value;
+				else other += value;
 			}
 
 			const net = cash + debt + investment + other;
-			rows.push({ date: t, net, cash, debt, investment, other });
+			rows.push({ date: datePoint, net, cash, debt, investment, other });
 		}
 
 		series = rows;
@@ -221,16 +165,7 @@
 
 {#if series.length}
 	<div class="bg-background overflow-visible rounded-sm shadow-md">
-		<Chart.Container
-			config={{
-				net: { label: 'Net worth', color: '#45403C' },
-				cash: { label: 'Cash', color: '#00a36f' },
-				debt: { label: 'Debt', color: '#e75258' },
-				investment: { label: 'Investments', color: '#b19b70' },
-				other: { label: 'Other assets', color: '#5255ac' }
-			}}
-			class="h-128 w-full"
-		>
+		<Chart.Container config={chartConfig} class="h-128 w-full">
 			<LineChart
 				data={series}
 				x="date"

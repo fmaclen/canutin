@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { SvelteMap } from 'svelte/reactivity';
+	import { endOfDay, startOfYear, subDays, subMonths, subYears } from 'date-fns';
 
 	import { formatCurrency } from '$lib/components/currency';
 	import { Skeleton } from '$lib/components/ui/skeleton/index';
@@ -12,13 +12,18 @@
 		AssetsResponse
 	} from '$lib/pocketbase.schema';
 
-	type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
+	import { buildPreparedMaps, type BalanceGroup } from './trends';
 
 	let {
-		rawAccounts = $bindable<AccountsResponse[]>([]),
-		rawAssets = $bindable<AssetsResponse[]>([]),
-		rawAccountBalances = $bindable<AccountBalancesResponse[]>([]),
-		rawAssetBalances = $bindable<AssetBalancesResponse[]>([])
+		rawAccounts = $bindable(),
+		rawAssets = $bindable(),
+		rawAccountBalances = $bindable(),
+		rawAssetBalances = $bindable()
+	}: {
+		rawAccounts: AccountsResponse[];
+		rawAssets: AssetsResponse[];
+		rawAccountBalances: AccountBalancesResponse[];
+		rawAssetBalances: AssetBalancesResponse[];
 	} = $props();
 
 	type PeriodOffset = {
@@ -39,18 +44,12 @@
 		{ key: 'max', label: 'MAX', offset: { max: true } }
 	];
 
-	function endOfDayUTC(d: Date) {
-		return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59, 999));
-	}
-
 	function subtractFromDate(now: Date, o: { days?: number; months?: number; years?: number }) {
-		return new Date(
-			Date.UTC(
-				now.getUTCFullYear() - (o.years ?? 0),
-				now.getUTCMonth() - (o.months ?? 0),
-				now.getUTCDate() - (o.days ?? 0)
-			)
-		);
+		let d = now;
+		if (o.days) d = subDays(d, o.days);
+		if (o.months) d = subMonths(d, o.months);
+		if (o.years) d = subYears(d, o.years);
+		return d;
 	}
 
 	function percentChange(currentValue: number, previousValue: number): number | null {
@@ -65,69 +64,60 @@
 		return (currentAbs - previousAbs) / previousAbs;
 	}
 
-	const prepared = $derived.by(() => {
-		const acctMap = new SvelteMap<string, AccountBalancesResponse[]>();
-		for (const b of rawAccountBalances) {
-			if (!rawAccounts.find((a) => a.id === b.account)) continue;
-			const arr = acctMap.get(b.account) || [];
-			arr.push(b);
-			acctMap.set(b.account, arr);
-		}
-		const assetMap = new SvelteMap<string, AssetBalancesResponse[]>();
-		for (const b of rawAssetBalances) {
-			if (!rawAssets.find((a) => a.id === b.asset)) continue;
-			const arr = assetMap.get(b.asset) || [];
-			arr.push(b);
-			assetMap.set(b.asset, arr);
-		}
-		return {
-			acctMap,
-			assetMap,
-			accountById: new Map(rawAccounts.map((a) => [a.id, a] as const)),
-			assetById: new Map(rawAssets.map((a) => [a.id, a] as const))
-		};
-	});
+	const prepared = $derived.by(() =>
+		buildPreparedMaps(rawAccounts, rawAssets, rawAccountBalances, rawAssetBalances)
+	);
 
-	function computeTotals(atDates: Date[]) {
-		const { acctMap, assetMap, accountById, assetById } = prepared;
-		const asc = [...atDates].sort((a, b) => a.getTime() - b.getTime());
-		const ascIndex = new Map(asc.map((d, i) => [d.getTime(), i] as const));
-		const sumsAsc = asc.map(() => ({ net: 0, cash: 0, debt: 0, investment: 0, other: 0 }));
+	function computeTotals(anchorDates: Date[]) {
+		const { accountBalancesByAccountId, assetBalancesByAssetId, accountById, assetById } = prepared;
+		const ascendingDates = [...anchorDates].sort((a, b) => a.getTime() - b.getTime());
+		const indexByTime = new Map(
+			ascendingDates.map((date, index) => [date.getTime(), index] as const)
+		);
+		const totalsAscending = ascendingDates.map(() => ({
+			net: 0,
+			cash: 0,
+			debt: 0,
+			investment: 0,
+			other: 0
+		}));
 
-		for (const [id, arr] of acctMap) {
-			const meta = accountById.get(id);
+		for (const [accountId, balances] of accountBalancesByAccountId) {
+			const meta = accountById.get(accountId);
 			if (!meta) continue;
-			let p = -1;
-			for (let j = 0; j < asc.length; j++) {
-				const t = asc[j];
-				while (p + 1 < arr.length && new Date(arr[p + 1].asOf) <= t) p++;
-				const val = p >= 0 ? (arr[p].value ?? 0) : 0;
-				const g = meta.balanceGroup as BalanceGroup;
-				if (g === 'CASH') sumsAsc[j].cash += val;
-				else if (g === 'DEBT') sumsAsc[j].debt += val;
-				else if (g === 'INVESTMENT') sumsAsc[j].investment += val;
-				else sumsAsc[j].other += val;
-				sumsAsc[j].net += val;
+			let pointer = -1;
+			for (let dateIndex = 0; dateIndex < ascendingDates.length; dateIndex++) {
+				const datePoint = ascendingDates[dateIndex];
+				while (pointer + 1 < balances.length && new Date(balances[pointer + 1].asOf) <= datePoint)
+					pointer++;
+				const value = pointer >= 0 ? (balances[pointer].value ?? 0) : 0;
+				const group = meta.balanceGroup as BalanceGroup;
+				if (group === 'CASH') totalsAscending[dateIndex].cash += value;
+				else if (group === 'DEBT') totalsAscending[dateIndex].debt += value;
+				else if (group === 'INVESTMENT') totalsAscending[dateIndex].investment += value;
+				else totalsAscending[dateIndex].other += value;
+				totalsAscending[dateIndex].net += value;
 			}
 		}
-		for (const [id, arr] of assetMap) {
-			const meta = assetById.get(id);
+		for (const [assetId, balances] of assetBalancesByAssetId) {
+			const meta = assetById.get(assetId);
 			if (!meta) continue;
-			let p = -1;
-			for (let j = 0; j < asc.length; j++) {
-				const t = asc[j];
-				while (p + 1 < arr.length && new Date(arr[p + 1].asOf) <= t) p++;
-				const val = p >= 0 ? (arr[p].value ?? 0) : 0;
-				const g = meta.balanceGroup as BalanceGroup;
-				if (g === 'CASH') sumsAsc[j].cash += val;
-				else if (g === 'DEBT') sumsAsc[j].debt += val;
-				else if (g === 'INVESTMENT') sumsAsc[j].investment += val;
-				else sumsAsc[j].other += val;
-				sumsAsc[j].net += val;
+			let pointer = -1;
+			for (let dateIndex = 0; dateIndex < ascendingDates.length; dateIndex++) {
+				const datePoint = ascendingDates[dateIndex];
+				while (pointer + 1 < balances.length && new Date(balances[pointer + 1].asOf) <= datePoint)
+					pointer++;
+				const value = pointer >= 0 ? (balances[pointer].value ?? 0) : 0;
+				const group = meta.balanceGroup as BalanceGroup;
+				if (group === 'CASH') totalsAscending[dateIndex].cash += value;
+				else if (group === 'DEBT') totalsAscending[dateIndex].debt += value;
+				else if (group === 'INVESTMENT') totalsAscending[dateIndex].investment += value;
+				else totalsAscending[dateIndex].other += value;
+				totalsAscending[dateIndex].net += value;
 			}
 		}
 
-		return atDates.map((d) => sumsAsc[ascIndex.get(d.getTime())!]);
+		return anchorDates.map((date) => totalsAscending[indexByTime.get(date.getTime())!]);
 	}
 
 	const table = $derived.by(() => {
@@ -145,21 +135,21 @@
 			if (!earliest || d < earliest) earliest = d;
 		}
 
-		const atDates = periods.map((p) => {
-			if (p.offset.max) return earliest ? new Date(earliest) : now;
-			if (p.offset.ytd) return endOfDayUTC(new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1)));
-			const anchor = subtractFromDate(new Date(), p.offset);
-			return endOfDayUTC(anchor);
+		const anchorDates = periods.map((periodDef) => {
+			if (periodDef.offset.max) return earliest ? new Date(earliest) : now;
+			if (periodDef.offset.ytd) return endOfDay(startOfYear(new Date()));
+			const anchorDate = subtractFromDate(new Date(), periodDef.offset);
+			return endOfDay(anchorDate);
 		});
-		const totals = computeTotals([...atDates, now]);
+		const totals = computeTotals([...anchorDates, now]);
 		const current = totals[totals.length - 1];
 
 		const allTimes = [
-			...rawAccountBalances.map((b) => new Date(b.asOf).getTime()),
-			...rawAssetBalances.map((b) => new Date(b.asOf).getTime())
+			...rawAccountBalances.map((balance) => new Date(balance.asOf).getTime()),
+			...rawAssetBalances.map((balance) => new Date(balance.asOf).getTime())
 		];
-		const uniqueAscTimes = Array.from(new Set(allTimes)).sort((a, b) => a - b);
-		const totalsAll = computeTotals(uniqueAscTimes.map((t) => new Date(t)));
+		const uniqueAscendingTimes = Array.from(new Set(allTimes)).sort((a, b) => a - b);
+		const totalsAll = computeTotals(uniqueAscendingTimes.map((timestamp) => new Date(timestamp)));
 		let baseline = { net: 0, cash: 0, debt: 0, investment: 0, other: 0 };
 		for (const row of totalsAll) {
 			if (baseline.net === 0 && row.net !== 0) baseline.net = row.net;
@@ -177,21 +167,14 @@
 				break;
 		}
 
-		const columns = periods.map((p, i) => {
-			const past = totals[i];
-
-			function pctDiffDebt(cur: number, prev: number) {
-				if (!prev || prev === 0) return null as number | null;
-				const curAbs = Math.abs(cur);
-				const prevAbs = Math.abs(prev);
-				return (curAbs - prevAbs) / prevAbs;
-			}
+		const columns = periods.map((periodDef, columnIndex) => {
+			const previousTotals = totals[columnIndex];
 
 			return {
-				key: p.key,
-				label: p.label,
-				at: atDates[i],
-				values: p.offset.max
+				key: periodDef.key,
+				label: periodDef.label,
+				at: anchorDates[columnIndex],
+				values: periodDef.offset.max
 					? {
 							net: {
 								pct: percentChange(current.net, baseline.net),
@@ -220,26 +203,30 @@
 							}
 						}
 					: {
-							net: { pct: percentChange(current.net, past.net), cur: current.net, prev: past.net },
+							net: {
+								pct: percentChange(current.net, previousTotals.net),
+								cur: current.net,
+								prev: previousTotals.net
+							},
 							cash: {
-								pct: percentChange(current.cash, past.cash),
+								pct: percentChange(current.cash, previousTotals.cash),
 								cur: current.cash,
-								prev: past.cash
+								prev: previousTotals.cash
 							},
 							debt: {
-								pct: pctDiffDebt(current.debt, past.debt),
+								pct: percentChangeDebtMagnitude(current.debt, previousTotals.debt),
 								cur: current.debt,
-								prev: past.debt
+								prev: previousTotals.debt
 							},
 							investment: {
-								pct: percentChange(current.investment, past.investment),
+								pct: percentChange(current.investment, previousTotals.investment),
 								cur: current.investment,
-								prev: past.investment
+								prev: previousTotals.investment
 							},
 							other: {
-								pct: percentChange(current.other, past.other),
+								pct: percentChange(current.other, previousTotals.other),
 								cur: current.other,
-								prev: past.other
+								prev: previousTotals.other
 							}
 						}
 			};
