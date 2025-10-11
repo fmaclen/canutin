@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Pagination as PaginationPrimitive } from 'bits-ui';
 
+	import { m } from '$lib/paraglide/messages';
 	import { cn } from '$lib/utils.js';
 
 	let {
@@ -18,7 +19,7 @@
 	bind:ref
 	bind:page
 	role="navigation"
-	aria-label="pagination"
+	aria-label={m.pagination_navigation_label()}
 	data-slot="pagination"
 	class={cn('mx-auto flex w-full justify-center', className)}
 	{count}

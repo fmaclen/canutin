@@ -1,24 +1,8 @@
 {
 	"name": "canutinx",
-	"private": true,
 	"version": "0.0.1",
-	"type": "module",
-	"scripts": {
-		"dev": "vite dev",
-		"build": "vite build",
-		"preview": "vite preview",
-		"prepare": "svelte-kit sync || echo ''",
-		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"format": "prettier --write .",
-		"lint": "prettier --check . && eslint .",
-		"test": "playwright test",
-		"quality": "bun run format && bun run lint && bun run check",
-		"pb": "IS_DEV=true bun scripts/pb-server.ts",
-		"pb:import": "bun scripts/pb-import.ts",
-		"pb:reset": "bun scripts/pb-reset.ts"
-	},
 	"devDependencies": {
+		"@date-fns/utc": "^2.1.1",
 		"@eslint/compat": "^1.2.5",
 		"@eslint/js": "^9.18.0",
 		"@ianvs/prettier-plugin-sort-imports": "^4.7.0",
@@ -64,5 +48,22 @@
 		"typescript-eslint": "^8.20.0",
 		"vaul-svelte": "^1.0.0-next.7",
 		"vite": "^7.0.4"
-	}
+	},
+	"private": true,
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"prepare": "svelte-kit sync || echo ''",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"format": "prettier --write .",
+		"lint": "prettier --check . && eslint .",
+		"test": "playwright test",
+		"quality": "bun run format && bun run lint && bun run check",
+		"pb": "IS_DEV=true bun scripts/pb-server.ts",
+		"pb:import": "bun scripts/pb-import.ts",
+		"pb:reset": "bun scripts/pb-reset.ts"
+	},
+	"type": "module"
 }

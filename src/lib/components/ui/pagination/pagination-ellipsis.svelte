@@ -2,6 +2,7 @@
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 	import type { HTMLAttributes } from 'svelte/elements';
 
+	import { m } from '$lib/paraglide/messages';
 	import { cn, type WithElementRef, type WithoutChildren } from '$lib/utils.js';
 
 	let {
@@ -19,5 +20,5 @@
 	{...restProps}
 >
 	<EllipsisIcon class="size-4" />
-	<span class="sr-only">More pages</span>
+	<span class="sr-only">{m.pagination_more_label()}</span>
 </span>

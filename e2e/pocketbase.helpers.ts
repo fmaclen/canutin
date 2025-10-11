@@ -6,6 +6,7 @@ import type {
 	AssetBalancesRecord,
 	AssetsRecord,
 	BalanceTypesRecord,
+	TransactionLabelsRecord,
 	TransactionsRecord,
 	TypedPocketBase,
 	UsersRecord
@@ -118,6 +119,14 @@ export async function seedAssetBalance(assetBalanceInput: {
 }) {
 	const pb = await getAdminPB();
 	return await pb.collection('assetBalances').create(assetBalanceInput);
+}
+
+export async function seedTransactionLabel(labelInput: {
+	name: TransactionLabelsRecord['name'];
+	owner: TransactionLabelsRecord['owner'];
+}) {
+	const pb = await getAdminPB();
+	return await pb.collection('transactionLabels').create(labelInput);
 }
 
 export async function seedTransaction(transactionInput: {

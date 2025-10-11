@@ -177,7 +177,7 @@ export type TransactionLabelsRecord = {
 export type TransactionsRecord = {
 	account: RecordIdString
 	created?: IsoDateString
-	date?: IsoDateString
+	date: IsoDateString
 	description?: string
 	excluded?: IsoDateString
 	id: string

@@ -1,3 +1,5 @@
+import { UTCDate } from '@date-fns/utc';
+import { addMonths, startOfMonth, startOfYear } from 'date-fns';
 import PocketBase, { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 
@@ -31,25 +33,13 @@ class CashflowContext {
 		if (e.action) await this.recomputeAll();
 	}
 
-	private startOfUtcMonth(year: number, monthIndex: number) {
-		return new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0, 0));
-	}
-
-	private monthStartUtcNow() {
-		const now = new Date();
-		return this.startOfUtcMonth(now.getUTCFullYear(), now.getUTCMonth());
-	}
-
-	private addMonthsUtc(d: Date, months: number) {
-		return this.startOfUtcMonth(d.getUTCFullYear(), d.getUTCMonth() + months);
-	}
-
 	private async recomputeAll() {
-		const startOfThisMonth = this.monthStartUtcNow();
-		const start12m = this.addMonthsUtc(startOfThisMonth, -11);
-		const start6m = this.addMonthsUtc(startOfThisMonth, -5);
-		const start3m = this.addMonthsUtc(startOfThisMonth, -2);
-		const startYtd = new Date(Date.UTC(startOfThisMonth.getUTCFullYear(), 0, 1, 0, 0, 0, 0));
+		const now = new UTCDate();
+		const startOfThisMonth = startOfMonth(now);
+		const start12m = addMonths(startOfThisMonth, -11);
+		const start6m = addMonths(startOfThisMonth, -5);
+		const start3m = addMonths(startOfThisMonth, -2);
+		const startYtd = startOfYear(now);
 
 		// Fetch all needed transactions since the earliest required start
 		const earliest = start12m < startYtd ? start12m : startYtd;

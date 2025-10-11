@@ -38,11 +38,11 @@
 	const periods: PeriodDef[] = [
 		{ key: '1w', label: m.trends_performance_period_1w_label(), offset: { days: 7 } },
 		{ key: '1m', label: m.trends_performance_period_1m_label(), offset: { months: 1 } },
-		{ key: '6m', label: m.trends_period_6m_label(), offset: { months: 6 } },
-		{ key: 'ytd', label: m.trends_period_ytd_label(), offset: { ytd: true } },
-		{ key: '1y', label: m.trends_period_1y_label(), offset: { years: 1 } },
-		{ key: '5y', label: m.trends_period_5y_label(), offset: { years: 5 } },
-		{ key: 'max', label: m.trends_period_max_label(), offset: { max: true } }
+		{ key: '6m', label: m.period_6m_label(), offset: { months: 6 } },
+		{ key: 'ytd', label: m.period_ytd_label(), offset: { ytd: true } },
+		{ key: '1y', label: m.period_1y_label(), offset: { years: 1 } },
+		{ key: '5y', label: m.period_5y_label(), offset: { years: 5 } },
+		{ key: 'max', label: m.period_max_label(), offset: { max: true } }
 	];
 
 	function subtractFromDate(now: Date, o: { days?: number; months?: number; years?: number }) {

@@ -1,55 +1,59 @@
 <script lang="ts">
-	// import TrendingUpIcon from '@lucide/svelte/icons/trending-up';
-	import { scaleUtc } from 'd3-scale';
-	import { curveNatural } from 'd3-shape';
-	import { LineChart } from 'layerchart';
+	import Page from '$lib/components/page.svelte';
+	import Section from '$lib/components/section.svelte';
+	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
+	import Separator from '$lib/components/ui/separator/separator.svelte';
+	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import { Skeleton } from '$lib/components/ui/skeleton/index';
+	import { m } from '$lib/paraglide/messages';
+	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+	import { setTransactionsContext } from '$lib/transactions.svelte';
 
-	// import * as Card from '$lib/components/ui/card/index.js';
-	import * as Chart from '$lib/components/ui/chart/index.js';
+	import TransactionFilters from './transaction-filters.svelte';
+	import TransactionTable from './transaction-table.svelte';
 
-	const chartData = [
-		{ date: new Date('2024-01-01'), desktop: 186, mobile: 80 },
-		{ date: new Date('2024-02-01'), desktop: 305, mobile: 200 },
-		{ date: new Date('2024-03-01'), desktop: 237, mobile: 120 },
-		{ date: new Date('2024-04-01'), desktop: 73, mobile: 190 },
-		{ date: new Date('2024-05-01'), desktop: 209, mobile: 130 },
-		{ date: new Date('2024-06-01'), desktop: 214, mobile: 140 }
-	];
+	const pb = getPocketBaseContext();
+	const txContext = setTransactionsContext(pb);
 
-	const chartConfig = {
-		desktop: { label: 'Desktop', color: 'var(--chart-1)' },
-		mobile: { label: 'Mobile', color: 'var(--chart-2)' }
-	} satisfies Chart.ChartConfig;
+	// Keep page within valid bounds
+	$effect(() => {
+		if (txContext.page > txContext.totalPages) txContext.page = txContext.totalPages;
+		if (txContext.page < 1) txContext.page = 1;
+	});
+
+	// Reset pagination whenever the active filters change
+	$effect(() => {
+		void txContext.period;
+		void txContext.kind;
+		txContext.page = 1;
+	});
 </script>
 
-<Chart.Container config={chartConfig}>
-	<LineChart
-		data={chartData}
-		x="date"
-		xScale={scaleUtc()}
-		axis="x"
-		series={[
-			{
-				key: 'desktop',
-				label: 'Desktop',
-				color: chartConfig.desktop.color
-			},
-			{
-				key: 'mobile',
-				label: 'Mobile',
-				color: chartConfig.mobile.color
-			}
-		]}
-		props={{
-			spline: { curve: curveNatural, motion: 'tween', strokeWidth: 2 },
-			xAxis: {
-				format: (v: Date) => v.toLocaleDateString('en-US', { month: 'short' })
-			},
-			highlight: { points: { r: 4 } }
-		}}
-	>
-		{#snippet tooltip()}
-			<Chart.Tooltip hideLabel />
-		{/snippet}
-	</LineChart>
-</Chart.Container>
+<header class="bg-background flex h-16 shrink-0 items-center gap-2 border-b">
+	<div class="flex items-center gap-2 px-4">
+		<Sidebar.Trigger class="-ml-1" />
+		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
+		<Breadcrumb.Root>
+			<Breadcrumb.List>
+				<Breadcrumb.Item>
+					<Breadcrumb.Page>{m.sidebar_transactions()}</Breadcrumb.Page>
+				</Breadcrumb.Item>
+			</Breadcrumb.List>
+		</Breadcrumb.Root>
+	</div>
+</header>
+
+<Page pageTitle={m.sidebar_transactions()}>
+	<Section>
+		{#if txContext.isLoading && txContext.rawTransactions.length === 0}
+			<div class="bg-background overflow-hidden rounded-sm shadow-md">
+				<Skeleton class="h-64 w-full" />
+			</div>
+		{:else}
+			<div class="flex flex-col gap-4">
+				<TransactionFilters />
+				<TransactionTable />
+			</div>
+		{/if}
+	</Section>
+</Page>

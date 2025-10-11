@@ -3,6 +3,7 @@
 	import KeyValue from '$lib/components/key-value.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import * as Tabs from '$lib/components/ui/tabs/index';
+	import { m } from '$lib/paraglide/messages';
 
 	const cashflow = getCashflowContext();
 	const avg3m = $derived.by(() => cashflow.avg3m);
@@ -16,10 +17,10 @@
 		<SectionTitle title="Trailing cashflow" />
 
 		<Tabs.List>
-			<Tabs.Trigger value="three-months">3M</Tabs.Trigger>
-			<Tabs.Trigger value="six-months">6M</Tabs.Trigger>
-			<Tabs.Trigger value="year-to-date">YTD</Tabs.Trigger>
-			<Tabs.Trigger value="one-year">1Y</Tabs.Trigger>
+			<Tabs.Trigger value="three-months">{m.period_3m_label()}</Tabs.Trigger>
+			<Tabs.Trigger value="six-months">{m.period_6m_label()}</Tabs.Trigger>
+			<Tabs.Trigger value="year-to-date">{m.period_ytd_label()}</Tabs.Trigger>
+			<Tabs.Trigger value="one-year">{m.period_1y_label()}</Tabs.Trigger>
 		</Tabs.List>
 	</nav>
 
