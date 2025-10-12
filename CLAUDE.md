@@ -95,6 +95,7 @@ See AGENTS.md lines 30-41 for complete runes reference.
 - Selector preference (in order): `getByText`, `getByLabel`, `getByRole`, and as last resort `getByTestId`
 - Avoid shared state: use unique person names for test emails (e.g., `alice@example.com`, `bob@example.com`) for easier debugging; avoid repeating already used names
 - Add negative assertions before positives to catch false positives
+- **Timeouts**: Never use explicit timeouts in Playwright tests except in extremely rare cases. Rely on Playwright's default timeouts. If you need to wait for something, use positive or negative assertions instead.
 
 ## Code Style
 

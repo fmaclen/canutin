@@ -1,6 +1,9 @@
 import PocketBase, { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
+import { toast } from 'svelte-sonner';
 
+import { ErrorHandler } from './error-handler';
+import { m } from './paraglide/messages';
 import type { BalanceTypesResponse } from './pocketbase.schema';
 
 class BalanceTypesContext {
@@ -14,15 +17,26 @@ class BalanceTypesContext {
 	}
 
 	private async init() {
-		const list = await this._pb.collection('balanceTypes').getFullList<BalanceTypesResponse>();
-		const map: Record<string, BalanceTypesResponse> = {};
-		for (const bt of list) map[bt.id] = bt;
-		this.byId = map;
-		this.realtimeSubscribe();
+		try {
+			const list = await this._pb.collection('balanceTypes').getFullList<BalanceTypesResponse>();
+			const map: Record<string, BalanceTypesResponse> = {};
+			for (const bt of list) map[bt.id] = bt;
+			this.byId = map;
+			this.realtimeSubscribe();
+		} catch (error) {
+			ErrorHandler.capture(error, 'balance_types', 'init');
+			toast.error(m.error_connection_failed());
+		}
 	}
 
 	private realtimeSubscribe() {
-		this._pb.collection('balanceTypes').subscribe('*', this.onEvent.bind(this));
+		this._pb
+			.collection('balanceTypes')
+			.subscribe('*', this.onEvent.bind(this))
+			.catch((error) => {
+				ErrorHandler.capture(error, 'balance_types', 'subscribe');
+				toast.error(m.error_subscription_failed());
+			});
 	}
 
 	private onEvent(e: RecordSubscription<BalanceTypesResponse>) {
@@ -45,8 +59,8 @@ class BalanceTypesContext {
 		try {
 			const bt = await this._pb.collection('balanceTypes').getOne<BalanceTypesResponse>(id);
 			this.byId = { ...this.byId, [bt.id]: bt };
-		} catch {
-			// ignore
+		} catch (error) {
+			ErrorHandler.capture(error, 'balance_types', 'ensure_loaded');
 		}
 	}
 
