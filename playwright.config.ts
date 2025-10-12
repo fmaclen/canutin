@@ -19,7 +19,11 @@ export default defineConfig({
 		},
 		{
 			command: 'npm run build && npm run preview',
-			port: 4173
+			port: 4173,
+			env: {
+				...process.env,
+				PUBLIC_PLAYWRIGHT_TESTING: 'true'
+			}
 		}
 	],
 	testDir: 'e2e',

@@ -23,6 +23,8 @@
 
 <Sonner />
 
-<AuthGuard>
-	{@render children?.()}
-</AuthGuard>
+<div class="bg-muted">
+	<AuthGuard>
+		{@render children?.()}
+	</AuthGuard>
+</div>

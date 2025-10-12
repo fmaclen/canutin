@@ -127,5 +127,6 @@
 	"pagination_previous_aria_label": "Go to previous page",
 	"pagination_next_aria_label": "Go to next page",
 	"pagination_more_label": "More pages",
-	"pagination_navigation_label": "Pagination"
+	"pagination_navigation_label": "Pagination",
+	"error_title": "Error {status}"
 }
