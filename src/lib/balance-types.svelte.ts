@@ -1,42 +1,38 @@
-import PocketBase, { type RecordSubscription } from 'pocketbase';
+import { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
-import { toast } from 'svelte-sonner';
 
-import { ErrorHandler } from './error-handler';
-import { m } from './paraglide/messages';
 import type { BalanceTypesResponse } from './pocketbase.schema';
+import type { PocketBaseContext } from './pocketbase.svelte';
 
 class BalanceTypesContext {
 	byId: Record<string, BalanceTypesResponse> = $state({});
 
-	private _pb: PocketBase;
+	private _pb: PocketBaseContext;
 
-	constructor(pb: PocketBase) {
+	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
 		this.init();
 	}
 
 	private async init() {
 		try {
-			const list = await this._pb.collection('balanceTypes').getFullList<BalanceTypesResponse>();
+			const list = await this._pb.authedClient
+				.collection('balanceTypes')
+				.getFullList<BalanceTypesResponse>();
 			const map: Record<string, BalanceTypesResponse> = {};
 			for (const bt of list) map[bt.id] = bt;
 			this.byId = map;
 			this.realtimeSubscribe();
 		} catch (error) {
-			ErrorHandler.capture(error, 'balance_types', 'init');
-			toast.error(m.error_connection_failed());
+			this._pb.handleConnectionError(error, 'balance_types', 'init');
 		}
 	}
 
 	private realtimeSubscribe() {
-		this._pb
+		this._pb.authedClient
 			.collection('balanceTypes')
 			.subscribe('*', this.onEvent.bind(this))
-			.catch((error) => {
-				ErrorHandler.capture(error, 'balance_types', 'subscribe');
-				toast.error(m.error_subscription_failed());
-			});
+			.catch((error) => this._pb.handleSubscriptionError(error, 'balance_types', 'subscribe'));
 	}
 
 	private onEvent(e: RecordSubscription<BalanceTypesResponse>) {
@@ -57,21 +53,23 @@ class BalanceTypesContext {
 	async ensureLoaded(id: string) {
 		if (!id || this.byId[id]) return;
 		try {
-			const bt = await this._pb.collection('balanceTypes').getOne<BalanceTypesResponse>(id);
+			const bt = await this._pb.authedClient
+				.collection('balanceTypes')
+				.getOne<BalanceTypesResponse>(id);
 			this.byId = { ...this.byId, [bt.id]: bt };
 		} catch (error) {
-			ErrorHandler.capture(error, 'balance_types', 'ensure_loaded');
+			console.error('[balance_types:ensure_loaded]', error);
 		}
 	}
 
 	dispose() {
-		this._pb.collection('balanceTypes').unsubscribe();
+		this._pb.authedClient.collection('balanceTypes').unsubscribe();
 	}
 }
 
 export const CONTEXT_KEY_BALANCE_TYPES = 'balance-types';
 
-export function setBalanceTypesContext(pb: PocketBase) {
+export function setBalanceTypesContext(pb: PocketBaseContext) {
 	return setContext(CONTEXT_KEY_BALANCE_TYPES, new BalanceTypesContext(pb));
 }
 
@@ -79,7 +77,7 @@ export function getBalanceTypesContext() {
 	return getContext<ReturnType<typeof setBalanceTypesContext>>(CONTEXT_KEY_BALANCE_TYPES);
 }
 
-export function getOrCreateBalanceTypesContext(pb: PocketBase) {
+export function getOrCreateBalanceTypesContext(pb: PocketBaseContext) {
 	let ctx = getContext<ReturnType<typeof setBalanceTypesContext>>(CONTEXT_KEY_BALANCE_TYPES);
 	if (!ctx) ctx = setBalanceTypesContext(pb);
 	return ctx;

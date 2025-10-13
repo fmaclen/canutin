@@ -155,3 +155,4 @@ Always run: `bun run quality && bun run test`
 - `src/routes/(app)/+layout.svelte` - App-level context initialization
 - `AGENTS.md` - Detailed coding guidelines and conventions (reference for complex patterns)
 - `playwright.config.ts` - Test configuration with desktop/mobile projects
+- avoid defininig return types, try to use type inference as much as possible

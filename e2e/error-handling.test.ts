@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { signIn } from './playwright.helpers';
+import { goToPageViaSidebar, signIn } from './playwright.helpers';
 import { seedUser } from './pocketbase.helpers';
 
 test('shows connection error toast when PocketBase is unreachable', async ({ page }) => {
@@ -9,9 +9,8 @@ test('shows connection error toast when PocketBase is unreachable', async ({ pag
 	await page.goto('/');
 	await signIn(page, user.email);
 	await expect(page.getByRole('region', { name: 'Net worth' })).toBeVisible();
-	await expect(page.getByText("Can't connect to the Canutin server")).not.toBeVisible();
+	await expect(page.getByText("Can't connect to the database server")).not.toBeVisible();
 
-	// Block all PocketBase requests to simulate server going down
 	await page.route('**/api/collections/**', (route) => {
 		route.abort('failed');
 	});
@@ -19,7 +18,7 @@ test('shows connection error toast when PocketBase is unreachable', async ({ pag
 	await page.reload();
 	await expect(
 		page.locator('[data-sonner-toast]', {
-			hasText: "Can't connect to the Canutin server"
+			hasText: "Can't connect to the database server"
 		})
 	).toBeVisible();
 });
@@ -29,18 +28,46 @@ test('shows subscription error toast when realtime subscription fails', async ({
 
 	await page.goto('/');
 
-	// Block realtime endpoint to make subscription fail
 	await page.route('**/api/realtime', (route) => {
 		route.abort('failed');
 	});
 
 	await signIn(page, user.email);
 	await expect(page.getByRole('region', { name: 'Net worth' })).toBeVisible();
-
-	// Wait for subscription error toast to appear
 	await expect(
 		page.locator('[data-sonner-toast]', {
 			hasText: 'Lost connection to live updates'
 		})
 	).toBeVisible();
+});
+
+test('shows auth error toast when session expires', async ({ page }) => {
+	const user = await seedUser('eve');
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await expect(page.getByRole('region', { name: 'Net worth' })).toBeVisible();
+	await expect(page.getByText('Your session has expired')).not.toBeVisible();
+
+	await page.route('**/api/collections/**', (route) => {
+		route.fulfill({
+			status: 401,
+			contentType: 'application/json',
+			body: JSON.stringify({
+				code: 401,
+				message: 'The request requires valid record authorization token to be set.',
+				data: {}
+			})
+		});
+	});
+
+	await page.reload();
+	await expect(
+		page.locator('[data-sonner-toast]', {
+			hasText: 'Your session has expired'
+		})
+	).toBeVisible();
+
+	await goToPageViaSidebar(page, 'Accounts');
+	await expect(page).toHaveURL('/auth');
 });

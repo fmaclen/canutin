@@ -69,7 +69,7 @@ class TransactionsContext {
 				});
 			this.rawTransactions = list;
 		} catch (error) {
-			console.error('Error loading transactions:', error);
+			this._pb.handleConnectionError(error, 'transactions', 'refresh');
 		} finally {
 			this.isLoading = false;
 		}

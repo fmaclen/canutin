@@ -1,8 +1,9 @@
-import PocketBase, { type RecordSubscription } from 'pocketbase';
+import { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 
 import { setBalanceTypesContext } from './balance-types.svelte';
 import type { AssetBalancesResponse, AssetsResponse } from './pocketbase.schema';
+import type { PocketBaseContext } from './pocketbase.svelte';
 
 type AssetWithBalance = AssetsResponse & { balance: number };
 
@@ -10,10 +11,13 @@ class AssetsContext {
 	assets: AssetWithBalance[] = $state([]);
 	lastBalanceEvent: number = $state(0);
 
-	private _pb: PocketBase;
+	private _pb: PocketBaseContext;
 	private balanceTypesContext: ReturnType<typeof setBalanceTypesContext>;
 
-	constructor(pb: PocketBase, balanceTypesContext: ReturnType<typeof setBalanceTypesContext>) {
+	constructor(
+		pb: PocketBaseContext,
+		balanceTypesContext: ReturnType<typeof setBalanceTypesContext>
+	) {
 		this._pb = pb;
 		this.balanceTypesContext = balanceTypesContext;
 		this.init();
@@ -24,19 +28,29 @@ class AssetsContext {
 	}
 
 	private async init() {
-		const list = await this._pb.collection('assets').getFullList<AssetsResponse>();
-		this.assets = list.map((a) => ({ ...a, balance: 0 }));
-		for (const a of this.assets) {
-			const value = await this.getLatestAssetBalance(a.id);
-			this.assets = this.assets.map((x) => (x.id === a.id ? { ...x, balance: value } : x));
+		try {
+			const list = await this._pb.authedClient.collection('assets').getFullList<AssetsResponse>();
+			this.assets = list.map((a) => ({ ...a, balance: 0 }));
+			for (const a of this.assets) {
+				const value = await this.getLatestAssetBalance(a.id);
+				this.assets = this.assets.map((x) => (x.id === a.id ? { ...x, balance: value } : x));
+			}
+			this.lastBalanceEvent = Date.now();
+			this.realtimeSubscribe();
+		} catch (error) {
+			this._pb.handleConnectionError(error, 'assets', 'init');
 		}
-		this.lastBalanceEvent = Date.now();
-		this.realtimeSubscribe();
 	}
 
 	private realtimeSubscribe() {
-		this._pb.collection('assets').subscribe('*', this.onAssetEvent.bind(this));
-		this._pb.collection('assetBalances').subscribe('*', this.onAssetBalanceEvent.bind(this));
+		this._pb.authedClient
+			.collection('assets')
+			.subscribe('*', this.onAssetEvent.bind(this))
+			.catch((error) => this._pb.handleSubscriptionError(error, 'assets', 'subscribe_assets'));
+		this._pb.authedClient
+			.collection('assetBalances')
+			.subscribe('*', this.onAssetBalanceEvent.bind(this))
+			.catch((error) => this._pb.handleSubscriptionError(error, 'assets', 'subscribe_balances'));
 	}
 
 	private async onAssetEvent(e: RecordSubscription<AssetsResponse>) {
@@ -55,29 +69,35 @@ class AssetsContext {
 	private async onAssetBalanceEvent(e: RecordSubscription<AssetBalancesResponse>) {
 		if (!e.action) return;
 		const assetId = e.record.asset;
-		const value = await this.getLatestAssetBalance(assetId);
-		this.assets = this.assets.map((x) => (x.id === assetId ? { ...x, balance: value } : x));
-		this.lastBalanceEvent = Date.now();
+		try {
+			const value = await this.getLatestAssetBalance(assetId);
+			this.assets = this.assets.map((x) => (x.id === assetId ? { ...x, balance: value } : x));
+			this.lastBalanceEvent = Date.now();
+		} catch (error) {
+			console.error('[assets:update_balance_on_event]', error);
+		}
 	}
 
 	private async getLatestAssetBalance(assetId: string) {
-		const res = await this._pb.collection('assetBalances').getList<AssetBalancesResponse>(1, 1, {
-			filter: `asset='${assetId}'`,
-			sort: '-asOf,-created,-id'
-		});
+		const res = await this._pb.authedClient
+			.collection('assetBalances')
+			.getList<AssetBalancesResponse>(1, 1, {
+				filter: `asset='${assetId}'`,
+				sort: '-asOf,-created,-id'
+			});
 		return res.items[0]?.value ?? 0;
 	}
 
 	dispose() {
-		this._pb.collection('assets').unsubscribe();
-		this._pb.collection('assetBalances').unsubscribe();
+		this._pb.authedClient.collection('assets').unsubscribe();
+		this._pb.authedClient.collection('assetBalances').unsubscribe();
 	}
 }
 
 export const CONTEXT_KEY_ASSETS = 'assets';
 
 export function setAssetsContext(
-	pb: PocketBase,
+	pb: PocketBaseContext,
 	balanceTypesContext: ReturnType<typeof setBalanceTypesContext>
 ) {
 	return setContext(CONTEXT_KEY_ASSETS, new AssetsContext(pb, balanceTypesContext));

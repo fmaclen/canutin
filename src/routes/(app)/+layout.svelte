@@ -10,9 +10,9 @@
 	let { children } = $props();
 
 	const pb = getPocketBaseContext();
-	const balanceTypesContext = setBalanceTypesContext(pb.authedClient);
-	setAccountsContext(pb.authedClient, balanceTypesContext);
-	setAssetsContext(pb.authedClient, balanceTypesContext);
+	const balanceTypesContext = setBalanceTypesContext(pb);
+	setAccountsContext(pb, balanceTypesContext);
+	setAssetsContext(pb, balanceTypesContext);
 </script>
 
 <Sidebar.Provider>

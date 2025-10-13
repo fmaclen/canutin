@@ -129,6 +129,7 @@
 	"pagination_more_label": "Más páginas",
 	"pagination_navigation_label": "Paginación",
 	"error_title": "Error {status}",
-	"error_connection_failed": "No se puede conectar al servidor de Canutin",
-	"error_subscription_failed": "Se perdió la conexión a las actualizaciones en vivo"
+	"error_connection_failed": "No se pudo conectar al servidor de datos",
+	"error_subscription_failed": "Se perdió la conexión a las actualizaciones en vivo",
+	"error_auth_failed": "Tu sesión ha expirado"
 }

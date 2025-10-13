@@ -1,9 +1,10 @@
 import { UTCDate } from '@date-fns/utc';
 import { addMonths, startOfMonth, startOfYear } from 'date-fns';
-import PocketBase, { type RecordSubscription } from 'pocketbase';
+import { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 
 import type { TransactionsResponse } from './pocketbase.schema';
+import type { PocketBaseContext } from './pocketbase.svelte';
 
 type CashflowAverages = { income: number; expenses: number; surplus: number };
 
@@ -13,24 +14,37 @@ class CashflowContext {
 	avgYtd: CashflowAverages = $state({ income: 0, expenses: 0, surplus: 0 });
 	avg1y: CashflowAverages = $state({ income: 0, expenses: 0, surplus: 0 });
 
-	private _pb: PocketBase;
+	private _pb: PocketBaseContext;
 
-	constructor(pb: PocketBase) {
+	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
 		this.init();
 	}
 
 	private async init() {
-		await this.recomputeAll();
-		this.realtimeSubscribe();
+		try {
+			await this.recomputeAll();
+			this.realtimeSubscribe();
+		} catch (error) {
+			this._pb.handleConnectionError(error, 'cashflow', 'init');
+		}
 	}
 
 	private realtimeSubscribe() {
-		this._pb.collection('transactions').subscribe('*', this.onTransactionEvent.bind(this));
+		this._pb.authedClient
+			.collection('transactions')
+			.subscribe('*', this.onTransactionEvent.bind(this))
+			.catch((error) => this._pb.handleSubscriptionError(error, 'cashflow', 'subscribe'));
 	}
 
 	private async onTransactionEvent(e: RecordSubscription<TransactionsResponse>) {
-		if (e.action) await this.recomputeAll();
+		if (e.action) {
+			try {
+				await this.recomputeAll();
+			} catch (error) {
+				console.error('[cashflow:recompute_on_event]', error);
+			}
+		}
 	}
 
 	private async recomputeAll() {
@@ -45,7 +59,7 @@ class CashflowContext {
 		const earliest = start12m < startYtd ? start12m : startYtd;
 		const earliestIso = earliest.toISOString();
 
-		const txns = await this._pb
+		const txns = await this._pb.authedClient
 			.collection('transactions')
 			.getFullList<TransactionsResponse>({ filter: `date >= '${earliestIso}'` });
 
@@ -94,13 +108,13 @@ class CashflowContext {
 	}
 
 	dispose() {
-		this._pb.collection('transactions').unsubscribe();
+		this._pb.authedClient.collection('transactions').unsubscribe();
 	}
 }
 
 export const CONTEXT_KEY_CASHFLOW = 'cashflow';
 
-export function setCashflowContext(pb: PocketBase) {
+export function setCashflowContext(pb: PocketBaseContext) {
 	return setContext(CONTEXT_KEY_CASHFLOW, new CashflowContext(pb));
 }
 

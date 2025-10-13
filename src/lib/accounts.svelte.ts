@@ -1,8 +1,9 @@
-import PocketBase, { type RecordSubscription } from 'pocketbase';
+import { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 
 import { setBalanceTypesContext } from './balance-types.svelte';
 import type { AccountBalancesResponse, AccountsResponse } from './pocketbase.schema';
+import type { PocketBaseContext } from './pocketbase.svelte';
 
 type AccountWithBalance = AccountsResponse & { balance: number };
 
@@ -10,10 +11,13 @@ class AccountsContext {
 	accounts: AccountWithBalance[] = $state([]);
 	lastBalanceEvent: number = $state(0);
 
-	private _pb: PocketBase;
+	private _pb: PocketBaseContext;
 	private balanceTypesContext: ReturnType<typeof setBalanceTypesContext>;
 
-	constructor(pb: PocketBase, balanceTypesContext: ReturnType<typeof setBalanceTypesContext>) {
+	constructor(
+		pb: PocketBaseContext,
+		balanceTypesContext: ReturnType<typeof setBalanceTypesContext>
+	) {
 		this._pb = pb;
 		this.balanceTypesContext = balanceTypesContext;
 		this.init();
@@ -24,19 +28,31 @@ class AccountsContext {
 	}
 
 	private async init() {
-		const list = await this._pb.collection('accounts').getFullList<AccountsResponse>();
-		this.accounts = list.map((a) => ({ ...a, balance: 0 }));
-		for (const a of this.accounts) {
-			const value = await this.getLatestAccountBalance(a.id);
-			this.accounts = this.accounts.map((x) => (x.id === a.id ? { ...x, balance: value } : x));
+		try {
+			const list = await this._pb.authedClient
+				.collection('accounts')
+				.getFullList<AccountsResponse>();
+			this.accounts = list.map((a) => ({ ...a, balance: 0 }));
+			for (const a of this.accounts) {
+				const value = await this.getLatestAccountBalance(a.id);
+				this.accounts = this.accounts.map((x) => (x.id === a.id ? { ...x, balance: value } : x));
+			}
+			this.lastBalanceEvent = Date.now();
+			this.realtimeSubscribe();
+		} catch (error) {
+			this._pb.handleConnectionError(error, 'accounts', 'init');
 		}
-		this.lastBalanceEvent = Date.now();
-		this.realtimeSubscribe();
 	}
 
 	private realtimeSubscribe() {
-		this._pb.collection('accounts').subscribe('*', this.onAccountEvent.bind(this));
-		this._pb.collection('accountBalances').subscribe('*', this.onAccountBalanceEvent.bind(this));
+		this._pb.authedClient
+			.collection('accounts')
+			.subscribe('*', this.onAccountEvent.bind(this))
+			.catch((error) => this._pb.handleSubscriptionError(error, 'accounts', 'subscribe_accounts'));
+		this._pb.authedClient
+			.collection('accountBalances')
+			.subscribe('*', this.onAccountBalanceEvent.bind(this))
+			.catch((error) => this._pb.handleSubscriptionError(error, 'accounts', 'subscribe_balances'));
 	}
 
 	private async onAccountEvent(e: RecordSubscription<AccountsResponse>) {
@@ -57,13 +73,17 @@ class AccountsContext {
 	private async onAccountBalanceEvent(e: RecordSubscription<AccountBalancesResponse>) {
 		if (!e.action) return;
 		const accountId = e.record.account;
-		const value = await this.getLatestAccountBalance(accountId);
-		this.accounts = this.accounts.map((x) => (x.id === accountId ? { ...x, balance: value } : x));
-		this.lastBalanceEvent = Date.now();
+		try {
+			const value = await this.getLatestAccountBalance(accountId);
+			this.accounts = this.accounts.map((x) => (x.id === accountId ? { ...x, balance: value } : x));
+			this.lastBalanceEvent = Date.now();
+		} catch (error) {
+			console.error('[accounts:update_balance_on_event]', error);
+		}
 	}
 
 	private async getLatestAccountBalance(accountId: string) {
-		const res = await this._pb
+		const res = await this._pb.authedClient
 			.collection('accountBalances')
 			.getList<AccountBalancesResponse>(1, 1, {
 				filter: `account='${accountId}'`,
@@ -73,15 +93,15 @@ class AccountsContext {
 	}
 
 	dispose() {
-		this._pb.collection('accounts').unsubscribe();
-		this._pb.collection('accountBalances').unsubscribe();
+		this._pb.authedClient.collection('accounts').unsubscribe();
+		this._pb.authedClient.collection('accountBalances').unsubscribe();
 	}
 }
 
 export const CONTEXT_KEY_ACCOUNTS = 'accounts';
 
 export function setAccountsContext(
-	pb: PocketBase,
+	pb: PocketBaseContext,
 	balanceTypesContext: ReturnType<typeof setBalanceTypesContext>
 ) {
 	return setContext(CONTEXT_KEY_ACCOUNTS, new AccountsContext(pb, balanceTypesContext));

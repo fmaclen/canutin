@@ -119,20 +119,24 @@
 	});
 
 	async function refreshTransactionsTotals() {
-		const txns = await pb.authedClient
-			.collection('transactions')
-			.getFullList<TransactionsResponse>({
-				fields: 'id,account,value,excluded',
-				requestKey: 'accounts:transactionsTotals'
-			});
-		const map = new SvelteMap<string, number>();
-		for (const txn of txns) {
-			const accountId = txn.account;
-			if (!accountId) continue;
-			map.set(accountId, (map.get(accountId) ?? 0) + 1);
+		try {
+			const txns = await pb.authedClient
+				.collection('transactions')
+				.getFullList<TransactionsResponse>({
+					fields: 'id,account,value,excluded',
+					requestKey: 'accounts:transactionsTotals'
+				});
+			const map = new SvelteMap<string, number>();
+			for (const txn of txns) {
+				const accountId = txn.account;
+				if (!accountId) continue;
+				map.set(accountId, (map.get(accountId) ?? 0) + 1);
+			}
+			transactionsCounts.clear();
+			for (const [accountId, count] of map) transactionsCounts.set(accountId, count);
+		} catch (error) {
+			pb.handleConnectionError(error, 'accounts', 'refresh_transactions_totals');
 		}
-		transactionsCounts.clear();
-		for (const [accountId, count] of map) transactionsCounts.set(accountId, count);
 	}
 
 	$effect(() => {

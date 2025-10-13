@@ -13,7 +13,7 @@
 	import TrailingCashflow from './trailing-cashflow.svelte';
 
 	const pb = getPocketBaseContext();
-	setCashflowContext(pb.authedClient);
+	setCashflowContext(pb);
 </script>
 
 <header class="bg-background flex h-16 shrink-0 items-center gap-2 border-b">
