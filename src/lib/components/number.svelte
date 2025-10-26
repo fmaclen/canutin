@@ -1,13 +1,19 @@
 <script lang="ts">
+	type Sentiment = 'positive' | 'negative' | 'neutral' | 'undefined';
+
 	interface Props {
-		value: string | number | null;
+		value: string | number;
+		sentiment?: Sentiment;
 	}
 
-	let { value }: Props = $props();
+	let { value, sentiment = 'undefined' }: Props = $props();
+
+	const sentimentClass = {
+		positive: 'text-cash',
+		negative: 'text-debt',
+		neutral: 'text-muted-foreground',
+		undefined: ''
+	};
 </script>
 
-{#if value}
-	<span class="font-jetbrains-mono text-inherit uppercase">{value}</span>
-{:else}
-	~
-{/if}
+<span class={`font-jetbrains-mono uppercase ${sentimentClass[sentiment]}`}>{value}</span>

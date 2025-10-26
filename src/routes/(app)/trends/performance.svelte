@@ -108,7 +108,7 @@
 				const datePoint = ascendingDates[dateIndex];
 				while (pointer + 1 < balances.length && new Date(balances[pointer + 1].asOf) <= datePoint)
 					pointer++;
-				const value = pointer >= 0 ? (balances[pointer].value ?? 0) : 0;
+				const value = pointer >= 0 ? (balances[pointer].marketValue ?? 0) : 0;
 				const group = meta.balanceGroup as BalanceGroup;
 				if (group === 'CASH') totalsAscending[dateIndex].cash += value;
 				else if (group === 'DEBT') totalsAscending[dateIndex].debt += value;

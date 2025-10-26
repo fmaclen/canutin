@@ -5,7 +5,12 @@ import { setBalanceTypesContext } from './balance-types.svelte';
 import type { AssetBalancesResponse, AssetsResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
 
-type AssetWithBalance = AssetsResponse & { balance: number };
+type AssetWithBalance = AssetsResponse & {
+	marketValue: number;
+	bookValue: number;
+	gain: number;
+	gainPercent: number;
+};
 
 class AssetsContext {
 	assets: AssetWithBalance[] = $state([]);
@@ -30,10 +35,16 @@ class AssetsContext {
 	private async init() {
 		try {
 			const list = await this._pb.authedClient.collection('assets').getFullList<AssetsResponse>();
-			this.assets = list.map((a) => ({ ...a, balance: 0 }));
+			this.assets = list.map((a) => ({
+				...a,
+				marketValue: 0,
+				bookValue: 0,
+				gain: 0,
+				gainPercent: 0
+			}));
 			for (const a of this.assets) {
-				const value = await this.getLatestAssetBalance(a.id);
-				this.assets = this.assets.map((x) => (x.id === a.id ? { ...x, balance: value } : x));
+				const balanceData = await this.getLatestAssetBalance(a.id);
+				this.assets = this.assets.map((x) => (x.id === a.id ? { ...x, ...balanceData } : x));
 			}
 			this.lastBalanceEvent = Date.now();
 			this.realtimeSubscribe();
@@ -56,11 +67,22 @@ class AssetsContext {
 	private async onAssetEvent(e: RecordSubscription<AssetsResponse>) {
 		if (e.action === 'create') {
 			await this.balanceTypesContext.ensureLoaded(e.record.balanceType);
-			this.assets = [...this.assets, { ...e.record, balance: 0 }];
+			this.assets = [
+				...this.assets,
+				{ ...e.record, marketValue: 0, bookValue: 0, gain: 0, gainPercent: 0 }
+			];
 		} else if (e.action === 'update') {
-			const balance = this.assets.find((a) => a.id === e.record.id)?.balance ?? 0;
+			const existing = this.assets.find((a) => a.id === e.record.id);
+			const balanceData = {
+				marketValue: existing?.marketValue ?? 0,
+				bookValue: existing?.bookValue ?? 0,
+				gain: existing?.gain ?? 0,
+				gainPercent: existing?.gainPercent ?? 0
+			};
 			await this.balanceTypesContext.ensureLoaded(e.record.balanceType);
-			this.assets = this.assets.map((x) => (x.id === e.record.id ? { ...e.record, balance } : x));
+			this.assets = this.assets.map((x) =>
+				x.id === e.record.id ? { ...e.record, ...balanceData } : x
+			);
 		} else if (e.action === 'delete') {
 			this.assets = this.assets.filter((x) => x.id !== e.record.id);
 		}
@@ -70,8 +92,8 @@ class AssetsContext {
 		if (!e.action) return;
 		const assetId = e.record.asset;
 		try {
-			const value = await this.getLatestAssetBalance(assetId);
-			this.assets = this.assets.map((x) => (x.id === assetId ? { ...x, balance: value } : x));
+			const balanceData = await this.getLatestAssetBalance(assetId);
+			this.assets = this.assets.map((x) => (x.id === assetId ? { ...x, ...balanceData } : x));
 			this.lastBalanceEvent = Date.now();
 		} catch (error) {
 			console.error('[assets:update_balance_on_event]', error);
@@ -83,9 +105,14 @@ class AssetsContext {
 			.collection('assetBalances')
 			.getList<AssetBalancesResponse>(1, 1, {
 				filter: `asset='${assetId}'`,
-				sort: '-asOf,-created,-id'
+				sort: '-asOf,-created,-id',
+				fields: 'marketValue,bookValue'
 			});
-		return res.items[0]?.value ?? 0;
+		const marketValue = res.items[0]?.marketValue ?? 0;
+		const bookValue = res.items[0]?.bookValue ?? 0;
+		const gain = marketValue - bookValue;
+		const gainPercent = bookValue !== 0 ? (gain / bookValue) * 100 : 0;
+		return { marketValue, bookValue, gain, gainPercent };
 	}
 
 	dispose() {

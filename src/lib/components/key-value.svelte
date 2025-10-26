@@ -15,6 +15,6 @@
 >
 	<div class="text-sm font-semibold tracking-tight text-balance">{title}</div>
 	<div class="font-mono text-sm tabular-nums">
-		<Currency {value} />
+		<Currency value={value ?? 0} />
 	</div>
 </div>

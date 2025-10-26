@@ -89,12 +89,12 @@
 		for (const a of assetsContext.assets) {
 			if (a.sold) continue;
 			const group = a.balanceGroup as BalanceGroup;
-			if (!a.excluded) groups[group].total += a.balance ?? 0;
+			if (!a.excluded) groups[group].total += a.marketValue ?? 0;
 			const type = upsert(group, a.balanceType, assetsContext.getTypeName(a.balanceType));
-			if (!a.excluded) type.total += a.balance ?? 0;
+			if (!a.excluded) type.total += a.marketValue ?? 0;
 			type.items = [
 				...type.items,
-				{ id: a.id, name: a.name, balance: a.balance ?? 0, excluded: Boolean(a.excluded) }
+				{ id: a.id, name: a.name, balance: a.marketValue ?? 0, excluded: Boolean(a.excluded) }
 			];
 		}
 

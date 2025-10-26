@@ -115,7 +115,7 @@ test('balance sheet', async ({ page }) => {
 		asset: otherAsset.id,
 		owner: user.id,
 		asOf: new Date().toISOString(),
-		value: 1000
+		marketValue: 1000
 	});
 
 	await expect(cash).toContainText('$500');
@@ -155,7 +155,7 @@ test('balance sheet', async ({ page }) => {
 		asset: soldAsset.id,
 		owner: user.id,
 		asOf: new Date().toISOString(),
-		value: 1234
+		marketValue: 1234
 	});
 
 	const excludedAsset = await seedAsset({
@@ -170,7 +170,7 @@ test('balance sheet', async ({ page }) => {
 		asset: excludedAsset.id,
 		owner: user.id,
 		asOf: new Date().toISOString(),
-		value: 1234
+		marketValue: 1234
 	});
 
 	await expect(cash).toContainText('$500');

@@ -40,7 +40,7 @@
 				}),
 				pb.authedClient.collection('assetBalances').getFullList<AssetBalancesResponse>({
 					sort: 'asOf,created,id',
-					fields: 'id,asset,value,asOf',
+					fields: 'id,asset,marketValue,asOf',
 					requestKey: 'trends:assetBalances'
 				})
 			]);

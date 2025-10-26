@@ -13,7 +13,7 @@
 		for (const a of accountsContext.accounts)
 			if (!a.excluded && !a.closed) g[a.balanceGroup] += a.balance ?? 0;
 		for (const a of assetsContext.assets)
-			if (!a.excluded && !a.sold) g[a.balanceGroup] += a.balance ?? 0;
+			if (!a.excluded && !a.sold) g[a.balanceGroup] += a.marketValue ?? 0;
 		const netWorth = g.CASH + g.INVESTMENT + g.OTHER + g.DEBT;
 		return { totalsByGroup: g, netWorth } as const;
 	});

@@ -146,7 +146,7 @@
 				const previousIndex = assetIndexPointer.get(assetId) ?? -1;
 				const index = latestIndexBeforeOrEqual(balances, datePoint, previousIndex);
 				assetIndexPointer.set(assetId, index);
-				const value = index >= 0 ? (balances[index].value ?? 0) : 0;
+				const value = index >= 0 ? (balances[index].marketValue ?? 0) : 0;
 				const group = meta.balanceGroup as BalanceGroup;
 				if (group === 'CASH') cash += value;
 				else if (group === 'DEBT') debt += value;

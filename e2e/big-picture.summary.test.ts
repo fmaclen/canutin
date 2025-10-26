@@ -102,7 +102,7 @@ test('big picture summary', async ({ page }) => {
 		asset: otherAsset.id,
 		owner: user.id,
 		asOf: new Date().toISOString(),
-		value: 1000
+		marketValue: 1000
 	});
 
 	await expect(netWorth).toContainText('$2,000');
@@ -138,7 +138,7 @@ test('big picture summary', async ({ page }) => {
 		asset: soldAsset.id,
 		owner: user.id,
 		asOf: new Date().toISOString(),
-		value: 1234
+		marketValue: 1234
 	});
 
 	const excludedAsset = await seedAsset({
@@ -153,7 +153,7 @@ test('big picture summary', async ({ page }) => {
 		asset: excludedAsset.id,
 		owner: user.id,
 		asOf: new Date().toISOString(),
-		value: 1234
+		marketValue: 1234
 	});
 
 	await expect(netWorth).toContainText('$2,000');

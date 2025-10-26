@@ -145,7 +145,7 @@ test('trends performance table', async ({ page }) => {
 		owner: user.id,
 		excluded: now.toISOString()
 	});
-	for (const [date, value] of [
+	for (const [date, marketValue] of [
 		[earliest, 12_000],
 		[fiveYears, 18_000],
 		[oneYear, 24_000],
@@ -159,10 +159,10 @@ test('trends performance table', async ({ page }) => {
 			asset: soldAsset.id,
 			owner: user.id,
 			asOf: setHours(date, 12).toISOString(),
-			value
+			marketValue
 		});
 	}
-	for (const [date, value] of [
+	for (const [date, marketValue] of [
 		[earliest, -2_000],
 		[fiveYears, -4_000],
 		[oneYear, -3_500],
@@ -176,7 +176,7 @@ test('trends performance table', async ({ page }) => {
 			asset: excludedDebtAsset.id,
 			owner: user.id,
 			asOf: setHours(date, 12).toISOString(),
-			value
+			marketValue
 		});
 	}
 

@@ -96,6 +96,8 @@ export async function seedAsset(assetInput: {
 	balanceGroup: AssetsRecord['balanceGroup'];
 	balanceType: BalanceTypesRecord['name'];
 	owner: UsersRecord['id'];
+	type?: AssetsRecord['type'];
+	symbol?: AssetsRecord['symbol'];
 	sold?: AssetsRecord['sold'];
 	excluded?: AssetsRecord['excluded'];
 }) {
@@ -113,9 +115,11 @@ export async function seedAssetBalance(assetBalanceInput: {
 	asset: AssetBalancesRecord['asset'];
 	owner: AssetBalancesRecord['owner'];
 	asOf: AssetBalancesRecord['asOf'];
-	value?: AssetBalancesRecord['value'];
+	bookValue?: AssetBalancesRecord['bookValue'];
+	marketValue?: AssetBalancesRecord['marketValue'];
+	bookPrice?: AssetBalancesRecord['bookPrice'];
+	marketPrice?: AssetBalancesRecord['marketPrice'];
 	quantity?: AssetBalancesRecord['quantity'];
-	cost?: AssetBalancesRecord['cost'];
 }) {
 	const pb = await getAdminPB();
 	return await pb.collection('assetBalances').create(assetBalanceInput);

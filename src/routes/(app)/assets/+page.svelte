@@ -3,6 +3,7 @@
 
 	import { getAssetsContext } from '$lib/assets.svelte';
 	import Currency from '$lib/components/currency.svelte';
+	import Number from '$lib/components/number.svelte';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
@@ -36,11 +37,14 @@
 		id: string;
 		name: string;
 		symbol: string | null;
-		balance: number;
+		bookValue: number;
+		marketValue: number;
 		typeName: string;
 		balanceGroup: BalanceGroup;
 		excluded: boolean;
 		sold: boolean;
+		gain: number;
+		gainPercent: number;
 	};
 
 	const filters: Array<{
@@ -77,14 +81,17 @@
 				id: asset.id,
 				name: asset.name,
 				symbol: asset.symbol ?? null,
-				balance: asset.balance ?? 0,
+				bookValue: asset.bookValue ?? 0,
+				marketValue: asset.marketValue ?? 0,
 				typeName: assetsContext.getTypeName(asset.balanceType),
 				balanceGroup: asset.balanceGroup as BalanceGroup,
 				excluded: Boolean(asset.excluded),
-				sold: Boolean(asset.sold)
+				sold: Boolean(asset.sold),
+				gain: asset.gain ?? 0,
+				gainPercent: asset.gainPercent ?? 0
 			}))
 			.sort((a, b) => {
-				if (b.balance !== a.balance) return b.balance - a.balance;
+				if (b.marketValue !== a.marketValue) return b.marketValue - a.marketValue;
 				return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
 			})
 	);
@@ -104,7 +111,7 @@
 		for (const option of filters) {
 			const rows = rowsByFilter.get(option.key) ?? [];
 			const total = rows.reduce(
-				(sum, row) => sum + (option.key === 'owned' && row.excluded ? 0 : row.balance),
+				(sum, row) => sum + (option.key === 'owned' && row.excluded ? 0 : row.marketValue),
 				0
 			);
 			totals.set(option.key, total);
@@ -114,11 +121,11 @@
 
 	const isLoaded = $derived(() => assetsContext.lastBalanceEvent !== 0);
 
-	function balanceClass(row: AssetRow) {
-		if (row.sold || row.excluded) return 'text-muted-foreground';
-		if (row.balance === 0) return 'text-muted-foreground';
-		if (row.balanceGroup === 'DEBT') return 'text-debt';
-		return 'text-cash';
+	function balanceSentiment(row: AssetRow) {
+		if (row.sold || row.excluded) return 'neutral';
+		if (row.marketValue === 0) return 'neutral';
+		if (row.balanceGroup === 'DEBT') return 'negative';
+		return 'positive';
 	}
 
 	const statusMeta = {
@@ -198,13 +205,22 @@
 												>{m.assets_table_header_group()}</Table.Head
 											>
 											<Table.Head class="text-left whitespace-nowrap"
-												>{m.assets_table_header_type()}</Table.Head
+												>{m.assets_table_header_category()}</Table.Head
 											>
 											<Table.Head class="text-left whitespace-nowrap"
 												>{m.assets_table_header_status()}</Table.Head
 											>
 											<Table.Head class="text-right whitespace-nowrap"
-												>{m.assets_table_header_balance()}</Table.Head
+												>{m.assets_table_header_book_value()}</Table.Head
+											>
+											<Table.Head class="text-right whitespace-nowrap"
+												>{m.assets_table_header_gain_loss()}</Table.Head
+											>
+											<Table.Head class="text-right whitespace-nowrap"
+												>{m.assets_table_header_gain_percent()}</Table.Head
+											>
+											<Table.Head class="text-right whitespace-nowrap"
+												>{m.assets_table_header_market_value()}</Table.Head
 											>
 										</Table.Row>
 									</Table.Header>
@@ -255,16 +271,45 @@
 														{/if}
 													</div>
 												</Table.Cell>
-												<Table.Cell
-													class={'font-jetbrains-mono text-right text-xs tabular-nums ' +
-														balanceClass(row)}
-												>
+												<Table.Cell class="text-muted-foreground text-right text-xs tabular-nums">
+													<Currency
+														value={row.bookValue}
+														maximumFractionDigits={2}
+														sentiment="neutral"
+													/>
+												</Table.Cell>
+												<Table.Cell class="text-right text-xs tabular-nums">
+													<Currency
+														value={row.gain}
+														maximumFractionDigits={2}
+														sentiment={row.gain > 0
+															? 'positive'
+															: row.gain < 0
+																? 'negative'
+																: 'neutral'}
+													/>
+												</Table.Cell>
+												<Table.Cell class="text-right text-xs tabular-nums">
+													<Number
+														value={`${row.gainPercent > 0 ? '+' : ''}${row.gainPercent.toFixed(1)}%`}
+														sentiment={row.gainPercent > 0
+															? 'positive'
+															: row.gainPercent < 0
+																? 'negative'
+																: 'neutral'}
+													/>
+												</Table.Cell>
+												<Table.Cell class="text-right text-xs tabular-nums">
 													{#if row.excluded || row.sold}
 														<Tooltip.Root>
 															<Tooltip.Trigger
 																class="border-border inline-block border-b border-dashed hover:border-current"
 															>
-																<Currency value={row.balance} maximumFractionDigits={2} />
+																<Currency
+																	value={row.marketValue}
+																	maximumFractionDigits={2}
+																	sentiment={balanceSentiment(row)}
+																/>
 															</Tooltip.Trigger>
 															<Tooltip.Content sideOffset={6}>
 																<p class="text-xs leading-snug font-normal">
@@ -275,7 +320,11 @@
 															</Tooltip.Content>
 														</Tooltip.Root>
 													{:else}
-														<Currency value={row.balance} maximumFractionDigits={2} />
+														<Currency
+															value={row.marketValue}
+															maximumFractionDigits={2}
+															sentiment={balanceSentiment(row)}
+														/>
 													{/if}
 												</Table.Cell>
 											</Table.Row>
@@ -286,12 +335,15 @@
 											<Table.Cell colspan={5} class="text-muted-foreground text-xs font-normal">
 												{m.assets_aggregate_total_label()}
 											</Table.Cell>
-											<Table.Cell
-												class="font-jetbrains-mono text-foreground text-right text-xs tabular-nums"
-											>
+											<Table.Cell></Table.Cell>
+											<Table.Cell></Table.Cell>
+											<Table.Cell></Table.Cell>
+											<Table.Cell class="text-foreground text-right text-xs tabular-nums">
+												{@const total = totalsByFilter.get(option.key) ?? 0}
 												<Currency
-													value={totalsByFilter.get(option.key) ?? 0}
+													value={total}
 													maximumFractionDigits={2}
+													sentiment={total > 0 ? 'positive' : total < 0 ? 'negative' : 'neutral'}
 												/>
 											</Table.Cell>
 										</Table.Row>

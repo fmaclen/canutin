@@ -145,11 +145,11 @@
 
 	const isLoaded = $derived(() => accountsContext.lastBalanceEvent !== 0);
 
-	function balanceClass(row: AccountRow) {
-		if (row.closed || row.excluded) return 'text-muted-foreground';
-		if (row.balance === 0) return 'text-muted-foreground';
-		if (row.balanceGroup === 'DEBT') return 'text-debt';
-		return 'text-cash';
+	function balanceSentiment(row: AccountRow) {
+		if (row.closed || row.excluded) return 'neutral';
+		if (row.balance === 0) return 'neutral';
+		if (row.balanceGroup === 'DEBT') return 'negative';
+		return 'positive';
 	}
 
 	const statusMeta = {
@@ -303,16 +303,17 @@
 														<span class="text-muted-foreground">~</span>
 													{/if}
 												</Table.Cell>
-												<Table.Cell
-													class={'font-jetbrains-mono text-right text-xs tabular-nums ' +
-														balanceClass(row)}
-												>
+												<Table.Cell class="text-right text-xs tabular-nums">
 													{#if row.excluded || row.closed}
 														<Tooltip.Root>
 															<Tooltip.Trigger
 																class="border-border inline-block border-b border-dashed hover:border-current"
 															>
-																<Currency value={row.balance} maximumFractionDigits={2} />
+																<Currency
+																	value={row.balance}
+																	maximumFractionDigits={2}
+																	sentiment={balanceSentiment(row)}
+																/>
 															</Tooltip.Trigger>
 															<Tooltip.Content sideOffset={6}>
 																<p class="text-xs leading-snug font-normal">
@@ -323,7 +324,11 @@
 															</Tooltip.Content>
 														</Tooltip.Root>
 													{:else}
-														<Currency value={row.balance} maximumFractionDigits={2} />
+														<Currency
+															value={row.balance}
+															maximumFractionDigits={2}
+															sentiment={balanceSentiment(row)}
+														/>
 													{/if}
 												</Table.Cell>
 											</Table.Row>
@@ -334,12 +339,12 @@
 											<Table.Cell colspan={6} class="text-muted-foreground text-xs font-normal">
 												{m.accounts_aggregate_total_label()}
 											</Table.Cell>
-											<Table.Cell
-												class="font-jetbrains-mono text-foreground text-right text-xs tabular-nums"
-											>
+											<Table.Cell class="text-foreground text-right text-xs tabular-nums">
+												{@const total = totalsByFilter.get(option.key) ?? 0}
 												<Currency
-													value={totalsByFilter.get(option.key) ?? 0}
+													value={total}
 													maximumFractionDigits={2}
+													sentiment={total > 0 ? 'positive' : total < 0 ? 'negative' : 'neutral'}
 												/>
 											</Table.Cell>
 										</Table.Row>

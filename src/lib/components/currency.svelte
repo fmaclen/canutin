@@ -2,19 +2,28 @@
 	import { formatCurrency } from './currency';
 	import Number from './number.svelte';
 
+	type Sentiment = 'positive' | 'negative' | 'neutral' | 'undefined';
+
 	interface Props {
-		value?: number | null;
+		value: number;
 		currency?: string;
 		locale?: string;
 		maximumFractionDigits?: number;
+		sentiment?: Sentiment;
 	}
 
-	let { value, currency = 'USD', locale = 'en-US', maximumFractionDigits = 0 }: Props = $props();
+	let {
+		value,
+		currency = 'USD',
+		locale = 'en-US',
+		maximumFractionDigits = 0,
+		sentiment = 'undefined'
+	}: Props = $props();
 
 	// Format: $1,523.00 || -$1,523.00
 	const formattedValue = $derived(
-		formatCurrency(value ?? 0, { currency, locale, maximumFractionDigits })
+		formatCurrency(value, { currency, locale, maximumFractionDigits })
 	);
 </script>
 
-<Number value={formattedValue} />
+<Number value={formattedValue} {sentiment} />
