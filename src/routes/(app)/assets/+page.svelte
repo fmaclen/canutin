@@ -3,6 +3,7 @@
 
 	import { getAssetsContext } from '$lib/assets.svelte';
 	import Currency from '$lib/components/currency.svelte';
+	import Link from '$lib/components/link.svelte';
 	import Number from '$lib/components/number.svelte';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
@@ -150,8 +151,8 @@
 	}
 </script>
 
-<header class="bg-background flex h-16 shrink-0 items-center gap-2 border-b">
-	<div class="flex items-center gap-2 px-4">
+<header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
+	<div class="flex items-center gap-2">
 		<Sidebar.Trigger class="-ml-1" />
 		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
 		<Breadcrumb.Root>
@@ -162,6 +163,9 @@
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 	</div>
+	<nav class="px-1">
+		<Link href="/assets/add" class="text-sm">Add asset</Link>
+	</nav>
 </header>
 
 <Page pageTitle="Assets">

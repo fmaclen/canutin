@@ -215,3 +215,75 @@ test('assets table shows appreciation and depreciation for shares assets', async
 	await expect(xyzCells.nth(7)).toContainText('-25.0%');
 	await expect(xyzCells.nth(8)).toContainText('$7,500.00');
 });
+
+test('user can add a new asset with type WHOLE or SHARES', async ({ page }) => {
+	const user = await seedUser('liam');
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Assets');
+
+	await expect(page.getByRole('row', { name: /Gold Coins/ })).not.toBeVisible();
+	await expect(page.getByRole('row', { name: /AAPL/ })).not.toBeVisible();
+
+	await page.getByRole('link', { name: 'Add asset' }).click();
+	await expect(page).toHaveURL('/assets/add');
+
+	await page.getByLabel('Type', { exact: true }).click();
+	await page.getByText('Whole').click();
+	await expect(page.getByLabel('Quantity')).not.toBeVisible();
+	await expect(page.getByLabel('Book price')).not.toBeVisible();
+	await expect(page.getByLabel('Market price')).not.toBeVisible();
+	await expect(page.getByLabel('Book value')).toBeVisible();
+	await expect(page.getByLabel('Market value')).toBeVisible();
+
+	await page.getByLabel('Name').fill('Gold Coins');
+	await page.getByLabel('Balance group').click();
+	await page.getByText('Other assets').click();
+	await page.getByLabel('Category').fill('Precious Metals');
+	await page.getByLabel('Book value').fill('12000');
+	await page.getByLabel('Market value').fill('15000');
+	await page.getByRole('button', { name: 'Add' }).click();
+	await expect(page.getByText('Asset added successfully')).toBeVisible();
+	await expect(page).toHaveURL('/assets');
+
+	const wholeAssetRow = page.getByRole('row', { name: /Gold Coins/ });
+	await expect(wholeAssetRow).toBeVisible();
+
+	const wholeCells = wholeAssetRow.locator('td');
+	await expect(wholeCells.nth(0)).toContainText('Gold Coins');
+	await expect(wholeCells.nth(5)).toContainText('$12,000.00');
+	await expect(wholeCells.nth(8)).toContainText('$15,000.00');
+
+	await page.getByRole('link', { name: 'Add asset' }).click();
+	await expect(page).toHaveURL('/assets/add');
+
+	await page.getByLabel('Type', { exact: true }).click();
+	await page.getByText('Shares').click();
+	await expect(page.getByLabel('Quantity')).toBeVisible();
+	await expect(page.getByLabel('Book price')).toBeVisible();
+	await expect(page.getByLabel('Market price')).toBeVisible();
+	await expect(page.getByLabel('Book value')).not.toBeVisible();
+	await expect(page.getByLabel('Market value')).not.toBeVisible();
+
+	await page.getByLabel('Name').fill('Apple Inc.');
+	await page.getByLabel('Symbol').fill('AAPL');
+	await page.getByLabel('Balance group').click();
+	await page.getByText('Investments').click();
+	await page.getByLabel('Category').fill('Stock');
+	await page.getByLabel('Quantity').fill('50');
+	await page.getByLabel('Book price').fill('150');
+	await page.getByLabel('Market price').fill('180');
+	await page.getByRole('button', { name: 'Add' }).click();
+	await expect(page.getByText('Asset added successfully')).toBeVisible();
+	await expect(page).toHaveURL('/assets');
+
+	const sharesAssetRow = page.getByRole('row', { name: /AAPL/ });
+	await expect(sharesAssetRow).toBeVisible();
+
+	const sharesCells = sharesAssetRow.locator('td');
+	await expect(sharesCells.nth(0)).toContainText('Apple Inc.');
+	await expect(sharesCells.nth(1)).toContainText('AAPL');
+	await expect(sharesCells.nth(5)).toContainText('$7,500.00');
+	await expect(sharesCells.nth(8)).toContainText('$9,000.00');
+});

@@ -380,6 +380,9 @@ test('transactions correctly handle UTC dates regardless of local timezone', asy
 	});
 	const page = await context.newPage();
 
+	const testDate = new Date('2025-10-15T12:00:00Z');
+	await page.clock.setFixedTime(testDate);
+
 	const user = await seedUser('samoa');
 
 	const account = await seedAccount({

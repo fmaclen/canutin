@@ -1,5 +1,5 @@
 import { UTCDate } from '@date-fns/utc';
-import { addMonths, startOfMonth } from 'date-fns';
+import { addMonths, startOfMonth, startOfYear } from 'date-fns';
 import { getContext, setContext } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 
@@ -41,7 +41,7 @@ class TransactionsContext {
 
 	readonly periodOptions: PeriodOption[] = ['mtd', '1m', '3m', '6m', 'ytd', '12m', 'all'];
 	readonly kindOptions: KindFilter[] = ['all', 'credits', 'debits'];
-	readonly pageSize = 50; // Arbitrary page size for pagination
+	readonly pageSize = 50;
 
 	private _pb: PocketBaseContext;
 	private _accountsContext: ReturnType<typeof getAccountsContext>;
@@ -77,20 +77,76 @@ class TransactionsContext {
 
 	private getPeriodRange(option: PeriodOption) {
 		const now = new UTCDate();
-		const startOfThisMonth = startOfMonth(now);
+		const startOfThisMonthDate = startOfMonth(now);
+		const startOfThisMonth = new UTCDate(
+			startOfThisMonthDate.getUTCFullYear(),
+			startOfThisMonthDate.getUTCMonth(),
+			1,
+			0,
+			0,
+			0,
+			0
+		);
 		switch (option) {
 			case 'mtd':
 				return { from: startOfThisMonth, to: null } as const;
-			case '1m':
-				return { from: addMonths(startOfThisMonth, -1), to: startOfThisMonth } as const;
-			case '3m':
-				return { from: addMonths(startOfThisMonth, -2), to: null } as const;
-			case '6m':
-				return { from: addMonths(startOfThisMonth, -5), to: null } as const;
-			case 'ytd':
-				return { from: startOfMonth(new UTCDate(now.getUTCFullYear(), 0)), to: null } as const;
-			case '12m':
-				return { from: addMonths(startOfThisMonth, -11), to: null } as const;
+			case '1m': {
+				const lastMonthDate = addMonths(startOfThisMonthDate, -1);
+				const startOfLastMonth = new UTCDate(
+					lastMonthDate.getUTCFullYear(),
+					lastMonthDate.getUTCMonth(),
+					1,
+					0,
+					0,
+					0,
+					0
+				);
+				return { from: startOfLastMonth, to: startOfThisMonth } as const;
+			}
+			case '3m': {
+				const threeMonthsAgoDate = addMonths(startOfThisMonthDate, -2);
+				const startOfThreeMonthsAgo = new UTCDate(
+					threeMonthsAgoDate.getUTCFullYear(),
+					threeMonthsAgoDate.getUTCMonth(),
+					1,
+					0,
+					0,
+					0,
+					0
+				);
+				return { from: startOfThreeMonthsAgo, to: null } as const;
+			}
+			case '6m': {
+				const sixMonthsAgoDate = addMonths(startOfThisMonthDate, -5);
+				const startOfSixMonthsAgo = new UTCDate(
+					sixMonthsAgoDate.getUTCFullYear(),
+					sixMonthsAgoDate.getUTCMonth(),
+					1,
+					0,
+					0,
+					0,
+					0
+				);
+				return { from: startOfSixMonthsAgo, to: null } as const;
+			}
+			case 'ytd': {
+				const yearStartDate = startOfYear(now);
+				const startOfYearUtc = new UTCDate(yearStartDate.getUTCFullYear(), 0, 1, 0, 0, 0, 0);
+				return { from: startOfYearUtc, to: null } as const;
+			}
+			case '12m': {
+				const twelveMonthsAgoDate = addMonths(startOfThisMonthDate, -11);
+				const startOfTwelveMonthsAgo = new UTCDate(
+					twelveMonthsAgoDate.getUTCFullYear(),
+					twelveMonthsAgoDate.getUTCMonth(),
+					1,
+					0,
+					0,
+					0,
+					0
+				);
+				return { from: startOfTwelveMonthsAgo, to: null } as const;
+			}
 			default:
 				return { from: null, to: null } as const;
 		}
