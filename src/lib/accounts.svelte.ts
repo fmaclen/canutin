@@ -32,6 +32,10 @@ class AccountsContext {
 		return this.accounts.find((a) => a.id === id);
 	}
 
+	async deleteAccount(id: string) {
+		await this._pb.authedClient.collection('accounts').delete(id);
+	}
+
 	private async init() {
 		try {
 			const list = await this._pb.authedClient

@@ -161,3 +161,13 @@ export async function seedTransaction(transactionInput: {
 	const pb = await getAdminPB();
 	return await pb.collection('transactions').create(transactionInput);
 }
+
+export async function recordExists(collection: string, id: string): Promise<boolean> {
+	const pb = await getAdminPB();
+	try {
+		await pb.collection(collection).getOne(id);
+		return true;
+	} catch {
+		return false;
+	}
+}

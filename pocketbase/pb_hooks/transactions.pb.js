@@ -90,7 +90,12 @@ function onTxUpdate(e) {
 function onTxDelete(e) {
   const accountId = e.record.getString('account')
   if (!accountId) return
-  const account = $app.findRecordById('accounts', accountId)
+  let account
+  try {
+    account = $app.findRecordById('accounts', accountId)
+  } catch {
+    return e.next()
+  }
   const autoCalculated = account.getDateTime('autoCalculated')
   if (!autoCalculated || autoCalculated.isZero()) return e.next()
   const txs = $app.findRecordsByFilter('transactions', 'account={:aid}', '', 0, 0, { aid: accountId })

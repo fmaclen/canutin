@@ -2,7 +2,13 @@ import { expect, test } from '@playwright/test';
 
 import { AssetsBalanceGroupOptions, AssetsTypeOptions } from '../src/lib/pocketbase.schema';
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
-import { seedAsset, seedAssetBalance, seedUser, updateAsset } from './pocketbase.helpers';
+import {
+	recordExists,
+	seedAsset,
+	seedAssetBalance,
+	seedUser,
+	updateAsset
+} from './pocketbase.helpers';
 
 test('assets table reflects filters and aggregate totals', async ({ page }) => {
 	const user = await seedUser('ivy');
@@ -511,4 +517,50 @@ test('user sees stale data warning and can refresh form', async ({ page }) => {
 	await refreshButton.click();
 	await expect(page.getByText("You're now viewing the latest data for this asset")).toBeVisible();
 	await expect(page.getByLabel('Name')).toHaveValue('Vanguard S&P 500 Index Fund');
+});
+
+test('user can delete asset and cascade deletes balances', async ({ page }) => {
+	const user = await seedUser('victor');
+
+	const asset = await seedAsset({
+		name: 'Old Investment',
+		balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
+		owner: user.id,
+		balanceType: 'ETF',
+		type: AssetsTypeOptions.WHOLE
+	});
+
+	const balance = await seedAssetBalance({
+		asset: asset.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		bookValue: 10000,
+		marketValue: 12000
+	});
+
+	expect(await recordExists('assets', asset.id)).toBe(true);
+	expect(await recordExists('assetBalances', balance.id)).toBe(true);
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Assets');
+
+	const assetRow = page.getByRole('row', { name: 'Old Investment' });
+	await expect(assetRow).toBeVisible();
+
+	await assetRow.getByRole('link', { name: 'Old Investment' }).click();
+	await expect(page).toHaveURL(`/assets/${asset.id}`);
+
+	await page.getByRole('button', { name: 'Delete' }).first().click();
+	const dialog = page.getByRole('alertdialog');
+	await expect(dialog).toBeVisible();
+	await expect(dialog.getByText('Are you absolutely sure?')).toBeVisible();
+
+	await dialog.getByRole('button', { name: 'Continue' }).click();
+	await expect(page.getByText('Asset deleted successfully')).toBeVisible();
+	await expect(page).toHaveURL('/assets');
+	await expect(page.getByRole('row', { name: 'Old Investment' })).not.toBeVisible();
+
+	expect(await recordExists('assets', asset.id)).toBe(false);
+	expect(await recordExists('assetBalances', balance.id)).toBe(false);
 });

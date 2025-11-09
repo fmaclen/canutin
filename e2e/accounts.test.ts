@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
 import {
+	recordExists,
 	seedAccount,
 	seedAccountBalance,
 	seedTransaction,
@@ -314,4 +315,67 @@ test('user sees stale data warning and can refresh form', async ({ page }) => {
 	await refreshButton.click();
 	await expect(page.getByText("You're now viewing the latest data for this account")).toBeVisible();
 	await expect(page.getByLabel('Name')).toHaveValue('Retirement Account');
+});
+
+test('user can delete account and cascade deletes transactions and balances', async ({ page }) => {
+	const user = await seedUser('ursula');
+
+	const checkingAccount = await seedAccount({
+		name: 'Old Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+
+	const balance = await seedAccountBalance({
+		account: checkingAccount.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 1500
+	});
+
+	const transaction1 = await seedTransaction({
+		account: checkingAccount.id,
+		owner: user.id,
+		date: new Date().toISOString(),
+		description: 'Salary',
+		value: 3000
+	});
+
+	const transaction2 = await seedTransaction({
+		account: checkingAccount.id,
+		owner: user.id,
+		date: new Date().toISOString(),
+		description: 'Rent',
+		value: -1500
+	});
+
+	expect(await recordExists('accounts', checkingAccount.id)).toBe(true);
+	expect(await recordExists('accountBalances', balance.id)).toBe(true);
+	expect(await recordExists('transactions', transaction1.id)).toBe(true);
+	expect(await recordExists('transactions', transaction2.id)).toBe(true);
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Accounts');
+
+	const accountRow = page.getByRole('row', { name: 'Old Checking' });
+	await expect(accountRow).toBeVisible();
+
+	await accountRow.getByRole('link', { name: 'Old Checking' }).click();
+	await expect(page).toHaveURL(`/accounts/${checkingAccount.id}`);
+
+	await page.getByRole('button', { name: 'Delete' }).first().click();
+	const dialog = page.getByRole('alertdialog');
+	await expect(dialog).toBeVisible();
+	await expect(dialog.getByText('Are you absolutely sure?')).toBeVisible();
+
+	await dialog.getByRole('button', { name: 'Continue' }).click();
+	await expect(page.getByText('Account deleted successfully')).toBeVisible();
+	await expect(page).toHaveURL('/accounts');
+	await expect(page.getByRole('row', { name: 'Old Checking' })).not.toBeVisible();
+	expect(await recordExists('accounts', checkingAccount.id)).toBe(false);
+	expect(await recordExists('accountBalances', balance.id)).toBe(false);
+	expect(await recordExists('transactions', transaction1.id)).toBe(false);
+	expect(await recordExists('transactions', transaction2.id)).toBe(false);
 });

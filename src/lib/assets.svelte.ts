@@ -40,6 +40,10 @@ class AssetsContext {
 		return this.assets.find((a) => a.id === id);
 	}
 
+	async deleteAsset(id: string) {
+		await this._pb.authedClient.collection('assets').delete(id);
+	}
+
 	private async init() {
 		try {
 			const list = await this._pb.authedClient.collection('assets').getFullList<AssetsResponse>();

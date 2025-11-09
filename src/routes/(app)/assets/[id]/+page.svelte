@@ -2,6 +2,8 @@
 	import { error } from '@sveltejs/kit';
 	import { toast } from 'svelte-sonner';
 
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { getAssetsContext } from '$lib/assets.svelte';
 	import { getAuthContext } from '$lib/auth.svelte';
@@ -9,7 +11,9 @@
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
@@ -235,6 +239,20 @@
 			syncState.justSaved = false;
 		}
 	}
+
+	async function handleDelete() {
+		const currentAssetId = assetId;
+		if (!currentAssetId) return;
+
+		try {
+			await assetsContext.deleteAsset(currentAssetId);
+			toast.success(m.assets_delete_success());
+			goto(resolve('/assets'));
+		} catch (error) {
+			console.error('Failed to delete asset:', error);
+			toast.error(m.assets_delete_failed());
+		}
+	}
 </script>
 
 <header class="bg-background flex h-16 shrink-0 items-center gap-2 border-b">
@@ -275,6 +293,47 @@
 			<Skeleton class="h-96" />
 		{:else}
 			<DetailsForm {formData} {isWhole} {isShares} onSubmit={handleUpdateDetails} />
+		{/if}
+	</Section>
+
+	<Section>
+		<SectionTitle title={m.danger_zone_title()} />
+		{#if isLoading || !asset}
+			<Skeleton class="h-24" />
+		{:else}
+			<div
+				class="bg-muted border-border overflow-hidden rounded-md border md:grayscale md:hover:grayscale-0"
+			>
+				<div class="flex items-center justify-between p-4">
+					<div>
+						<p class="text-sm">
+							{m.assets_delete_description()}
+						</p>
+						<p class="text-destructive text-sm">
+							{m.assets_delete_subtext()}
+						</p>
+					</div>
+					<AlertDialog.Root>
+						<AlertDialog.Trigger>
+							<Button variant="destructive">{m.assets_delete_button()}</Button>
+						</AlertDialog.Trigger>
+						<AlertDialog.Content>
+							<AlertDialog.Header>
+								<AlertDialog.Title>{m.assets_delete_confirm_title()}</AlertDialog.Title>
+								<AlertDialog.Description>
+									{m.assets_delete_confirm_description()}
+								</AlertDialog.Description>
+							</AlertDialog.Header>
+							<AlertDialog.Footer>
+								<AlertDialog.Cancel>{m.assets_delete_confirm_cancel()}</AlertDialog.Cancel>
+								<AlertDialog.Action onclick={handleDelete}>
+									{m.assets_delete_confirm_continue()}
+								</AlertDialog.Action>
+							</AlertDialog.Footer>
+						</AlertDialog.Content>
+					</AlertDialog.Root>
+				</div>
+			</div>
 		{/if}
 	</Section>
 </Page>
