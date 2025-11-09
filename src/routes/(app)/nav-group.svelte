@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Component } from 'svelte';
 
+	import { page } from '$app/stores';
 	import type { ResolvedPathname } from '$app/types';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 
@@ -15,6 +16,10 @@
 			icon: Component;
 		}[];
 	} = $props();
+
+	function isActive(url: ResolvedPathname) {
+		return $page.url.pathname === url;
+	}
 </script>
 
 <Sidebar.Group
@@ -24,7 +29,7 @@
 	<Sidebar.Menu>
 		{#each links as item (item.name)}
 			<Sidebar.MenuItem>
-				<Sidebar.MenuButton>
+				<Sidebar.MenuButton isActive={isActive(item.url)}>
 					{#snippet child({ props })}
 						<!-- eslint-disable svelte/no-navigation-without-resolve -->
 						<a href={item.url} {...props}>

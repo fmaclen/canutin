@@ -4,6 +4,7 @@
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
+	import Link from '$lib/components/link.svelte';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
@@ -149,8 +150,7 @@
 	function balanceSentiment(row: AccountRow) {
 		if (row.closed || row.excluded) return 'neutral';
 		if (row.balance === 0) return 'neutral';
-		if (row.balanceGroup === 'DEBT') return 'negative';
-		return 'positive';
+		return row.balance > 0 ? 'positive' : 'negative';
 	}
 
 	const statusMeta = {
@@ -180,8 +180,8 @@
 	}
 </script>
 
-<header class="bg-background flex h-16 shrink-0 items-center gap-2 border-b">
-	<div class="flex items-center gap-2 px-4">
+<header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
+	<div class="flex items-center gap-2">
 		<Sidebar.Trigger class="-ml-1" />
 		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
 		<Breadcrumb.Root>
@@ -192,6 +192,9 @@
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 	</div>
+	<nav class="px-1">
+		<Link href="/accounts/add" class="text-sm">Add account</Link>
+	</nav>
 </header>
 
 <Page pageTitle="Accounts">
@@ -250,7 +253,12 @@
 										{#each rowsForOption as row (row.id)}
 											<Table.Row class={row.excluded || row.closed ? 'bg-muted/30' : ''}>
 												<Table.Cell>
-													<span class="text-foreground/90 text-sm font-medium">{row.name}</span>
+													<Link
+														href={`/accounts/${row.id}`}
+														class="text-foreground/90 text-sm font-medium"
+													>
+														{row.name}
+													</Link>
 												</Table.Cell>
 												<Table.Cell class="text-foreground/80 text-sm">
 													{#if row.institution}
@@ -334,7 +342,9 @@
 										{/each}
 									</Table.Body>
 									<Table.Footer>
-										<Table.Row class="bg-background sticky bottom-0 border-t-2">
+										<Table.Row
+											class="[&>td]:!bg-muted [&>td]:hover:!bg-muted sticky bottom-0 border-t-2"
+										>
 											<Table.Cell colspan={6} class="text-muted-foreground text-xs font-normal">
 												{m.accounts_aggregate_total_label()}
 											</Table.Cell>

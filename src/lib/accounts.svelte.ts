@@ -10,6 +10,7 @@ type AccountWithBalance = AccountsResponse & { balance: number };
 class AccountsContext {
 	accounts: AccountWithBalance[] = $state([]);
 	lastBalanceEvent: number = $state(0);
+	isLoading: boolean = $state(true);
 
 	private _pb: PocketBaseContext;
 	private balanceTypesContext: ReturnType<typeof setBalanceTypesContext>;
@@ -27,6 +28,10 @@ class AccountsContext {
 		return this.balanceTypesContext.getName(id);
 	}
 
+	getAccount(id: string): AccountWithBalance | undefined {
+		return this.accounts.find((a) => a.id === id);
+	}
+
 	private async init() {
 		try {
 			const list = await this._pb.authedClient
@@ -39,8 +44,10 @@ class AccountsContext {
 			}
 			this.lastBalanceEvent = Date.now();
 			this.realtimeSubscribe();
+			this.isLoading = false;
 		} catch (error) {
 			this._pb.handleConnectionError(error, 'accounts', 'init');
+			this.isLoading = false;
 		}
 	}
 

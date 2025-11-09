@@ -133,6 +133,14 @@ export async function updateAsset(
 	return await pb.collection('assets').update(id, updates);
 }
 
+export async function updateAccount(
+	id: string,
+	updates: Partial<AccountsRecord>
+): Promise<AccountsRecord> {
+	const pb = await getAdminPB();
+	return await pb.collection('accounts').update(id, updates);
+}
+
 export async function seedTransactionLabel(labelInput: {
 	name: TransactionLabelsRecord['name'];
 	owner: TransactionLabelsRecord['owner'];
