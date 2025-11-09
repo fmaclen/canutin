@@ -125,6 +125,14 @@ export async function seedAssetBalance(assetBalanceInput: {
 	return await pb.collection('assetBalances').create(assetBalanceInput);
 }
 
+export async function updateAsset(
+	id: string,
+	updates: Partial<AssetsRecord>
+): Promise<AssetsRecord> {
+	const pb = await getAdminPB();
+	return await pb.collection('assets').update(id, updates);
+}
+
 export async function seedTransactionLabel(labelInput: {
 	name: TransactionLabelsRecord['name'];
 	owner: TransactionLabelsRecord['owner'];

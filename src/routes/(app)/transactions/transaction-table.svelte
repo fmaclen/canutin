@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Currency from '$lib/components/currency.svelte';
+	import Empty from '$lib/components/empty.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import * as Pagination from '$lib/components/ui/pagination/index';
 	import * as Table from '$lib/components/ui/table/index';
@@ -28,11 +29,9 @@
 </script>
 
 {#if txContext.filteredRows.length === 0}
-	<div
-		class="text-muted-foreground bg-muted/40 flex min-h-40 items-center justify-center rounded-sm border border-dashed px-6 text-sm"
-	>
+	<Empty>
 		{m.transactions_table_empty()}
-	</div>
+	</Empty>
 {:else}
 	<div class="bg-background overflow-hidden rounded-sm shadow-md" aria-busy={txContext.isLoading}>
 		<Table.Root>

@@ -211,5 +211,5 @@
 		</Chart.Container>
 	</div>
 {:else}
-	<Skeleton class="h-128 w-full" />
+	<Skeleton class="h-128" />
 {/if}

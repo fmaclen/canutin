@@ -3,6 +3,7 @@
 
 	import { getAssetsContext } from '$lib/assets.svelte';
 	import Currency from '$lib/components/currency.svelte';
+	import Empty from '$lib/components/empty.svelte';
 	import Link from '$lib/components/link.svelte';
 	import Number from '$lib/components/number.svelte';
 	import Page from '$lib/components/page.svelte';
@@ -172,7 +173,7 @@
 	<Section>
 		{#if !isLoaded}
 			<div class="bg-background overflow-hidden rounded-sm shadow-md">
-				<Skeleton class="h-64 w-full" />
+				<Skeleton class="h-64" />
 			</div>
 		{:else}
 			<Tabs.Root bind:value={filter}>
@@ -189,11 +190,9 @@
 					<Tabs.Content value={option.key}>
 						{@const rowsForOption = rowsByFilter.get(option.key) ?? []}
 						{#if rowsForOption.length === 0}
-							<div
-								class="text-muted-foreground bg-muted/40 flex min-h-40 items-center justify-center rounded-sm border border-dashed"
-							>
+							<Empty>
 								{option.empty}
-							</div>
+							</Empty>
 						{:else}
 							<div class="bg-background overflow-hidden rounded-sm shadow-md">
 								<Table.Root>
@@ -232,7 +231,12 @@
 										{#each rowsForOption as row (row.id)}
 											<Table.Row class={row.excluded || row.sold ? 'bg-muted/30' : ''}>
 												<Table.Cell>
-													<span class="text-foreground/90 text-sm font-medium">{row.name}</span>
+													<Link
+														href={`/assets/${row.id}`}
+														class="text-foreground/90 text-sm font-medium"
+													>
+														{row.name}
+													</Link>
 												</Table.Cell>
 												<Table.Cell class="text-foreground/80 text-sm tracking-wide uppercase">
 													{#if row.symbol}

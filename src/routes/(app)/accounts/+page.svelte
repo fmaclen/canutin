@@ -3,6 +3,7 @@
 
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import Currency from '$lib/components/currency.svelte';
+	import Empty from '$lib/components/empty.svelte';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
@@ -197,7 +198,7 @@
 	<Section>
 		{#if !isLoaded}
 			<div class="bg-background overflow-hidden rounded-sm shadow-md">
-				<Skeleton class="h-64 w-full" />
+				<Skeleton class="h-64" />
 			</div>
 		{:else}
 			<Tabs.Root bind:value={filter}>
@@ -214,11 +215,9 @@
 					<Tabs.Content value={option.key}>
 						{@const rowsForOption = rowsByFilter.get(option.key) ?? []}
 						{#if rowsForOption.length === 0}
-							<div
-								class="text-muted-foreground bg-muted/40 flex min-h-40 items-center justify-center rounded-sm border border-dashed"
-							>
+							<Empty>
 								{option.empty}
-							</div>
+							</Empty>
 						{:else}
 							<div class="bg-background overflow-hidden rounded-sm shadow-md">
 								<Table.Root>

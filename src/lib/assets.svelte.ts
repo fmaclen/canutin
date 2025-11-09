@@ -5,16 +5,20 @@ import { setBalanceTypesContext } from './balance-types.svelte';
 import type { AssetBalancesResponse, AssetsResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
 
-type AssetWithBalance = AssetsResponse & {
+export type AssetWithBalance = AssetsResponse & {
 	marketValue: number;
 	bookValue: number;
 	gain: number;
 	gainPercent: number;
+	quantity?: number;
+	bookPrice?: number;
+	marketPrice?: number;
 };
 
 class AssetsContext {
 	assets: AssetWithBalance[] = $state([]);
 	lastBalanceEvent: number = $state(0);
+	isLoading: boolean = $state(true);
 
 	private _pb: PocketBaseContext;
 	private balanceTypesContext: ReturnType<typeof setBalanceTypesContext>;
@@ -32,6 +36,10 @@ class AssetsContext {
 		return this.balanceTypesContext.getName(id);
 	}
 
+	getAsset(id: string): AssetWithBalance | undefined {
+		return this.assets.find((a) => a.id === id);
+	}
+
 	private async init() {
 		try {
 			const list = await this._pb.authedClient.collection('assets').getFullList<AssetsResponse>();
@@ -40,7 +48,10 @@ class AssetsContext {
 				marketValue: 0,
 				bookValue: 0,
 				gain: 0,
-				gainPercent: 0
+				gainPercent: 0,
+				quantity: undefined,
+				bookPrice: undefined,
+				marketPrice: undefined
 			}));
 			for (const a of this.assets) {
 				const balanceData = await this.getLatestAssetBalance(a.id);
@@ -48,8 +59,10 @@ class AssetsContext {
 			}
 			this.lastBalanceEvent = Date.now();
 			this.realtimeSubscribe();
+			this.isLoading = false;
 		} catch (error) {
 			this._pb.handleConnectionError(error, 'assets', 'init');
+			this.isLoading = false;
 		}
 	}
 
@@ -69,7 +82,16 @@ class AssetsContext {
 			await this.balanceTypesContext.ensureLoaded(e.record.balanceType);
 			this.assets = [
 				...this.assets,
-				{ ...e.record, marketValue: 0, bookValue: 0, gain: 0, gainPercent: 0 }
+				{
+					...e.record,
+					marketValue: 0,
+					bookValue: 0,
+					gain: 0,
+					gainPercent: 0,
+					quantity: undefined,
+					bookPrice: undefined,
+					marketPrice: undefined
+				}
 			];
 		} else if (e.action === 'update') {
 			const existing = this.assets.find((a) => a.id === e.record.id);
@@ -77,7 +99,10 @@ class AssetsContext {
 				marketValue: existing?.marketValue ?? 0,
 				bookValue: existing?.bookValue ?? 0,
 				gain: existing?.gain ?? 0,
-				gainPercent: existing?.gainPercent ?? 0
+				gainPercent: existing?.gainPercent ?? 0,
+				quantity: existing?.quantity,
+				bookPrice: existing?.bookPrice,
+				marketPrice: existing?.marketPrice
 			};
 			await this.balanceTypesContext.ensureLoaded(e.record.balanceType);
 			this.assets = this.assets.map((x) =>
@@ -105,14 +130,22 @@ class AssetsContext {
 			.collection('assetBalances')
 			.getList<AssetBalancesResponse>(1, 1, {
 				filter: `asset='${assetId}'`,
-				sort: '-asOf,-created,-id',
-				fields: 'marketValue,bookValue'
+				sort: '-asOf,-created,-id'
 			});
-		const marketValue = res.items[0]?.marketValue ?? 0;
-		const bookValue = res.items[0]?.bookValue ?? 0;
+		const balance = res.items[0];
+		const marketValue = balance?.marketValue ?? 0;
+		const bookValue = balance?.bookValue ?? 0;
 		const gain = marketValue - bookValue;
 		const gainPercent = bookValue !== 0 ? (gain / bookValue) * 100 : 0;
-		return { marketValue, bookValue, gain, gainPercent };
+		return {
+			marketValue,
+			bookValue,
+			gain,
+			gainPercent,
+			quantity: balance?.quantity,
+			bookPrice: balance?.bookPrice,
+			marketPrice: balance?.marketPrice
+		};
 	}
 
 	dispose() {

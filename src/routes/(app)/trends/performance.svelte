@@ -534,5 +534,5 @@
 		</div>
 	</div>
 {:else}
-	<Skeleton class="h-64 w-full" />
+	<Skeleton class="h-64" />
 {/if}

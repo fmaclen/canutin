@@ -550,6 +550,6 @@ test('transactions display edge cases correctly (empty labels, no account name, 
 	if (!isMobile) {
 		await dashedAmount.hover();
 		// Tooltip should appear with exact exclusion message
-		await expect(page.getByText('Excluded transactions do not affect reports.')).toBeVisible();
+		await expect(page.getByText('Excluded transactions do not affect reports')).toBeVisible();
 	}
 });

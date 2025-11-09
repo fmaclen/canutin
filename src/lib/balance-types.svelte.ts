@@ -62,6 +62,21 @@ class BalanceTypesContext {
 		}
 	}
 
+	async getOrCreate(name: string, ownerId: string): Promise<string> {
+		const trimmed = name.trim();
+		if (!trimmed) throw new Error('Balance type name is required');
+
+		const existing = Object.values(this.byId).find((bt) => bt.name === trimmed);
+		if (existing) return existing.id;
+
+		const created = await this._pb.authedClient.collection('balanceTypes').create({
+			name: trimmed,
+			owner: ownerId
+		});
+		this.byId = { ...this.byId, [created.id]: created };
+		return created.id;
+	}
+
 	dispose() {
 		this._pb.authedClient.collection('balanceTypes').unsubscribe();
 	}

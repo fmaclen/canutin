@@ -46,9 +46,7 @@
 <Page pageTitle={m.sidebar_transactions()}>
 	<Section>
 		{#if txContext.isLoading && txContext.rawTransactions.length === 0}
-			<div class="bg-background overflow-hidden rounded-sm shadow-md">
-				<Skeleton class="h-64 w-full" />
-			</div>
+			<Skeleton class="h-64" />
 		{:else}
 			<div class="flex flex-col gap-4">
 				<TransactionFilters />

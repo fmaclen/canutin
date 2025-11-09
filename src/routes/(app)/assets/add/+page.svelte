@@ -5,6 +5,8 @@
 	import { resolve } from '$app/paths';
 	import { getAuthContext } from '$lib/auth.svelte';
 	import { getBalanceTypesContext } from '$lib/balance-types.svelte';
+	import Fieldset from '$lib/components/fieldset.svelte';
+	import FormFieldRow from '$lib/components/form-field-row.svelte';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
@@ -20,14 +22,11 @@
 	import { AssetsBalanceGroupOptions, AssetsTypeOptions } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 
-	import Fieldset from './fieldset.svelte';
-	import FormFieldRow from './form-field-row.svelte';
-
 	const pb = getPocketBaseContext();
 	const auth = getAuthContext();
 	const balanceTypesContext = getBalanceTypesContext();
 
-	const ownerId = $derived(() => auth.currentUser?.model?.id);
+	const ownerId = $derived(auth.currentUser?.record?.id);
 
 	let name = $state('');
 	let type = $state<AssetsTypeOptions | ''>('');
@@ -49,31 +48,12 @@
 	const isWhole = $derived(type === AssetsTypeOptions.WHOLE);
 	const isShares = $derived(type === AssetsTypeOptions.SHARES);
 
-	async function getOrCreateBalanceType(name: string): Promise<string> {
-		const trimmed = name.trim();
-		if (!trimmed) throw new Error('Balance type name is required');
-
-		// Check if it exists
-		const existing = Object.values(balanceTypesContext.byId).find((bt) => bt.name === trimmed);
-		if (existing) return existing.id;
-
-		// Create new balance type
-		const currentOwnerId = ownerId();
-		if (!currentOwnerId) throw new Error('User not authenticated');
-		const created = await pb.authedClient.collection('balanceTypes').create({
-			name: trimmed,
-			owner: currentOwnerId
-		});
-		return created.id;
-	}
-
 	async function handleSubmit() {
-		const currentOwnerId = ownerId();
+		const currentOwnerId = ownerId;
 		if (!currentOwnerId) return;
 
 		try {
-			// Get or create balance type
-			const balanceTypeId = await getOrCreateBalanceType(assetTypeName);
+			const balanceTypeId = await balanceTypesContext.getOrCreate(assetTypeName, currentOwnerId);
 
 			// Create asset
 			const assetData: Record<string, unknown> = {
@@ -132,16 +112,16 @@
 				</Breadcrumb.Item>
 				<Breadcrumb.Separator />
 				<Breadcrumb.Item>
-					<Breadcrumb.Page>Add asset</Breadcrumb.Page>
+					<Breadcrumb.Page>{m.assets_add_page_title()}</Breadcrumb.Page>
 				</Breadcrumb.Item>
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 	</div>
 </header>
 
-<Page pageTitle="Add asset">
+<Page pageTitle={m.assets_add_page_title()}>
 	<Section>
-		<SectionTitle title="Details" />
+		<SectionTitle title={m.assets_section_details()} />
 		<div class="bg-muted border-border overflow-hidden rounded-md border">
 			<form
 				onsubmit={(e) => {
@@ -152,13 +132,15 @@
 			>
 				<Fieldset isFirst={true}>
 					<FormFieldRow>
-						<Label for="name" class="justify-start pr-0 md:justify-end">Name</Label>
+						<Label for="name" class="justify-start pr-0 md:justify-end"
+							>{m.assets_label_name()}</Label
+						>
 						<Input id="name" bind:value={name} required />
 					</FormFieldRow>
 
 					<FormFieldRow>
 						<Label id="category-label" for="category" class="justify-start pr-0 md:justify-end"
-							>Category</Label
+							>{m.assets_label_category()}</Label
 						>
 						<Input
 							id="category"
@@ -171,7 +153,7 @@
 
 					<FormFieldRow>
 						<Label for="balance-group" class="justify-start pr-0 md:justify-end"
-							>Balance group</Label
+							>{m.assets_label_balance_group()}</Label
 						>
 						<Select.Root type="single" bind:value={balanceGroup}>
 							<Select.Trigger id="balance-group" class="bg-background w-full">
@@ -234,7 +216,9 @@
 
 				<Fieldset>
 					<FormFieldRow>
-						<Label id="type-label" for="type" class="justify-start pr-0 md:justify-end">Type</Label>
+						<Label id="type-label" for="type" class="justify-start pr-0 md:justify-end"
+							>{m.assets_label_type()}</Label
+						>
 						<Select.Root type="single" bind:value={type}>
 							<Select.Trigger
 								id="type"
@@ -263,77 +247,81 @@
 						</Select.Root>
 					</FormFieldRow>
 
-					{#if isWhole || isShares}
-						{#if isShares}
-							<FormFieldRow>
-								<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-									<Label for="symbol" class="justify-start pr-0 md:justify-end">Symbol</Label>
-									<span class="text-muted-foreground text-sm">Optional</span>
-								</div>
-								<Input id="symbol" bind:value={symbol} />
-							</FormFieldRow>
-						{/if}
-
-						{#if isWhole}
-							<FormFieldRow>
-								<Label for="market-value" class="justify-start pr-0 md:justify-end"
-									>Market value</Label
+					{#if isShares}
+						<FormFieldRow>
+							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+								<Label for="symbol" class="justify-start pr-0 md:justify-end"
+									>{m.assets_label_symbol()}</Label
 								>
-								<Input id="market-value" type="number" step="0.01" bind:value={marketValue} />
-							</FormFieldRow>
+								<span class="text-muted-foreground text-sm">{m.assets_text_optional()}</span>
+							</div>
+							<Input id="symbol" bind:value={symbol} />
+						</FormFieldRow>
+					{/if}
 
-							<FormFieldRow>
-								<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-									<Label for="book-value" class="justify-start pr-0 md:justify-end"
-										>Book value</Label
-									>
-									<span class="text-muted-foreground text-sm">Optional</span>
-								</div>
-								<Input id="book-value" type="number" step="0.01" bind:value={bookValue} />
-							</FormFieldRow>
-						{:else if isShares}
-							<FormFieldRow>
-								<Label for="quantity" class="justify-start pr-0 md:justify-end">Quantity</Label>
-								<Input id="quantity" type="number" step="0.01" bind:value={quantity} />
-							</FormFieldRow>
+					{#if isWhole}
+						<FormFieldRow>
+							<Label for="market-value" class="justify-start pr-0 md:justify-end"
+								>{m.assets_label_market_value()}</Label
+							>
+							<Input id="market-value" type="number" step="0.01" bind:value={marketValue} />
+						</FormFieldRow>
 
-							<FormFieldRow>
-								<Label for="market-price" class="justify-start pr-0 md:justify-end"
-									>Market price</Label
+						<FormFieldRow>
+							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+								<Label for="book-value" class="justify-start pr-0 md:justify-end"
+									>{m.assets_label_book_value()}</Label
 								>
-								<Input id="market-price" type="number" step="0.01" bind:value={marketPrice} />
-							</FormFieldRow>
+								<span class="text-muted-foreground text-sm">{m.assets_text_optional()}</span>
+							</div>
+							<Input id="book-value" type="number" step="0.01" bind:value={bookValue} />
+						</FormFieldRow>
+					{:else if isShares}
+						<FormFieldRow>
+							<Label for="quantity" class="justify-start pr-0 md:justify-end"
+								>{m.assets_label_quantity()}</Label
+							>
+							<Input id="quantity" type="number" step="0.01" bind:value={quantity} />
+						</FormFieldRow>
 
-							<FormFieldRow>
-								<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-									<Label for="book-price" class="justify-start pr-0 md:justify-end"
-										>Book price</Label
-									>
-									<span class="text-muted-foreground text-sm">Optional</span>
-								</div>
-								<Input id="book-price" type="number" step="0.01" bind:value={bookPrice} />
-							</FormFieldRow>
-						{/if}
+						<FormFieldRow>
+							<Label for="market-price" class="justify-start pr-0 md:justify-end"
+								>{m.assets_label_market_price()}</Label
+							>
+							<Input id="market-price" type="number" step="0.01" bind:value={marketPrice} />
+						</FormFieldRow>
+
+						<FormFieldRow>
+							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+								<Label for="book-price" class="justify-start pr-0 md:justify-end"
+									>{m.assets_label_book_price()}</Label
+								>
+								<span class="text-muted-foreground text-sm">{m.assets_text_optional()}</span>
+							</div>
+							<Input id="book-price" type="number" step="0.01" bind:value={bookPrice} />
+						</FormFieldRow>
 					{/if}
 				</Fieldset>
 
 				<Fieldset>
 					<FormFieldRow itemsAlignment="items-start">
-						<Label class="justify-start pr-0 md:justify-end md:pt-2.5">Marked as</Label>
+						<Label class="justify-start pr-0 md:justify-end md:pt-2.5"
+							>{m.assets_label_marked_as()}</Label
+						>
 						<div class="space-y-2">
 							<Label
 								for="excluded"
 								class="flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 py-1 font-normal"
 							>
 								<Checkbox id="excluded" bind:checked={excluded} class="bg-background" />
-								<span>Exclude from net worth</span>
+								<span>{m.assets_label_exclude_from_net_worth()}</span>
 							</Label>
 							<Label
 								for="sold"
 								class="flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 py-1 font-normal"
 							>
 								<Checkbox id="sold" bind:checked={sold} class="bg-background" />
-								<span>Sold</span>
+								<span>{m.assets_label_sold()}</span>
 							</Label>
 						</div>
 					</FormFieldRow>
@@ -341,7 +329,7 @@
 
 				<footer class="border-border bg-border border-t p-2">
 					<div class="flex justify-end">
-						<Button type="submit">Add</Button>
+						<Button type="submit">{m.assets_button_add()}</Button>
 					</div>
 				</footer>
 			</form>
