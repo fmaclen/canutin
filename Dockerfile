@@ -1,32 +1,40 @@
-FROM node:20-slim
+# Build stage
+FROM oven/bun:1-alpine AS builder
 
-# Install OpenSSL for Prisma
-RUN apt-get update -y && apt-get install -y openssl
+WORKDIR /app
 
-WORKDIR /canutin
+COPY package.json bun.lock* ./
+RUN bun install
 
-ENV HOST "0.0.0.0"
-ENV PORT "42069"
-ENV SHOULD_CHECK_VAULT "true"
-ENV DATABASE_URL "file:../vaults/Canutin.vault"
+COPY . .
+RUN bun run build
 
-COPY /sveltekit/package.json .
-COPY /sveltekit/package-lock.json .
-COPY /sveltekit/build .
-COPY /sveltekit/prisma ./prisma
-COPY /scripts/docker-entrypoint.sh .
+# Production stage
+FROM oven/bun:1-alpine
 
-# Installing production dependencies
-RUN npm ci --omit=dev
+ARG POCKETBASE_VERSION
+ENV POCKETBASE_VERSION=${POCKETBASE_VERSION}
 
-# Generating Prisma's artifacts
-RUN npx prisma generate
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# Creating vaults directory
-RUN mkdir vaults
+WORKDIR /app
 
-# Setting the entrypoint script as executable
-RUN chmod +x docker-entrypoint.sh
+# Download PocketBase using build arg version
+RUN apk add --no-cache wget unzip && \
+    wget https://github.com/pocketbase/pocketbase/releases/download/v${POCKETBASE_VERSION}/pocketbase_${POCKETBASE_VERSION}_linux_amd64.zip && \
+    unzip pocketbase_${POCKETBASE_VERSION}_linux_amd64.zip -d /usr/local/bin && \
+    rm pocketbase_${POCKETBASE_VERSION}_linux_amd64.zip && \
+    apk del wget unzip
 
-# Start the server
-ENTRYPOINT ["/bin/sh", "docker-entrypoint.sh"]
+COPY --from=builder --chown=appuser:appgroup /app/build ./build
+COPY --from=builder --chown=appuser:appgroup /app/pocketbase ./pocketbase
+COPY --from=builder --chown=appuser:appgroup /app/scripts ./scripts
+
+USER appuser
+
+ENV NODE_ENV=production
+ENV PORT=3000
+
+EXPOSE 3000
+
+CMD ["bun", "run", "build/index.js"]
