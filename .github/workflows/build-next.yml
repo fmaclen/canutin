@@ -1,7 +1,6 @@
 name: Build & publish (next)
 
 on:
-  workflow_dispatch:
   push:
     tags:
       - 'v*-next.*'
@@ -13,8 +12,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: next
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
