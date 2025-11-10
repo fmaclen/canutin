@@ -1,0 +1,38 @@
+name: Build & publish (next)
+
+on:
+  workflow_run:
+    workflows: ['Version & release (next)']
+    types:
+      - completed
+
+jobs:
+  docker:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    name: Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: next
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Extract version from package.json
+        id: package_version
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Build & publish
+        uses: mr-smithers-excellent/docker-build-push@v6
+        with:
+          image: canutin
+          registry: ghcr.io
+          multiPlatform: true
+          platform: linux/amd64,linux/arm64
+          tags: next, ${{ steps.package_version.outputs.version }}
+          username: ${{ secrets.GH_REGISTRY_USERNAME }}
+          password: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
