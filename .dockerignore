@@ -1,0 +1,10 @@
+node_modules
+.svelte-kit
+build
+.DS_Store
+pocketbase/pb_data
+temp
+*.log
+.env
+.env.*
+!.env.example

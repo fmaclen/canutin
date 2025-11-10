@@ -1,0 +1,17 @@
+services:
+  canutin:
+    build: .
+    container_name: canutin
+    ports:
+      - "42069:42069"
+      - "42070:42070"
+    volumes:
+      - canutin-data:/app/pocketbase/pb_data
+    restart: unless-stopped
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "42069"
+      PUBLIC_PB_URL: "http://localhost:42070"
+
+volumes:
+  canutin-data:

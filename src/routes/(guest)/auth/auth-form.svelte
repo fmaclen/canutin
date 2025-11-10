@@ -1,0 +1,100 @@
+<script lang="ts">
+	import { toast } from 'svelte-sonner';
+
+	import { dev } from '$app/environment';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { getAuthContext } from '$lib/auth.svelte';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import * as Card from '$lib/components/ui/card/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
+	import { Label } from '$lib/components/ui/label/index.js';
+	import { m } from '$lib/paraglide/messages.js';
+
+	import DevAuthShortcuts from './dev-auth-shortcuts.svelte';
+
+	let { mode = 'login' }: { mode?: 'login' | 'signup' } = $props();
+
+	const id = $props.id();
+
+	const auth = getAuthContext();
+
+	let email = $state(dev ? 'test@example.com' : '');
+	let password = $state(dev ? '123qweasdzxc' : '');
+	let passwordConfirm = $state(dev ? '123qweasdzxc' : '');
+
+	const title = $derived(mode === 'signup' ? m.auth_signup_title() : m.auth_login_title());
+	const description = $derived(
+		mode === 'signup' ? m.auth_signup_description() : m.auth_login_description()
+	);
+	const primaryText = $derived(
+		mode === 'signup' ? m.auth_primary_signup() : m.auth_primary_login()
+	);
+	const altCtaText = $derived(
+		mode === 'signup' ? m.auth_alt_have_account() : m.auth_alt_no_account()
+	);
+	const altCtaHref = $derived(mode === 'signup' ? '/auth' : '/auth/sign-up');
+	const altCtaLinkText = $derived(mode === 'signup' ? m.auth_link_login() : m.auth_link_signup());
+
+	async function handleSubmit(event: Event) {
+		event.preventDefault();
+
+		if (auth.isLoading) return;
+		if (mode === 'signup') {
+			const result = await auth.signup(email, password, passwordConfirm);
+			if (result.success) {
+				toast.success(m.auth_signup_success());
+				goto(resolve('/auth'));
+			}
+		} else {
+			await auth.login(email, password);
+		}
+	}
+</script>
+
+<Card.Root class="mx-auto w-full max-w-sm">
+	<Card.Header>
+		<Card.Title class="text-2xl">{title}</Card.Title>
+		<Card.Description>{description}</Card.Description>
+	</Card.Header>
+	<Card.Content>
+		<form class="grid gap-4" method="post" onsubmit={handleSubmit}>
+			<div class="grid gap-2">
+				<Label for="email-{id}">{m.auth_email_label()}</Label>
+				<Input
+					id="email-{id}"
+					type="email"
+					placeholder={m.auth_email_placeholder()}
+					bind:value={email}
+					required
+				/>
+			</div>
+
+			<div class="grid gap-2">
+				<Label for="password-{id}">{m.auth_password_label()}</Label>
+				<Input id="password-{id}" type="password" bind:value={password} required />
+			</div>
+
+			{#if mode === 'signup'}
+				<div class="grid gap-2">
+					<Label for="password2-{id}">{m.auth_password_confirm_label()}</Label>
+					<Input id="password2-{id}" type="password" bind:value={passwordConfirm} required />
+				</div>
+			{/if}
+
+			{#if auth.error}
+				<p class="text-sm text-red-600">{auth.error}</p>
+			{/if}
+
+			<Button type="submit" class="w-full" disabled={auth.isLoading}>{primaryText}</Button>
+
+			{#if dev}
+				<DevAuthShortcuts />
+			{/if}
+		</form>
+		<div class="mt-4 text-center text-sm">
+			{altCtaText}
+			<a href={resolve(altCtaHref)} class="underline"> {altCtaLinkText} </a>
+		</div>
+	</Card.Content>
+</Card.Root>
