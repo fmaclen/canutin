@@ -12,7 +12,7 @@ FROM oven/bun:1-slim
 
 WORKDIR /app
 
-COPY --from=builder /app/build ./build
+COPY --from=builder /app/.svelte-kit/output ./build
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/pocketbase ./pocketbase
 
@@ -24,4 +24,4 @@ ENV ORIGIN=http://localhost:42069
 EXPOSE 42069
 EXPOSE 42070
 
-CMD ["bun", "run", "build/index.js"]
+CMD ["bun", "run", "build/server/index.js"]
