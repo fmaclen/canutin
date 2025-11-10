@@ -1,35 +1,12 @@
 {
-  "name": "canutin",
-  "version": "0.0.0-development",
-  "description": "Personal finance platform",
-  "main": "main.js",
-  "license": "Apache License 2.0",
-  "scripts": {
-    "start": "node scripts/sveltekit-start.js",
-    "dev": "electron-esbuild dev",
-    "build": "electron-esbuild build",
-    "test": "jest --watchAll",
-    "package:release": "node scripts/package-release.js",
-    "package:electron": "node scripts/package-electron.js && electron-builder"
-  },
-  "devDependencies": {
-    "@types/jest": "29.5.12",
-    "@types/node": "^20.12.10",
-    "electron": "^30.0.2",
-    "electron-builder": "^25.0.3",
-    "electron-esbuild": "^8.0.0",
-    "electron-store": "^8.1.0",
-    "esbuild": "^0.18.0",
-    "jest": "^29.5.0",
-    "rimraf": "^3.0.2",
-    "ts-jest": "^29.1.2",
-    "ts-node": "^10.9.1",
-    "typescript": "^4.7.4"
-  },
-  "author": {
-    "name": "Fernando Maclen",
-    "email": "hello@fernando.is",
-    "url": "https://fernando.is"
-  },
-  "private": true
+	"name": "canutin-next",
+	"version": "2.0.0",
+	"devDependencies": {
+		"@semantic-release/commit-analyzer": "^13.0.1",
+		"@semantic-release/git": "^10.0.1",
+		"@semantic-release/github": "^12.0.2",
+		"@semantic-release/npm": "^13.1.1",
+		"@semantic-release/release-notes-generator": "^14.1.0",
+		"semantic-release": "^25.0.2"
+	}
 }
