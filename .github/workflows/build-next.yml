@@ -1,13 +1,12 @@
 name: Build & publish (next)
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*-next.*'
 
 jobs:
   docker:
-    # Only run for next prereleases
-    if: contains(github.event.release.tag_name, '-next.')
     name: Docker image
     runs-on: ubuntu-latest
     steps:
