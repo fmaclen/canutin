@@ -10,24 +10,29 @@ Pull and run the latest pre-release version:
 
 ```bash
 docker pull ghcr.io/fmaclen/canutin:next-latest
-docker run -d -p 3000:3000 -v canutin-data:/app/pocketbase/pb_data ghcr.io/fmaclen/canutin:next-latest
+docker run -d \
+  -p 42069:42069 \
+  -p 42070:42070 \
+  -v canutin-data:/app/pocketbase/pb_data \
+  ghcr.io/fmaclen/canutin:next-latest
 ```
 
-Access the app at `http://localhost:3000`
+Access the app at `http://localhost:42069`
+
+The PocketBase admin UI is available at `http://localhost:42070/_/`
 
 ### Using Docker Compose
 
 Create a `docker-compose.yml`:
 
 ```yaml
-version: '3.8'
-
 services:
   canutin:
     image: ghcr.io/fmaclen/canutin:next-latest
     container_name: canutin-next
     ports:
-      - "3000:3000"
+      - "42069:42069"
+      - "42070:42070"
     volumes:
       - canutin-data:/app/pocketbase/pb_data
     restart: unless-stopped
@@ -39,15 +44,7 @@ volumes:
 Run with:
 
 ```bash
-docker-compose up -d
-```
-
-### Version Pinning
-
-Use specific versions for stability:
-
-```bash
-docker pull ghcr.io/fmaclen/canutin:v2.0.0-next.1
+docker compose up -d
 ```
 
 ## Development
