@@ -7,8 +7,8 @@ import https from 'node:https';
 import os from 'node:os';
 import path from 'node:path';
 
-const POCKETBASE_VERSION = '0.30.0';
-const POCKETBASE_TAG = `v${POCKETBASE_VERSION}`; // GitHub release tag
+export const POCKETBASE_VERSION = '0.30.0';
+export const POCKETBASE_TAG = `v${POCKETBASE_VERSION}`; // GitHub release tag
 
 const projectRoot = process.cwd();
 const pbDir = path.join(projectRoot, 'pocketbase');

@@ -1,0 +1,43 @@
+name: Build & publish (next)
+
+on:
+  workflow_run:
+    workflows: ['Version & release (next)']
+    types:
+      - completed
+
+jobs:
+  docker:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    name: Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: next
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Extract version from package.json
+        id: package_version
+        run: echo "version=$(bun run -e 'console.log(require("./package.json").version)')" >> $GITHUB_OUTPUT
+
+      - name: Extract PocketBase version
+        id: pb_version
+        run: echo "version=$(bun run -e 'import("./scripts/pb-server.ts").then(m => console.log(m.POCKETBASE_VERSION))')" >> $GITHUB_OUTPUT
+
+      - name: Build & publish
+        uses: mr-smithers-excellent/docker-build-push@v6
+        with:
+          image: canutin
+          registry: ghcr.io
+          multiPlatform: true
+          platform: linux/amd64,linux/arm64
+          tags: next-latest, v${{ steps.package_version.outputs.version }}
+          buildArgs: POCKETBASE_VERSION=${{ steps.pb_version.outputs.version }}
+          username: ${{ secrets.GH_REGISTRY_USERNAME }}
+          password: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
