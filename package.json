@@ -1,5 +1,5 @@
 {
-	"name": "canutinx",
+	"name": "canutin-next",
 	"version": "0.0.1",
 	"devDependencies": {
 		"@date-fns/utc": "^2.1.1",

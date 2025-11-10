@@ -1,13 +1,65 @@
-# CanutinX
+# Canutin (Next)
+
+A personal finance tracker built with SvelteKit and PocketBase.
+
+## Self-Hosting with Docker
+
+### Quick Start
+
+Pull and run the latest pre-release version:
+
+```bash
+docker pull ghcr.io/fmaclen/canutin:next-latest
+docker run -d -p 3000:3000 -v canutin-data:/app/pocketbase/pb_data ghcr.io/fmaclen/canutin:next-latest
+```
+
+Access the app at `http://localhost:3000`
+
+### Using Docker Compose
+
+Create a `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+
+services:
+  canutin:
+    image: ghcr.io/fmaclen/canutin:next-latest
+    container_name: canutin-next
+    ports:
+      - "3000:3000"
+    volumes:
+      - canutin-data:/app/pocketbase/pb_data
+    restart: unless-stopped
+
+volumes:
+  canutin-data:
+```
+
+Run with:
+
+```bash
+docker-compose up -d
+```
+
+### Version Pinning
+
+Use specific versions for stability:
+
+```bash
+docker pull ghcr.io/fmaclen/canutin:v2.0.0-next.1
+```
+
+## Development
 
 All you need to start is:
 
 ```bash
-bun run install
+bun install
 bun run test
 ```
 
-## Commands
+### Commands
 
 | Command                                     | Description                                    |
 | ------------------------------------------- | ---------------------------------------------- |
