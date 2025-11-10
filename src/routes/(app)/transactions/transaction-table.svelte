@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
+	import Link from '$lib/components/link.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import * as Pagination from '$lib/components/ui/pagination/index';
 	import * as Table from '$lib/components/ui/table/index';
@@ -64,9 +65,11 @@
 						</Table.Cell>
 						<Table.Cell>
 							{#if row.description}
-								<span class="text-foreground/90 text-sm font-medium">{row.description}</span>
+								<Link href="/transactions/{row.id}" class="text-foreground/90 text-sm font-medium">
+									{row.description}
+								</Link>
 							{:else}
-								<span class="text-muted-foreground text-sm">~</span>
+								<Link href="/transactions/{row.id}" class="text-muted-foreground text-sm">~</Link>
 							{/if}
 						</Table.Cell>
 						<Table.Cell>

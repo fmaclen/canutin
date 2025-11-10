@@ -553,3 +553,278 @@ test('transactions display edge cases correctly (empty labels, no account name, 
 		await expect(page.getByText('Excluded transactions do not affect reports')).toBeVisible();
 	}
 });
+
+test('user can add a new transaction', async ({ page }) => {
+	const user = await seedUser('bella');
+
+	const checkingAccount = await seedAccount({
+		name: 'Meridian Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: checkingAccount.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 5000
+	});
+
+	const creditCardAccount = await seedAccount({
+		name: 'Apex Credit Card',
+		balanceGroup: AccountsBalanceGroupOptions.DEBT,
+		owner: user.id,
+		balanceType: 'Credit Card'
+	});
+	await seedAccountBalance({
+		account: creditCardAccount.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: -2500
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	await expect(page.getByText('Moonbeam Cafe')).not.toBeVisible();
+	await expect(page.getByText('Freelance Design Project')).not.toBeVisible();
+
+	await page.getByRole('link', { name: 'Add transaction' }).click();
+	await expect(page).toHaveURL('/transactions/add');
+
+	await page.getByLabel('Description').fill('Moonbeam Cafe');
+	await page.getByLabel('Amount').fill('-45.50');
+	await page.getByLabel('Date').fill('2025-11-01');
+	await page.getByLabel('Account').click();
+
+	await expect(page.getByText('Cash')).toBeVisible();
+	await expect(page.getByText('Debt')).toBeVisible();
+	await expect(page.getByRole('option', { name: 'Meridian Checking' })).toBeVisible();
+	await expect(page.getByRole('option', { name: 'Apex Credit Card' })).toBeVisible();
+
+	await page.getByRole('option', { name: 'Meridian Checking' }).click();
+	await expect(page.getByText('Cash')).not.toBeVisible();
+	await expect(page.getByText('Debt')).not.toBeVisible();
+	await expect(page.getByRole('option', { name: 'Meridian Checking' })).not.toBeVisible();
+	await expect(page.getByRole('option', { name: 'Apex Credit Card' })).not.toBeVisible();
+
+	await page.getByLabel('Labels').fill('Food & Dining, Personal');
+	await page.getByRole('button', { name: 'Add' }).click();
+	await expect(page.getByText('Transaction added').first()).toBeVisible();
+	await expect(page).toHaveURL('/transactions');
+	await expect(page.getByText('Moonbeam Cafe')).toBeVisible();
+	await expect(page.getByText('-$45.50')).toBeVisible();
+	await expect(page.getByText('Meridian Checking').first()).toBeVisible();
+	await expect(page.getByText('Food & Dining').first()).toBeVisible();
+	await expect(page.getByText('Personal').first()).toBeVisible();
+
+	await page.getByRole('link', { name: 'Add transaction' }).click();
+	await expect(page).toHaveURL('/transactions/add');
+
+	await page.getByLabel('Description').fill('Credit Card Payment');
+	await page.getByLabel('Amount').fill('-500');
+	await page.getByLabel('Date').fill('2025-11-05');
+	await page.getByLabel('Account').click();
+	await expect(page.getByText('Cash')).toBeVisible();
+	await expect(page.getByText('Debt')).toBeVisible();
+	await expect(page.getByRole('option', { name: 'Meridian Checking' })).toBeVisible();
+	await expect(page.getByRole('option', { name: 'Apex Credit Card' })).toBeVisible();
+
+	await page.getByRole('option', { name: 'Apex Credit Card' }).click();
+	await expect(page.getByText('Cash')).not.toBeVisible();
+	await expect(page.getByText('Debt')).not.toBeVisible();
+	await expect(page.getByRole('option', { name: 'Meridian Checking' })).not.toBeVisible();
+	await expect(page.getByRole('option', { name: 'Apex Credit Card' })).not.toBeVisible();
+
+	await page.getByRole('button', { name: 'Add' }).click();
+	await expect(page.getByText('Transaction added').first()).toBeVisible();
+	await expect(page).toHaveURL('/transactions');
+	await expect(page.getByText('Credit Card Payment')).toBeVisible();
+	await expect(page.getByText('-$500.00')).toBeVisible();
+	await expect(page.getByText('Apex Credit Card')).toBeVisible();
+});
+
+test('user can edit transaction details', async ({ page }) => {
+	const user = await seedUser('clara');
+
+	const checkingAccount = await seedAccount({
+		name: 'Northwind Business',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: checkingAccount.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 3000
+	});
+
+	const savingsAccount = await seedAccount({
+		name: 'Eastgate Savings',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Savings'
+	});
+	await seedAccountBalance({
+		account: savingsAccount.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 8000
+	});
+
+	const officeLabel = await seedTransactionLabel({
+		name: 'Office Supplies',
+		owner: user.id
+	});
+
+	const transaction = await seedTransaction({
+		account: checkingAccount.id,
+		owner: user.id,
+		date: new UTCDate(2025, 10, 15, 12, 0, 0, 0).toISOString(),
+		description: 'Paperclip Office Supply Co',
+		value: -150,
+		labels: [officeLabel.id]
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	await expect(page.getByText('Paperclip Office Supply Co')).toBeVisible();
+	await expect(page.getByText('-$150.00')).toBeVisible();
+	await expect(page.getByText('Northwind Business').first()).toBeVisible();
+	await expect(page.getByText('Office Supplies').first()).toBeVisible();
+
+	await page.getByRole('link', { name: 'Paperclip Office Supply Co' }).click();
+	await expect(page).toHaveURL(`/transactions/${transaction.id}`);
+	await expect(page.getByLabel('Description')).toHaveValue('Paperclip Office Supply Co');
+	await expect(page.getByLabel('Amount')).toHaveValue('-150');
+	await expect(page.getByLabel('Date')).toHaveValue('2025-11-15');
+	await expect(page.getByLabel('Account')).toHaveText('Northwind Business');
+	await expect(page.getByLabel('Labels')).toHaveValue('Office Supplies');
+
+	await page.getByLabel('Description').fill('Skyward Airlines Conference Trip');
+	await page.getByLabel('Amount').fill('-450');
+	await page.getByLabel('Date').fill('2025-11-20');
+	await page.getByLabel('Account').click();
+	await page.getByRole('option', { name: 'Eastgate Savings' }).click();
+	await page.getByLabel('Labels').fill('Business Travel, Conference');
+	await page.getByRole('button', { name: 'Save' }).click();
+	await expect(page.getByText('Transaction updated')).toBeVisible();
+
+	await page.getByLabel('breadcrumb').getByRole('link', { name: 'Transactions' }).click();
+	await expect(page).toHaveURL('/transactions');
+	await expect(page.getByText('Paperclip Office Supply Co')).not.toBeVisible();
+
+	await expect(page.getByText('Skyward Airlines Conference Trip')).toBeVisible();
+	await expect(page.getByText('-$450.00')).toBeVisible();
+	await expect(page.getByText('Eastgate Savings').first()).toBeVisible();
+	await expect(page.getByText('Business Travel').first()).toBeVisible();
+	await expect(page.getByText('Conference').first()).toBeVisible();
+
+	await page.getByRole('link', { name: 'Skyward Airlines Conference Trip' }).click();
+	await expect(page).toHaveURL(`/transactions/${transaction.id}`);
+	await expect(page.getByLabel('Description')).toHaveValue('Skyward Airlines Conference Trip');
+	await expect(page.getByLabel('Amount')).toHaveValue('-450');
+	await expect(page.getByLabel('Date')).toHaveValue('2025-11-20');
+	await expect(page.getByLabel('Account')).toHaveText('Eastgate Savings');
+	await expect(page.getByLabel('Labels')).toHaveValue('Business Travel, Conference');
+
+	await page.getByLabel('Excluded from totals').check();
+	await page.getByRole('button', { name: 'Save' }).click();
+	await expect(page.getByText('Transaction updated').first()).toBeVisible();
+	await expect(page.getByLabel('Excluded from totals')).toBeChecked();
+
+	await page.getByLabel('Excluded from totals').uncheck();
+	await page.getByRole('button', { name: 'Save' }).click();
+	await expect(page.getByText('Transaction updated').first()).toBeVisible();
+	await expect(page.getByLabel('Excluded from totals')).not.toBeChecked();
+});
+
+test('user can directly navigate to transaction edit page', async ({ page }) => {
+	const user = await seedUser('diana');
+
+	const account = await seedAccount({
+		name: 'Riverside Community',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 2000
+	});
+
+	const healthLabel = await seedTransactionLabel({
+		name: 'Healthcare',
+		owner: user.id
+	});
+
+	const transaction = await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: new UTCDate(2025, 10, 10, 12, 0, 0, 0).toISOString(),
+		description: 'Greenleaf Pharmacy',
+		value: -85,
+		labels: [healthLabel.id]
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+
+	await page.goto(`/transactions/${transaction.id}`);
+	await expect(page).toHaveURL(`/transactions/${transaction.id}`);
+	await expect(page.getByLabel('Description')).toHaveValue('Greenleaf Pharmacy');
+	await expect(page.getByLabel('Amount')).toHaveValue('-85');
+	await expect(page.getByLabel('Date')).toHaveValue('2025-11-10');
+	await expect(page.getByLabel('Account')).toHaveText('Riverside Community');
+});
+
+test('user can delete transaction', async ({ page }) => {
+	const user = await seedUser('edward');
+
+	const checkingAccount = await seedAccount({
+		name: 'Lakeside Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+
+	await seedAccountBalance({
+		account: checkingAccount.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 5000
+	});
+
+	const transaction = await seedTransaction({
+		account: checkingAccount.id,
+		owner: user.id,
+		date: new UTCDate(2025, 10, 12, 12, 0, 0, 0).toISOString(),
+		description: 'StreamFlix Annual Subscription',
+		value: -200
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	await expect(page.getByText('StreamFlix Annual Subscription')).toBeVisible();
+
+	await page.getByRole('link', { name: 'StreamFlix Annual Subscription' }).click();
+	await expect(page).toHaveURL(`/transactions/${transaction.id}`);
+
+	await page.getByRole('button', { name: 'Delete' }).first().click();
+	const dialog = page.getByRole('alertdialog');
+	await expect(dialog).toBeVisible();
+	await expect(dialog.getByText('Are you absolutely sure?')).toBeVisible();
+
+	await dialog.getByRole('button', { name: 'Continue' }).click();
+	await expect(page.getByText('Transaction deleted')).toBeVisible();
+	await expect(page).toHaveURL('/transactions');
+	await expect(page.getByText('StreamFlix Annual Subscription')).not.toBeVisible();
+});

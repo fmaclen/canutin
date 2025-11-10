@@ -192,7 +192,7 @@
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 	</div>
-	<nav class="px-1">
+	<nav class="px-2">
 		<Link href="/accounts/add" class="text-sm">Add account</Link>
 	</nav>
 </header>

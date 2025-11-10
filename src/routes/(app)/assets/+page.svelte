@@ -164,7 +164,7 @@
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 	</div>
-	<nav class="px-1">
+	<nav class="px-2">
 		<Link href="/assets/add" class="text-sm">Add asset</Link>
 	</nav>
 </header>

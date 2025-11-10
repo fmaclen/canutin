@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Link from '$lib/components/link.svelte';
 	import Page from '$lib/components/page.svelte';
 	import Section from '$lib/components/section.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
@@ -29,8 +30,8 @@
 	});
 </script>
 
-<header class="bg-background flex h-16 shrink-0 items-center gap-2 border-b">
-	<div class="flex items-center gap-2 px-4">
+<header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
+	<div class="flex items-center gap-2">
 		<Sidebar.Trigger class="-ml-1" />
 		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
 		<Breadcrumb.Root>
@@ -41,6 +42,9 @@
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 	</div>
+	<nav class="px-2">
+		<Link href="/transactions/add" class="text-sm">{m.transactions_add_link()}</Link>
+	</nav>
 </header>
 
 <Page pageTitle={m.sidebar_transactions()}>
