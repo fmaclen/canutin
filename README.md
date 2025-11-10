@@ -4,6 +4,8 @@ This is the next prerelease branch for Canutin v2.
 
 ## Install (Docker)
 
+Docker images for the `next` branch are available at `ghcr.io/fmaclen/canutin:next`.
+
 To deploy Canutin using Docker, execute this command and then access the application at `http://localhost:42069`:
 
 ```bash
