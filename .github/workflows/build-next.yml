@@ -1,21 +1,18 @@
 name: Build & publish (next)
 
 on:
-  workflow_run:
-    workflows: ['Version & release (next)']
-    types:
-      - completed
+  release:
+    types: [published]
 
 jobs:
   docker:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # Only run for next prereleases
+    if: contains(github.event.release.tag_name, '-next.')
     name: Docker image
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: next
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
