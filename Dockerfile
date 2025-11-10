@@ -33,8 +33,9 @@ COPY --from=builder --chown=appuser:appgroup /app/scripts ./scripts
 USER appuser
 
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=42069
 
-EXPOSE 3000
+EXPOSE 42069
+EXPOSE 42070
 
 CMD ["bun", "run", "build/index.js"]

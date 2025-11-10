@@ -2,6 +2,14 @@
 
 A personal finance tracker built with SvelteKit and PocketBase.
 
+## Table of Contents
+
+- [Self-Hosting with Docker](#self-hosting-with-docker)
+  - [Quick Start](#quick-start)
+  - [Using Docker Compose](#using-docker-compose)
+- [Development](#development)
+  - [Commands](#commands)
+
 ## Self-Hosting with Docker
 
 ### Quick Start
@@ -17,9 +25,10 @@ docker run -d \
   ghcr.io/fmaclen/canutin:next-latest
 ```
 
-Access the app at `http://localhost:42069`
+After starting the container:
 
-The PocketBase admin UI is available at `http://localhost:42070/_/`
+1. Create a superadmin account in PocketBase at `http://localhost:42070/_/`
+2. Access the app at `http://localhost:42069`
 
 ### Using Docker Compose
 
@@ -31,8 +40,8 @@ services:
     image: ghcr.io/fmaclen/canutin:next-latest
     container_name: canutin-next
     ports:
-      - "42069:42069"
-      - "42070:42070"
+      - '42069:42069'
+      - '42070:42070'
     volumes:
       - canutin-data:/app/pocketbase/pb_data
     restart: unless-stopped
@@ -46,6 +55,11 @@ Run with:
 ```bash
 docker compose up -d
 ```
+
+After starting the container:
+
+1. Create a superadmin account in PocketBase at `http://localhost:42070/_/`
+2. Access the app at `http://localhost:42069`
 
 ## Development
 

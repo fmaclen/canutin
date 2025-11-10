@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { $ } from 'bun';
+
 import { POCKETBASE_VERSION } from './pb-server.js';
 
 const version = process.argv[2] || 'latest';
