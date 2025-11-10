@@ -1,0 +1,420 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { Database } from 'bun:sqlite';
+import PocketBase from 'pocketbase';
+
+const PB_HOST = '127.0.0.1';
+const PB_PORT = 42070;
+const PB_SUPERUSER_EMAIL = 'superadmin@example.com';
+const PB_SUPERUSER_PASSWORD = '123qweasdzxc';
+// Temporary import user; records will be owned by this user
+const IMPORT_EMAIL = 'import@example.com';
+const IMPORT_PASSWORD = '123qweasdzxc';
+const PB_BASE_URL = `http://${PB_HOST}:${PB_PORT}`;
+
+function log(msg: string) {
+	console.log(`[pb:import] ${msg}`);
+}
+
+function error(msg: string) {
+	console.error(`[pb:import] ERROR: ${msg}`);
+}
+
+function mapBalanceGroup(
+	n: number | null | undefined
+): 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER' | undefined {
+	if (n === null || n === undefined) return undefined;
+	switch (Number(n)) {
+		case 0:
+			return 'CASH';
+		case 1:
+			return 'DEBT';
+		case 2:
+			return 'INVESTMENT';
+		case 3:
+			return 'OTHER';
+		default:
+			return undefined;
+	}
+}
+
+function toISODate(d: unknown): string | undefined {
+	if (d === null || d === undefined) return undefined;
+	try {
+		// Handle numeric epoch (seconds or ms) and numeric-like strings
+		if (typeof d === 'number' && Number.isFinite(d)) {
+			const ms = d > 1e12 ? d : d * 1000; // seconds vs ms
+			return formatDateTimeZ(new Date(ms));
+		}
+		const s = String(d).trim();
+		if (!s) return undefined;
+		if (/^\d+$/.test(s)) {
+			const n = Number(s);
+			if (Number.isFinite(n)) {
+				const ms = s.length >= 13 ? n : n * 1000; // 13+ digits -> ms
+				return formatDateTimeZ(new Date(ms));
+			}
+		}
+		// 'YYYY-MM-DD'
+		if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return `${s} 00:00:00.000Z`;
+		// 'YYYY-MM-DD HH:MM:SS' or other parseable strings
+		const dt = new Date(s);
+		if (!isNaN(dt.getTime())) return formatDateTimeZ(dt);
+		return undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function pad(n: number, w = 2) {
+	return String(n).padStart(w, '0');
+}
+
+function formatDateTimeZ(d: Date): string {
+	// Always format as 'YYYY-MM-DD HH:MM:SS.mmmZ' in UTC
+	const y = d.getUTCFullYear();
+	const m = pad(d.getUTCMonth() + 1);
+	const day = pad(d.getUTCDate());
+	const hh = pad(d.getUTCHours());
+	const mm = pad(d.getUTCMinutes());
+	const ss = pad(d.getUTCSeconds());
+	const ms = pad(d.getUTCMilliseconds(), 3);
+	return `${y}-${m}-${day} ${hh}:${mm}:${ss}.${ms}Z`;
+}
+
+function normalizeDateOr(primary: unknown, fallback?: unknown): string | undefined {
+	return toISODate(primary) ?? toISODate(fallback ?? '') ?? undefined;
+}
+
+async function main() {
+	const args = process.argv.slice(2);
+	if (args.length < 1) {
+		error('Missing required path to .vault file. Example: bun pb:import temp/Canutin.demo.vault');
+		process.exit(1);
+	}
+	const vaultPath = path.resolve(args[0]);
+
+	try {
+		await fs.access(vaultPath);
+	} catch {
+		error(`Vault file not found: ${vaultPath}`);
+		process.exit(1);
+	}
+
+	log(`Opening SQLite vault: ${vaultPath}`);
+	const db = new Database(vaultPath, { readonly: true });
+
+	// Prepare PocketBase client
+	const pb = new PocketBase(PB_BASE_URL);
+
+	log(`Authenticating as superuser at ${PB_BASE_URL} ...`);
+	try {
+		// With PB >=0.23 superusers are a system auth collection
+		await pb.collection('_superusers').authWithPassword(PB_SUPERUSER_EMAIL, PB_SUPERUSER_PASSWORD);
+	} catch (e) {
+		error(`Failed to authenticate: ${(e as Error).message}`);
+		process.exit(1);
+	}
+
+	// Ensure/import user exists, then authenticate as that user to own imported data
+	let importUserId: string | null = null;
+	try {
+		const existing = await pb
+			.collection('users')
+			.getFirstListItem(`email = ${JSON.stringify(IMPORT_EMAIL)}`);
+		importUserId = existing.id;
+		log(`Found import user: ${IMPORT_EMAIL} (${importUserId})`);
+	} catch {
+		log(`Creating import user: ${IMPORT_EMAIL}`);
+		const created = await pb.collection('users').create({
+			email: IMPORT_EMAIL,
+			password: IMPORT_PASSWORD,
+			passwordConfirm: IMPORT_PASSWORD
+		});
+		importUserId = created.id;
+	}
+
+	// Authenticate as import user so create/update rules using @request.auth.id pass
+	await pb.collection('users').authWithPassword(IMPORT_EMAIL, IMPORT_PASSWORD);
+	if (!pb.authStore.model) {
+		throw new Error('Failed to authenticate as import user');
+	}
+	log(`Authenticated as import user (${pb.authStore.model.id})`);
+
+	// Helpers: upsert by name and cache ids (per-user scope)
+	const balanceTypeIdByName = new Map<string, string>();
+	const txLabelIdByName = new Map<string, string>();
+
+	async function upsertBalanceType(name: string): Promise<string> {
+		const key = name.trim();
+		if (balanceTypeIdByName.has(key)) return balanceTypeIdByName.get(key) as string;
+		try {
+			const existing = await pb
+				.collection('balanceTypes')
+				.getFirstListItem(`name = ${JSON.stringify(key)}`);
+			balanceTypeIdByName.set(key, existing.id);
+			return existing.id;
+		} catch {
+			const created = await pb
+				.collection('balanceTypes')
+				.create({ name: key, owner: importUserId });
+			balanceTypeIdByName.set(key, created.id);
+			return created.id;
+		}
+	}
+
+	async function upsertTxLabel(name: string): Promise<string> {
+		const key = name.trim();
+		if (txLabelIdByName.has(key)) return txLabelIdByName.get(key) as string;
+		try {
+			const existing = await pb
+				.collection('transactionLabels')
+				.getFirstListItem(`name = ${JSON.stringify(key)}`);
+			txLabelIdByName.set(key, existing.id);
+			return existing.id;
+		} catch {
+			const created = await pb
+				.collection('transactionLabels')
+				.create({ name: key, owner: importUserId });
+			txLabelIdByName.set(key, created.id);
+			return created.id;
+		}
+	}
+
+	// Load old reference tables
+	type Ref = { id: number; name: string };
+	const accountTypes = db.query('SELECT id, name FROM AccountType ORDER BY id').all() as Ref[];
+	const assetTypes = db.query('SELECT id, name FROM AssetType ORDER BY id').all() as Ref[];
+	const txGroups = db
+		.query('SELECT id, name FROM TransactionCategoryGroup ORDER BY id')
+		.all() as Ref[];
+	const txCategories = db
+		.query('SELECT id, name, transactionCategoryId FROM TransactionCategory ORDER BY id')
+		.all() as Array<Ref & { transactionCategoryId: number }>;
+
+	log(
+		`Found: ${accountTypes.length} AccountType, ${assetTypes.length} AssetType, ${txGroups.length} Tx Groups, ${txCategories.length} Tx Categories`
+	);
+
+	const accountTypeNameById = new Map<number, string>(accountTypes.map((r) => [r.id, r.name]));
+	const assetTypeNameById = new Map<number, string>(assetTypes.map((r) => [r.id, r.name]));
+	const txGroupNameById = new Map<number, string>(txGroups.map((r) => [r.id, r.name]));
+	const txCatNameById = new Map<number, string>(txCategories.map((r) => [r.id, r.name]));
+	const txCatGroupIdByCatId = new Map<number, number>(
+		txCategories.map((r) => [r.id, r.transactionCategoryId])
+	);
+
+	type AccountRow = {
+		id: number;
+		name: string;
+		institution?: string | null;
+		isClosed: number;
+		isAutoCalculated: number;
+		isExcludedFromNetWorth: number;
+		balanceGroup: number;
+		accountTypeId: number | null;
+		createdAt?: string;
+		updatedAt?: string;
+	};
+	const accounts = db
+		.query(
+			'SELECT id,name,institution,isClosed,isAutoCalculated,isExcludedFromNetWorth,balanceGroup,accountTypeId,createdAt,updatedAt FROM Account ORDER BY id'
+		)
+		.all() as AccountRow[];
+
+	type AssetRow = {
+		id: number;
+		name: string;
+		balanceGroup: number;
+		isSold: number;
+		symbol?: string | null;
+		assetTypeId: number | null;
+		isExcludedFromNetWorth: number;
+		createdAt?: string;
+		updatedAt?: string;
+	};
+	const assets = db
+		.query(
+			'SELECT id,name,balanceGroup,isSold,symbol,assetTypeId,isExcludedFromNetWorth,createdAt,updatedAt FROM Asset ORDER BY id'
+		)
+		.all() as AssetRow[];
+
+	type AccBalRow = {
+		id: number;
+		value: number;
+		accountId: number;
+		createdAt?: string;
+		updatedAt?: string;
+	};
+	const accountBalances = db
+		.query(
+			'SELECT id,value,accountId,createdAt,updatedAt FROM AccountBalanceStatement ORDER BY createdAt, id'
+		)
+		.all() as AccBalRow[];
+
+	type AstBalRow = {
+		id: number;
+		value: number;
+		quantity?: number | null;
+		cost?: number | null;
+		assetId: number;
+		createdAt?: string;
+		updatedAt?: string;
+	};
+	const assetBalances = db
+		.query(
+			'SELECT id,value,quantity,cost,assetId,createdAt,updatedAt FROM AssetBalanceStatement ORDER BY createdAt, id'
+		)
+		.all() as AstBalRow[];
+
+	type TxRow = {
+		id: number;
+		description: string;
+		date: string;
+		value: number;
+		isExcluded: number;
+		isPending: number;
+		categoryId: number | null;
+		accountId: number;
+		createdAt?: string;
+		updatedAt?: string;
+	};
+	const transactions = db
+		.query(
+			'SELECT id,description,date,value,isExcluded,isPending,categoryId,accountId,createdAt,updatedAt FROM "Transaction" ORDER BY id'
+		)
+		.all() as TxRow[];
+
+	log(
+		`Rows: accounts=${accounts.length}, assets=${assets.length}, accountBalances=${accountBalances.length}, assetBalances=${assetBalances.length}, transactions=${transactions.length}`
+	);
+
+	// Create accounts and assets first
+	const pbAccountIdByOldId = new Map<number, string>();
+	const pbAssetIdByOldId = new Map<number, string>();
+
+	for (const a of accounts) {
+		const autoDate = a.isAutoCalculated
+			? (normalizeDateOr(a.updatedAt, a.createdAt) ?? toISODate(new Date().toISOString()))
+			: undefined;
+
+		const excludedDate = a.isExcludedFromNetWorth
+			? (normalizeDateOr(a.createdAt, a.updatedAt) ?? toISODate(new Date().toISOString()))
+			: undefined;
+
+		const data: Record<string, unknown> = {
+			name: a.name,
+			institution: a.institution ?? undefined,
+			balanceGroup: mapBalanceGroup(a.balanceGroup),
+			// If closed, prefer updatedAt then createdAt; fallback to now for determinism
+			closed: a.isClosed
+				? (normalizeDateOr(a.updatedAt, a.createdAt) ?? toISODate(new Date().toISOString()))
+				: undefined,
+			// For auto-calculated accounts, ensure a truthy RFC date even if updatedAt is null
+			autoCalculated: autoDate,
+			// Legacy flag maps to datetime; prefer creation, fallback update, then now
+			excluded: excludedDate,
+			owner: importUserId
+		};
+
+		// BalanceType in PB is used to indicate computation mode such as "Auto-calculated".
+		// If the legacy account is marked auto-calculated, set BalanceType to "Auto-calculated".
+		// Otherwise, fallback to the legacy account type name if present.
+		const typeName = a.accountTypeId ? accountTypeNameById.get(a.accountTypeId) : undefined;
+		if (a.isAutoCalculated) {
+			data.balanceType = await upsertBalanceType('Auto-calculated');
+		} else if (typeName) {
+			data.balanceType = await upsertBalanceType(typeName);
+		}
+
+		const created = await pb.collection('accounts').create(data);
+		pbAccountIdByOldId.set(a.id, created.id);
+	}
+
+	for (const a of assets) {
+		const data: Record<string, unknown> = {
+			name: a.name,
+			symbol: a.symbol ?? undefined,
+			balanceGroup: mapBalanceGroup(a.balanceGroup),
+			// If sold, prefer updatedAt then createdAt; fallback to now for determinism
+			sold: a.isSold
+				? (normalizeDateOr(a.updatedAt, a.createdAt) ?? toISODate(new Date().toISOString()))
+				: undefined,
+			excluded: a.isExcludedFromNetWorth ? toISODate(a.updatedAt) : undefined,
+			owner: importUserId
+		};
+		const typeName = a.assetTypeId ? assetTypeNameById.get(a.assetTypeId) : undefined;
+		if (typeName) data.balanceType = await upsertBalanceType(typeName);
+
+		const created = await pb.collection('assets').create(data);
+		pbAssetIdByOldId.set(a.id, created.id);
+	}
+
+	// Create balance records with direct relations to parent
+	for (const s of accountBalances) {
+		const pbAccountId = pbAccountIdByOldId.get(s.accountId);
+		if (!pbAccountId) continue;
+		await pb.collection('accountBalances').create({
+			account: pbAccountId,
+			value: s.value,
+			asOf: toISODate(s.createdAt),
+			owner: importUserId
+		});
+	}
+
+	for (const s of assetBalances) {
+		const pbAssetId = pbAssetIdByOldId.get(s.assetId);
+		if (!pbAssetId) continue;
+		await pb.collection('assetBalances').create({
+			asset: pbAssetId,
+			value: s.value,
+			quantity: s.quantity ?? undefined,
+			cost: s.cost ?? undefined,
+			asOf: toISODate(s.createdAt),
+			owner: importUserId
+		});
+	}
+
+	// Create transactions with direct account relation
+	for (const t of transactions) {
+		const pbAccountId = pbAccountIdByOldId.get(t.accountId);
+		if (!pbAccountId) continue;
+
+		const labels: string[] = [];
+		if (t.categoryId != null) {
+			const catName = txCatNameById.get(t.categoryId);
+			if (catName) labels.push(await upsertTxLabel(catName));
+			const groupId = txCatGroupIdByCatId.get(t.categoryId);
+			if (groupId) {
+				const groupName = txGroupNameById.get(groupId);
+				if (groupName) labels.push(await upsertTxLabel(groupName));
+			}
+		}
+
+		const exDate = t.isExcluded
+			? (normalizeDateOr(t.updatedAt, t.date) ?? toISODate(new Date().toISOString()))
+			: undefined;
+		const pendDate = t.isPending
+			? (normalizeDateOr(t.updatedAt, t.date) ?? toISODate(new Date().toISOString()))
+			: undefined;
+
+		const data: Record<string, unknown> = {
+			account: pbAccountId,
+			description: t.description,
+			date: normalizeDateOr(t.date, t.createdAt ?? t.updatedAt),
+			value: t.value,
+			excluded: exDate,
+			pending: pendDate,
+			labels,
+			owner: importUserId
+		};
+		await pb.collection('transactions').create(data);
+	}
+
+	log('Import complete.');
+}
+
+main().catch((e) => {
+	error((e as Error).stack || (e as Error).message);
+	process.exit(1);
+});
