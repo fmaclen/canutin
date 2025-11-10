@@ -1,4 +1,4 @@
-# CanutinX
+# Canutin (Next)
 
 All you need to start is:
 
