@@ -1,6 +1,6 @@
 {
 	"name": "canutin-next",
-	"version": "2.0.0-next.8",
+	"version": "2.0.0-next.9",
 	"devDependencies": {
 		"@semantic-release/commit-analyzer": "^13.0.1",
 		"@semantic-release/git": "^10.0.1",
