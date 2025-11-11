@@ -13,12 +13,12 @@ export default defineConfig({
 	globalSetup: 'e2e/global.setup.ts',
 	webServer: [
 		{
-			command: 'npm run pb',
+			command: 'bun run pb',
 			port: 42070,
 			reuseExistingServer: true
 		},
 		{
-			command: 'npm run build && npm run preview',
+			command: 'bun run build && bun run preview',
 			port: 4173,
 			env: {
 				...process.env,
