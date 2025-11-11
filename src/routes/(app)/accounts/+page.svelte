@@ -342,9 +342,7 @@
 										{/each}
 									</Table.Body>
 									<Table.Footer>
-										<Table.Row
-											class="[&>td]:!bg-muted [&>td]:hover:!bg-muted sticky bottom-0 border-t-2"
-										>
+										<Table.Row class="border-t-2">
 											<Table.Cell colspan={6} class="text-muted-foreground text-xs font-normal">
 												{m.accounts_aggregate_total_label()}
 											</Table.Cell>

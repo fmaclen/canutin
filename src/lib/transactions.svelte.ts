@@ -11,7 +11,15 @@ import type {
 } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
 
-export type PeriodOption = 'mtd' | '1m' | '3m' | '6m' | 'ytd' | '12m' | 'all';
+export type PeriodOption =
+	| 'this-month'
+	| 'last-month'
+	| 'last-3-months'
+	| 'last-6-months'
+	| 'last-12-months'
+	| 'year-to-date'
+	| 'last-year'
+	| 'lifetime';
 export type KindFilter = 'all' | 'credits' | 'debits';
 
 type TransactionExpand = {
@@ -33,13 +41,22 @@ export type TransactionRow = {
 };
 
 class TransactionsContext {
-	period: PeriodOption = $state('3m');
+	period: PeriodOption = $state('last-3-months');
 	kind: KindFilter = $state('all');
 	page: number = $state(1);
 	isLoading: boolean = $state(true);
 	rawTransactions: TransactionsResponse<TransactionExpand>[] = $state([]);
 
-	readonly periodOptions: PeriodOption[] = ['mtd', '1m', '3m', '6m', 'ytd', '12m', 'all'];
+	readonly periodOptions: PeriodOption[] = [
+		'this-month',
+		'last-month',
+		'last-3-months',
+		'last-6-months',
+		'last-12-months',
+		'year-to-date',
+		'last-year',
+		'lifetime'
+	];
 	readonly kindOptions: KindFilter[] = ['all', 'credits', 'debits'];
 	readonly pageSize = 50;
 
@@ -88,9 +105,9 @@ class TransactionsContext {
 			0
 		);
 		switch (option) {
-			case 'mtd':
+			case 'this-month':
 				return { from: startOfThisMonth, to: null } as const;
-			case '1m': {
+			case 'last-month': {
 				const lastMonthDate = addMonths(startOfThisMonthDate, -1);
 				const startOfLastMonth = new UTCDate(
 					lastMonthDate.getUTCFullYear(),
@@ -103,7 +120,7 @@ class TransactionsContext {
 				);
 				return { from: startOfLastMonth, to: startOfThisMonth } as const;
 			}
-			case '3m': {
+			case 'last-3-months': {
 				const threeMonthsAgoDate = addMonths(startOfThisMonthDate, -2);
 				const startOfThreeMonthsAgo = new UTCDate(
 					threeMonthsAgoDate.getUTCFullYear(),
@@ -116,7 +133,7 @@ class TransactionsContext {
 				);
 				return { from: startOfThreeMonthsAgo, to: null } as const;
 			}
-			case '6m': {
+			case 'last-6-months': {
 				const sixMonthsAgoDate = addMonths(startOfThisMonthDate, -5);
 				const startOfSixMonthsAgo = new UTCDate(
 					sixMonthsAgoDate.getUTCFullYear(),
@@ -129,12 +146,7 @@ class TransactionsContext {
 				);
 				return { from: startOfSixMonthsAgo, to: null } as const;
 			}
-			case 'ytd': {
-				const yearStartDate = startOfYear(now);
-				const startOfYearUtc = new UTCDate(yearStartDate.getUTCFullYear(), 0, 1, 0, 0, 0, 0);
-				return { from: startOfYearUtc, to: null } as const;
-			}
-			case '12m': {
+			case 'last-12-months': {
 				const twelveMonthsAgoDate = addMonths(startOfThisMonthDate, -11);
 				const startOfTwelveMonthsAgo = new UTCDate(
 					twelveMonthsAgoDate.getUTCFullYear(),
@@ -147,6 +159,19 @@ class TransactionsContext {
 				);
 				return { from: startOfTwelveMonthsAgo, to: null } as const;
 			}
+			case 'year-to-date': {
+				const yearStartDate = startOfYear(now);
+				const startOfYearUtc = new UTCDate(yearStartDate.getUTCFullYear(), 0, 1, 0, 0, 0, 0);
+				return { from: startOfYearUtc, to: null } as const;
+			}
+			case 'last-year': {
+				const yearStartDate = startOfYear(now);
+				const lastYearStartDate = addMonths(yearStartDate, -12);
+				const startOfLastYear = new UTCDate(lastYearStartDate.getUTCFullYear(), 0, 1, 0, 0, 0, 0);
+				const startOfThisYear = new UTCDate(yearStartDate.getUTCFullYear(), 0, 1, 0, 0, 0, 0);
+				return { from: startOfLastYear, to: startOfThisYear } as const;
+			}
+			case 'lifetime':
 			default:
 				return { from: null, to: null } as const;
 		}
