@@ -4,51 +4,22 @@ This is the next prerelease branch for Canutin v2.
 
 ## Install (Docker)
 
-Docker images are automatically built and published for each release on the `next` branch to `ghcr.io/fmaclen/canutin:next`.
-
-To deploy Canutin using Docker, execute this command and then access the application at `http://localhost:42069`:
+Clone the repository and use Docker Compose:
 
 ```bash
-docker run -d \
-  --name canutin \
-  -p 42069:42069 \
-  -p 42070:42070 \
-  -v canutin-data:/app/pocketbase/pb_data \
-  --restart=unless-stopped \
-  ghcr.io/fmaclen/canutin:latest
+git clone https://github.com/fmaclen/canutin.git
+cd canutin
+docker compose up -d
 ```
 
-Alternatively, create a `docker-compose.yml` file:
-
-```yaml
-services:
-  canutin:
-    image: ghcr.io/fmaclen/canutin:latest
-    container_name: canutin
-    ports:
-      - "42069:42069"
-      - "42070:42070"
-    volumes:
-      - canutin-data:/app/pocketbase/pb_data
-    restart: unless-stopped
-    environment:
-      HOST: "0.0.0.0"
-      PORT: "42069"
-      PUBLIC_PB_URL: "http://localhost:42070"
-
-volumes:
-  canutin-data:
-```
-
-Then run: `docker compose up -d`
+This will build the Docker image locally and start Canutin at `http://localhost:42069`.
 
 ## Development
 
-All you need to start is:
+All you need to start is [Bun](https://bun.sh) installed, then run:
 
 ```bash
-bun install
-bun run test
+bun install && bunx playwright install && bun run test
 ```
 
 ## Commands
