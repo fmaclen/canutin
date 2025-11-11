@@ -70,43 +70,50 @@ This project uses Svelte 5's runes syntax exclusively. See [Svelte 5 Migration G
 **Core Runes:**
 
 - **State**: `let count = $state(0)` - Reactive variables (replaces top-level `let` declarations)
+
   ```typescript
   let count = $state(0);
-  let user = $state({ name: 'Alice' });  // Works with objects/arrays
+  let user = $state({ name: 'Alice' }); // Works with objects/arrays
   ```
 
 - **Derived**: `let doubled = $derived(count * 2)` - Computed values (replaces `$:` reactive declarations)
+
   ```typescript
   let doubled = $derived(count * 2);
   ```
 
 - **Effects**: Side effects and lifecycle (replaces `onMount` and `onDestroy`)
+
   ```typescript
   $effect(() => {
-    console.log('count changed:', count);
-    // Cleanup function (replaces onDestroy)
-    return () => {
-      console.log('cleanup');
-    };
+  	console.log('count changed:', count);
+  	// Cleanup function (replaces onDestroy)
+  	return () => {
+  		console.log('cleanup');
+  	};
   });
   ```
 
 - **Props**: Component props (replaces `export let`)
   ```typescript
-  let { id = '', onSelect } = $props();  // With defaults
+  let { id = '', onSelect } = $props(); // With defaults
   ```
 
 **Event Handling:**
+
 - Use standard DOM properties: `onclick={handler}` instead of `on:click={handler}`
 
 **Snippets & Content Passing:**
+
 - Default children available as snippet via `$props.children`
+
   ```typescript
   let { children } = $props();
   {@render children?.()}
   ```
 
 - Named snippets replace named slots:
+
   ```typescript
   // Parent component
   <Child>
@@ -171,6 +178,7 @@ See AGENTS.md lines 30-41 for additional patterns.
 ### Import Organization
 
 Sort order (handled by Prettier):
+
 1. Built-in modules
 2. Third-party modules
 3. `$env/*` aliases
