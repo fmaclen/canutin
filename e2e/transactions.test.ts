@@ -12,7 +12,15 @@ import {
 	seedUser
 } from './pocketbase.helpers';
 
-type PeriodOption = 'mtd' | '1m' | '3m' | '6m' | 'ytd' | '12m' | 'all';
+type PeriodOption =
+	| 'this-month'
+	| 'last-month'
+	| 'last-3-months'
+	| 'last-6-months'
+	| 'last-12-months'
+	| 'year-to-date'
+	| 'last-year'
+	| 'lifetime';
 
 test('transactions table responds to period and type filters', async ({ page }) => {
 	const user = await seedUser('taylor');
@@ -82,29 +90,24 @@ test('transactions table responds to period and type filters', async ({ page }) 
 
 	await expect(page.getByRole('row', { name: /Invoice Payment/ })).toBeVisible();
 
-	const periodTabs = page.getByRole('tablist').first();
-	const typeTabs = page.getByRole('tablist').nth(1);
-
-	await expect(periodTabs.getByRole('tab', { name: '3M' })).toHaveAttribute(
-		'aria-selected',
-		'true'
-	);
-	await expect(typeTabs.getByRole('tab', { name: 'All' })).toHaveAttribute('aria-selected', 'true');
+	await expect(page.getByLabel('Period')).toContainText('Last 3 months');
+	await expect(page.getByLabel('Type')).toContainText('Any amounts');
 
 	const periodFilters: Array<{ label: string; value: PeriodOption }> = [
-		{ label: 'MTD', value: 'mtd' },
-		{ label: '1M', value: '1m' },
-		{ label: '3M', value: '3m' },
-		{ label: '6M', value: '6m' },
-		{ label: 'YTD', value: 'ytd' },
-		{ label: '12M', value: '12m' },
-		{ label: 'All', value: 'all' }
+		{ label: 'This month', value: 'this-month' },
+		{ label: 'Last month', value: 'last-month' },
+		{ label: 'Last 3 months', value: 'last-3-months' },
+		{ label: 'Last 6 months', value: 'last-6-months' },
+		{ label: 'Last 12 months', value: 'last-12-months' },
+		{ label: 'Year to date', value: 'year-to-date' },
+		{ label: 'Last year', value: 'last-year' },
+		{ label: 'Lifetime', value: 'lifetime' }
 	];
 
 	for (const { label, value } of periodFilters) {
-		const tab = periodTabs.getByRole('tab', { name: label });
-		await tab.click();
-		await expect(tab).toHaveAttribute('aria-selected', 'true');
+		await page.getByLabel('Period').click();
+		await page.getByRole('option', { name: label }).click();
+		await expect(page.getByLabel('Period')).toContainText(label);
 		for (const txn of transactions) {
 			const shouldBeVisible = isWithinPeriod(txn.date, value, now);
 			await expectRowVisibility(page, txn.description, shouldBeVisible);
@@ -115,22 +118,23 @@ test('transactions table responds to period and type filters', async ({ page }) 
 		label: string;
 		predicate: (txn: { value: number; excluded: boolean }) => boolean;
 	}> = [
-		{ label: 'All', predicate: () => true },
-		{ label: 'Credits', predicate: (txn) => txn.value > 0 },
-		{ label: 'Debits', predicate: (txn) => txn.value < 0 }
+		{ label: 'Any amounts', predicate: () => true },
+		{ label: 'Credits only', predicate: (txn) => txn.value > 0 },
+		{ label: 'Debits only', predicate: (txn) => txn.value < 0 }
 	];
 
 	for (const { label, predicate } of typeFilters) {
-		const tab = typeTabs.getByRole('tab', { name: label });
-		await tab.click();
-		await expect(tab).toHaveAttribute('aria-selected', 'true');
+		await page.getByLabel('Type').click();
+		await page.getByRole('option', { name: label }).click();
+		await expect(page.getByLabel('Type')).toContainText(label);
 		for (const txn of transactions) {
 			const shouldBeVisible = predicate(txn);
 			await expectRowVisibility(page, txn.description, shouldBeVisible);
 		}
 	}
 
-	await typeTabs.getByRole('tab', { name: 'All' }).click();
+	await page.getByLabel('Type').click();
+	await page.getByRole('option', { name: 'Any amounts' }).click();
 	const excludedRow = page.getByRole('row', { name: /Excluded Adjustment/ });
 	await expect(excludedRow).toBeVisible();
 	const excludedAmount = excludedRow.locator('td').nth(4).locator('.border-dashed');
@@ -227,9 +231,9 @@ test('transactions pagination navigates between pages', async ({ page }) => {
 	await nextButton.click();
 	await expect(rowsForBatch).toHaveCount(5);
 
-	// Apply "Credits" filter (only even-indexed transactions, which are positive)
-	const typeTabs = page.getByRole('tablist').nth(1);
-	await typeTabs.getByRole('tab', { name: 'Credits' }).click();
+	// Apply "Credits only" filter (only even-indexed transactions, which are positive)
+	await page.getByLabel('Type').click();
+	await page.getByRole('option', { name: 'Credits only' }).click();
 
 	// Should have only ~28 credit transactions (every other one), all on page 1
 	// Pagination footer should disappear since we're under 51 transactions
@@ -252,19 +256,24 @@ function dateForMonthOffset(baseMonth: Date, monthsOffset: number, day: number) 
 function getPeriodRange(option: PeriodOption, reference: Date) {
 	const startOfThisMonth = startOfMonth(reference);
 	switch (option) {
-		case 'mtd':
+		case 'this-month':
 			return { from: startOfThisMonth, to: null } as const;
-		case '1m':
+		case 'last-month':
 			return { from: addMonths(startOfThisMonth, -1), to: startOfThisMonth } as const;
-		case '3m':
+		case 'last-3-months':
 			return { from: addMonths(startOfThisMonth, -2), to: null } as const;
-		case '6m':
+		case 'last-6-months':
 			return { from: addMonths(startOfThisMonth, -5), to: null } as const;
-		case 'ytd':
-			return { from: startOfMonth(new UTCDate(reference.getUTCFullYear(), 0)), to: null } as const;
-		case '12m':
+		case 'last-12-months':
 			return { from: addMonths(startOfThisMonth, -11), to: null } as const;
-		case 'all':
+		case 'year-to-date':
+			return { from: startOfMonth(new UTCDate(reference.getUTCFullYear(), 0)), to: null } as const;
+		case 'last-year': {
+			const yearStart = startOfMonth(new UTCDate(reference.getUTCFullYear(), 0));
+			const lastYearStart = addMonths(yearStart, -12);
+			return { from: lastYearStart, to: yearStart } as const;
+		}
+		case 'lifetime':
 		default:
 			return { from: null, to: null } as const;
 	}
@@ -429,10 +438,10 @@ test('transactions correctly handle UTC dates regardless of local timezone', asy
 	await expect(page.getByRole('row', { name: /Early October UTC Transaction/ })).toBeVisible();
 	await expect(page.getByRole('row', { name: /Late September UTC Transaction/ })).toBeVisible();
 
-	// Switch to MTD (Month To Date) filter
+	// Switch to This month (Month To Date) filter
 	// This should show only transactions from October 1 UTC onwards
-	const periodTabs = page.getByRole('tablist').first();
-	await periodTabs.getByRole('tab', { name: 'MTD' }).click();
+	await page.getByLabel('Period').click();
+	await page.getByRole('option', { name: 'This month' }).click();
 
 	// The October transaction should be visible
 	await expect(page.getByRole('row', { name: /Early October UTC Transaction/ })).toBeVisible();
@@ -440,9 +449,10 @@ test('transactions correctly handle UTC dates regardless of local timezone', asy
 	// The September transaction should NOT be visible
 	await expect(page.getByRole('row', { name: /Late September UTC Transaction/ })).toHaveCount(0);
 
-	// Switch to 1M (previous month) filter
+	// Switch to Last month filter
 	// This should show only September transactions
-	await periodTabs.getByRole('tab', { name: '1M' }).click();
+	await page.getByLabel('Period').click();
+	await page.getByRole('option', { name: 'Last month' }).click();
 
 	// The September transaction should be visible
 	await expect(page.getByRole('row', { name: /Late September UTC Transaction/ })).toBeVisible();

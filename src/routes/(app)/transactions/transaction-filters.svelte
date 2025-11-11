@@ -49,7 +49,7 @@
 	<SectionTitle title={m.transactions_section_title()} />
 	<div class="flex flex-col gap-3 sm:flex-row sm:items-center">
 		<Select.Root type="single" bind:value={txContext.period}>
-			<Select.Trigger id="period-select" class="bg-background sm:w-48">
+			<Select.Trigger aria-label="Period" class="bg-background sm:w-48">
 				{periodLabel(txContext.period)}
 			</Select.Trigger>
 			<Select.Content>
@@ -59,7 +59,7 @@
 			</Select.Content>
 		</Select.Root>
 		<Select.Root type="single" bind:value={txContext.kind}>
-			<Select.Trigger id="kind-select" class="bg-background sm:w-48">
+			<Select.Trigger aria-label="Type" class="bg-background sm:w-48">
 				{kindLabel(txContext.kind)}
 			</Select.Trigger>
 			<Select.Content>
