@@ -20,7 +20,7 @@ export type PeriodOption =
 	| 'year-to-date'
 	| 'last-year'
 	| 'lifetime';
-export type KindFilter = 'all' | 'credits' | 'debits';
+export type KindFilter = 'all' | 'credits' | 'debits' | 'excluded';
 
 type TransactionExpand = {
 	account?: AccountsResponse;
@@ -57,7 +57,7 @@ class TransactionsContext {
 		'last-year',
 		'lifetime'
 	];
-	readonly kindOptions: KindFilter[] = ['all', 'credits', 'debits'];
+	readonly kindOptions: KindFilter[] = ['all', 'credits', 'debits', 'excluded'];
 	readonly pageSize = 50;
 
 	private _pb: PocketBaseContext;
@@ -221,6 +221,7 @@ class TransactionsContext {
 				if (toTime !== null && time >= toTime) return false;
 				if (this.kind === 'credits') return row.value > 0;
 				if (this.kind === 'debits') return row.value < 0;
+				if (this.kind === 'excluded') return row.excluded;
 				return true;
 			})
 			.sort((a, b) => {

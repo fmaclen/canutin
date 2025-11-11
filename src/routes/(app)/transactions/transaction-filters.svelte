@@ -38,6 +38,8 @@
 				return m.transactions_filter_kind_credits_only();
 			case 'debits':
 				return m.transactions_filter_kind_debits_only();
+			case 'excluded':
+				return m.transactions_filter_kind_excluded_only();
 			case 'all':
 			default:
 				return m.transactions_filter_kind_any_amounts();

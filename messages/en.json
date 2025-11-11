@@ -200,6 +200,7 @@
 	"transactions_filter_kind_any_amounts": "Any amounts",
 	"transactions_filter_kind_credits_only": "Credits only",
 	"transactions_filter_kind_debits_only": "Debits only",
+	"transactions_filter_kind_excluded_only": "Excluded only",
 	"transactions_table_header_date": "Date",
 	"transactions_table_header_description": "Description",
 	"transactions_table_header_labels": "Labels",

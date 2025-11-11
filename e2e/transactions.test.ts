@@ -120,7 +120,8 @@ test('transactions table responds to period and type filters', async ({ page }) 
 	}> = [
 		{ label: 'Any amounts', predicate: () => true },
 		{ label: 'Credits only', predicate: (txn) => txn.value > 0 },
-		{ label: 'Debits only', predicate: (txn) => txn.value < 0 }
+		{ label: 'Debits only', predicate: (txn) => txn.value < 0 },
+		{ label: 'Excluded only', predicate: (txn) => txn.excluded }
 	];
 
 	for (const { label, predicate } of typeFilters) {
