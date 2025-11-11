@@ -13,34 +13,34 @@
 	function periodLabel(option: PeriodOption) {
 		switch (option) {
 			case 'this-month':
-				return 'This month';
+				return m.transactions_filter_period_this_month();
 			case 'last-month':
-				return 'Last month';
+				return m.transactions_filter_period_last_month();
 			case 'last-3-months':
-				return 'Last 3 months';
+				return m.transactions_filter_period_last_3_months();
 			case 'last-6-months':
-				return 'Last 6 months';
+				return m.transactions_filter_period_last_6_months();
 			case 'last-12-months':
-				return 'Last 12 months';
+				return m.transactions_filter_period_last_12_months();
 			case 'year-to-date':
-				return 'Year to date';
+				return m.transactions_filter_period_year_to_date();
 			case 'last-year':
-				return 'Last year';
+				return m.transactions_filter_period_last_year();
 			case 'lifetime':
 			default:
-				return 'Lifetime';
+				return m.transactions_filter_period_lifetime();
 		}
 	}
 
 	function kindLabel(option: KindFilter) {
 		switch (option) {
 			case 'credits':
-				return 'Credits only';
+				return m.transactions_filter_kind_credits_only();
 			case 'debits':
-				return 'Debits only';
+				return m.transactions_filter_kind_debits_only();
 			case 'all':
 			default:
-				return 'Any amounts';
+				return m.transactions_filter_kind_any_amounts();
 		}
 	}
 </script>
@@ -49,7 +49,10 @@
 	<SectionTitle title={m.transactions_section_title()} />
 	<div class="flex flex-col gap-3 sm:flex-row sm:items-center">
 		<Select.Root type="single" bind:value={txContext.period}>
-			<Select.Trigger aria-label="Period" class="bg-background sm:w-48">
+			<Select.Trigger
+				aria-label={m.transactions_filter_period_label()}
+				class="bg-background sm:w-48"
+			>
 				{periodLabel(txContext.period)}
 			</Select.Trigger>
 			<Select.Content>
@@ -59,7 +62,7 @@
 			</Select.Content>
 		</Select.Root>
 		<Select.Root type="single" bind:value={txContext.kind}>
-			<Select.Trigger aria-label="Type" class="bg-background sm:w-48">
+			<Select.Trigger aria-label={m.transactions_filter_kind_label()} class="bg-background sm:w-48">
 				{kindLabel(txContext.kind)}
 			</Select.Trigger>
 			<Select.Content>
