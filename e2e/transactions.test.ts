@@ -888,8 +888,7 @@ test('transactions list updates in real-time when new transaction is added', asy
 	await page.getByLabel('Type').click();
 	await page.getByRole('option', { name: 'Debits only' }).click();
 	await expect(page.getByLabel('Type')).toContainText('Debits only');
-
-	await expect(page.getByRole('row', { name: /Fresh Groceries Market/ })).toHaveCount(0);
+	await expect(page.getByText('Fresh Groceries Market')).toHaveCount(0);
 
 	await seedTransaction({
 		account: checkingAccount.id,
@@ -899,5 +898,5 @@ test('transactions list updates in real-time when new transaction is added', asy
 		value: -125
 	});
 
-	await expect(page.getByRole('row', { name: /Fresh Groceries Market/ })).toBeVisible();
+	await expect(page.getByText('Fresh Groceries Market')).toHaveCount(1);
 });
