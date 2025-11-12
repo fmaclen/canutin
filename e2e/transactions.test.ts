@@ -1,6 +1,6 @@
 import { UTCDate } from '@date-fns/utc';
 import { expect, test, type Page } from '@playwright/test';
-import { addMonths, endOfMonth, startOfMonth, subMonths, subYears } from 'date-fns';
+import { addMonths, startOfMonth, subYears } from 'date-fns';
 
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
@@ -425,27 +425,14 @@ test('transactions correctly handle UTC dates regardless of local timezone', asy
 	});
 
 	const now = new UTCDate();
-	const thisMonthStart = startOfMonth(now);
-	const lastMonthEnd = endOfMonth(subMonths(now, 1));
+	const currentYear = now.getUTCFullYear();
+	const currentMonth = now.getUTCMonth();
 
-	const startOfThisMonthUtc = new UTCDate(
-		thisMonthStart.getUTCFullYear(),
-		thisMonthStart.getUTCMonth(),
-		thisMonthStart.getUTCDate(),
-		0,
-		30,
-		0,
-		0
-	);
-	const endOfLastMonthUtc = new UTCDate(
-		lastMonthEnd.getUTCFullYear(),
-		lastMonthEnd.getUTCMonth(),
-		lastMonthEnd.getUTCDate(),
-		23,
-		30,
-		0,
-		0
-	);
+	const startOfThisMonthUtc = new UTCDate(currentYear, currentMonth, 1, 0, 30, 0, 0);
+	const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+	const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+	const lastMonthLastDay = new UTCDate(currentYear, currentMonth, 0).getUTCDate();
+	const endOfLastMonthUtc = new UTCDate(lastMonthYear, lastMonth, lastMonthLastDay, 23, 30, 0, 0);
 
 	await seedTransaction({
 		account: account.id,
