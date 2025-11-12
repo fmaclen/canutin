@@ -1,6 +1,6 @@
 import { UTCDate } from '@date-fns/utc';
 import { expect, test, type Page } from '@playwright/test';
-import { addMonths, startOfMonth } from 'date-fns';
+import { addMonths, startOfMonth, subYears } from 'date-fns';
 
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
@@ -858,4 +858,46 @@ test('user can delete transaction', async ({ page }) => {
 	await expect(page.getByText('Transaction deleted')).toBeVisible();
 	await expect(page.url()).toContain('/transactions');
 	await expect(page.getByText('StreamFlix Annual Subscription')).not.toBeVisible();
+});
+
+test('transactions list updates in real-time when new transaction is added', async ({ page }) => {
+	const user = await seedUser('frank');
+
+	const checkingAccount = await seedAccount({
+		name: 'Realtime Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+
+	await seedAccountBalance({
+		account: checkingAccount.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 3000
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	await page.getByLabel('Period').click();
+	await page.getByRole('option', { name: 'Last year' }).click();
+	await expect(page.getByLabel('Period')).toContainText('Last year');
+
+	await page.getByLabel('Type').click();
+	await page.getByRole('option', { name: 'Debits only' }).click();
+	await expect(page.getByLabel('Type')).toContainText('Debits only');
+
+	await expect(page.getByRole('row', { name: /Fresh Groceries Market/ })).toHaveCount(0);
+
+	await seedTransaction({
+		account: checkingAccount.id,
+		owner: user.id,
+		date: subYears(new UTCDate(), 1).toISOString(),
+		description: 'Fresh Groceries Market',
+		value: -125
+	});
+
+	await expect(page.getByRole('row', { name: /Fresh Groceries Market/ })).toBeVisible();
 });

@@ -1,5 +1,6 @@
 import { UTCDate } from '@date-fns/utc';
 import { addMonths, format, startOfMonth, startOfYear } from 'date-fns';
+import type { RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 import { SvelteMap, SvelteURLSearchParams } from 'svelte/reactivity';
 import { get } from 'svelte/store';
@@ -174,6 +175,7 @@ class TransactionsContext {
 
 	private async init() {
 		await this.refreshTransactions();
+		this.realtimeSubscribe();
 	}
 
 	async refreshTransactions() {
@@ -192,6 +194,35 @@ class TransactionsContext {
 			this._pb.handleConnectionError(error, 'transactions', 'refresh');
 		} finally {
 			this.isLoading = false;
+		}
+	}
+
+	private realtimeSubscribe() {
+		this._pb.authedClient
+			.collection('transactions')
+			.subscribe('*', this.onTransactionEvent.bind(this))
+			.catch((error) =>
+				this._pb.handleSubscriptionError(error, 'transactions', 'subscribe_transactions')
+			);
+	}
+
+	private async onTransactionEvent(e: RecordSubscription<TransactionsResponse<TransactionExpand>>) {
+		if (e.action === 'create') {
+			const txn = await this._pb.authedClient
+				.collection('transactions')
+				.getOne<TransactionsResponse<TransactionExpand>>(e.record.id, {
+					expand: 'account,labels'
+				});
+			this.rawTransactions = [...this.rawTransactions, txn];
+		} else if (e.action === 'update') {
+			const txn = await this._pb.authedClient
+				.collection('transactions')
+				.getOne<TransactionsResponse<TransactionExpand>>(e.record.id, {
+					expand: 'account,labels'
+				});
+			this.rawTransactions = this.rawTransactions.map((x) => (x.id === e.record.id ? txn : x));
+		} else if (e.action === 'delete') {
+			this.rawTransactions = this.rawTransactions.filter((x) => x.id !== e.record.id);
 		}
 	}
 
@@ -354,6 +385,10 @@ class TransactionsContext {
 	get paginatedRows() {
 		const start = (this.page - 1) * this.pageSize;
 		return this.filteredRows.slice(start, start + this.pageSize);
+	}
+
+	dispose() {
+		this._pb.authedClient.collection('transactions').unsubscribe();
 	}
 }
 
