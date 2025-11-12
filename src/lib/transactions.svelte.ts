@@ -204,10 +204,14 @@ class TransactionsContext {
 			});
 
 			if (from) {
-				filterParts.push(`date >= '${from.toISOString()}'`);
+				const filterStr = `date >= '${from.toISOString()}'`;
+				console.log('[refreshTransactions] adding filter:', filterStr);
+				filterParts.push(filterStr);
 			}
 			if (to) {
-				filterParts.push(`date < '${to.toISOString()}'`);
+				const filterStr = `date < '${to.toISOString()}'`;
+				console.log('[refreshTransactions] adding filter:', filterStr);
+				filterParts.push(filterStr);
 			}
 
 			if (this.kind === 'credits') {
@@ -220,6 +224,8 @@ class TransactionsContext {
 
 			const filter = filterParts.length > 0 ? filterParts.join(' && ') : undefined;
 
+			console.log('[refreshTransactions] final PocketBase filter:', filter);
+
 			const list = await this._pb.authedClient
 				.collection('transactions')
 				.getFullList<TransactionsResponse<TransactionExpand>>({
@@ -229,6 +235,14 @@ class TransactionsContext {
 					filter,
 					requestKey: 'transactions:list'
 				});
+			console.log('[refreshTransactions] PocketBase returned', list.length, 'transactions');
+			if (list.length > 0) {
+				console.log('[refreshTransactions] first transaction:', {
+					id: list[0].id,
+					date: list[0].date,
+					description: list[0].description
+				});
+			}
 			this.rawTransactions = list;
 		} catch (error) {
 			this._pb.handleConnectionError(error, 'transactions', 'refresh');
