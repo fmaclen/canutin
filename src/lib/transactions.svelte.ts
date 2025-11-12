@@ -1,5 +1,5 @@
 import { UTCDate } from '@date-fns/utc';
-import { format } from 'date-fns';
+import { addMonths, format, startOfMonth, startOfYear } from 'date-fns';
 import type { RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 import { SvelteMap, SvelteURLSearchParams } from 'svelte/reactivity';
@@ -261,40 +261,23 @@ class TransactionsContext {
 
 	private getPeriodRange(option: PeriodOption) {
 		const now = new UTCDate();
-		const currentYear = now.getUTCFullYear();
-		const currentMonth = now.getUTCMonth();
-		const startOfThisMonth = new UTCDate(currentYear, currentMonth, 1, 0, 0, 0, 0);
+		const thisMonthStart = startOfMonth(now);
 
 		switch (option) {
 			case 'this-month':
-				return { from: startOfThisMonth, to: null } as const;
-			case 'last-month': {
-				const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-				const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-				const startOfLastMonth = new UTCDate(lastMonthYear, lastMonth, 1, 0, 0, 0, 0);
-				return { from: startOfLastMonth, to: startOfThisMonth } as const;
-			}
-			case 'last-3-months': {
-				const threeMonthsAgo = new UTCDate(currentYear, currentMonth - 2, 1, 0, 0, 0, 0);
-				return { from: threeMonthsAgo, to: null } as const;
-			}
-			case 'last-6-months': {
-				const sixMonthsAgo = new UTCDate(currentYear, currentMonth - 5, 1, 0, 0, 0, 0);
-				return { from: sixMonthsAgo, to: null } as const;
-			}
-			case 'last-12-months': {
-				const twelveMonthsAgo = new UTCDate(currentYear, currentMonth - 11, 1, 0, 0, 0, 0);
-				return { from: twelveMonthsAgo, to: null } as const;
-			}
-			case 'year-to-date': {
-				const startOfYearUtc = new UTCDate(currentYear, 0, 1, 0, 0, 0, 0);
-				return { from: startOfYearUtc, to: null } as const;
-			}
-			case 'last-year': {
-				const startOfLastYear = new UTCDate(currentYear - 1, 0, 1, 0, 0, 0, 0);
-				const startOfThisYear = new UTCDate(currentYear, 0, 1, 0, 0, 0, 0);
-				return { from: startOfLastYear, to: startOfThisYear } as const;
-			}
+				return { from: thisMonthStart, to: null } as const;
+			case 'last-month':
+				return { from: startOfMonth(addMonths(now, -1)), to: thisMonthStart } as const;
+			case 'last-3-months':
+				return { from: startOfMonth(addMonths(now, -2)), to: null } as const;
+			case 'last-6-months':
+				return { from: startOfMonth(addMonths(now, -5)), to: null } as const;
+			case 'last-12-months':
+				return { from: startOfMonth(addMonths(now, -11)), to: null } as const;
+			case 'year-to-date':
+				return { from: startOfYear(now), to: null } as const;
+			case 'last-year':
+				return { from: startOfYear(addMonths(now, -12)), to: startOfYear(now) } as const;
 			case 'lifetime':
 			default:
 				return { from: null, to: null } as const;
