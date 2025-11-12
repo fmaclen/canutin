@@ -1,7 +1,10 @@
 import { UTCDate } from '@date-fns/utc';
-import { addMonths, startOfMonth, startOfYear } from 'date-fns';
+import { addMonths, format, startOfMonth, startOfYear } from 'date-fns';
 import { getContext, setContext } from 'svelte';
-import { SvelteMap } from 'svelte/reactivity';
+import { SvelteMap, SvelteURLSearchParams } from 'svelte/reactivity';
+import { get } from 'svelte/store';
+
+import { page } from '$app/stores';
 
 import { getAccountsContext } from './accounts.svelte';
 import type {
@@ -66,7 +69,88 @@ class TransactionsContext {
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
 		this._accountsContext = getAccountsContext();
+		this.initFromUrlParams();
 		this.init();
+		this.syncToUrlParams();
+	}
+
+	private initFromUrlParams() {
+		const currentPage = get(page);
+		const params = currentPage.url.searchParams;
+
+		const fromParam = params.get('from');
+		const toParam = params.get('to');
+
+		// Try to find matching period from date params only if at least one param exists
+		if (fromParam !== null || toParam !== null) {
+			const matchingPeriod = this.findPeriodFromDates(fromParam, toParam);
+			if (matchingPeriod) {
+				this.period = matchingPeriod;
+			}
+		}
+
+		const amountParam = params.get('amount');
+		if (amountParam && this.kindOptions.includes(amountParam as KindFilter)) {
+			this.kind = amountParam as KindFilter;
+		}
+	}
+
+	private findPeriodFromDates(from: string | null, to: string | null) {
+		// Handle lifetime sentinel value
+		if (from === 'lifetime' && to === null) {
+			return 'lifetime';
+		}
+
+		for (const option of this.periodOptions) {
+			const range = this.getPeriodRange(option);
+			const rangeFrom = range.from ? this.formatDate(range.from) : null;
+			const rangeTo = range.to ? this.formatDate(range.to) : null;
+
+			if (rangeFrom === from && rangeTo === to) {
+				return option;
+			}
+		}
+		return null;
+	}
+
+	private formatDate(date: Date) {
+		return format(date, 'yyyy-MM-dd');
+	}
+
+	private syncToUrlParams() {
+		$effect(() => {
+			const currentPage = get(page);
+			const params = new SvelteURLSearchParams(currentPage.url.searchParams);
+
+			const range = this.getPeriodRange(this.period);
+
+			// Handle "lifetime" specially - use a sentinel value
+			if (this.period === 'lifetime') {
+				params.set('from', 'lifetime');
+				params.delete('to');
+			} else {
+				if (range.from) {
+					params.set('from', this.formatDate(range.from));
+				} else {
+					params.delete('from');
+				}
+
+				if (range.to) {
+					params.set('to', this.formatDate(range.to));
+				} else {
+					params.delete('to');
+				}
+			}
+
+			params.set('amount', this.kind);
+
+			const search = params.toString();
+			const newUrl = `${currentPage.url.pathname}${search ? `?${search}` : ''}`;
+
+			if (newUrl !== `${currentPage.url.pathname}${currentPage.url.search}`) {
+				history.replaceState(history.state, '', newUrl);
+			}
+		});
 	}
 
 	private async init() {
@@ -183,7 +267,7 @@ class TransactionsContext {
 		return map;
 	}
 
-	get allRows(): TransactionRow[] {
+	get allRows() {
 		return this.rawTransactions.map((txn) => {
 			const dateIso = txn.date;
 			const date = new Date(dateIso);
@@ -210,7 +294,7 @@ class TransactionsContext {
 		});
 	}
 
-	get filteredRows(): TransactionRow[] {
+	get filteredRows() {
 		const { from, to } = this.getPeriodRange(this.period);
 		const fromTime = from?.getTime() ?? null;
 		const toTime = to?.getTime() ?? null;
@@ -231,13 +315,13 @@ class TransactionsContext {
 			});
 	}
 
-	get totalPages(): number {
+	get totalPages() {
 		const total = this.filteredRows.length;
 		if (total === 0) return 1;
 		return Math.ceil(total / this.pageSize);
 	}
 
-	get paginatedRows(): TransactionRow[] {
+	get paginatedRows() {
 		const start = (this.page - 1) * this.pageSize;
 		return this.filteredRows.slice(start, start + this.pageSize);
 	}

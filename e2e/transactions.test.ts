@@ -112,6 +112,19 @@ test('transactions table responds to period and type filters', async ({ page }) 
 			const shouldBeVisible = isWithinPeriod(txn.date, value, now);
 			await expectRowVisibility(page, txn.description, shouldBeVisible);
 		}
+
+		// Verify filter persists after reload
+		await page.reload();
+		await expect(page.getByLabel('Period')).toContainText(label);
+		// Verify default filter is not applied
+		if (label !== 'Last 3 months') {
+			await expect(page.getByLabel('Period')).not.toContainText('Last 3 months');
+		}
+		// Verify transactions still match the filter
+		for (const txn of transactions) {
+			const shouldBeVisible = isWithinPeriod(txn.date, value, now);
+			await expectRowVisibility(page, txn.description, shouldBeVisible);
+		}
 	}
 
 	const typeFilters: Array<{
@@ -128,6 +141,19 @@ test('transactions table responds to period and type filters', async ({ page }) 
 		await page.getByLabel('Type').click();
 		await page.getByRole('option', { name: label }).click();
 		await expect(page.getByLabel('Type')).toContainText(label);
+		for (const txn of transactions) {
+			const shouldBeVisible = predicate(txn);
+			await expectRowVisibility(page, txn.description, shouldBeVisible);
+		}
+
+		// Verify filter persists after reload
+		await page.reload();
+		await expect(page.getByLabel('Type')).toContainText(label);
+		// Verify default filter is not applied
+		if (label !== 'Any amounts') {
+			await expect(page.getByLabel('Type')).not.toContainText('Any amounts');
+		}
+		// Verify transactions still match the filter
 		for (const txn of transactions) {
 			const shouldBeVisible = predicate(txn);
 			await expectRowVisibility(page, txn.description, shouldBeVisible);
@@ -623,7 +649,7 @@ test('user can add a new transaction', async ({ page }) => {
 	await page.getByLabel('Labels').fill('Food & Dining, Personal');
 	await page.getByRole('button', { name: 'Add' }).click();
 	await expect(page.getByText('Transaction added').first()).toBeVisible();
-	await expect(page).toHaveURL('/transactions');
+	await expect(page.url()).toContain('/transactions');
 	await expect(page.getByText('Moonbeam Cafe')).toBeVisible();
 	await expect(page.getByText('-$45.50')).toBeVisible();
 	await expect(page.getByText('Meridian Checking').first()).toBeVisible();
@@ -650,7 +676,7 @@ test('user can add a new transaction', async ({ page }) => {
 
 	await page.getByRole('button', { name: 'Add' }).click();
 	await expect(page.getByText('Transaction added').first()).toBeVisible();
-	await expect(page).toHaveURL('/transactions');
+	await expect(page.url()).toContain('/transactions');
 	await expect(page.getByText('Credit Card Payment')).toBeVisible();
 	await expect(page.getByText('-$500.00')).toBeVisible();
 	await expect(page.getByText('Apex Credit Card')).toBeVisible();
@@ -726,7 +752,7 @@ test('user can edit transaction details', async ({ page }) => {
 	await expect(page.getByText('Transaction updated')).toBeVisible();
 
 	await page.getByLabel('breadcrumb').getByRole('link', { name: 'Transactions' }).click();
-	await expect(page).toHaveURL('/transactions');
+	await expect(page.url()).toContain('/transactions');
 	await expect(page.getByText('Paperclip Office Supply Co')).not.toBeVisible();
 
 	await expect(page.getByText('Skyward Airlines Conference Trip')).toBeVisible();
@@ -836,6 +862,6 @@ test('user can delete transaction', async ({ page }) => {
 
 	await dialog.getByRole('button', { name: 'Continue' }).click();
 	await expect(page.getByText('Transaction deleted')).toBeVisible();
-	await expect(page).toHaveURL('/transactions');
+	await expect(page.url()).toContain('/transactions');
 	await expect(page.getByText('StreamFlix Annual Subscription')).not.toBeVisible();
 });
