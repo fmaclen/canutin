@@ -113,14 +113,11 @@ test('transactions table responds to period and type filters', async ({ page }) 
 			await expectRowVisibility(page, txn.description, shouldBeVisible);
 		}
 
-		// Verify filter persists after reload
 		await page.reload();
 		await expect(page.getByLabel('Period')).toContainText(label);
-		// Verify default filter is not applied
 		if (label !== 'Last 3 months') {
 			await expect(page.getByLabel('Period')).not.toContainText('Last 3 months');
 		}
-		// Verify transactions still match the filter
 		for (const txn of transactions) {
 			const shouldBeVisible = isWithinPeriod(txn.date, value, now);
 			await expectRowVisibility(page, txn.description, shouldBeVisible);
@@ -146,14 +143,11 @@ test('transactions table responds to period and type filters', async ({ page }) 
 			await expectRowVisibility(page, txn.description, shouldBeVisible);
 		}
 
-		// Verify filter persists after reload
 		await page.reload();
 		await expect(page.getByLabel('Type')).toContainText(label);
-		// Verify default filter is not applied
 		if (label !== 'Any amounts') {
 			await expect(page.getByLabel('Type')).not.toContainText('Any amounts');
 		}
-		// Verify transactions still match the filter
 		for (const txn of transactions) {
 			const shouldBeVisible = predicate(txn);
 			await expectRowVisibility(page, txn.description, shouldBeVisible);
