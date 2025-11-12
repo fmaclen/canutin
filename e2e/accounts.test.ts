@@ -153,6 +153,8 @@ test('user can add a new account', async ({ page }) => {
 	await page.getByRole('option', { name: 'Debt' }).click();
 	await page.getByLabel('Category').fill('Credit card');
 	await page.getByRole('spinbutton', { name: 'Balance' }).fill('-1200');
+	await expect(page.getByText('Account added successfully')).not.toBeVisible();
+
 	await page.getByRole('button', { name: 'Add' }).click();
 	await expect(page.getByText('Account added successfully')).toBeVisible();
 	await expect(page).toHaveURL('/accounts');
