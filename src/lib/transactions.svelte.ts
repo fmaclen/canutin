@@ -1,5 +1,5 @@
 import { UTCDate } from '@date-fns/utc';
-import { addMonths, format, startOfMonth, startOfYear } from 'date-fns';
+import { format } from 'date-fns';
 import type { RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 import { SvelteMap, SvelteURLSearchParams } from 'svelte/reactivity';
