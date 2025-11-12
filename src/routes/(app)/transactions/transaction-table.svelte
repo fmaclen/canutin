@@ -34,7 +34,7 @@
 		{m.transactions_table_empty()}
 	</Empty>
 {:else}
-	<div class="bg-background overflow-hidden rounded-sm shadow-md" aria-busy={txContext.isLoading}>
+	<div class="bg-background overflow-hidden rounded-sm shadow-md">
 		<Table.Root>
 			<Table.Header>
 				<Table.Row>

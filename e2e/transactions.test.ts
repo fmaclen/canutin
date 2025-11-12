@@ -871,7 +871,7 @@ test('transactions list updates in real-time when new transaction is added', asy
 	await seedAccountBalance({
 		account: checkingAccount.id,
 		owner: user.id,
-		asOf: new Date().toISOString(),
+		asOf: new UTCDate().toISOString(),
 		value: 3000
 	});
 
