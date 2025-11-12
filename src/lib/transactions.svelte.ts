@@ -196,6 +196,13 @@ class TransactionsContext {
 				to = range.to;
 			}
 
+			console.log('[refreshTransactions] filter dates:', {
+				from: from?.toISOString(),
+				to: to?.toISOString(),
+				fromConstructor: from?.constructor.name,
+				toConstructor: to?.constructor.name
+			});
+
 			if (from) {
 				filterParts.push(`date >= '${from.toISOString()}'`);
 			}
@@ -262,6 +269,14 @@ class TransactionsContext {
 	private getPeriodRange(option: PeriodOption) {
 		const now = new UTCDate();
 		const thisMonthStart = startOfMonth(now);
+
+		console.log('[getPeriodRange]', {
+			option,
+			now: now.toISOString(),
+			nowConstructor: now.constructor.name,
+			thisMonthStart: thisMonthStart.toISOString(),
+			thisMonthStartConstructor: thisMonthStart.constructor.name
+		});
 
 		switch (option) {
 			case 'this-month':

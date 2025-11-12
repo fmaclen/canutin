@@ -409,6 +409,12 @@ test('transactions correctly handle UTC dates regardless of local timezone', asy
 	});
 	const page = await context.newPage();
 
+	page.on('console', (msg) => {
+		if (msg.text().includes('[getPeriodRange]') || msg.text().includes('[refreshTransactions]')) {
+			console.log('[Browser Console]', msg.text());
+		}
+	});
+
 	const user = await seedUser('samoa');
 
 	const account = await seedAccount({
@@ -427,6 +433,15 @@ test('transactions correctly handle UTC dates regardless of local timezone', asy
 	const now = new UTCDate();
 	const startOfThisMonthUtc = startOfMonth(now);
 	const endOfLastMonthUtc = endOfMonth(subMonths(now, 1));
+
+	console.log('[Test] UTC timezone test dates:', {
+		now: now.toISOString(),
+		nowConstructor: now.constructor.name,
+		startOfThisMonthUtc: startOfThisMonthUtc.toISOString(),
+		startOfThisMonthUtcConstructor: startOfThisMonthUtc.constructor.name,
+		endOfLastMonthUtc: endOfLastMonthUtc.toISOString(),
+		endOfLastMonthUtcConstructor: endOfLastMonthUtc.constructor.name
+	});
 
 	await seedTransaction({
 		account: account.id,
