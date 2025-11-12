@@ -1,6 +1,6 @@
 import { UTCDate } from '@date-fns/utc';
 import { expect, test, type Page } from '@playwright/test';
-import { addMonths, startOfMonth, subYears } from 'date-fns';
+import { addMonths, endOfMonth, startOfMonth, subMonths, subYears } from 'date-fns';
 
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
@@ -403,15 +403,11 @@ test('transactions are sorted by date DESC, then amount DESC, then id ASC', asyn
 test('transactions correctly handle UTC dates regardless of local timezone', async ({
 	browser
 }) => {
-	// Set timezone to American Samoa (UTC-11) to expose timezone bugs
 	const context = await browser.newContext({
 		timezoneId: 'Pacific/Pago_Pago',
 		locale: 'en-US'
 	});
 	const page = await context.newPage();
-
-	const testDate = new Date('2025-10-15T12:00:00Z');
-	await page.clock.setFixedTime(testDate);
 
 	const user = await seedUser('samoa');
 
@@ -428,26 +424,42 @@ test('transactions correctly handle UTC dates regardless of local timezone', asy
 		value: 2000
 	});
 
-	// Create transactions at month boundaries in UTC
-	// October 1, 2025 00:30:00 UTC = September 30, 2025 13:30:00 in American Samoa
-	// If the app uses local dates, this transaction would appear in September
-	// If the app correctly uses UTC, it should appear in October
-	const octoberInUtc = new UTCDate(2025, 9, 1, 0, 30, 0, 0); // October 1 UTC
-	const septemberInUtc = new UTCDate(2025, 8, 30, 23, 30, 0, 0); // September 30 UTC
+	const now = new UTCDate();
+	const thisMonthStart = startOfMonth(now);
+	const lastMonthEnd = endOfMonth(subMonths(now, 1));
+
+	const startOfThisMonthUtc = new UTCDate(
+		thisMonthStart.getUTCFullYear(),
+		thisMonthStart.getUTCMonth(),
+		thisMonthStart.getUTCDate(),
+		0,
+		30,
+		0,
+		0
+	);
+	const endOfLastMonthUtc = new UTCDate(
+		lastMonthEnd.getUTCFullYear(),
+		lastMonthEnd.getUTCMonth(),
+		lastMonthEnd.getUTCDate(),
+		23,
+		30,
+		0,
+		0
+	);
 
 	await seedTransaction({
 		account: account.id,
 		owner: user.id,
-		date: octoberInUtc.toISOString(),
-		description: 'Early October UTC Transaction',
+		date: startOfThisMonthUtc.toISOString(),
+		description: 'Early This Month UTC Transaction',
 		value: 500
 	});
 
 	await seedTransaction({
 		account: account.id,
 		owner: user.id,
-		date: septemberInUtc.toISOString(),
-		description: 'Late September UTC Transaction',
+		date: endOfLastMonthUtc.toISOString(),
+		description: 'Late Last Month UTC Transaction',
 		value: -300
 	});
 
@@ -455,33 +467,19 @@ test('transactions correctly handle UTC dates regardless of local timezone', asy
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Transactions');
 
-	// Both transactions should be visible with default "3M" filter
-	await expect(page.getByRole('row', { name: /Early October UTC Transaction/ })).toBeVisible();
-	await expect(page.getByRole('row', { name: /Late September UTC Transaction/ })).toBeVisible();
+	await expect(page.getByText('Early This Month UTC Transaction')).toHaveCount(1);
+	await expect(page.getByText('Late Last Month UTC Transaction')).toHaveCount(1);
 
-	// Switch to This month (Month To Date) filter
-	// This should show only transactions from October 1 UTC onwards
 	await page.getByLabel('Period').click();
 	await page.getByRole('option', { name: 'This month' }).click();
+	await expect(page.getByText('Early This Month UTC Transaction')).toHaveCount(1);
+	await expect(page.getByText('Late Last Month UTC Transaction')).toHaveCount(0);
 
-	// The October transaction should be visible
-	await expect(page.getByRole('row', { name: /Early October UTC Transaction/ })).toBeVisible();
-
-	// The September transaction should NOT be visible
-	await expect(page.getByRole('row', { name: /Late September UTC Transaction/ })).toHaveCount(0);
-
-	// Switch to Last month filter
-	// This should show only September transactions
 	await page.getByLabel('Period').click();
 	await page.getByRole('option', { name: 'Last month' }).click();
+	await expect(page.getByText('Late Last Month UTC Transaction')).toHaveCount(1);
+	await expect(page.getByText('Early This Month UTC Transaction')).toHaveCount(0);
 
-	// The September transaction should be visible
-	await expect(page.getByRole('row', { name: /Late September UTC Transaction/ })).toBeVisible();
-
-	// The October transaction should NOT be visible
-	await expect(page.getByRole('row', { name: /Early October UTC Transaction/ })).toHaveCount(0);
-
-	// Clean up
 	await context.close();
 });
 
