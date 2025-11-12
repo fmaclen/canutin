@@ -50,6 +50,9 @@ class TransactionsContext {
 	isLoading: boolean = $state(true);
 	rawTransactions: TransactionsResponse<TransactionExpand>[] = $state([]);
 
+	private _customFromDate: Date | null = $state(null);
+	private _customToDate: Date | null = $state(null);
+
 	readonly periodOptions: PeriodOption[] = [
 		'this-month',
 		'last-month',
@@ -71,7 +74,7 @@ class TransactionsContext {
 		this._accountsContext = getAccountsContext();
 		this.initFromUrlParams();
 		this.init();
-		this.syncToUrlParams();
+		this.setupUrlSync();
 	}
 
 	private initFromUrlParams() {
@@ -81,8 +84,10 @@ class TransactionsContext {
 		const fromParam = params.get('from');
 		const toParam = params.get('to');
 
-		// Try to find matching period from date params only if at least one param exists
 		if (fromParam !== null || toParam !== null) {
+			this._customFromDate = fromParam && fromParam !== 'lifetime' ? new Date(fromParam) : null;
+			this._customToDate = toParam ? new Date(toParam) : null;
+
 			const matchingPeriod = this.findPeriodFromDates(fromParam, toParam);
 			if (matchingPeriod) {
 				this.period = matchingPeriod;
@@ -96,7 +101,6 @@ class TransactionsContext {
 	}
 
 	private findPeriodFromDates(from: string | null, to: string | null) {
-		// Handle lifetime sentinel value
 		if (from === 'lifetime' && to === null) {
 			return 'lifetime';
 		}
@@ -117,14 +121,29 @@ class TransactionsContext {
 		return format(date, 'yyyy-MM-dd');
 	}
 
-	private syncToUrlParams() {
+	private setupUrlSync() {
+		let isFirstRun = true;
+
 		$effect(() => {
+			const currentPeriod = this.period;
+			const currentKind = this.kind;
+
+			if (isFirstRun) {
+				isFirstRun = false;
+				return;
+			}
+
+			void currentPeriod;
+			void currentKind;
+
+			this._customFromDate = null;
+			this._customToDate = null;
+
 			const currentPage = get(page);
 			const params = new SvelteURLSearchParams(currentPage.url.searchParams);
 
 			const range = this.getPeriodRange(this.period);
 
-			// Handle "lifetime" specially - use a sentinel value
 			if (this.period === 'lifetime') {
 				params.set('from', 'lifetime');
 				params.delete('to');
@@ -295,7 +314,18 @@ class TransactionsContext {
 	}
 
 	get filteredRows() {
-		const { from, to } = this.getPeriodRange(this.period);
+		let from: Date | null;
+		let to: Date | null;
+
+		if (this._customFromDate !== null || this._customToDate !== null) {
+			from = this._customFromDate;
+			to = this._customToDate;
+		} else {
+			const range = this.getPeriodRange(this.period);
+			from = range.from;
+			to = range.to;
+		}
+
 		const fromTime = from?.getTime() ?? null;
 		const toTime = to?.getTime() ?? null;
 		return this.allRows
