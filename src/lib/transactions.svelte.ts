@@ -196,22 +196,11 @@ class TransactionsContext {
 				to = range.to;
 			}
 
-			console.log('[refreshTransactions] filter dates:', {
-				from: from?.toISOString(),
-				to: to?.toISOString(),
-				fromConstructor: from?.constructor.name,
-				toConstructor: to?.constructor.name
-			});
-
 			if (from) {
-				const filterStr = `date >= '${from.toISOString()}'`;
-				console.log('[refreshTransactions] adding filter:', filterStr);
-				filterParts.push(filterStr);
+				filterParts.push(`date >= '${from.toISOString()}'`);
 			}
 			if (to) {
-				const filterStr = `date < '${to.toISOString()}'`;
-				console.log('[refreshTransactions] adding filter:', filterStr);
-				filterParts.push(filterStr);
+				filterParts.push(`date < '${to.toISOString()}'`);
 			}
 
 			if (this.kind === 'credits') {
@@ -224,8 +213,6 @@ class TransactionsContext {
 
 			const filter = filterParts.length > 0 ? filterParts.join(' && ') : undefined;
 
-			console.log('[refreshTransactions] final PocketBase filter:', filter);
-
 			const list = await this._pb.authedClient
 				.collection('transactions')
 				.getFullList<TransactionsResponse<TransactionExpand>>({
@@ -235,14 +222,6 @@ class TransactionsContext {
 					filter,
 					requestKey: 'transactions:list'
 				});
-			console.log('[refreshTransactions] PocketBase returned', list.length, 'transactions');
-			if (list.length > 0) {
-				console.log('[refreshTransactions] first transaction:', {
-					id: list[0].id,
-					date: list[0].date,
-					description: list[0].description
-				});
-			}
 			this.rawTransactions = list;
 		} catch (error) {
 			this._pb.handleConnectionError(error, 'transactions', 'refresh');
@@ -285,14 +264,6 @@ class TransactionsContext {
 		const currentYear = now.getUTCFullYear();
 		const currentMonth = now.getUTCMonth();
 		const startOfThisMonth = new UTCDate(currentYear, currentMonth, 1, 0, 0, 0, 0);
-
-		console.log('[getPeriodRange]', {
-			option,
-			now: now.toISOString(),
-			nowConstructor: now.constructor.name,
-			startOfThisMonth: startOfThisMonth.toISOString(),
-			startOfThisMonthConstructor: startOfThisMonth.constructor.name
-		});
 
 		switch (option) {
 			case 'this-month': {
