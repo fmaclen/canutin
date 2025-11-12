@@ -49,13 +49,13 @@
 
 <Page pageTitle={m.sidebar_transactions()}>
 	<Section>
-		{#if txContext.isLoading && txContext.rawTransactions.length === 0}
-			<Skeleton class="h-64" />
-		{:else}
-			<div class="flex flex-col gap-4">
-				<TransactionFilters />
+		<div class="flex flex-col gap-4">
+			<TransactionFilters />
+			{#if txContext.isLoading && txContext.rawTransactions.length === 0}
+				<Skeleton class="min-h-32" />
+			{:else}
 				<TransactionTable />
-			</div>
-		{/if}
+			{/if}
+		</div>
 	</Section>
 </Page>

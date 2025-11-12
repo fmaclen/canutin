@@ -1,5 +1,6 @@
 import { UTCDate } from '@date-fns/utc';
-import { addMonths, format, startOfMonth, startOfYear } from 'date-fns';
+import { format } from 'date-fns';
+import type { RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 import { SvelteMap, SvelteURLSearchParams } from 'svelte/reactivity';
 import { get } from 'svelte/store';
@@ -169,22 +170,56 @@ class TransactionsContext {
 			if (newUrl !== `${currentPage.url.pathname}${currentPage.url.search}`) {
 				history.replaceState(history.state, '', newUrl);
 			}
+
+			this.refreshTransactions();
 		});
 	}
 
 	private async init() {
 		await this.refreshTransactions();
+		this.realtimeSubscribe();
 	}
 
 	async refreshTransactions() {
 		this.isLoading = true;
 		try {
+			const filterParts: string[] = [];
+
+			let from: Date | null;
+			let to: Date | null;
+			if (this._customFromDate !== null || this._customToDate !== null) {
+				from = this._customFromDate;
+				to = this._customToDate;
+			} else {
+				const range = this.getPeriodRange(this.period);
+				from = range.from;
+				to = range.to;
+			}
+
+			if (from) {
+				filterParts.push(`date >= '${from.toISOString()}'`);
+			}
+			if (to) {
+				filterParts.push(`date < '${to.toISOString()}'`);
+			}
+
+			if (this.kind === 'credits') {
+				filterParts.push('value > 0');
+			} else if (this.kind === 'debits') {
+				filterParts.push('value < 0');
+			} else if (this.kind === 'excluded') {
+				filterParts.push('excluded != ""');
+			}
+
+			const filter = filterParts.length > 0 ? filterParts.join(' && ') : undefined;
+
 			const list = await this._pb.authedClient
 				.collection('transactions')
 				.getFullList<TransactionsResponse<TransactionExpand>>({
 					sort: '-date,-created,-id',
 					expand: 'account,labels',
 					batch: 200,
+					filter,
 					requestKey: 'transactions:list'
 				});
 			this.rawTransactions = list;
@@ -195,83 +230,71 @@ class TransactionsContext {
 		}
 	}
 
+	private realtimeSubscribe() {
+		this._pb.authedClient
+			.collection('transactions')
+			.subscribe('*', this.onTransactionEvent.bind(this))
+			.catch((error) =>
+				this._pb.handleSubscriptionError(error, 'transactions', 'subscribe_transactions')
+			);
+	}
+
+	private async onTransactionEvent(e: RecordSubscription<TransactionsResponse<TransactionExpand>>) {
+		if (e.action === 'create') {
+			const txn = await this._pb.authedClient
+				.collection('transactions')
+				.getOne<TransactionsResponse<TransactionExpand>>(e.record.id, {
+					expand: 'account,labels'
+				});
+			this.rawTransactions = [...this.rawTransactions, txn];
+		} else if (e.action === 'update') {
+			const txn = await this._pb.authedClient
+				.collection('transactions')
+				.getOne<TransactionsResponse<TransactionExpand>>(e.record.id, {
+					expand: 'account,labels'
+				});
+			this.rawTransactions = this.rawTransactions.map((x) => (x.id === e.record.id ? txn : x));
+		} else if (e.action === 'delete') {
+			this.rawTransactions = this.rawTransactions.filter((x) => x.id !== e.record.id);
+		}
+	}
+
 	private getPeriodRange(option: PeriodOption) {
 		const now = new UTCDate();
-		const startOfThisMonthDate = startOfMonth(now);
-		const startOfThisMonth = new UTCDate(
-			startOfThisMonthDate.getUTCFullYear(),
-			startOfThisMonthDate.getUTCMonth(),
-			1,
-			0,
-			0,
-			0,
-			0
-		);
+		const currentYear = now.getUTCFullYear();
+		const currentMonth = now.getUTCMonth();
+		const startOfThisMonth = new UTCDate(currentYear, currentMonth, 1, 0, 0, 0, 0);
+
 		switch (option) {
-			case 'this-month':
-				return { from: startOfThisMonth, to: null } as const;
+			case 'this-month': {
+				const adjusted = new Date(startOfThisMonth.getTime() - 1);
+				return { from: adjusted, to: null } as const;
+			}
 			case 'last-month': {
-				const lastMonthDate = addMonths(startOfThisMonthDate, -1);
-				const startOfLastMonth = new UTCDate(
-					lastMonthDate.getUTCFullYear(),
-					lastMonthDate.getUTCMonth(),
-					1,
-					0,
-					0,
-					0,
-					0
-				);
+				const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+				const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+				const startOfLastMonth = new UTCDate(lastMonthYear, lastMonth, 1, 0, 0, 0, 0);
 				return { from: startOfLastMonth, to: startOfThisMonth } as const;
 			}
 			case 'last-3-months': {
-				const threeMonthsAgoDate = addMonths(startOfThisMonthDate, -2);
-				const startOfThreeMonthsAgo = new UTCDate(
-					threeMonthsAgoDate.getUTCFullYear(),
-					threeMonthsAgoDate.getUTCMonth(),
-					1,
-					0,
-					0,
-					0,
-					0
-				);
-				return { from: startOfThreeMonthsAgo, to: null } as const;
+				const threeMonthsAgo = new UTCDate(currentYear, currentMonth - 2, 1, 0, 0, 0, 0);
+				return { from: threeMonthsAgo, to: null } as const;
 			}
 			case 'last-6-months': {
-				const sixMonthsAgoDate = addMonths(startOfThisMonthDate, -5);
-				const startOfSixMonthsAgo = new UTCDate(
-					sixMonthsAgoDate.getUTCFullYear(),
-					sixMonthsAgoDate.getUTCMonth(),
-					1,
-					0,
-					0,
-					0,
-					0
-				);
-				return { from: startOfSixMonthsAgo, to: null } as const;
+				const sixMonthsAgo = new UTCDate(currentYear, currentMonth - 5, 1, 0, 0, 0, 0);
+				return { from: sixMonthsAgo, to: null } as const;
 			}
 			case 'last-12-months': {
-				const twelveMonthsAgoDate = addMonths(startOfThisMonthDate, -11);
-				const startOfTwelveMonthsAgo = new UTCDate(
-					twelveMonthsAgoDate.getUTCFullYear(),
-					twelveMonthsAgoDate.getUTCMonth(),
-					1,
-					0,
-					0,
-					0,
-					0
-				);
-				return { from: startOfTwelveMonthsAgo, to: null } as const;
+				const twelveMonthsAgo = new UTCDate(currentYear, currentMonth - 11, 1, 0, 0, 0, 0);
+				return { from: twelveMonthsAgo, to: null } as const;
 			}
 			case 'year-to-date': {
-				const yearStartDate = startOfYear(now);
-				const startOfYearUtc = new UTCDate(yearStartDate.getUTCFullYear(), 0, 1, 0, 0, 0, 0);
+				const startOfYearUtc = new UTCDate(currentYear, 0, 1, 0, 0, 0, 0);
 				return { from: startOfYearUtc, to: null } as const;
 			}
 			case 'last-year': {
-				const yearStartDate = startOfYear(now);
-				const lastYearStartDate = addMonths(yearStartDate, -12);
-				const startOfLastYear = new UTCDate(lastYearStartDate.getUTCFullYear(), 0, 1, 0, 0, 0, 0);
-				const startOfThisYear = new UTCDate(yearStartDate.getUTCFullYear(), 0, 1, 0, 0, 0, 0);
+				const startOfLastYear = new UTCDate(currentYear - 1, 0, 1, 0, 0, 0, 0);
+				const startOfThisYear = new UTCDate(currentYear, 0, 1, 0, 0, 0, 0);
 				return { from: startOfLastYear, to: startOfThisYear } as const;
 			}
 			case 'lifetime':
@@ -354,6 +377,10 @@ class TransactionsContext {
 	get paginatedRows() {
 		const start = (this.page - 1) * this.pageSize;
 		return this.filteredRows.slice(start, start + this.pageSize);
+	}
+
+	dispose() {
+		this._pb.authedClient.collection('transactions').unsubscribe();
 	}
 }
 
