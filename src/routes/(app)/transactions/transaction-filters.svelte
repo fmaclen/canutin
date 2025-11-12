@@ -1,6 +1,6 @@
 <script lang="ts">
 	import SectionTitle from '$lib/components/section-title.svelte';
-	import * as Tabs from '$lib/components/ui/tabs/index';
+	import * as Select from '$lib/components/ui/select/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import {
 		getTransactionsContext,
@@ -12,53 +12,66 @@
 
 	function periodLabel(option: PeriodOption) {
 		switch (option) {
-			case 'mtd':
-				return m.period_mtd_label();
-			case '1m':
-				return m.period_1m_label();
-			case '3m':
-				return m.period_3m_label();
-			case '6m':
-				return m.period_6m_label();
-			case '12m':
-				return m.period_12m_label();
-			case 'ytd':
-				return m.period_ytd_label();
-			case 'all':
+			case 'this-month':
+				return m.transactions_filter_period_this_month();
+			case 'last-month':
+				return m.transactions_filter_period_last_month();
+			case 'last-3-months':
+				return m.transactions_filter_period_last_3_months();
+			case 'last-6-months':
+				return m.transactions_filter_period_last_6_months();
+			case 'last-12-months':
+				return m.transactions_filter_period_last_12_months();
+			case 'year-to-date':
+				return m.transactions_filter_period_year_to_date();
+			case 'last-year':
+				return m.transactions_filter_period_last_year();
+			case 'lifetime':
 			default:
-				return m.period_all_label();
+				return m.transactions_filter_period_lifetime();
 		}
 	}
 
 	function kindLabel(option: KindFilter) {
 		switch (option) {
 			case 'credits':
-				return m.transactions_kind_credits_label();
+				return m.transactions_filter_kind_credits_only();
 			case 'debits':
-				return m.transactions_kind_debits_label();
+				return m.transactions_filter_kind_debits_only();
+			case 'excluded':
+				return m.transactions_filter_kind_excluded_only();
 			case 'all':
 			default:
-				return m.transactions_kind_all_label();
+				return m.transactions_filter_kind_any_amounts();
 		}
 	}
 </script>
 
-<nav class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+<div class="flex flex-col gap-4">
 	<SectionTitle title={m.transactions_section_title()} />
-	<div class="flex items-center gap-3">
-		<Tabs.Root bind:value={txContext.period}>
-			<Tabs.List class="flex items-center gap-1">
+	<div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+		<Select.Root type="single" bind:value={txContext.period}>
+			<Select.Trigger
+				aria-label={m.transactions_filter_period_label()}
+				class="bg-background sm:w-48"
+			>
+				{periodLabel(txContext.period)}
+			</Select.Trigger>
+			<Select.Content>
 				{#each txContext.periodOptions as option (option)}
-					<Tabs.Trigger value={option}>{periodLabel(option)}</Tabs.Trigger>
+					<Select.Item value={option}>{periodLabel(option)}</Select.Item>
 				{/each}
-			</Tabs.List>
-		</Tabs.Root>
-		<Tabs.Root bind:value={txContext.kind}>
-			<Tabs.List class="flex items-center gap-1">
+			</Select.Content>
+		</Select.Root>
+		<Select.Root type="single" bind:value={txContext.kind}>
+			<Select.Trigger aria-label={m.transactions_filter_kind_label()} class="bg-background sm:w-48">
+				{kindLabel(txContext.kind)}
+			</Select.Trigger>
+			<Select.Content>
 				{#each txContext.kindOptions as option (option)}
-					<Tabs.Trigger value={option}>{kindLabel(option)}</Tabs.Trigger>
+					<Select.Item value={option}>{kindLabel(option)}</Select.Item>
 				{/each}
-			</Tabs.List>
-		</Tabs.Root>
+			</Select.Content>
+		</Select.Root>
 	</div>
-</nav>
+</div>

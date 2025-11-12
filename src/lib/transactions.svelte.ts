@@ -1,7 +1,10 @@
 import { UTCDate } from '@date-fns/utc';
-import { addMonths, startOfMonth, startOfYear } from 'date-fns';
+import { addMonths, format, startOfMonth, startOfYear } from 'date-fns';
 import { getContext, setContext } from 'svelte';
-import { SvelteMap } from 'svelte/reactivity';
+import { SvelteMap, SvelteURLSearchParams } from 'svelte/reactivity';
+import { get } from 'svelte/store';
+
+import { page } from '$app/stores';
 
 import { getAccountsContext } from './accounts.svelte';
 import type {
@@ -11,8 +14,16 @@ import type {
 } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
 
-export type PeriodOption = 'mtd' | '1m' | '3m' | '6m' | 'ytd' | '12m' | 'all';
-export type KindFilter = 'all' | 'credits' | 'debits';
+export type PeriodOption =
+	| 'this-month'
+	| 'last-month'
+	| 'last-3-months'
+	| 'last-6-months'
+	| 'last-12-months'
+	| 'year-to-date'
+	| 'last-year'
+	| 'lifetime';
+export type KindFilter = 'all' | 'credits' | 'debits' | 'excluded';
 
 type TransactionExpand = {
 	account?: AccountsResponse;
@@ -33,14 +44,26 @@ export type TransactionRow = {
 };
 
 class TransactionsContext {
-	period: PeriodOption = $state('3m');
+	period: PeriodOption = $state('last-3-months');
 	kind: KindFilter = $state('all');
 	page: number = $state(1);
 	isLoading: boolean = $state(true);
 	rawTransactions: TransactionsResponse<TransactionExpand>[] = $state([]);
 
-	readonly periodOptions: PeriodOption[] = ['mtd', '1m', '3m', '6m', 'ytd', '12m', 'all'];
-	readonly kindOptions: KindFilter[] = ['all', 'credits', 'debits'];
+	private _customFromDate: Date | null = $state(null);
+	private _customToDate: Date | null = $state(null);
+
+	readonly periodOptions: PeriodOption[] = [
+		'this-month',
+		'last-month',
+		'last-3-months',
+		'last-6-months',
+		'last-12-months',
+		'year-to-date',
+		'last-year',
+		'lifetime'
+	];
+	readonly kindOptions: KindFilter[] = ['all', 'credits', 'debits', 'excluded'];
 	readonly pageSize = 50;
 
 	private _pb: PocketBaseContext;
@@ -49,7 +72,104 @@ class TransactionsContext {
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
 		this._accountsContext = getAccountsContext();
+		this.initFromUrlParams();
 		this.init();
+		this.setupUrlSync();
+	}
+
+	private initFromUrlParams() {
+		const currentPage = get(page);
+		const params = currentPage.url.searchParams;
+
+		const fromParam = params.get('from');
+		const toParam = params.get('to');
+
+		if (fromParam !== null || toParam !== null) {
+			this._customFromDate = fromParam && fromParam !== 'lifetime' ? new Date(fromParam) : null;
+			this._customToDate = toParam ? new Date(toParam) : null;
+
+			const matchingPeriod = this.findPeriodFromDates(fromParam, toParam);
+			if (matchingPeriod) {
+				this.period = matchingPeriod;
+			}
+		}
+
+		const amountParam = params.get('amount');
+		if (amountParam && this.kindOptions.includes(amountParam as KindFilter)) {
+			this.kind = amountParam as KindFilter;
+		}
+	}
+
+	private findPeriodFromDates(from: string | null, to: string | null) {
+		if (from === 'lifetime' && to === null) {
+			return 'lifetime';
+		}
+
+		for (const option of this.periodOptions) {
+			const range = this.getPeriodRange(option);
+			const rangeFrom = range.from ? this.formatDate(range.from) : null;
+			const rangeTo = range.to ? this.formatDate(range.to) : null;
+
+			if (rangeFrom === from && rangeTo === to) {
+				return option;
+			}
+		}
+		return null;
+	}
+
+	private formatDate(date: Date) {
+		return format(date, 'yyyy-MM-dd');
+	}
+
+	private setupUrlSync() {
+		let isFirstRun = true;
+
+		$effect(() => {
+			const currentPeriod = this.period;
+			const currentKind = this.kind;
+
+			if (isFirstRun) {
+				isFirstRun = false;
+				return;
+			}
+
+			void currentPeriod;
+			void currentKind;
+
+			this._customFromDate = null;
+			this._customToDate = null;
+
+			const currentPage = get(page);
+			const params = new SvelteURLSearchParams(currentPage.url.searchParams);
+
+			const range = this.getPeriodRange(this.period);
+
+			if (this.period === 'lifetime') {
+				params.set('from', 'lifetime');
+				params.delete('to');
+			} else {
+				if (range.from) {
+					params.set('from', this.formatDate(range.from));
+				} else {
+					params.delete('from');
+				}
+
+				if (range.to) {
+					params.set('to', this.formatDate(range.to));
+				} else {
+					params.delete('to');
+				}
+			}
+
+			params.set('amount', this.kind);
+
+			const search = params.toString();
+			const newUrl = `${currentPage.url.pathname}${search ? `?${search}` : ''}`;
+
+			if (newUrl !== `${currentPage.url.pathname}${currentPage.url.search}`) {
+				history.replaceState(history.state, '', newUrl);
+			}
+		});
 	}
 
 	private async init() {
@@ -88,9 +208,9 @@ class TransactionsContext {
 			0
 		);
 		switch (option) {
-			case 'mtd':
+			case 'this-month':
 				return { from: startOfThisMonth, to: null } as const;
-			case '1m': {
+			case 'last-month': {
 				const lastMonthDate = addMonths(startOfThisMonthDate, -1);
 				const startOfLastMonth = new UTCDate(
 					lastMonthDate.getUTCFullYear(),
@@ -103,7 +223,7 @@ class TransactionsContext {
 				);
 				return { from: startOfLastMonth, to: startOfThisMonth } as const;
 			}
-			case '3m': {
+			case 'last-3-months': {
 				const threeMonthsAgoDate = addMonths(startOfThisMonthDate, -2);
 				const startOfThreeMonthsAgo = new UTCDate(
 					threeMonthsAgoDate.getUTCFullYear(),
@@ -116,7 +236,7 @@ class TransactionsContext {
 				);
 				return { from: startOfThreeMonthsAgo, to: null } as const;
 			}
-			case '6m': {
+			case 'last-6-months': {
 				const sixMonthsAgoDate = addMonths(startOfThisMonthDate, -5);
 				const startOfSixMonthsAgo = new UTCDate(
 					sixMonthsAgoDate.getUTCFullYear(),
@@ -129,12 +249,7 @@ class TransactionsContext {
 				);
 				return { from: startOfSixMonthsAgo, to: null } as const;
 			}
-			case 'ytd': {
-				const yearStartDate = startOfYear(now);
-				const startOfYearUtc = new UTCDate(yearStartDate.getUTCFullYear(), 0, 1, 0, 0, 0, 0);
-				return { from: startOfYearUtc, to: null } as const;
-			}
-			case '12m': {
+			case 'last-12-months': {
 				const twelveMonthsAgoDate = addMonths(startOfThisMonthDate, -11);
 				const startOfTwelveMonthsAgo = new UTCDate(
 					twelveMonthsAgoDate.getUTCFullYear(),
@@ -147,6 +262,19 @@ class TransactionsContext {
 				);
 				return { from: startOfTwelveMonthsAgo, to: null } as const;
 			}
+			case 'year-to-date': {
+				const yearStartDate = startOfYear(now);
+				const startOfYearUtc = new UTCDate(yearStartDate.getUTCFullYear(), 0, 1, 0, 0, 0, 0);
+				return { from: startOfYearUtc, to: null } as const;
+			}
+			case 'last-year': {
+				const yearStartDate = startOfYear(now);
+				const lastYearStartDate = addMonths(yearStartDate, -12);
+				const startOfLastYear = new UTCDate(lastYearStartDate.getUTCFullYear(), 0, 1, 0, 0, 0, 0);
+				const startOfThisYear = new UTCDate(yearStartDate.getUTCFullYear(), 0, 1, 0, 0, 0, 0);
+				return { from: startOfLastYear, to: startOfThisYear } as const;
+			}
+			case 'lifetime':
 			default:
 				return { from: null, to: null } as const;
 		}
@@ -158,7 +286,7 @@ class TransactionsContext {
 		return map;
 	}
 
-	get allRows(): TransactionRow[] {
+	get allRows() {
 		return this.rawTransactions.map((txn) => {
 			const dateIso = txn.date;
 			const date = new Date(dateIso);
@@ -185,8 +313,19 @@ class TransactionsContext {
 		});
 	}
 
-	get filteredRows(): TransactionRow[] {
-		const { from, to } = this.getPeriodRange(this.period);
+	get filteredRows() {
+		let from: Date | null;
+		let to: Date | null;
+
+		if (this._customFromDate !== null || this._customToDate !== null) {
+			from = this._customFromDate;
+			to = this._customToDate;
+		} else {
+			const range = this.getPeriodRange(this.period);
+			from = range.from;
+			to = range.to;
+		}
+
 		const fromTime = from?.getTime() ?? null;
 		const toTime = to?.getTime() ?? null;
 		return this.allRows
@@ -196,6 +335,7 @@ class TransactionsContext {
 				if (toTime !== null && time >= toTime) return false;
 				if (this.kind === 'credits') return row.value > 0;
 				if (this.kind === 'debits') return row.value < 0;
+				if (this.kind === 'excluded') return row.excluded;
 				return true;
 			})
 			.sort((a, b) => {
@@ -205,13 +345,13 @@ class TransactionsContext {
 			});
 	}
 
-	get totalPages(): number {
+	get totalPages() {
 		const total = this.filteredRows.length;
 		if (total === 0) return 1;
 		return Math.ceil(total / this.pageSize);
 	}
 
-	get paginatedRows(): TransactionRow[] {
+	get paginatedRows() {
 		const start = (this.page - 1) * this.pageSize;
 		return this.filteredRows.slice(start, start + this.pageSize);
 	}
