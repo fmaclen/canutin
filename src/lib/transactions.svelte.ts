@@ -170,6 +170,8 @@ class TransactionsContext {
 			if (newUrl !== `${currentPage.url.pathname}${currentPage.url.search}`) {
 				history.replaceState(history.state, '', newUrl);
 			}
+
+			this.refreshTransactions();
 		});
 	}
 
@@ -181,12 +183,43 @@ class TransactionsContext {
 	async refreshTransactions() {
 		this.isLoading = true;
 		try {
+			const filterParts: string[] = [];
+
+			let from: Date | null;
+			let to: Date | null;
+			if (this._customFromDate !== null || this._customToDate !== null) {
+				from = this._customFromDate;
+				to = this._customToDate;
+			} else {
+				const range = this.getPeriodRange(this.period);
+				from = range.from;
+				to = range.to;
+			}
+
+			if (from) {
+				filterParts.push(`date >= '${from.toISOString()}'`);
+			}
+			if (to) {
+				filterParts.push(`date < '${to.toISOString()}'`);
+			}
+
+			if (this.kind === 'credits') {
+				filterParts.push('value > 0');
+			} else if (this.kind === 'debits') {
+				filterParts.push('value < 0');
+			} else if (this.kind === 'excluded') {
+				filterParts.push('excluded != ""');
+			}
+
+			const filter = filterParts.length > 0 ? filterParts.join(' && ') : undefined;
+
 			const list = await this._pb.authedClient
 				.collection('transactions')
 				.getFullList<TransactionsResponse<TransactionExpand>>({
 					sort: '-date,-created,-id',
 					expand: 'account,labels',
 					batch: 200,
+					filter,
 					requestKey: 'transactions:list'
 				});
 			this.rawTransactions = list;
