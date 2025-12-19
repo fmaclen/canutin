@@ -54,6 +54,7 @@ class TransactionsContext {
 	private _customFromDate: Date | null = $state(null);
 	private _customToDate: Date | null = $state(null);
 	private _searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+	private _loadingDelayTimer: ReturnType<typeof setTimeout> | null = null;
 
 	readonly periodOptions: PeriodOption[] = [
 		'this-month',
@@ -172,7 +173,15 @@ class TransactionsContext {
 	}
 
 	async refreshTransactions() {
-		this.isLoading = true;
+		if (this._loadingDelayTimer) {
+			clearTimeout(this._loadingDelayTimer);
+			this._loadingDelayTimer = null;
+		}
+
+		this._loadingDelayTimer = setTimeout(() => {
+			this.isLoading = true;
+		}, 150);
+
 		try {
 			const filterParts: string[] = [];
 
@@ -223,6 +232,10 @@ class TransactionsContext {
 		} catch (error) {
 			this._pb.handleConnectionError(error, 'transactions', 'refresh');
 		} finally {
+			if (this._loadingDelayTimer) {
+				clearTimeout(this._loadingDelayTimer);
+				this._loadingDelayTimer = null;
+			}
 			this.isLoading = false;
 		}
 	}
