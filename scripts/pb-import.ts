@@ -134,6 +134,9 @@ async function main() {
 		importUserId = created.id;
 	}
 
+	// Clear superuser auth before authenticating as import user
+	pb.authStore.clear();
+
 	// Authenticate as import user so create/update rules using @request.auth.id pass
 	await pb.collection('users').authWithPassword(IMPORT_EMAIL, IMPORT_PASSWORD);
 	if (!pb.authStore.model) {
@@ -367,9 +370,9 @@ async function main() {
 		if (!pbAssetId) continue;
 		await pb.collection('assetBalances').create({
 			asset: pbAssetId,
-			value: s.value,
+			marketValue: s.value,
 			quantity: s.quantity ?? undefined,
-			cost: s.cost ?? undefined,
+			bookValue: s.cost ?? undefined,
 			asOf: toISODate(s.createdAt),
 			owner: importUserId
 		});
@@ -394,9 +397,6 @@ async function main() {
 		const exDate = t.isExcluded
 			? (normalizeDateOr(t.updatedAt, t.date) ?? toISODate(new Date().toISOString()))
 			: undefined;
-		const pendDate = t.isPending
-			? (normalizeDateOr(t.updatedAt, t.date) ?? toISODate(new Date().toISOString()))
-			: undefined;
 
 		const data: Record<string, unknown> = {
 			account: pbAccountId,
@@ -404,7 +404,6 @@ async function main() {
 			date: normalizeDateOr(t.date, t.createdAt ?? t.updatedAt),
 			value: t.value,
 			excluded: exDate,
-			pending: pendDate,
 			labels,
 			owner: importUserId
 		};
