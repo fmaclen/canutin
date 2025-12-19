@@ -255,5 +255,6 @@
 	"transactions_delete_confirm_cancel": "Cancelar",
 	"transactions_delete_confirm_continue": "Continuar",
 	"transactions_delete_success": "Transacción eliminada",
-	"transactions_delete_failed": "Error al eliminar transacción"
+	"transactions_delete_failed": "Error al eliminar transacción",
+	"transactions_search_placeholder": "Buscar transacciones"
 }

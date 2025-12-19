@@ -879,3 +879,161 @@ test('transactions list updates in real-time when new transaction is added', asy
 
 	await expect(page.getByText('Fresh Groceries Market')).toHaveCount(1);
 });
+
+test('transactions can be searched by description', async ({ page }) => {
+	const user = await seedUser('grace');
+
+	const account = await seedAccount({
+		name: 'Search Test Account',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 5000
+	});
+
+	const now = new UTCDate();
+
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Whole Foods Grocery Store',
+		value: -150
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Amazon Prime Subscription',
+		value: -14.99
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Trader Joes Grocery',
+		value: -85
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Netflix Monthly',
+		value: -15.99
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	await expect(page.getByText('Whole Foods Grocery Store')).toBeVisible();
+	await expect(page.getByText('Amazon Prime Subscription')).toBeVisible();
+	await expect(page.getByText('Trader Joes Grocery')).toBeVisible();
+	await expect(page.getByText('Netflix Monthly')).toBeVisible();
+
+	const searchInput = page.getByPlaceholder('Search transactions');
+	await searchInput.fill('Grocery');
+
+	await expect(page.getByText('Whole Foods Grocery Store')).toBeVisible();
+	await expect(page.getByText('Trader Joes Grocery')).toBeVisible();
+	await expect(page.getByText('Amazon Prime Subscription')).not.toBeVisible();
+	await expect(page.getByText('Netflix Monthly')).not.toBeVisible();
+
+	await searchInput.fill('Amazon');
+
+	await expect(page.getByText('Amazon Prime Subscription')).toBeVisible();
+	await expect(page.getByText('Whole Foods Grocery Store')).not.toBeVisible();
+	await expect(page.getByText('Trader Joes Grocery')).not.toBeVisible();
+	await expect(page.getByText('Netflix Monthly')).not.toBeVisible();
+
+	await page.reload();
+
+	await expect(searchInput).toHaveValue('Amazon');
+	await expect(page.getByText('Amazon Prime Subscription')).toBeVisible();
+	await expect(page.getByText('Whole Foods Grocery Store')).not.toBeVisible();
+
+	await page.getByLabel('Clear search').click();
+
+	await expect(page.getByText('Whole Foods Grocery Store')).toBeVisible();
+	await expect(page.getByText('Amazon Prime Subscription')).toBeVisible();
+	await expect(page.getByText('Trader Joes Grocery')).toBeVisible();
+	await expect(page.getByText('Netflix Monthly')).toBeVisible();
+});
+
+test('transaction search persists in URL and combines with filters', async ({ page }) => {
+	const user = await seedUser('henry');
+
+	const account = await seedAccount({
+		name: 'URL Search Account',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 3000
+	});
+
+	const now = new UTCDate();
+
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Salary Deposit',
+		value: 5000
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Salary Bonus',
+		value: 1000
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Coffee Shop',
+		value: -5.5
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	const searchInput = page.getByPlaceholder('Search transactions');
+	await searchInput.fill('Salary');
+
+	await expect(page.url()).toContain('q=Salary');
+
+	await expect(page.getByText('Salary Deposit')).toBeVisible();
+	await expect(page.getByText('Salary Bonus')).toBeVisible();
+	await expect(page.getByText('Coffee Shop')).not.toBeVisible();
+
+	await page.reload();
+
+	await expect(searchInput).toHaveValue('Salary');
+	await expect(page.getByText('Salary Deposit')).toBeVisible();
+	await expect(page.getByText('Salary Bonus')).toBeVisible();
+	await expect(page.getByText('Coffee Shop')).not.toBeVisible();
+
+	await page.getByLabel('Type').click();
+	await page.getByRole('option', { name: 'Credits only' }).click();
+
+	await expect(page.getByText('Salary Deposit')).toBeVisible();
+	await expect(page.getByText('Salary Bonus')).toBeVisible();
+
+	await page.getByLabel('Clear search').click();
+
+	await expect(page.getByText('Salary Deposit')).toBeVisible();
+	await expect(page.getByText('Salary Bonus')).toBeVisible();
+	await expect(page.getByText('Coffee Shop')).not.toBeVisible();
+});
