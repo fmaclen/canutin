@@ -1,5 +1,4 @@
 import { UTCDate } from '@date-fns/utc';
-import { format } from 'date-fns';
 import type { RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 import { SvelteMap, SvelteURLSearchParams } from 'svelte/reactivity';
@@ -82,44 +81,15 @@ class TransactionsContext {
 		const currentPage = get(page);
 		const params = currentPage.url.searchParams;
 
-		const fromParam = params.get('from');
-		const toParam = params.get('to');
-
-		if (fromParam !== null || toParam !== null) {
-			this._customFromDate = fromParam && fromParam !== 'lifetime' ? new Date(fromParam) : null;
-			this._customToDate = toParam ? new Date(toParam) : null;
-
-			const matchingPeriod = this.findPeriodFromDates(fromParam, toParam);
-			if (matchingPeriod) {
-				this.period = matchingPeriod;
-			}
+		const periodParam = params.get('period');
+		if (periodParam && this.periodOptions.includes(periodParam as PeriodOption)) {
+			this.period = periodParam as PeriodOption;
 		}
 
 		const amountParam = params.get('amount');
 		if (amountParam && this.kindOptions.includes(amountParam as KindFilter)) {
 			this.kind = amountParam as KindFilter;
 		}
-	}
-
-	private findPeriodFromDates(from: string | null, to: string | null) {
-		if (from === 'lifetime' && to === null) {
-			return 'lifetime';
-		}
-
-		for (const option of this.periodOptions) {
-			const range = this.getPeriodRange(option);
-			const rangeFrom = range.from ? this.formatDate(range.from) : null;
-			const rangeTo = range.to ? this.formatDate(range.to) : null;
-
-			if (rangeFrom === from && rangeTo === to) {
-				return option;
-			}
-		}
-		return null;
-	}
-
-	private formatDate(date: Date) {
-		return format(date, 'yyyy-MM-dd');
 	}
 
 	private setupUrlSync() {
@@ -143,25 +113,7 @@ class TransactionsContext {
 			const currentPage = get(page);
 			const params = new SvelteURLSearchParams(currentPage.url.searchParams);
 
-			const range = this.getPeriodRange(this.period);
-
-			if (this.period === 'lifetime') {
-				params.set('from', 'lifetime');
-				params.delete('to');
-			} else {
-				if (range.from) {
-					params.set('from', this.formatDate(range.from));
-				} else {
-					params.delete('from');
-				}
-
-				if (range.to) {
-					params.set('to', this.formatDate(range.to));
-				} else {
-					params.delete('to');
-				}
-			}
-
+			params.set('period', this.period);
 			params.set('amount', this.kind);
 
 			const search = params.toString();
