@@ -46,12 +46,14 @@ export type TransactionRow = {
 class TransactionsContext {
 	period: PeriodOption = $state('last-3-months');
 	kind: KindFilter = $state('all');
+	search: string = $state('');
 	page: number = $state(1);
 	isLoading: boolean = $state(true);
 	rawTransactions: TransactionsResponse<TransactionExpand>[] = $state([]);
 
 	private _customFromDate: Date | null = $state(null);
 	private _customToDate: Date | null = $state(null);
+	private _searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 	readonly periodOptions: PeriodOption[] = [
 		'this-month',
@@ -89,6 +91,11 @@ class TransactionsContext {
 		const amountParam = params.get('amount');
 		if (amountParam && this.kindOptions.includes(amountParam as KindFilter)) {
 			this.kind = amountParam as KindFilter;
+		}
+
+		const searchParam = params.get('q');
+		if (searchParam) {
+			this.search = searchParam;
 		}
 	}
 
@@ -132,6 +139,38 @@ class TransactionsContext {
 		this.realtimeSubscribe();
 	}
 
+	setSearch(query: string) {
+		this.search = query;
+		this.page = 1;
+		this.syncSearchToUrl();
+
+		if (this._searchDebounceTimer) {
+			clearTimeout(this._searchDebounceTimer);
+		}
+
+		this._searchDebounceTimer = setTimeout(() => {
+			this.refreshTransactions();
+		}, 300);
+	}
+
+	private syncSearchToUrl() {
+		const currentPage = get(page);
+		const params = new SvelteURLSearchParams(currentPage.url.searchParams);
+
+		if (this.search.trim()) {
+			params.set('q', this.search.trim());
+		} else {
+			params.delete('q');
+		}
+
+		const searchStr = params.toString();
+		const newUrl = `${currentPage.url.pathname}${searchStr ? `?${searchStr}` : ''}`;
+
+		if (newUrl !== `${currentPage.url.pathname}${currentPage.url.search}`) {
+			history.replaceState(history.state, '', newUrl);
+		}
+	}
+
 	async refreshTransactions() {
 		this.isLoading = true;
 		try {
@@ -161,6 +200,12 @@ class TransactionsContext {
 				filterParts.push('value < 0');
 			} else if (this.kind === 'excluded') {
 				filterParts.push('excluded != ""');
+			}
+
+			const searchQuery = this.search.trim();
+			if (searchQuery) {
+				const escaped = searchQuery.replace(/'/g, "''");
+				filterParts.push(`description ~ '${escaped}'`);
 			}
 
 			const filter = filterParts.length > 0 ? filterParts.join(' && ') : undefined;

@@ -255,5 +255,6 @@
 	"transactions_delete_confirm_cancel": "Cancel",
 	"transactions_delete_confirm_continue": "Continue",
 	"transactions_delete_success": "Transaction deleted",
-	"transactions_delete_failed": "Failed to delete transaction"
+	"transactions_delete_failed": "Failed to delete transaction",
+	"transactions_search_placeholder": "Search transactions"
 }
