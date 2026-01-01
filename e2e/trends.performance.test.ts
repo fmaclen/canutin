@@ -39,8 +39,10 @@ test('trends performance table', async ({ page }) => {
 	const sixMonths = subMonths(now, 6);
 	const oneYear = subYears(now, 1);
 	const fiveYears = subYears(now, 5);
-	const ytd = startOfYear(now);
 	const earliest = subYears(now, 6);
+
+	// Offset by 1 day to avoid collision when test runs on Jan 1st
+	const ytd = subDays(startOfYear(now), 1);
 
 	const baselineCash: Array<[Date, number]> = [
 		[earliest, 1000],
@@ -189,7 +191,15 @@ test('trends performance table', async ({ page }) => {
 	});
 	await expect(cells.nth(2).getByRole('button', { name: '+78.6%' })).toBeVisible();
 	await expect(cells.nth(3).getByRole('button', { name: '+233.3%' })).toBeVisible();
-	await expect(cells.nth(4).getByRole('button', { name: '+400%' })).toBeVisible();
+
+	// On Jan 1st, YTD and current date are the same so both find the same balance
+	const isJan1 = now.getMonth() === 0 && now.getDate() === 1;
+	if (isJan1) {
+		await expect(cells.nth(4).getByRole('button', { name: '0%' })).toBeVisible();
+	} else {
+		await expect(cells.nth(4).getByRole('button', { name: '+400%' })).toBeVisible();
+	}
+
 	await expect(cells.nth(5).getByRole('button', { name: '+900%' })).toBeVisible();
 	await expect(cells.nth(6)).toContainText('~');
 	await expect(cells.nth(7).getByRole('button', { name: '+900%' })).toBeVisible();
@@ -199,7 +209,13 @@ test('trends performance table', async ({ page }) => {
 	await expect(cashCells.nth(1).getByRole('button', { name: '+14.3%' })).toBeVisible();
 	await expect(cashCells.nth(2).getByRole('button', { name: '+33.3%' })).toBeVisible();
 	await expect(cashCells.nth(3).getByRole('button', { name: '+60%' })).toBeVisible();
-	await expect(cashCells.nth(4).getByRole('button', { name: '+100%' })).toBeVisible();
+
+	if (isJan1) {
+		await expect(cashCells.nth(4).getByRole('button', { name: '0%' })).toBeVisible();
+	} else {
+		await expect(cashCells.nth(4).getByRole('button', { name: '+100%' })).toBeVisible();
+	}
+
 	await expect(cashCells.nth(5).getByRole('button', { name: '+166.7%' })).toBeVisible();
 	await expect(cashCells.nth(6).getByRole('button', { name: '+300%' })).toBeVisible();
 	await expect(cashCells.nth(7).getByRole('button', { name: '+700%' })).toBeVisible();
@@ -209,7 +225,9 @@ test('trends performance table', async ({ page }) => {
 	await expect(debtCells.nth(1).getByRole('button', { name: '-3.2%' })).toBeVisible();
 	await expect(debtCells.nth(2).getByRole('button', { name: '-6.3%' })).toBeVisible();
 	await expect(debtCells.nth(3).getByRole('button', { name: '-14.3%' })).toBeVisible();
+
 	await expect(debtCells.nth(4).getByRole('button', { name: '0%' })).toBeVisible();
+
 	await expect(debtCells.nth(5).getByRole('button', { name: '+20%' })).toBeVisible();
 	await expect(debtCells.nth(6).getByRole('button', { name: '+50%' })).toBeVisible();
 	await expect(debtCells.nth(7).getByRole('button', { name: '+200%' })).toBeVisible();

@@ -2,6 +2,10 @@ import { expect, Page } from '@playwright/test';
 
 import { DEFAULT_PASSWORD } from './pocketbase.helpers';
 
+export function formatDateForInput(date: Date) {
+	return date.toISOString().slice(0, 10);
+}
+
 export async function signIn(page: Page, email: string) {
 	await page.getByLabel('Email').fill(email);
 	await page.getByLabel('Password', { exact: true }).fill(DEFAULT_PASSWORD);
