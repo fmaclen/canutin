@@ -96,7 +96,7 @@ export async function seedAsset(assetInput: {
 	balanceGroup: AssetsRecord['balanceGroup'];
 	balanceType: BalanceTypesRecord['name'];
 	owner: UsersRecord['id'];
-	type?: AssetsRecord['type'];
+	type: AssetsRecord['type'];
 	symbol?: AssetsRecord['symbol'];
 	sold?: AssetsRecord['sold'];
 	excluded?: AssetsRecord['excluded'];
