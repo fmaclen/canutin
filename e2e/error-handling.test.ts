@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { goToPageViaSidebar, signIn } from './playwright.helpers';
+import { signIn } from './playwright.helpers';
 import { deleteUser, seedUser } from './pocketbase.helpers';
 
 test('shows connection error toast when PocketBase is unreachable', async ({ page }) => {
@@ -48,6 +48,7 @@ test('shows auth error toast when session expires', async ({ page }) => {
 	await signIn(page, user.email);
 	await expect(page.getByRole('region', { name: 'Net worth' })).toBeVisible();
 	await expect(page.getByText('Your session has expired')).not.toBeVisible();
+	await expect(page).not.toHaveURL('/auth');
 
 	await page.route('**/api/collections/**', (route) => {
 		route.fulfill({
@@ -62,14 +63,13 @@ test('shows auth error toast when session expires', async ({ page }) => {
 	});
 
 	await page.reload();
+	await expect(page).toHaveURL('/auth');
+	await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
 	await expect(
 		page.locator('[data-sonner-toast]', {
 			hasText: 'Your session has expired'
 		})
 	).toBeVisible();
-
-	await goToPageViaSidebar(page, 'Accounts');
-	await expect(page).toHaveURL('/auth');
 });
 
 test('logs out user automatically when their account is deleted', async ({ page }) => {
