@@ -17,7 +17,8 @@ test('assets table reflects filters and aggregate totals', async ({ page }) => {
 		name: 'Growth Fund',
 		balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
 		owner: user.id,
-		balanceType: 'ETF'
+		balanceType: 'ETF',
+		type: AssetsTypeOptions.WHOLE
 	});
 	await seedAssetBalance({
 		asset: ownedAsset.id,
@@ -31,6 +32,7 @@ test('assets table reflects filters and aggregate totals', async ({ page }) => {
 		balanceGroup: AssetsBalanceGroupOptions.OTHER,
 		owner: user.id,
 		balanceType: 'Collectible',
+		type: AssetsTypeOptions.WHOLE,
 		excluded: new Date().toISOString()
 	});
 	await seedAssetBalance({
@@ -45,6 +47,7 @@ test('assets table reflects filters and aggregate totals', async ({ page }) => {
 		balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
 		owner: user.id,
 		balanceType: 'Stock',
+		type: AssetsTypeOptions.WHOLE,
 		sold: new Date().toISOString()
 	});
 	await seedAssetBalance({
@@ -95,7 +98,8 @@ test('assets table shows appreciation and depreciation for whole assets', async 
 		name: 'Primary Residence',
 		balanceGroup: AssetsBalanceGroupOptions.OTHER,
 		owner: user.id,
-		balanceType: 'Real Estate'
+		balanceType: 'Real Estate',
+		type: AssetsTypeOptions.WHOLE
 	});
 	await seedAssetBalance({
 		asset: appreciatingHouse.id,
@@ -109,7 +113,8 @@ test('assets table shows appreciation and depreciation for whole assets', async 
 		name: 'Vehicle',
 		balanceGroup: AssetsBalanceGroupOptions.OTHER,
 		owner: user.id,
-		balanceType: 'Vehicle'
+		balanceType: 'Vehicle',
+		type: AssetsTypeOptions.WHOLE
 	});
 	await seedAssetBalance({
 		asset: depreciatingCar.id,
@@ -123,7 +128,8 @@ test('assets table shows appreciation and depreciation for whole assets', async 
 		name: 'Stable Fund',
 		balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
 		owner: user.id,
-		balanceType: 'ETF'
+		balanceType: 'ETF',
+		type: AssetsTypeOptions.WHOLE
 	});
 	await seedAssetBalance({
 		asset: breakEvenAsset.id,
@@ -170,7 +176,8 @@ test('assets table shows appreciation and depreciation for shares assets', async
 		symbol: 'NVDA',
 		balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
 		owner: user.id,
-		balanceType: 'Stock'
+		balanceType: 'Stock',
+		type: AssetsTypeOptions.SHARES
 	});
 	await seedAssetBalance({
 		asset: gainStock.id,
@@ -188,7 +195,8 @@ test('assets table shows appreciation and depreciation for shares assets', async
 		symbol: 'XYZ',
 		balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
 		owner: user.id,
-		balanceType: 'Stock'
+		balanceType: 'Stock',
+		type: AssetsTypeOptions.SHARES
 	});
 	await seedAssetBalance({
 		asset: lossStock.id,

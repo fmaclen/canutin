@@ -162,7 +162,7 @@ export type AssetsRecord = {
 	owner: RecordIdString
 	sold?: IsoDateString
 	symbol?: string
-	type?: AssetsTypeOptions
+	type: AssetsTypeOptions
 	updated?: IsoDateString
 }
 
