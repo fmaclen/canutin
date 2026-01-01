@@ -226,4 +226,15 @@ test('balance sheet', async ({ page }) => {
 	await expect(balanceRegions.nth(1)).toContainText('$1,500');
 	await expect(balanceRegions.nth(2)).toContainText('Savings');
 	await expect(balanceRegions.nth(2)).toContainText('$500');
+
+	// Clicking on an account navigates to its detail page
+	await page.getByRole('link', { name: 'Willow Everyday' }).click();
+	await expect(page).toHaveURL(`/accounts/${checkingAccount.id}`);
+	await expect(page.getByText('Willow Everyday')).toBeVisible();
+
+	// Go back to balance sheet and click on an asset
+	await goToPageViaSidebar(page, 'Balance sheet');
+	await page.getByRole('link', { name: 'Las Meninas' }).click();
+	await expect(page).toHaveURL(`/assets/${otherAsset.id}`);
+	await expect(page.getByText('Las Meninas')).toBeVisible();
 });
