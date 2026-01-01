@@ -16,7 +16,7 @@
 	bind:this={ref}
 	{href}
 	class={cn(
-		'border-foreground/20 hover:text-primary hover:border-primary border-b transition-colors [text-decoration:none]',
+		'text-foreground/90 decoration-foreground/20 hover:text-primary hover:decoration-primary underline underline-offset-4 transition-colors',
 		className
 	)}
 	{...restProps}

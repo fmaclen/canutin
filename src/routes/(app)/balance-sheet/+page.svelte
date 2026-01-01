@@ -3,6 +3,7 @@
 	import { getAssetsContext } from '$lib/assets.svelte';
 	import Currency from '$lib/components/currency.svelte';
 	import KeyValue from '$lib/components/key-value.svelte';
+	import Link from '$lib/components/link.svelte';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
@@ -47,7 +48,13 @@
 					id: string;
 					name: string;
 					total: number;
-					items: Array<{ id: string; name: string; balance: number; excluded: boolean }>;
+					items: Array<{
+						id: string;
+						name: string;
+						balance: number;
+						excluded: boolean;
+						type: 'account' | 'asset';
+					}>;
 				}>;
 			}
 		> = {
@@ -78,11 +85,17 @@
 			if (a.closed) continue;
 			const group = a.balanceGroup as BalanceGroup;
 			if (!a.excluded) groups[group].total += a.balance ?? 0;
-			const type = upsert(group, a.balanceType, accountsContext.getTypeName(a.balanceType));
-			if (!a.excluded) type.total += a.balance ?? 0;
-			type.items = [
-				...type.items,
-				{ id: a.id, name: a.name, balance: a.balance ?? 0, excluded: Boolean(a.excluded) }
+			const balanceType = upsert(group, a.balanceType, accountsContext.getTypeName(a.balanceType));
+			if (!a.excluded) balanceType.total += a.balance ?? 0;
+			balanceType.items = [
+				...balanceType.items,
+				{
+					id: a.id,
+					name: a.name,
+					balance: a.balance ?? 0,
+					excluded: Boolean(a.excluded),
+					type: 'account'
+				}
 			];
 		}
 
@@ -90,11 +103,17 @@
 			if (a.sold) continue;
 			const group = a.balanceGroup as BalanceGroup;
 			if (!a.excluded) groups[group].total += a.marketValue ?? 0;
-			const type = upsert(group, a.balanceType, assetsContext.getTypeName(a.balanceType));
-			if (!a.excluded) type.total += a.marketValue ?? 0;
-			type.items = [
-				...type.items,
-				{ id: a.id, name: a.name, balance: a.marketValue ?? 0, excluded: Boolean(a.excluded) }
+			const balanceType = upsert(group, a.balanceType, assetsContext.getTypeName(a.balanceType));
+			if (!a.excluded) balanceType.total += a.marketValue ?? 0;
+			balanceType.items = [
+				...balanceType.items,
+				{
+					id: a.id,
+					name: a.name,
+					balance: a.marketValue ?? 0,
+					excluded: Boolean(a.excluded),
+					type: 'asset'
+				}
 			];
 		}
 
@@ -150,12 +169,13 @@
 									<li
 										class="odd:bg-sidebar flex items-center justify-between gap-2 border-b px-4 py-3 text-balance last:border-b-0"
 									>
-										<span
+										<Link
+											href={item.type === 'account' ? `/accounts/${item.id}` : `/assets/${item.id}`}
 											class={'text-sm ' +
 												(item.excluded ? 'text-muted-foreground' : 'text-foreground/90')}
 										>
 											{item.name}
-										</span>
+										</Link>
 										<span
 											class={'font-mono text-xs tabular-nums ' +
 												(item.excluded ? 'text-muted-foreground' : '')}
