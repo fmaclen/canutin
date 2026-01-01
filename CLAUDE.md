@@ -204,6 +204,13 @@ Sort order (handled by Prettier):
 - **Avoid adding comments** - Only add comments when explicitly requested by the user
 - **Never run dev automatically** - Always assume the user is running dev server in a separate terminal
 
+### Branches and Pull Requests
+
+- **Branch naming**: Use `{issue-number}-{short-description}` (e.g., `256-balance-sheet-links`)
+- **Base branch**: Always use `next` as the base branch for v2 features
+- **Title format**: Use the same format as commit messages: `type: description` (e.g., `feat: add account links to balance sheet`). This is important for semantic versioning (`feat:` → minor, `fix:` → patch)
+- **Body format**: Keep it short and high-level, minimal formatting. Always include `Closes #123` to reference the issue
+
 ### Background Processes
 
 Developers typically run these processes constantly in separate terminals:
