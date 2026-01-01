@@ -1,9 +1,17 @@
 import { UTCDate } from '@date-fns/utc';
 import { expect, test, type Page } from '@playwright/test';
-import { addMonths, endOfMonth, startOfMonth, subMonths, subYears } from 'date-fns';
+import {
+	addMonths,
+	endOfMonth,
+	setHours,
+	startOfMonth,
+	subDays,
+	subMonths,
+	subYears
+} from 'date-fns';
 
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
-import { goToPageViaSidebar, signIn } from './playwright.helpers';
+import { formatDateForInput, goToPageViaSidebar, signIn } from './playwright.helpers';
 import {
 	seedAccount,
 	seedAccountBalance,
@@ -339,42 +347,37 @@ test('transactions are sorted by date DESC, then amount DESC, then id ASC', asyn
 		value: 1000
 	});
 
-	// Create transactions with specific dates and amounts to test sorting
-	const date1 = new UTCDate(2025, 9, 15, 12, 0, 0, 0); // Oct 15
-	const date2 = new UTCDate(2025, 9, 10, 12, 0, 0, 0); // Oct 10
-	const date3 = new UTCDate(2025, 9, 5, 12, 0, 0, 0); // Oct 5
+	const now = new UTCDate();
+	const date1 = setHours(subDays(now, 1), 12);
+	const date2 = setHours(subDays(now, 5), 12);
+	const date3 = setHours(subDays(now, 10), 12);
 
-	// Same date, different amounts - should sort by amount DESC
 	await seedTransaction({
 		account: account.id,
 		owner: user.id,
 		date: date1.toISOString(),
-		description: 'Oct 15 - Small',
+		description: 'Recent - Small',
 		value: 100
 	});
 	await seedTransaction({
 		account: account.id,
 		owner: user.id,
 		date: date1.toISOString(),
-		description: 'Oct 15 - Large',
+		description: 'Recent - Large',
 		value: 500
 	});
-
-	// Different dates
 	await seedTransaction({
 		account: account.id,
 		owner: user.id,
 		date: date2.toISOString(),
-		description: 'Oct 10 - Medium',
+		description: 'Middle - Medium',
 		value: 300
 	});
-
-	// Oldest date
 	await seedTransaction({
 		account: account.id,
 		owner: user.id,
 		date: date3.toISOString(),
-		description: 'Oct 5 - Oldest',
+		description: 'Oldest - Entry',
 		value: 200
 	});
 
@@ -382,17 +385,10 @@ test('transactions are sorted by date DESC, then amount DESC, then id ASC', asyn
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Transactions');
 
-	// Get all transaction rows (excluding header)
 	const rows = page.locator('tbody tr');
 	await expect(rows).toHaveCount(4);
 
-	// Verify order: newest date first (Oct 15), then by amount DESC within same date
-	const expectedOrder = [
-		'Oct 15 - Large', // Date: Oct 15, Amount: 500 (largest)
-		'Oct 15 - Small', // Date: Oct 15, Amount: 100
-		'Oct 10 - Medium', // Date: Oct 10, Amount: 300
-		'Oct 5 - Oldest' // Date: Oct 5, Amount: 200
-	];
+	const expectedOrder = ['Recent - Large', 'Recent - Small', 'Middle - Medium', 'Oldest - Entry'];
 
 	for (let i = 0; i < expectedOrder.length; i++) {
 		const row = rows.nth(i);
@@ -605,7 +601,7 @@ test('user can add a new transaction', async ({ page }) => {
 
 	await page.getByLabel('Description').fill('Moonbeam Cafe');
 	await page.getByLabel('Amount').fill('-45.50');
-	await page.getByLabel('Date').fill('2025-11-01');
+	await page.getByLabel('Date').fill(formatDateForInput(new UTCDate()));
 	await page.getByLabel('Account').click();
 
 	await expect(page.getByText('Cash')).toBeVisible();
@@ -634,7 +630,7 @@ test('user can add a new transaction', async ({ page }) => {
 
 	await page.getByLabel('Description').fill('Credit Card Payment');
 	await page.getByLabel('Amount').fill('-500');
-	await page.getByLabel('Date').fill('2025-11-05');
+	await page.getByLabel('Date').fill(formatDateForInput(subDays(new UTCDate(), 1)));
 	await page.getByLabel('Account').click();
 	await expect(page.getByText('Cash')).toBeVisible();
 	await expect(page.getByText('Debt')).toBeVisible();
@@ -689,10 +685,13 @@ test('user can edit transaction details', async ({ page }) => {
 		owner: user.id
 	});
 
+	const initialDate = setHours(subDays(new UTCDate(), 5), 12);
+	const updatedDateStr = formatDateForInput(setHours(subDays(new UTCDate(), 2), 12));
+
 	const transaction = await seedTransaction({
 		account: checkingAccount.id,
 		owner: user.id,
-		date: new UTCDate(2025, 10, 15, 12, 0, 0, 0).toISOString(),
+		date: initialDate.toISOString(),
 		description: 'Paperclip Office Supply Co',
 		value: -150,
 		labels: [officeLabel.id]
@@ -711,13 +710,13 @@ test('user can edit transaction details', async ({ page }) => {
 	await expect(page).toHaveURL(`/transactions/${transaction.id}`);
 	await expect(page.getByLabel('Description')).toHaveValue('Paperclip Office Supply Co');
 	await expect(page.getByLabel('Amount')).toHaveValue('-150');
-	await expect(page.getByLabel('Date')).toHaveValue('2025-11-15');
+	await expect(page.getByLabel('Date')).toHaveValue(formatDateForInput(initialDate));
 	await expect(page.getByLabel('Account')).toHaveText('Northwind Business');
 	await expect(page.getByLabel('Labels')).toHaveValue('Office Supplies');
 
 	await page.getByLabel('Description').fill('Skyward Airlines Conference Trip');
 	await page.getByLabel('Amount').fill('-450');
-	await page.getByLabel('Date').fill('2025-11-20');
+	await page.getByLabel('Date').fill(updatedDateStr);
 	await page.getByLabel('Account').click();
 	await page.getByRole('option', { name: 'Eastgate Savings' }).click();
 	await page.getByLabel('Labels').fill('Business Travel, Conference');
@@ -738,7 +737,7 @@ test('user can edit transaction details', async ({ page }) => {
 	await expect(page).toHaveURL(`/transactions/${transaction.id}`);
 	await expect(page.getByLabel('Description')).toHaveValue('Skyward Airlines Conference Trip');
 	await expect(page.getByLabel('Amount')).toHaveValue('-450');
-	await expect(page.getByLabel('Date')).toHaveValue('2025-11-20');
+	await expect(page.getByLabel('Date')).toHaveValue(updatedDateStr);
 	await expect(page.getByLabel('Account')).toHaveText('Eastgate Savings');
 	await expect(page.getByLabel('Labels')).toHaveValue('Business Travel, Conference');
 
@@ -774,10 +773,12 @@ test('user can directly navigate to transaction edit page', async ({ page }) => 
 		owner: user.id
 	});
 
+	const transactionDate = setHours(subDays(new UTCDate(), 3), 12);
+
 	const transaction = await seedTransaction({
 		account: account.id,
 		owner: user.id,
-		date: new UTCDate(2025, 10, 10, 12, 0, 0, 0).toISOString(),
+		date: transactionDate.toISOString(),
 		description: 'Greenleaf Pharmacy',
 		value: -85,
 		labels: [healthLabel.id]
@@ -790,7 +791,7 @@ test('user can directly navigate to transaction edit page', async ({ page }) => 
 	await expect(page).toHaveURL(`/transactions/${transaction.id}`);
 	await expect(page.getByLabel('Description')).toHaveValue('Greenleaf Pharmacy');
 	await expect(page.getByLabel('Amount')).toHaveValue('-85');
-	await expect(page.getByLabel('Date')).toHaveValue('2025-11-10');
+	await expect(page.getByLabel('Date')).toHaveValue(formatDateForInput(transactionDate));
 	await expect(page.getByLabel('Account')).toHaveText('Riverside Community');
 });
 
@@ -814,7 +815,7 @@ test('user can delete transaction', async ({ page }) => {
 	const transaction = await seedTransaction({
 		account: checkingAccount.id,
 		owner: user.id,
-		date: new UTCDate(2025, 10, 12, 12, 0, 0, 0).toISOString(),
+		date: setHours(subDays(new UTCDate(), 2), 12).toISOString(),
 		description: 'StreamFlix Annual Subscription',
 		value: -200
 	});
