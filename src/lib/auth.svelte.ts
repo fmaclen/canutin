@@ -1,7 +1,8 @@
-import PocketBase, { type BaseAuthStore } from 'pocketbase';
+import PocketBase, { type BaseAuthStore, type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 
 import { m } from '$lib/paraglide/messages.js';
+import type { UsersResponse } from '$lib/pocketbase.schema';
 
 export class AuthContext {
 	currentUser: BaseAuthStore | null = $state(null);
@@ -13,7 +14,48 @@ export class AuthContext {
 	constructor(pb: PocketBase) {
 		this._pb = pb;
 		this.currentUser = this._pb.authStore;
+		this.init();
+	}
+
+	private async init() {
+		const isValid = await this.validateSession();
+		if (isValid) {
+			this.subscribeToCurrentUser();
+		}
 		this.isLoading = false;
+	}
+
+	private async validateSession() {
+		if (!this._pb.authStore.isValid) {
+			return false;
+		}
+
+		try {
+			await this._pb.collection('users').authRefresh();
+			this.currentUser = this._pb.authStore;
+			return true;
+		} catch {
+			this._pb.authStore.clear();
+			this.currentUser = null;
+			return false;
+		}
+	}
+
+	private subscribeToCurrentUser() {
+		const userId = this._pb.authStore.record?.id;
+		if (!userId) return;
+
+		this._pb
+			.collection('users')
+			.subscribe(userId, this.onCurrentUserEvent.bind(this))
+			.catch((error) => console.error('[auth:subscribe]', error));
+	}
+
+	private onCurrentUserEvent(e: RecordSubscription<UsersResponse>) {
+		if (e.action === 'delete') {
+			this._pb.authStore.clear();
+			this.currentUser = null;
+		}
 	}
 
 	private getErrorMessage(err: unknown, fallback: string): string {

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
-import { seedUser } from './pocketbase.helpers';
+import { deleteUser, seedUser } from './pocketbase.helpers';
 
 test('shows connection error toast when PocketBase is unreachable', async ({ page }) => {
 	const user = await seedUser('charlie');
@@ -70,4 +70,18 @@ test('shows auth error toast when session expires', async ({ page }) => {
 
 	await goToPageViaSidebar(page, 'Accounts');
 	await expect(page).toHaveURL('/auth');
+});
+
+test('logs out user automatically when their account is deleted', async ({ page }) => {
+	const user = await seedUser('george');
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await expect(page.getByRole('region', { name: 'Net worth' })).toBeVisible();
+	await expect(page).not.toHaveURL('/auth');
+	await expect(page.getByRole('button', { name: 'Login' })).not.toBeVisible();
+
+	await deleteUser(user.id);
+	await expect(page).toHaveURL('/auth');
+	await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
 });
