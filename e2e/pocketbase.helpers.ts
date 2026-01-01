@@ -172,7 +172,7 @@ export async function recordExists(collection: string, id: string): Promise<bool
 	}
 }
 
-export async function deleteUser(id: string): Promise<void> {
+export async function deleteUser(id: string) {
 	const pb = await getAdminPB();
 	await pb.collection('users').delete(id);
 }
