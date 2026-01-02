@@ -442,9 +442,9 @@ test('user can edit shares asset and update balance', async ({ page }) => {
 	await expect(page.getByLabel('Name')).toHaveValue('Apple Inc');
 	await expect(page.getByLabel('Symbol')).toHaveValue('AAPL');
 	await expect(page.getByLabel('Type', { exact: true })).toBeDisabled();
-	await expect(page.getByLabel('Quantity')).toHaveValue('$100');
-	await expect(page.getByLabel('Market price')).toHaveValue('$60');
-	await expect(page.getByLabel('Book price')).toHaveValue('$50');
+	await expect(page.getByLabel('Quantity')).toHaveValue('$100.00');
+	await expect(page.getByLabel('Market price')).toHaveValue('$60.00');
+	await expect(page.getByLabel('Book price')).toHaveValue('$50.00');
 
 	await page.getByLabel('Name').fill('NVIDIA Corporation');
 	await page.getByLabel('Symbol').fill('NVDA');
@@ -477,9 +477,9 @@ test('user can edit shares asset and update balance', async ({ page }) => {
 	await expect(page.getByLabel('Name')).toHaveValue('NVIDIA Corporation');
 	await expect(page.getByLabel('Symbol')).toHaveValue('NVDA');
 	await expect(page.getByLabel('Category')).toHaveValue('Securities');
-	await expect(page.getByLabel('Quantity')).toHaveValue('$150');
-	await expect(page.getByLabel('Market price')).toHaveValue('$75');
-	await expect(page.getByLabel('Book price')).toHaveValue('$50');
+	await expect(page.getByLabel('Quantity')).toHaveValue('$150.00');
+	await expect(page.getByLabel('Market price')).toHaveValue('$75.00');
+	await expect(page.getByLabel('Book price')).toHaveValue('$50.00');
 });
 
 test('user can directly navigate to asset edit page', async ({ page }) => {
@@ -507,8 +507,8 @@ test('user can directly navigate to asset edit page', async ({ page }) => {
 	await expect(page).toHaveURL(`/assets/${vehicle.id}`);
 	await expect(page.getByLabel('Name')).toHaveValue('2020 Honda Civic');
 	await expect(page.getByLabel('Category')).toHaveValue('Vehicle');
-	await expect(page.getByLabel('Market value')).toHaveValue('$18,500');
-	await expect(page.getByLabel('Book value')).toHaveValue('$20,000');
+	await expect(page.getByLabel('Market value')).toHaveValue('$18,500.00');
+	await expect(page.getByLabel('Book value')).toHaveValue('$20,000.00');
 });
 
 test('user sees stale data warning and can refresh form', async ({ page }) => {

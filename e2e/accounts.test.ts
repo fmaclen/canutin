@@ -276,7 +276,7 @@ test('user can directly navigate to account edit page', async ({ page }) => {
 	await expect(page.getByLabel('Name')).toHaveValue('Emergency Fund');
 	await expect(page.getByLabel('Institution')).toHaveValue('Ally Bank');
 	await expect(page.getByLabel('Category')).toHaveValue('Savings');
-	await expect(page.getByLabel('Balance', { exact: true })).toHaveValue('$10,000');
+	await expect(page.getByLabel('Balance', { exact: true })).toHaveValue('$10,000.00');
 });
 
 test('user sees stale data warning and can refresh form', async ({ page }) => {
