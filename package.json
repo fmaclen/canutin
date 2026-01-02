@@ -71,5 +71,8 @@
 		"pb:import": "bun scripts/pb-import.ts",
 		"pb:reset": "bun scripts/pb-reset.ts"
 	},
-	"type": "module"
+	"type": "module",
+	"dependencies": {
+		"@canutin/svelte-currency-input": "^1.0.0-next.7"
+	}
 }

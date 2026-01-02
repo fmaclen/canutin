@@ -5,6 +5,7 @@
 	import { resolve } from '$app/paths';
 	import { getAuthContext } from '$lib/auth.svelte';
 	import { getBalanceTypesContext } from '$lib/balance-types.svelte';
+	import CurrencyField from '$lib/components/currency-field.svelte';
 	import Fieldset from '$lib/components/fieldset.svelte';
 	import FormFieldRow from '$lib/components/form-field-row.svelte';
 	import Page from '$lib/components/page.svelte';
@@ -264,7 +265,7 @@
 							<Label for="market-value" class="justify-start pr-0 md:justify-end"
 								>{m.assets_label_market_value()}</Label
 							>
-							<Input id="market-value" type="number" step="0.01" bind:value={marketValue} />
+							<CurrencyField id="market-value" name="market-value" bind:value={marketValue} />
 						</FormFieldRow>
 
 						<FormFieldRow>
@@ -274,21 +275,21 @@
 								>
 								<span class="text-muted-foreground text-sm">{m.assets_text_optional()}</span>
 							</div>
-							<Input id="book-value" type="number" step="0.01" bind:value={bookValue} />
+							<CurrencyField id="book-value" name="book-value" bind:value={bookValue} />
 						</FormFieldRow>
 					{:else if isShares}
 						<FormFieldRow>
 							<Label for="quantity" class="justify-start pr-0 md:justify-end"
 								>{m.assets_label_quantity()}</Label
 							>
-							<Input id="quantity" type="number" step="0.01" bind:value={quantity} />
+							<CurrencyField id="quantity" name="quantity" bind:value={quantity} />
 						</FormFieldRow>
 
 						<FormFieldRow>
 							<Label for="market-price" class="justify-start pr-0 md:justify-end"
 								>{m.assets_label_market_price()}</Label
 							>
-							<Input id="market-price" type="number" step="0.01" bind:value={marketPrice} />
+							<CurrencyField id="market-price" name="market-price" bind:value={marketPrice} />
 						</FormFieldRow>
 
 						<FormFieldRow>
@@ -298,7 +299,7 @@
 								>
 								<span class="text-muted-foreground text-sm">{m.assets_text_optional()}</span>
 							</div>
-							<Input id="book-price" type="number" step="0.01" bind:value={bookPrice} />
+							<CurrencyField id="book-price" name="book-price" bind:value={bookPrice} />
 						</FormFieldRow>
 					{/if}
 				</Fieldset>

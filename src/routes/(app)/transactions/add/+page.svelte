@@ -6,6 +6,7 @@
 	import { resolve } from '$app/paths';
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAuthContext } from '$lib/auth.svelte';
+	import CurrencyField from '$lib/components/currency-field.svelte';
 	import Fieldset from '$lib/components/fieldset.svelte';
 	import FormFieldRow from '$lib/components/form-field-row.svelte';
 	import Page from '$lib/components/page.svelte';
@@ -156,7 +157,7 @@
 						<Label for="amount" class="justify-start pr-0 md:justify-end"
 							>{m.transactions_label_amount()}</Label
 						>
-						<Input id="amount" type="number" step="0.01" bind:value={amount} required />
+						<CurrencyField id="amount" name="amount" bind:value={amount} required />
 					</FormFieldRow>
 
 					<FormFieldRow>

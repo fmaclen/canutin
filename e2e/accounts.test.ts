@@ -132,7 +132,7 @@ test('user can add a new account', async ({ page }) => {
 	await page.getByLabel('Balance group').click();
 	await page.getByRole('option', { name: 'Cash' }).click();
 	await page.getByLabel('Category').fill('Savings');
-	await page.getByRole('spinbutton', { name: 'Balance' }).fill('5000');
+	await page.getByLabel('Balance', { exact: true }).fill('5000');
 	await page.getByRole('button', { name: 'Add' }).click();
 	await expect(page.getByText('Account added successfully')).toBeVisible();
 	await expect(page).toHaveURL('/accounts');
@@ -152,7 +152,7 @@ test('user can add a new account', async ({ page }) => {
 	await page.getByLabel('Balance group').click();
 	await page.getByRole('option', { name: 'Debt' }).click();
 	await page.getByLabel('Category').fill('Credit card');
-	await page.getByRole('spinbutton', { name: 'Balance' }).fill('-1200');
+	await page.getByLabel('Balance', { exact: true }).fill('-1200');
 	await expect(page.getByText('Account added successfully')).not.toBeVisible();
 
 	await page.getByRole('button', { name: 'Add' }).click();
@@ -215,7 +215,7 @@ test('user can edit account details and update balance', async ({ page }) => {
 		)
 	).not.toBeVisible();
 
-	await page.getByRole('spinbutton', { name: 'Balance' }).fill('4500');
+	await page.getByLabel('Balance', { exact: true }).fill('4500');
 	await page.getByRole('button', { name: 'Update' }).click();
 	await expect(page.getByText('Account added successfully')).toBeVisible();
 
@@ -276,7 +276,7 @@ test('user can directly navigate to account edit page', async ({ page }) => {
 	await expect(page.getByLabel('Name')).toHaveValue('Emergency Fund');
 	await expect(page.getByLabel('Institution')).toHaveValue('Ally Bank');
 	await expect(page.getByLabel('Category')).toHaveValue('Savings');
-	await expect(page.getByRole('spinbutton', { name: 'Balance' })).toHaveValue('10000');
+	await expect(page.getByLabel('Balance', { exact: true })).toHaveValue('$10,000');
 });
 
 test('user sees stale data warning and can refresh form', async ({ page }) => {
