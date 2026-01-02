@@ -30,7 +30,7 @@
 	}
 
 	$effect(() => {
-		const adminPb = new PocketBase(env.PUBLIC_PB_URL);
+		const adminPb = new PocketBase(env.PUBLIC_PB_URL || 'http://127.0.0.1:42070');
 
 		adminPb
 			.collection('_superusers')
