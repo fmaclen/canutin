@@ -1,8 +1,8 @@
 <script lang="ts">
+	import CurrencyField from '$lib/components/currency-field.svelte';
 	import Fieldset from '$lib/components/fieldset.svelte';
 	import FormFieldRow from '$lib/components/form-field-row.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { m } from '$lib/paraglide/messages';
 
@@ -36,7 +36,7 @@
 					<Label for="market-value" class="justify-start pr-0 md:justify-end"
 						>{m.assets_label_market_value()}</Label
 					>
-					<Input id="market-value" type="number" step="0.01" bind:value={formData.marketValue} />
+					<CurrencyField id="market-value" name="market-value" bind:value={formData.marketValue} />
 				</FormFieldRow>
 
 				<FormFieldRow>
@@ -46,21 +46,21 @@
 						>
 						<span class="text-muted-foreground text-sm">{m.assets_text_optional()}</span>
 					</div>
-					<Input id="book-value" type="number" step="0.01" bind:value={formData.bookValue} />
+					<CurrencyField id="book-value" name="book-value" bind:value={formData.bookValue} />
 				</FormFieldRow>
 			{:else if isShares}
 				<FormFieldRow>
 					<Label for="quantity" class="justify-start pr-0 md:justify-end"
 						>{m.assets_label_quantity()}</Label
 					>
-					<Input id="quantity" type="number" step="0.01" bind:value={formData.quantity} />
+					<CurrencyField id="quantity" name="quantity" bind:value={formData.quantity} />
 				</FormFieldRow>
 
 				<FormFieldRow>
 					<Label for="market-price" class="justify-start pr-0 md:justify-end"
 						>{m.assets_label_market_price()}</Label
 					>
-					<Input id="market-price" type="number" step="0.01" bind:value={formData.marketPrice} />
+					<CurrencyField id="market-price" name="market-price" bind:value={formData.marketPrice} />
 				</FormFieldRow>
 
 				<FormFieldRow>
@@ -70,7 +70,7 @@
 						>
 						<span class="text-muted-foreground text-sm">{m.assets_text_optional()}</span>
 					</div>
-					<Input id="book-price" type="number" step="0.01" bind:value={formData.bookPrice} />
+					<CurrencyField id="book-price" name="book-price" bind:value={formData.bookPrice} />
 				</FormFieldRow>
 			{/if}
 		</Fieldset>

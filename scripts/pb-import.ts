@@ -371,8 +371,8 @@ async function main() {
 		await pb.collection('assetBalances').create({
 			asset: pbAssetId,
 			marketValue: s.value,
-			quantity: s.quantity ?? undefined,
-			bookValue: s.cost ?? undefined,
+			quantity: s.quantity || undefined,
+			bookValue: s.cost || undefined,
 			asOf: toISODate(s.createdAt),
 			owner: importUserId
 		});

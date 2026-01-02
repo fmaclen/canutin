@@ -84,6 +84,10 @@
 		return `${assetData.updated || assetData.created}_${assetData.name}_${assetData.balanceGroup}_${assetData.symbol}_${assetData.excluded}_${assetData.sold}_${assetData.marketValue}_${assetData.bookValue}_${assetData.quantity}_${assetData.bookPrice}_${assetData.marketPrice}`;
 	}
 
+	function toFieldValue(value: number | null | undefined) {
+		return value ? value.toString() : '';
+	}
+
 	async function syncFormWithAsset(assetData: typeof asset) {
 		if (!assetData) return;
 
@@ -96,15 +100,14 @@
 			sold: Boolean(assetData.sold),
 			type: assetData.type ?? '',
 			bookValue:
-				assetData.type === AssetsTypeOptions.WHOLE ? (assetData.bookValue?.toString() ?? '') : '',
+				assetData.type === AssetsTypeOptions.WHOLE ? toFieldValue(assetData.bookValue) : '',
 			marketValue:
-				assetData.type === AssetsTypeOptions.WHOLE ? (assetData.marketValue?.toString() ?? '') : '',
-			quantity:
-				assetData.type === AssetsTypeOptions.SHARES ? (assetData.quantity?.toString() ?? '') : '',
+				assetData.type === AssetsTypeOptions.WHOLE ? toFieldValue(assetData.marketValue) : '',
+			quantity: assetData.type === AssetsTypeOptions.SHARES ? toFieldValue(assetData.quantity) : '',
 			bookPrice:
-				assetData.type === AssetsTypeOptions.SHARES ? (assetData.bookPrice?.toString() ?? '') : '',
+				assetData.type === AssetsTypeOptions.SHARES ? toFieldValue(assetData.bookPrice) : '',
 			marketPrice:
-				assetData.type === AssetsTypeOptions.SHARES ? (assetData.marketPrice?.toString() ?? '') : ''
+				assetData.type === AssetsTypeOptions.SHARES ? toFieldValue(assetData.marketPrice) : ''
 		};
 
 		await balanceTypesContext.ensureLoaded(assetData.balanceType);

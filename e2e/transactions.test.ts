@@ -709,7 +709,7 @@ test('user can edit transaction details', async ({ page }) => {
 	await page.getByRole('link', { name: 'Paperclip Office Supply Co' }).click();
 	await expect(page).toHaveURL(`/transactions/${transaction.id}`);
 	await expect(page.getByLabel('Description')).toHaveValue('Paperclip Office Supply Co');
-	await expect(page.getByLabel('Amount')).toHaveValue('-150');
+	await expect(page.getByLabel('Amount')).toHaveValue('-$150.00');
 	await expect(page.getByLabel('Date')).toHaveValue(formatDateForInput(initialDate));
 	await expect(page.getByLabel('Account')).toHaveText('Northwind Business');
 	await expect(page.getByLabel('Labels')).toHaveValue('Office Supplies');
@@ -736,7 +736,7 @@ test('user can edit transaction details', async ({ page }) => {
 	await page.getByRole('link', { name: 'Skyward Airlines Conference Trip' }).click();
 	await expect(page).toHaveURL(`/transactions/${transaction.id}`);
 	await expect(page.getByLabel('Description')).toHaveValue('Skyward Airlines Conference Trip');
-	await expect(page.getByLabel('Amount')).toHaveValue('-450');
+	await expect(page.getByLabel('Amount')).toHaveValue('-$450.00');
 	await expect(page.getByLabel('Date')).toHaveValue(updatedDateStr);
 	await expect(page.getByLabel('Account')).toHaveText('Eastgate Savings');
 	await expect(page.getByLabel('Labels')).toHaveValue('Business Travel, Conference');
@@ -790,7 +790,7 @@ test('user can directly navigate to transaction edit page', async ({ page }) => 
 	await page.goto(`/transactions/${transaction.id}`);
 	await expect(page).toHaveURL(`/transactions/${transaction.id}`);
 	await expect(page.getByLabel('Description')).toHaveValue('Greenleaf Pharmacy');
-	await expect(page.getByLabel('Amount')).toHaveValue('-85');
+	await expect(page.getByLabel('Amount')).toHaveValue('-$85.00');
 	await expect(page.getByLabel('Date')).toHaveValue(formatDateForInput(transactionDate));
 	await expect(page.getByLabel('Account')).toHaveText('Riverside Community');
 });
