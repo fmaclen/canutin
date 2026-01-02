@@ -1,6 +1,6 @@
 {
 	"name": "canutin-next",
-	"version": "2.0.0-next.19",
+	"version": "2.0.0-next.20",
 	"devDependencies": {
 		"@canutin/svelte-currency-input": "^1.0.0-next.7",
 		"@date-fns/utc": "^2.1.1",
