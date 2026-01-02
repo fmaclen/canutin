@@ -145,7 +145,7 @@
 		void refreshTransactionsTotals();
 	});
 
-	const isLoaded = $derived(() => accountsContext.lastBalanceEvent !== 0);
+	const isLoaded = $derived(accountsContext.lastBalanceEvent !== 0);
 
 	function balanceSentiment(row: AccountRow) {
 		if (row.closed || row.excluded) return 'neutral';

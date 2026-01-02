@@ -121,7 +121,7 @@
 		return totals;
 	});
 
-	const isLoaded = $derived(() => assetsContext.lastBalanceEvent !== 0);
+	const isLoaded = $derived(assetsContext.lastBalanceEvent !== 0);
 
 	function balanceSentiment(row: AssetRow) {
 		if (row.sold || row.excluded) return 'neutral';

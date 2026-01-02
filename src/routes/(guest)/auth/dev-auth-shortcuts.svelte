@@ -1,27 +1,59 @@
 <script lang="ts">
+	import PocketBase, { type RecordSubscription } from 'pocketbase';
+
 	import { getAuthContext } from '$lib/auth.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+	import type { UsersResponse } from '$lib/pocketbase.schema';
 
 	const auth = getAuthContext();
-	const pb = getPocketBaseContext();
 
 	type DevUser = { id: string; email: string };
 	let users: DevUser[] = $state([]);
 
-	async function fetchUsers() {
-		try {
-			const url = pb.authedClient.buildURL('/api/dev/example-users');
-			const res = await fetch(url.toString());
-			if (!res.ok) throw new Error('failed');
-			users = (await res.json()) as DevUser[];
-		} catch {
-			users = [];
+	const DEV_PB_URL = 'http://127.0.0.1:42070';
+	const DEV_SUPERADMIN_EMAIL = 'superadmin@example.com';
+	const DEV_SUPERADMIN_PASSWORD = '123qweasdzxc';
+
+	function isExampleUser(email: string) {
+		return email.endsWith('@example.com');
+	}
+
+	function onUserEvent(e: RecordSubscription<UsersResponse>) {
+		const email = e.record.email;
+		if (!isExampleUser(email)) return;
+
+		if (e.action === 'create') {
+			users = [{ id: e.record.id, email }, ...users].slice(0, 10);
+		} else if (e.action === 'delete') {
+			users = users.filter((u) => u.id !== e.record.id);
 		}
 	}
 
 	$effect(() => {
-		void fetchUsers();
+		const adminPb = new PocketBase(DEV_PB_URL);
+
+		adminPb
+			.collection('_superusers')
+			.authWithPassword(DEV_SUPERADMIN_EMAIL, DEV_SUPERADMIN_PASSWORD)
+			.then(async () => {
+				const list = await adminPb
+					.collection('users')
+					.getFullList<UsersResponse>({ filter: 'email ~ "@example.com"', sort: '-created' });
+				users = list.slice(0, 10).map((u) => ({ id: u.id, email: u.email }));
+
+				adminPb
+					.collection('users')
+					.subscribe('*', onUserEvent)
+					.catch((error) => console.error('[dev-auth-shortcuts:subscribe]', error));
+			})
+			.catch((error) => console.error('[dev-auth-shortcuts:auth]', error));
+
+		return () => {
+			adminPb
+				.collection('users')
+				.unsubscribe('*')
+				.catch((error) => console.error('[dev-auth-shortcuts:unsubscribe]', error));
+		};
 	});
 
 	async function handleAutoLogin(email: string) {
