@@ -19,9 +19,9 @@
 
 	const auth = getAuthContext();
 
-	let email = $state(dev ? 'test@example.com' : '');
-	let password = $state(dev ? '123qweasdzxc' : '');
-	let passwordConfirm = $state(dev ? '123qweasdzxc' : '');
+	let email = $state('');
+	let password = $state('');
+	let passwordConfirm = $state('');
 
 	const title = $derived(mode === 'signup' ? m.auth_signup_title() : m.auth_login_title());
 	const description = $derived(
