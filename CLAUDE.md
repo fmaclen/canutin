@@ -263,3 +263,4 @@ Always run: `bun run quality && bun run test`
 - Avoid defining return types, use type inference as much as possible
 - PocketBase v0.30.0 is automatically downloaded and managed by scripts
 - Frozen lockfile (`bun.lock`) ensures reproducible builds
+- All dependencies should be devDependencies (SvelteKit bundles everything at build time)
