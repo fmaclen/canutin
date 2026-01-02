@@ -1,7 +1,9 @@
-import PocketBase, { type BaseAuthStore } from 'pocketbase';
+import PocketBase, { type BaseAuthStore, type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
+import { toast } from 'svelte-sonner';
 
 import { m } from '$lib/paraglide/messages.js';
+import type { UsersResponse } from '$lib/pocketbase.schema';
 
 export class AuthContext {
 	currentUser: BaseAuthStore | null = $state(null);
@@ -13,7 +15,61 @@ export class AuthContext {
 	constructor(pb: PocketBase) {
 		this._pb = pb;
 		this.currentUser = this._pb.authStore;
+		this.init();
+	}
+
+	private async init() {
+		const isValid = await this.validateSession();
+		if (isValid) {
+			this.subscribeToCurrentUser();
+		}
 		this.isLoading = false;
+	}
+
+	private async validateSession() {
+		if (!this._pb.authStore.isValid) {
+			return false;
+		}
+
+		try {
+			await this._pb.collection('users').authRefresh();
+			this.currentUser = this._pb.authStore;
+			return true;
+		} catch {
+			this.unsubscribeFromCurrentUser();
+			this._pb.authStore.clear();
+			this.currentUser = null;
+			toast.error(m.error_auth_failed(), { id: 'auth-error' });
+			return false;
+		}
+	}
+
+	private subscribeToCurrentUser() {
+		const userId = this._pb.authStore.record?.id;
+		if (!userId) return;
+
+		this._pb
+			.collection('users')
+			.subscribe(userId, this.onCurrentUserEvent.bind(this))
+			.catch((error) => console.error('[auth:subscribe]', error));
+	}
+
+	private unsubscribeFromCurrentUser() {
+		const userId = this._pb.authStore.record?.id;
+		if (!userId) return;
+
+		this._pb
+			.collection('users')
+			.unsubscribe(userId)
+			.catch((error) => console.error('[auth:unsubscribe]', error));
+	}
+
+	private onCurrentUserEvent(e: RecordSubscription<UsersResponse>) {
+		if (e.action === 'delete') {
+			this.unsubscribeFromCurrentUser();
+			this._pb.authStore.clear();
+			this.currentUser = null;
+		}
 	}
 
 	private getErrorMessage(err: unknown, fallback: string): string {
@@ -33,6 +89,7 @@ export class AuthContext {
 		try {
 			await this._pb.collection('users').authWithPassword(email, password);
 			this.currentUser = this._pb.authStore;
+			this.subscribeToCurrentUser();
 			return { success: true } as const;
 		} catch (e: unknown) {
 			this.error = this.getErrorMessage(e, m.auth_login_failed());
@@ -60,6 +117,7 @@ export class AuthContext {
 	async logout() {
 		this.error = null;
 		try {
+			this.unsubscribeFromCurrentUser();
 			this._pb.authStore.clear();
 		} finally {
 			this.currentUser = null;

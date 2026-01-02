@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { dev } from '$app/environment';
 	import { getAuthContext } from '$lib/auth.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
@@ -10,7 +9,7 @@
 	type DevUser = { id: string; email: string };
 	let users: DevUser[] = $state([]);
 
-	async function fetchUsers(): Promise<void> {
+	async function fetchUsers() {
 		try {
 			const url = pb.authedClient.buildURL('/api/dev/example-users');
 			const res = await fetch(url.toString());
@@ -22,11 +21,10 @@
 	}
 
 	$effect(() => {
-		if (!dev) return;
 		void fetchUsers();
 	});
 
-	async function handleAutoLogin(email: string): Promise<void> {
+	async function handleAutoLogin(email: string) {
 		await auth.login(email, '123qweasdzxc');
 	}
 </script>
