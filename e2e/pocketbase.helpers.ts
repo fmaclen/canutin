@@ -35,7 +35,8 @@ export async function resetDatabase() {
 
 export async function seedUser(name: string) {
 	const pbAdmin = await getAdminPB();
-	const uniqueEmail = `${name}.${Date.now()}@example.com`;
+	const uniqueId = Math.random().toString(36).slice(2, 10);
+	const uniqueEmail = `${name}.${uniqueId}@example.com`;
 	return await pbAdmin.collection('users').create({
 		email: uniqueEmail,
 		password: DEFAULT_PASSWORD,
