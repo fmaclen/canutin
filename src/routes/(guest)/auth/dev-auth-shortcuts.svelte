@@ -45,7 +45,7 @@
 	$effect(() => {
 		fetchUsers();
 
-		const adminPb = new PocketBase(env.PUBLIC_PB_URL || 'http://127.0.0.1:42070');
+		const adminPb = new PocketBase(env.PUBLIC_PB_URL);
 
 		adminPb
 			.collection('_superusers')
