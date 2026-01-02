@@ -1,7 +1,6 @@
 <script lang="ts">
 	import PocketBase, { type RecordSubscription } from 'pocketbase';
 
-	import { env } from '$env/dynamic/public';
 	import { getAuthContext } from '$lib/auth.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import type { UsersResponse } from '$lib/pocketbase.schema';
@@ -11,6 +10,7 @@
 	type DevUser = { id: string; email: string };
 	let users: DevUser[] = $state([]);
 
+	const DEV_PB_URL = 'http://127.0.0.1:42070';
 	const DEV_SUPERADMIN_EMAIL = 'superadmin@example.com';
 	const DEV_SUPERADMIN_PASSWORD = '123qweasdzxc';
 
@@ -30,7 +30,7 @@
 	}
 
 	$effect(() => {
-		const adminPb = new PocketBase(env.PUBLIC_PB_URL || 'http://127.0.0.1:42070');
+		const adminPb = new PocketBase(DEV_PB_URL);
 
 		adminPb
 			.collection('_superusers')
