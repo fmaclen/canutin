@@ -5,10 +5,8 @@
 	import { getAuthContext } from '$lib/auth.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import type { UsersResponse } from '$lib/pocketbase.schema';
-	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 
 	const auth = getAuthContext();
-	const pb = getPocketBaseContext();
 
 	type DevUser = { id: string; email: string };
 	let users: DevUser[] = $state([]);
@@ -18,17 +16,6 @@
 
 	function isExampleUser(email: string) {
 		return email.endsWith('@example.com');
-	}
-
-	async function fetchUsers() {
-		try {
-			const url = pb.authedClient.buildURL('/api/dev/example-users');
-			const res = await fetch(url.toString());
-			if (!res.ok) throw new Error('failed');
-			users = (await res.json()) as DevUser[];
-		} catch {
-			users = [];
-		}
 	}
 
 	function onUserEvent(e: RecordSubscription<UsersResponse>) {
@@ -43,14 +30,17 @@
 	}
 
 	$effect(() => {
-		fetchUsers();
-
 		const adminPb = new PocketBase(env.PUBLIC_PB_URL);
 
 		adminPb
 			.collection('_superusers')
 			.authWithPassword(DEV_SUPERADMIN_EMAIL, DEV_SUPERADMIN_PASSWORD)
-			.then(() => {
+			.then(async () => {
+				const list = await adminPb
+					.collection('users')
+					.getFullList<UsersResponse>({ filter: 'email ~ "@example.com"', sort: '-created' });
+				users = list.slice(0, 10).map((u) => ({ id: u.id, email: u.email }));
+
 				adminPb
 					.collection('users')
 					.subscribe('*', onUserEvent)
