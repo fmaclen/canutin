@@ -3,6 +3,7 @@
 
 	import { goto } from '$app/navigation';
 	import { getCashflowContext, type CashflowPeriod } from '$lib/cashflow.svelte';
+	import { formatCurrency } from '$lib/components/currency';
 	import SectionTitle from '$lib/components/section-title.svelte';
 
 	const cashflow = getCashflowContext();
@@ -10,6 +11,9 @@
 
 	// Minimum bar height in pixels
 	const MIN_BAR_HEIGHT = 3;
+
+	// Track hovered period index
+	let hoveredIndex = $state<number | null>(null);
 
 	// Transform data for the chart - split positive/negative for different colors
 	const chartData = $derived(
@@ -58,6 +62,37 @@
 		});
 	});
 
+	// Find indices of highest and lowest surplus values
+	const extremeIndices = $derived.by(() => {
+		if (!periods.length) return { highestIndex: -1, lowestIndex: -1 };
+
+		let highestIndex = 0;
+		let lowestIndex = 0;
+		let highest = periods[0].surplus;
+		let lowest = periods[0].surplus;
+
+		periods.forEach((p, i) => {
+			if (p.surplus > highest) {
+				highest = p.surplus;
+				highestIndex = i;
+			}
+			if (p.surplus < lowest) {
+				lowest = p.surplus;
+				lowestIndex = i;
+			}
+		});
+
+		return { highestIndex, lowestIndex };
+	});
+
+	// Determine which bars should show their value label
+	function shouldShowLabel(index: number): boolean {
+		if (hoveredIndex === index) return true;
+		if (index === extremeIndices.highestIndex && periods[index].surplus > 0) return true;
+		if (index === extremeIndices.lowestIndex && periods[index].surplus < 0) return true;
+		return false;
+	}
+
 	function handleBarClick(_event: MouseEvent, detail: { data: CashflowPeriod }) {
 		const period = detail.data;
 		const url = `/transactions?periodFrom=${period.periodFrom}&periodTo=${period.periodTo}&periodLabel=${encodeURIComponent(period.periodLabel)}`;
@@ -72,7 +107,7 @@
 	<div class="bg-background relative overflow-hidden rounded-md shadow-sm">
 		{#if chartData.length > 0}
 			<!-- Custom bar chart with styled bars -->
-			<div class="relative flex h-80 flex-col">
+			<div class="relative flex h-80 flex-col pt-5">
 				<!-- Vertical divider lines (full height including labels) -->
 				<div
 					class="pointer-events-none absolute inset-0 z-10 grid"
@@ -86,7 +121,7 @@
 				<div class="relative flex-1">
 					<!-- Bars container -->
 					<div
-						class="absolute inset-0 grid"
+						class="absolute top-0 right-0 bottom-5 left-0 grid"
 						style="grid-template-columns: repeat({chartData.length}, 1fr);"
 					>
 						{#each chartData as period, i (period.id)}
@@ -97,6 +132,9 @@
 								type="button"
 								class="group relative cursor-pointer"
 								onclick={(e) => handleBarClick(e, { data: period })}
+								onmouseenter={() => (hoveredIndex = i)}
+								onmouseleave={() => (hoveredIndex = null)}
+								title="See transactions in {period.periodLabel}"
 							>
 								<!-- Bar with secondary fill, primary on hover -->
 								{#if period.surplus !== 0}
@@ -108,7 +146,14 @@
 												top: calc({zeroLinePercent}% - max({MIN_BAR_HEIGHT}px, {heightPercent}%));
 												height: max({MIN_BAR_HEIGHT}px, {heightPercent}%);
 											"
-										></div>
+										>
+											<!-- Value label -->
+											{#if shouldShowLabel(i)}
+												<span class="cashflow-label cashflow-label--positive">
+													{formatCurrency(period.surplus)}
+												</span>
+											{/if}
+										</div>
 									{:else}
 										<!-- Negative bar: anchored at zero line, grows downward -->
 										<div
@@ -117,7 +162,14 @@
 												top: {zeroLinePercent}%;
 												height: max({MIN_BAR_HEIGHT}px, {heightPercent}%);
 											"
-										></div>
+										>
+											<!-- Value label -->
+											{#if shouldShowLabel(i)}
+												<span class="cashflow-label cashflow-label--negative">
+													{formatCurrency(period.surplus)}
+												</span>
+											{/if}
+										</div>
 									{/if}
 								{/if}
 							</button>
@@ -160,5 +212,30 @@
 
 	.group:hover .cashflow-bar--negative {
 		background-color: #e75258;
+	}
+
+	.cashflow-label {
+		position: absolute;
+		left: 0;
+		right: 0;
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		font-weight: 500;
+		text-align: center;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		pointer-events: none;
+	}
+
+	.cashflow-label--positive {
+		bottom: calc(100% + 4px);
+		color: #00a36f;
+	}
+
+	.cashflow-label--negative {
+		top: 100%;
+		margin-top: 4px;
+		color: #e75258;
 	}
 </style>
