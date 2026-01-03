@@ -106,10 +106,14 @@
 					{@const isPositive = barData.isPositive}
 					{@const heightPercent = barData.height}
 					{@const isHovered = hoveredIndex === i}
+					{@const isDecember = period.month.getMonth() === 11}
+					{@const isLastColumn = i === chartData.length - 1}
 					<Tooltip.Root delayDuration={50}>
 						<Tooltip.Trigger
-							class="relative flex h-80 flex-col pt-2 sm:pt-8 {i < chartData.length - 1
-								? 'border-border border-r'
+							class="relative flex h-80 flex-col pt-2 sm:pt-8 {!isLastColumn
+								? isDecember
+									? 'border-border border-r border-dashed'
+									: 'border-border border-r'
 								: ''} {isHovered ? 'bg-muted/50' : ''}"
 							onmouseenter={() => (hoveredIndex = i)}
 							onmouseleave={() => (hoveredIndex = null)}
