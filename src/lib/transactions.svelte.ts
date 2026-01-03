@@ -136,8 +136,9 @@ class TransactionsContext {
 	}
 
 	private async init() {
-		await this.refreshTransactions();
+		// Subscribe FIRST to avoid missing events during initial fetch
 		this.realtimeSubscribe();
+		await this.refreshTransactions();
 	}
 
 	setSearch(query: string) {

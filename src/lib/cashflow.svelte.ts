@@ -23,8 +23,9 @@ class CashflowContext {
 
 	private async init() {
 		try {
-			await this.recomputeAll();
+			// Subscribe FIRST to avoid missing events during initial fetch
 			this.realtimeSubscribe();
+			await this.recomputeAll();
 		} catch (error) {
 			this._pb.handleConnectionError(error, 'cashflow', 'init');
 		}
