@@ -280,16 +280,12 @@
 													</div>
 												</Table.Cell>
 												<Table.Cell class="text-muted-foreground text-right text-xs tabular-nums">
-													<Currency
-														value={row.bookValue}
-														maximumFractionDigits={2}
-														sentiment="neutral"
-													/>
+													<Currency value={row.bookValue} decimalScale={2} sentiment="neutral" />
 												</Table.Cell>
 												<Table.Cell class="text-right text-xs tabular-nums">
 													<Currency
 														value={row.gain}
-														maximumFractionDigits={2}
+														decimalScale={2}
 														sentiment={row.gain > 0
 															? 'positive'
 															: row.gain < 0
@@ -315,7 +311,7 @@
 															>
 																<Currency
 																	value={row.marketValue}
-																	maximumFractionDigits={2}
+																	decimalScale={2}
 																	sentiment={balanceSentiment(row)}
 																/>
 															</Tooltip.Trigger>
@@ -330,7 +326,7 @@
 													{:else}
 														<Currency
 															value={row.marketValue}
-															maximumFractionDigits={2}
+															decimalScale={2}
 															sentiment={balanceSentiment(row)}
 														/>
 													{/if}
@@ -350,7 +346,7 @@
 												{@const total = totalsByFilter.get(option.key) ?? 0}
 												<Currency
 													value={total}
-													maximumFractionDigits={2}
+													decimalScale={2}
 													sentiment={total > 0 ? 'positive' : total < 0 ? 'negative' : 'neutral'}
 												/>
 											</Table.Cell>

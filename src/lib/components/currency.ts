@@ -1,14 +1,7 @@
-export type CurrencyFormatOptions = {
-	currency?: string;
-	locale?: string;
-	maximumFractionDigits?: number;
-};
+import { formatValue } from '@canutin/svelte-currency-input';
 
-export function formatCurrency(value: number | null | undefined, options?: CurrencyFormatOptions) {
-	const { currency = 'USD', locale = 'en-US', maximumFractionDigits = 0 } = options ?? {};
-	return new Intl.NumberFormat(locale, {
-		currency,
-		style: 'currency',
-		maximumFractionDigits
-	}).format(value ?? 0);
+export const intlConfig = { locale: 'en-US', currency: 'USD' };
+
+export function formatCurrency(value: number | null | undefined, decimalScale = 0) {
+	return formatValue({ value: String(value ?? 0), intlConfig, decimalScale, roundValue: true });
 }

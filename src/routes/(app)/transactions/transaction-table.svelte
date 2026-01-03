@@ -105,7 +105,7 @@
 									<Tooltip.Trigger
 										class="border-border inline-block border-b border-dashed hover:border-current"
 									>
-										<Currency value={row.value} maximumFractionDigits={2} />
+										<Currency value={row.value} decimalScale={2} />
 									</Tooltip.Trigger>
 									<Tooltip.Content sideOffset={6}>
 										<p class="text-xs leading-snug font-normal">
@@ -114,7 +114,7 @@
 									</Tooltip.Content>
 								</Tooltip.Root>
 							{:else}
-								<Currency value={row.value} maximumFractionDigits={2} />
+								<Currency value={row.value} decimalScale={2} />
 							{/if}
 						</Table.Cell>
 					</Table.Row>

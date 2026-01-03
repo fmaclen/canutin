@@ -318,7 +318,7 @@
 															>
 																<Currency
 																	value={row.balance}
-																	maximumFractionDigits={2}
+																	decimalScale={2}
 																	sentiment={balanceSentiment(row)}
 																/>
 															</Tooltip.Trigger>
@@ -333,7 +333,7 @@
 													{:else}
 														<Currency
 															value={row.balance}
-															maximumFractionDigits={2}
+															decimalScale={2}
 															sentiment={balanceSentiment(row)}
 														/>
 													{/if}
@@ -350,7 +350,7 @@
 												{@const total = totalsByFilter.get(option.key) ?? 0}
 												<Currency
 													value={total}
-													maximumFractionDigits={2}
+													decimalScale={2}
 													sentiment={total > 0 ? 'positive' : total < 0 ? 'negative' : 'neutral'}
 												/>
 											</Table.Cell>

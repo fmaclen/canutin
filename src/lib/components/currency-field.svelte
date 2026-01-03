@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { CurrencyInput, formatValue } from '@canutin/svelte-currency-input';
 
+	import { intlConfig } from './currency';
+
 	interface Props {
 		id: string;
 		name?: string;
@@ -9,8 +11,6 @@
 	}
 
 	let { id, name, value = $bindable(), required = false }: Props = $props();
-
-	const intlConfig = { locale: 'en-US', currency: 'USD' };
 
 	const placeholder = formatValue({ value: '0', intlConfig, decimalScale: 2 });
 

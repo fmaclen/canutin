@@ -6,29 +6,13 @@
 
 	interface Props {
 		value: number;
-		currency?: string;
-		locale?: string;
-		maximumFractionDigits?: number;
 		decimalScale?: number;
 		sentiment?: Sentiment;
 	}
 
-	let {
-		value,
-		currency = 'USD',
-		locale = 'en-US',
-		maximumFractionDigits = 0,
-		decimalScale,
-		sentiment = 'undefined'
-	}: Props = $props();
+	let { value, decimalScale = 0, sentiment = 'undefined' }: Props = $props();
 
-	const formattedValue = $derived(
-		formatCurrency(value, {
-			currency,
-			locale,
-			maximumFractionDigits: decimalScale ?? maximumFractionDigits
-		})
-	);
+	const formattedValue = $derived.by(() => formatCurrency(value, decimalScale));
 </script>
 
 <Number value={formattedValue} {sentiment} />
