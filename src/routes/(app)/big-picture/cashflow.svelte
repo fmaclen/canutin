@@ -17,7 +17,7 @@
 	let hoveredIndex = $state<number | null>(null);
 
 	// Transform data for the chart - split positive/negative for different colors
-	const chartData = $derived(
+	const chartData = $derived.by(() =>
 		periods.map((p) => {
 			const isJanuary = p.month.getMonth() === 0;
 			return {
