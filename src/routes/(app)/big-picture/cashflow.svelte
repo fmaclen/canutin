@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { format } from 'date-fns';
 
-	import { goto } from '$app/navigation';
-	import { getCashflowContext, type CashflowPeriod } from '$lib/cashflow.svelte';
+	import { getCashflowContext } from '$lib/cashflow.svelte';
 	import { formatCurrency } from '$lib/components/currency';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
@@ -93,13 +92,6 @@
 		if (index === extremeIndices.lowestIndex && periods[index].surplus < 0) return true;
 		return false;
 	}
-
-	function handleBarClick(_event: MouseEvent, detail: { data: CashflowPeriod }) {
-		const period = detail.data;
-		const url = `/transactions?periodFrom=${period.periodFrom}&periodTo=${period.periodTo}&periodLabel=${encodeURIComponent(period.periodLabel)}`;
-		// eslint-disable-next-line svelte/no-navigation-without-resolve
-		goto(url);
-	}
 </script>
 
 <SectionTitle title="Cashflow" />
@@ -114,13 +106,11 @@
 					{@const isPositive = barData.isPositive}
 					{@const heightPercent = barData.height}
 					{@const isHovered = hoveredIndex === i}
-					<Tooltip.Root delayDuration={0}>
+					<Tooltip.Root delayDuration={50}>
 						<Tooltip.Trigger
-							class="relative flex h-80 cursor-pointer flex-col pt-2 sm:pt-8 {i <
-							chartData.length - 1
+							class="relative flex h-80 flex-col pt-2 sm:pt-8 {i < chartData.length - 1
 								? 'border-border border-r'
 								: ''} {isHovered ? 'bg-muted/50' : ''}"
-							onclick={(e) => handleBarClick(e, { data: period })}
 							onmouseenter={() => (hoveredIndex = i)}
 							onmouseleave={() => (hoveredIndex = null)}
 						>
@@ -131,7 +121,7 @@
 									{#if period.surplus !== 0}
 										{#if isPositive}
 											<div
-												class="absolute right-0 left-0 border-t-3 border-t-[#00a36f] {isHovered
+												class="absolute right-0 left-0 border-t-3 border-t-[#00a36f] transition-all duration-200 ease-out {isHovered
 													? 'bg-[#00a36f]'
 													: 'bg-[hsl(166,52%,95%)]'}"
 												style="
@@ -150,7 +140,7 @@
 											</div>
 										{:else}
 											<div
-												class="absolute right-0 left-0 border-b-3 border-b-[#e75258] {isHovered
+												class="absolute right-0 left-0 border-b-3 border-b-[#e75258] transition-all duration-200 ease-out {isHovered
 													? 'bg-[#e75258]'
 													: 'bg-[hsl(346,52%,95%)]'}"
 												style="
