@@ -1,20 +1,21 @@
 <script lang="ts">
-	import { scaleBand, scaleLinear } from 'd3-scale';
 	import { format } from 'date-fns';
-	import { BarChart, Tooltip } from 'layerchart';
 
 	import { goto } from '$app/navigation';
 	import { getCashflowContext, type CashflowPeriod } from '$lib/cashflow.svelte';
-	import Currency from '$lib/components/currency.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
-	import * as Chart from '$lib/components/ui/chart/index';
 
 	const cashflow = getCashflowContext();
 	const periods = $derived(cashflow.periods);
 
-	// Use CSS variable colors
-	const COLOR_CASH = '#00a36f';
-	const COLOR_DEBT = '#e75258';
+	// Colors with 25% opacity for bar fill, full color for edge border
+	const COLOR_CASH = 'rgba(0, 163, 111, 0.25)';
+	const COLOR_CASH_SOLID = '#00a36f';
+	const COLOR_DEBT = 'rgba(231, 82, 88, 0.25)';
+	const COLOR_DEBT_SOLID = '#e75258';
+
+	// Minimum bar height in pixels
+	const MIN_BAR_HEIGHT = 3;
 
 	// Transform data for the chart - split positive/negative for different colors
 	const chartData = $derived(
@@ -47,10 +48,21 @@
 		return ((max - 0) / range) * 100;
 	});
 
-	const chartConfig = {
-		positive: { label: 'Balance', color: COLOR_CASH },
-		negative: { label: 'Balance', color: COLOR_DEBT }
-	} satisfies Chart.ChartConfig;
+	// Calculate bar heights as percentages, with minimum height enforcement
+	const barHeights = $derived.by(() => {
+		const [min, max] = yDomain;
+		const range = max - min;
+		if (range === 0) return periods.map(() => ({ height: 0, isPositive: true }));
+
+		return periods.map((p) => {
+			const absValue = Math.abs(p.surplus);
+			const heightPercent = (absValue / range) * 100;
+			return {
+				height: heightPercent,
+				isPositive: p.surplus >= 0
+			};
+		});
+	});
 
 	function handleBarClick(_event: MouseEvent, detail: { data: CashflowPeriod }) {
 		const period = detail.data;
@@ -65,72 +77,71 @@
 
 	<div class="bg-background relative overflow-hidden rounded-md shadow-sm">
 		{#if chartData.length > 0}
-			<!-- Grid overlay for vertical dividers and zero line -->
-			<div
-				class="pointer-events-none absolute inset-0 z-10 grid"
-				style="grid-template-columns: repeat({chartData.length}, 1fr); padding-bottom: 32px;"
-			>
-				{#each chartData as period, i (period.id)}
-					<div class={i < chartData.length - 1 ? 'border-border border-r' : ''}></div>
-				{/each}
-			</div>
-			<!-- Horizontal zero line -->
-			<div
-				class="border-border pointer-events-none absolute right-0 left-0 z-10 border-t"
-				style="top: calc((100% - 32px) * {zeroLinePercent} / 100)"
-			></div>
-			<Chart.Container
-				config={chartConfig}
-				class="h-80 w-full py-0 [&_.lc-axis-y]:hidden [&_.lc-bar]:stroke-none [&_.lc-grid]:hidden"
-			>
-				<BarChart
-					data={chartData}
-					x="label"
-					xScale={scaleBand().padding(0)}
-					yScale={scaleLinear()}
-					{yDomain}
-					yNice={false}
-					yBaseline={0}
-					padding={{ top: 0, right: 0, bottom: 32, left: 0 }}
-					onBarClick={handleBarClick}
-					series={[
-						{ key: 'positive', color: COLOR_CASH },
-						{ key: 'negative', color: COLOR_DEBT }
-					]}
-					seriesLayout="overlap"
-					props={{
-						bars: { radius: 0 },
-						xAxis: { format: (v: string) => v },
-						yAxis: { ticks: 0 }
-					}}
+			<!-- Custom bar chart with styled bars -->
+			<div class="flex h-80 flex-col">
+				<!-- Chart area -->
+				<div class="relative flex-1">
+					<!-- Bars container -->
+					<div
+						class="absolute inset-0 grid"
+						style="grid-template-columns: repeat({chartData.length}, 1fr);"
+					>
+						{#each chartData as period, i (period.id)}
+							{@const barData = barHeights[i]}
+							{@const isPositive = barData.isPositive}
+							{@const heightPercent = barData.height}
+							<button
+								type="button"
+								class="border-border relative cursor-pointer {i < chartData.length - 1
+									? 'border-r'
+									: ''}"
+								onclick={(e) => handleBarClick(e, { data: period })}
+							>
+								<!-- Bar with 25% opacity fill and solid edge border -->
+								{#if period.surplus !== 0}
+									{#if isPositive}
+										<!-- Positive bar: anchored at zero line, grows upward -->
+										<div
+											class="absolute right-0 left-0"
+											style="
+												top: calc({zeroLinePercent}% - max({MIN_BAR_HEIGHT}px, {heightPercent}%));
+												height: max({MIN_BAR_HEIGHT}px, {heightPercent}%);
+												background-color: {COLOR_CASH};
+												border-top: 3px solid {COLOR_CASH_SOLID};
+											"
+										></div>
+									{:else}
+										<!-- Negative bar: anchored at zero line, grows downward -->
+										<div
+											class="absolute right-0 left-0"
+											style="
+												top: {zeroLinePercent}%;
+												height: max({MIN_BAR_HEIGHT}px, {heightPercent}%);
+												background-color: {COLOR_DEBT};
+												border-bottom: 3px solid {COLOR_DEBT_SOLID};
+											"
+										></div>
+									{/if}
+								{/if}
+							</button>
+						{/each}
+					</div>
+					<!-- Horizontal zero line -->
+					<div
+						class="border-border pointer-events-none absolute right-0 left-0 z-10 border-t"
+						style="top: {zeroLinePercent}%"
+					></div>
+				</div>
+				<!-- X-axis labels -->
+				<div
+					class="grid h-8 items-center"
+					style="grid-template-columns: repeat({chartData.length}, 1fr);"
 				>
-					{#snippet tooltip()}
-						<Tooltip.Root variant="none">
-							{#snippet children({ data }: { data: CashflowPeriod })}
-								<div
-									class="border-border/50 bg-background grid min-w-36 gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs shadow-xl"
-								>
-									<div class="text-muted-foreground border-b pb-1">
-										{data.periodLabel}
-									</div>
-									<div class="flex items-center justify-between gap-4">
-										<span class="text-muted-foreground">Income</span>
-										<Currency value={data.income} />
-									</div>
-									<div class="flex items-center justify-between gap-4">
-										<span class="text-muted-foreground">Expenses</span>
-										<Currency value={Math.abs(data.expenses)} />
-									</div>
-									<div class="flex items-center justify-between gap-4 border-t pt-1">
-										<span class="text-muted-foreground">Balance</span>
-										<Currency value={data.surplus} />
-									</div>
-								</div>
-							{/snippet}
-						</Tooltip.Root>
-					{/snippet}
-				</BarChart>
-			</Chart.Container>
+					{#each chartData as period (period.id)}
+						<div class="text-muted-foreground text-center text-xs">{period.label}</div>
+					{/each}
+				</div>
+			</div>
 		{/if}
 	</div>
 </div>
