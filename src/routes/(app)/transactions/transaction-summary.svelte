@@ -1,17 +1,16 @@
 <script lang="ts">
-	import Currency from '$lib/components/currency.svelte';
+	import KeyValue from '$lib/components/key-value.svelte';
 	import { getTransactionsContext } from '$lib/transactions.svelte';
 
 	const txContext = getTransactionsContext();
 </script>
 
-<div role="region" aria-label="Transactions summary">
-	<div>
-		<span>Transactions</span>
-		<span>{txContext.filteredRows.length}</span>
-	</div>
-	<div>
-		<span>Net balance</span>
-		<Currency value={txContext.netBalance} maximumFractionDigits={2} />
-	</div>
+<div role="region" aria-label="Transactions summary" class="grid grid-cols-2 gap-2">
+	<KeyValue
+		title="Transactions"
+		value={txContext.filteredRows.length}
+		variant="outline"
+		format="number"
+	/>
+	<KeyValue title="Net balance" value={txContext.netBalance} variant="outline" />
 </div>
