@@ -309,13 +309,13 @@
 											<Tooltip.Content sideOffset={6}>
 												<p class="font-normal">
 													{m.trends_performance_tooltip_from()}
-													<span class="font-jetbrains-mono tabular-nums"
-														>{formatCurrency(c.values.net.prev, { maximumFractionDigits: 2 })}</span
-													>
+													<span class="font-jetbrains-mono tabular-nums">
+														{formatCurrency(c.values.net.prev, 2)}
+													</span>
 													{m.trends_performance_tooltip_to()}
-													<span class="font-jetbrains-mono tabular-nums"
-														>{formatCurrency(c.values.net.cur, { maximumFractionDigits: 2 })}</span
-													>
+													<span class="font-jetbrains-mono tabular-nums">
+														{formatCurrency(c.values.net.cur, 2)}
+													</span>
 												</p>
 											</Tooltip.Content>
 										</Tooltip.Root>
@@ -330,7 +330,7 @@
 									>
 									<Tooltip.Content sideOffset={6}>
 										<p class="font-normal">
-											{formatCurrency(table.current.net, { maximumFractionDigits: 2 })}
+											{formatCurrency(table.current.net, 2)}
 										</p>
 									</Tooltip.Content>
 								</Tooltip.Root>
@@ -354,15 +354,13 @@
 											<Tooltip.Content sideOffset={6}>
 												<p class="font-normal">
 													{m.trends_performance_tooltip_from()}
-													<span class="font-jetbrains-mono tabular-nums"
-														>{formatCurrency(c.values.cash.prev, {
-															maximumFractionDigits: 2
-														})}</span
-													>
+													<span class="font-jetbrains-mono tabular-nums">
+														{formatCurrency(c.values.cash.prev, 2)}
+													</span>
 													to
-													<span class="font-jetbrains-mono tabular-nums"
-														>{formatCurrency(c.values.cash.cur, { maximumFractionDigits: 2 })}</span
-													>
+													<span class="font-jetbrains-mono tabular-nums">
+														{formatCurrency(c.values.cash.cur, 2)}
+													</span>
 												</p>
 											</Tooltip.Content>
 										</Tooltip.Root>
@@ -377,7 +375,7 @@
 									>
 									<Tooltip.Content sideOffset={6}>
 										<p class="font-normal">
-											{formatCurrency(table.current.cash, { maximumFractionDigits: 2 })}
+											{formatCurrency(table.current.cash, 2)}
 										</p>
 									</Tooltip.Content>
 								</Tooltip.Root>
@@ -401,15 +399,13 @@
 											<Tooltip.Content sideOffset={6}>
 												<p class="font-normal">
 													{m.trends_performance_tooltip_from()}
-													<span class="font-jetbrains-mono tabular-nums"
-														>{formatCurrency(c.values.debt.prev, {
-															maximumFractionDigits: 2
-														})}</span
-													>
+													<span class="font-jetbrains-mono tabular-nums">
+														{formatCurrency(c.values.debt.prev, 2)}
+													</span>
 													to
-													<span class="font-jetbrains-mono tabular-nums"
-														>{formatCurrency(c.values.debt.cur, { maximumFractionDigits: 2 })}</span
-													>
+													<span class="font-jetbrains-mono tabular-nums">
+														{formatCurrency(c.values.debt.cur, 2)}
+													</span>
 												</p>
 											</Tooltip.Content>
 										</Tooltip.Root>
@@ -424,7 +420,7 @@
 									>
 									<Tooltip.Content sideOffset={6}>
 										<p class="font-normal">
-											{formatCurrency(table.current.debt, { maximumFractionDigits: 2 })}
+											{formatCurrency(table.current.debt, 2)}
 										</p>
 									</Tooltip.Content>
 								</Tooltip.Root>
@@ -448,17 +444,13 @@
 											<Tooltip.Content sideOffset={6}>
 												<p class="font-normal">
 													{m.trends_performance_tooltip_from()}
-													<span class="font-jetbrains-mono tabular-nums"
-														>{formatCurrency(c.values.investment.prev, {
-															maximumFractionDigits: 2
-														})}</span
-													>
+													<span class="font-jetbrains-mono tabular-nums">
+														{formatCurrency(c.values.investment.prev, 2)}
+													</span>
 													to
-													<span class="font-jetbrains-mono tabular-nums"
-														>{formatCurrency(c.values.investment.cur, {
-															maximumFractionDigits: 2
-														})}</span
-													>
+													<span class="font-jetbrains-mono tabular-nums">
+														{formatCurrency(c.values.investment.cur, 2)}
+													</span>
 												</p>
 											</Tooltip.Content>
 										</Tooltip.Root>
@@ -473,7 +465,7 @@
 									>
 									<Tooltip.Content sideOffset={6}>
 										<p class="font-normal">
-											{formatCurrency(table.current.investment, { maximumFractionDigits: 2 })}
+											{formatCurrency(table.current.investment, 2)}
 										</p>
 									</Tooltip.Content>
 								</Tooltip.Root>
@@ -497,17 +489,13 @@
 											<Tooltip.Content sideOffset={6}>
 												<p class="font-normal">
 													{m.trends_performance_tooltip_from()}
-													<span class="font-jetbrains-mono tabular-nums"
-														>{formatCurrency(c.values.other.prev, {
-															maximumFractionDigits: 2
-														})}</span
-													>
+													<span class="font-jetbrains-mono tabular-nums">
+														{formatCurrency(c.values.other.prev, 2)}
+													</span>
 													to
-													<span class="font-jetbrains-mono tabular-nums"
-														>{formatCurrency(c.values.other.cur, {
-															maximumFractionDigits: 2
-														})}</span
-													>
+													<span class="font-jetbrains-mono tabular-nums">
+														{formatCurrency(c.values.other.cur, 2)}
+													</span>
 												</p>
 											</Tooltip.Content>
 										</Tooltip.Root>
@@ -522,7 +510,7 @@
 									>
 									<Tooltip.Content sideOffset={6}>
 										<p class="font-normal">
-											{formatCurrency(table.current.other, { maximumFractionDigits: 2 })}
+											{formatCurrency(table.current.other, 2)}
 										</p>
 									</Tooltip.Content>
 								</Tooltip.Root>
