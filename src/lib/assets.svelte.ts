@@ -134,7 +134,7 @@ class AssetsContext {
 			}
 		} else if (e.action === 'delete') {
 			// When a balance is deleted, we need to re-fetch to get the next most recent
-			this.refetchAssetBalance(assetId);
+			void this.refetchAssetBalance(assetId);
 		}
 	}
 

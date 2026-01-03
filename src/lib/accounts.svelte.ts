@@ -110,7 +110,7 @@ class AccountsContext {
 			}
 		} else if (e.action === 'delete') {
 			// When a balance is deleted, we need to re-fetch to get the next most recent
-			this.refetchAccountBalance(accountId);
+			void this.refetchAccountBalance(accountId);
 		}
 	}
 
