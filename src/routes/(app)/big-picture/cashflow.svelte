@@ -5,6 +5,7 @@
 	import { getCashflowContext, type CashflowPeriod } from '$lib/cashflow.svelte';
 	import { formatCurrency } from '$lib/components/currency';
 	import SectionTitle from '$lib/components/section-title.svelte';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	const cashflow = getCashflowContext();
 	const periods = $derived(cashflow.periods);
@@ -105,82 +106,115 @@
 
 <div class="bg-background relative overflow-hidden rounded-md shadow-md">
 	{#if chartData.length > 0}
-		<!-- Grid layout: columns for each period -->
-		<div class="grid" style="grid-template-columns: repeat({chartData.length}, minmax(0, 1fr));">
-			{#each chartData as period, i (period.id)}
-				{@const barData = barHeights[i]}
-				{@const isPositive = barData.isPositive}
-				{@const heightPercent = barData.height}
-				{@const isHovered = hoveredIndex === i}
-				<button
-					type="button"
-					class="relative flex h-80 cursor-pointer flex-col pt-2 sm:pt-8 {i < chartData.length - 1
-						? 'border-border border-r'
-						: ''} {isHovered ? 'bg-muted/50' : ''}"
-					onclick={(e) => handleBarClick(e, { data: period })}
-					onmouseenter={() => (hoveredIndex = i)}
-					onmouseleave={() => (hoveredIndex = null)}
-					title="See transactions in {period.periodLabel}"
-				>
-					<!-- Chart area -->
-					<div class="relative flex-1">
-						<!-- Inner container for bars, inset to leave room for labels -->
-						<div class="absolute inset-x-0 top-0 bottom-0 sm:bottom-8">
-							{#if period.surplus !== 0}
-								{#if isPositive}
-									<div
-										class="absolute right-0 left-0 border-t-3 border-t-[#00a36f] {isHovered
-											? 'bg-[#00a36f]'
-											: 'bg-[hsl(166,52%,95%)]'}"
-										style="
+		<Tooltip.Provider>
+			<!-- Grid layout: columns for each period -->
+			<div class="grid" style="grid-template-columns: repeat({chartData.length}, minmax(0, 1fr));">
+				{#each chartData as period, i (period.id)}
+					{@const barData = barHeights[i]}
+					{@const isPositive = barData.isPositive}
+					{@const heightPercent = barData.height}
+					{@const isHovered = hoveredIndex === i}
+					<Tooltip.Root delayDuration={0}>
+						<Tooltip.Trigger
+							class="relative flex h-80 cursor-pointer flex-col pt-2 sm:pt-8 {i <
+							chartData.length - 1
+								? 'border-border border-r'
+								: ''} {isHovered ? 'bg-muted/50' : ''}"
+							onclick={(e) => handleBarClick(e, { data: period })}
+							onmouseenter={() => (hoveredIndex = i)}
+							onmouseleave={() => (hoveredIndex = null)}
+						>
+							<!-- Chart area -->
+							<div class="relative flex-1">
+								<!-- Inner container for bars, inset to leave room for labels -->
+								<div class="absolute inset-x-0 top-0 bottom-0 sm:bottom-8">
+									{#if period.surplus !== 0}
+										{#if isPositive}
+											<div
+												class="absolute right-0 left-0 border-t-3 border-t-[#00a36f] {isHovered
+													? 'bg-[#00a36f]'
+													: 'bg-[hsl(166,52%,95%)]'}"
+												style="
 											top: calc({zeroLinePercent}% - max({MIN_BAR_HEIGHT}px, {heightPercent}%));
 											height: max({MIN_BAR_HEIGHT}px, {heightPercent}%);
 										"
-									>
-										<!-- Value label (positive) -->
-										{#if shouldShowLabel(i)}
-											<span
-												class="pointer-events-none absolute right-0 bottom-full left-0 hidden truncate p-2 text-center font-mono text-xs font-medium text-[#00a36f] sm:block"
 											>
-												{formatCurrency(period.surplus)}
-											</span>
-										{/if}
-									</div>
-								{:else}
-									<div
-										class="absolute right-0 left-0 border-b-3 border-b-[#e75258] {isHovered
-											? 'bg-[#e75258]'
-											: 'bg-[hsl(346,52%,95%)]'}"
-										style="
+												<!-- Value label (positive) -->
+												{#if shouldShowLabel(i)}
+													<span
+														class="pointer-events-none absolute right-0 bottom-full left-0 hidden truncate p-2 text-center font-mono text-xs font-medium text-[#00a36f] sm:block"
+													>
+														{formatCurrency(period.surplus)}
+													</span>
+												{/if}
+											</div>
+										{:else}
+											<div
+												class="absolute right-0 left-0 border-b-3 border-b-[#e75258] {isHovered
+													? 'bg-[#e75258]'
+													: 'bg-[hsl(346,52%,95%)]'}"
+												style="
 											top: {zeroLinePercent}%;
 											height: max({MIN_BAR_HEIGHT}px, {heightPercent}%);
 										"
-									>
-										<!-- Value label (negative) -->
-										{#if shouldShowLabel(i)}
-											<span
-												class="pointer-events-none absolute top-full right-0 left-0 hidden truncate p-2 text-center font-mono text-xs font-medium text-[#e75258] sm:block"
 											>
-												{formatCurrency(period.surplus)}
-											</span>
+												<!-- Value label (negative) -->
+												{#if shouldShowLabel(i)}
+													<span
+														class="pointer-events-none absolute top-full right-0 left-0 hidden truncate p-2 text-center font-mono text-xs font-medium text-[#e75258] sm:block"
+													>
+														{formatCurrency(period.surplus)}
+													</span>
+												{/if}
+											</div>
 										{/if}
-									</div>
-								{/if}
-							{/if}
-							<!-- Zero line -->
-							<div
-								class="border-border pointer-events-none absolute right-0 left-0 border-t"
-								style="top: {zeroLinePercent}%"
-							></div>
-						</div>
-					</div>
+									{/if}
+									<!-- Zero line -->
+									<div
+										class="border-border pointer-events-none absolute right-0 left-0 border-t"
+										style="top: {zeroLinePercent}%"
+									></div>
+								</div>
+							</div>
 
-					<!-- X-axis label -->
-					<div class="text-muted-foreground flex h-8 items-center justify-center text-xs">
-						{period.label}
-					</div>
-				</button>
-			{/each}
-		</div>
+							<!-- X-axis label -->
+							<div class="text-muted-foreground flex h-8 items-center justify-center text-xs">
+								{period.label}
+							</div>
+						</Tooltip.Trigger>
+						<Tooltip.Content>
+							<div class="flex flex-col gap-1">
+								<div class="font-semibold">{period.periodLabel}</div>
+								<div class="flex items-center justify-between gap-4">
+									<span class="flex items-center gap-1.5">
+										<span class="size-2 rounded-full border border-[#00a36f]"></span>
+										Income
+									</span>
+									<span class="font-mono">{formatCurrency(period.income)}</span>
+								</div>
+								<div class="flex items-center justify-between gap-4">
+									<span class="flex items-center gap-1.5">
+										<span class="size-2 rounded-full border border-[#e75258]"></span>
+										Expenses
+									</span>
+									<span class="font-mono">{formatCurrency(period.expenses)}</span>
+								</div>
+								<div class="flex items-center justify-between gap-4">
+									<span class="flex items-center gap-1.5">
+										<span
+											class="size-2 rounded-full {period.surplus >= 0
+												? 'bg-[#00a36f]'
+												: 'bg-[#e75258]'}"
+										></span>
+										Surplus
+									</span>
+									<span class="font-mono">{formatCurrency(period.surplus)}</span>
+								</div>
+							</div>
+						</Tooltip.Content>
+					</Tooltip.Root>
+				{/each}
+			</div>
+		</Tooltip.Provider>
 	{/if}
 </div>
