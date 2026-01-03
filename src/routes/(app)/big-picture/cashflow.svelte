@@ -108,6 +108,7 @@
 					{@const isHovered = hoveredIndex === i}
 					{@const isDecember = period.month.getMonth() === 11}
 					{@const isLastColumn = i === chartData.length - 1}
+					{@const isCurrentPeriod = period.isCurrentPeriod}
 					<Tooltip.Root delayDuration={50}>
 						<Tooltip.Trigger
 							class="relative flex h-80 flex-col pt-2 sm:pt-8 {!isLastColumn
@@ -125,12 +126,15 @@
 									{#if period.surplus !== 0}
 										{#if isPositive}
 											<div
-												class="absolute right-0 left-0 border-t-3 border-t-[#00a36f] transition-all duration-200 ease-out {isHovered
-													? 'bg-[#00a36f]'
-													: 'bg-[hsl(166,52%,95%)]'}"
+												class="absolute right-0 left-0 border-t-3 border-t-[#00a36f] transition-all duration-200 ease-out {isCurrentPeriod
+													? ''
+													: isHovered
+														? 'bg-[#00a36f]'
+														: 'bg-[hsl(166,52%,95%)]'}"
 												style="
 											top: calc({zeroLinePercent}% - max({MIN_BAR_HEIGHT}px, {heightPercent}%));
 											height: max({MIN_BAR_HEIGHT}px, {heightPercent}%);
+											{isCurrentPeriod ? 'background-image: url(/chart-current-background.svg);' : ''}
 										"
 											>
 												<!-- Value label (positive) -->
@@ -144,12 +148,15 @@
 											</div>
 										{:else}
 											<div
-												class="absolute right-0 left-0 border-b-3 border-b-[#e75258] transition-all duration-200 ease-out {isHovered
-													? 'bg-[#e75258]'
-													: 'bg-[hsl(346,52%,95%)]'}"
+												class="absolute right-0 left-0 border-b-3 border-b-[#e75258] transition-all duration-200 ease-out {isCurrentPeriod
+													? ''
+													: isHovered
+														? 'bg-[#e75258]'
+														: 'bg-[hsl(346,52%,95%)]'}"
 												style="
 											top: {zeroLinePercent}%;
 											height: max({MIN_BAR_HEIGHT}px, {heightPercent}%);
+											{isCurrentPeriod ? 'background-image: url(/chart-current-background.svg);' : ''}
 										"
 											>
 												<!-- Value label (negative) -->
