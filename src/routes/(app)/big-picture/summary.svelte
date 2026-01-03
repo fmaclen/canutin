@@ -30,8 +30,8 @@
 			<Currency value={totals.netWorth} />
 		</div>
 	</div>
-	<KeyValue title="Cash" value={totals.totalsByGroup.CASH} className="bg-cash" />
-	<KeyValue title="Investments" value={totals.totalsByGroup.INVESTMENT} className="bg-investment" />
-	<KeyValue title="Debt" value={totals.totalsByGroup.DEBT} className="bg-debt" />
-	<KeyValue title="Other assets" value={totals.totalsByGroup.OTHER} className="bg-other" />
+	<KeyValue title="Cash" value={totals.totalsByGroup.CASH} variant="cash" />
+	<KeyValue title="Investments" value={totals.totalsByGroup.INVESTMENT} variant="investment" />
+	<KeyValue title="Debt" value={totals.totalsByGroup.DEBT} variant="debt" />
+	<KeyValue title="Other assets" value={totals.totalsByGroup.OTHER} variant="other" />
 </div>

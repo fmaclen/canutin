@@ -14,7 +14,7 @@
 				cash: 'bg-cash text-background border-transparent',
 				debt: 'bg-debt text-background border-transparent',
 				investment: 'bg-investment text-background border-transparent',
-				other: 'bg-other text-background border-transparent'
+				other: 'bg-other-assets text-background border-transparent'
 			}
 		},
 		defaultVariants: {

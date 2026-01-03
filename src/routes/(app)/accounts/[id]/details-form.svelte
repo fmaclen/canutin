@@ -78,7 +78,7 @@
 											? 'bg-debt'
 											: formData.balanceGroup === AccountsBalanceGroupOptions.INVESTMENT
 												? 'bg-investment'
-												: 'bg-other'}"
+												: 'bg-other-assets'}"
 								></div>
 								{#if formData.balanceGroup === AccountsBalanceGroupOptions.CASH}
 									{m.accounts_group_cash_label()}
@@ -117,7 +117,7 @@
 						</Select.Item>
 						<Select.Item value={AccountsBalanceGroupOptions.OTHER}>
 							<div class="flex items-center gap-2">
-								<div class="bg-other size-2 rounded-full"></div>
+								<div class="bg-other-assets size-2 rounded-full"></div>
 								{m.accounts_group_other_label()}
 							</div>
 						</Select.Item>

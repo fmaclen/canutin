@@ -29,14 +29,14 @@
 					: 'Other assets';
 	}
 
-	function groupClass(group: BalanceGroup) {
+	function groupVariant(group: BalanceGroup) {
 		return group === 'CASH'
-			? 'bg-cash'
+			? 'cash'
 			: group === 'DEBT'
-				? 'bg-debt'
+				? 'debt'
 				: group === 'INVESTMENT'
-					? 'bg-investment'
-					: 'bg-other';
+					? 'investment'
+					: 'other';
 	}
 
 	const grouped = $derived.by(() => {
@@ -150,7 +150,7 @@
 					<KeyValue
 						title={groupTitle(balanceGroup)}
 						value={grouped[balanceGroup].total}
-						className={`${groupClass(balanceGroup)} text-background`}
+						variant={groupVariant(balanceGroup)}
 					/>
 					{#each grouped[balanceGroup].types as balanceType (balanceType.id)}
 						<div
