@@ -6,7 +6,7 @@
 	const txContext = getTransactionsContext();
 </script>
 
-<div role="region" aria-label="Transactions summary" class="grid grid-cols-2 gap-3">
+<div role="region" aria-label={m.transactions_summary_aria_label()} class="grid grid-cols-2 gap-3">
 	<KeyValue
 		title={m.transactions_summary_count_label()}
 		value={txContext.filteredRows.length}
