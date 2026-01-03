@@ -256,5 +256,8 @@
 	"transactions_delete_confirm_continue": "Continue",
 	"transactions_delete_success": "Transaction deleted",
 	"transactions_delete_failed": "Failed to delete transaction",
-	"transactions_search_placeholder": "Search transactions"
+	"transactions_search_placeholder": "Search transactions",
+	"transactions_summary_count_label": "Transactions",
+	"transactions_summary_net_balance_label": "Net balance",
+	"transactions_summary_aria_label": "Transactions summary"
 }

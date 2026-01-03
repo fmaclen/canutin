@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Link from '$lib/components/link.svelte';
 	import Page from '$lib/components/page.svelte';
+	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
@@ -50,7 +51,8 @@
 
 <Page pageTitle={m.sidebar_transactions()}>
 	<Section>
-		<div class="flex flex-col gap-4">
+		<SectionTitle title={m.transactions_section_title()} />
+		<div class="flex flex-col gap-3">
 			<TransactionFilters />
 			<TransactionSummary />
 			{#if txContext.isLoading && txContext.rawTransactions.length === 0}

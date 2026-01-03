@@ -1,16 +1,21 @@
 <script lang="ts">
 	import KeyValue from '$lib/components/key-value.svelte';
+	import { m } from '$lib/paraglide/messages';
 	import { getTransactionsContext } from '$lib/transactions.svelte';
 
 	const txContext = getTransactionsContext();
 </script>
 
-<div role="region" aria-label="Transactions summary" class="grid grid-cols-2 gap-2">
+<div role="region" aria-label="Transactions summary" class="grid grid-cols-2 gap-3">
 	<KeyValue
-		title="Transactions"
+		title={m.transactions_summary_count_label()}
 		value={txContext.filteredRows.length}
 		variant="outline"
 		format="number"
 	/>
-	<KeyValue title="Net balance" value={txContext.netBalance} variant="outline" />
+	<KeyValue
+		title={m.transactions_summary_net_balance_label()}
+		value={txContext.netBalance}
+		variant="outline"
+	/>
 </div>
