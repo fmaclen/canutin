@@ -17,5 +17,6 @@
 		title={m.transactions_summary_net_balance_label()}
 		value={txContext.netBalance}
 		variant="outline"
+		decimalScale={2}
 	/>
 </div>

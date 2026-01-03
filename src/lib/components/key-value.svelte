@@ -6,12 +6,14 @@
 		value = null,
 		variant = 'filled',
 		format = 'currency',
+		decimalScale = 0,
 		className
 	}: {
 		title: string;
 		value: number | null;
 		variant?: 'filled' | 'outline';
 		format?: 'currency' | 'number';
+		decimalScale?: number;
 		className?: string;
 	} = $props();
 
@@ -28,7 +30,7 @@
 		{#if format === 'number'}
 			{value ?? 0}
 		{:else}
-			<Currency value={value ?? 0} />
+			<Currency value={value ?? 0} {decimalScale} />
 		{/if}
 	</div>
 </div>

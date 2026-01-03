@@ -9,6 +9,7 @@
 		currency?: string;
 		locale?: string;
 		maximumFractionDigits?: number;
+		decimalScale?: number;
 		sentiment?: Sentiment;
 	}
 
@@ -17,12 +18,16 @@
 		currency = 'USD',
 		locale = 'en-US',
 		maximumFractionDigits = 0,
+		decimalScale,
 		sentiment = 'undefined'
 	}: Props = $props();
 
-	// Format: $1,523.00 || -$1,523.00
 	const formattedValue = $derived(
-		formatCurrency(value, { currency, locale, maximumFractionDigits })
+		formatCurrency(value, {
+			currency,
+			locale,
+			maximumFractionDigits: decimalScale ?? maximumFractionDigits
+		})
 	);
 </script>
 

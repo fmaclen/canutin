@@ -24,39 +24,39 @@ test('transactions page shows correct count and net balance in summary', async (
 	const now = new UTCDate();
 
 	// Seed 5 transactions:
-	// - 2 credits: +500, +300 = +800
-	// - 2 debits: -200, -150 = -350
+	// - 2 credits: +500.75, +300.50 = +801.25
+	// - 2 debits: -200.25, -150.33 = -350.58
 	// - 1 excluded credit: +1000 (should not affect net balance)
 	// Expected count: 5
-	// Expected net balance: 500 + 300 - 200 - 150 = 450
+	// Expected net balance: 500.75 + 300.50 - 200.25 - 150.33 = 450.67
 
 	await seedTransaction({
 		account: account.id,
 		owner: user.id,
 		date: now.toISOString(),
 		description: 'Freelance Payment',
-		value: 500
+		value: 500.75
 	});
 	await seedTransaction({
 		account: account.id,
 		owner: user.id,
 		date: now.toISOString(),
 		description: 'Refund Received',
-		value: 300
+		value: 300.5
 	});
 	await seedTransaction({
 		account: account.id,
 		owner: user.id,
 		date: now.toISOString(),
 		description: 'Grocery Shopping',
-		value: -200
+		value: -200.25
 	});
 	await seedTransaction({
 		account: account.id,
 		owner: user.id,
 		date: now.toISOString(),
 		description: 'Utility Bill',
-		value: -150
+		value: -150.33
 	});
 	await seedTransaction({
 		account: account.id,
@@ -83,23 +83,23 @@ test('transactions page shows correct count and net balance in summary', async (
 	await expect(summaryRegion.getByText('Transactions')).toBeVisible();
 	await expect(summaryRegion.getByText('5', { exact: true })).toBeVisible();
 	await expect(summaryRegion.getByText('Net balance')).toBeVisible();
-	await expect(summaryRegion.getByText('$450.00')).toBeVisible();
+	await expect(summaryRegion.getByText('$450.67')).toBeVisible();
 
 	// Change filter to "Credits only"
-	// Expected: count = 3 (2 regular credits + 1 excluded credit), net balance = $800 (500 + 300)
+	// Expected: count = 3 (2 regular credits + 1 excluded credit), net balance = $801.25 (500.75 + 300.50)
 	await page.getByLabel('Type').click();
 	await page.getByRole('option', { name: 'Credits only' }).click();
 
 	await expect(summaryRegion.getByText('3', { exact: true })).toBeVisible();
-	await expect(summaryRegion.getByText('$800.00')).toBeVisible();
+	await expect(summaryRegion.getByText('$801.25')).toBeVisible();
 
 	// Change filter to "Debits only"
-	// Expected: count = 2, net balance = -$350 (-200 + -150)
+	// Expected: count = 2, net balance = -$350.58 (-200.25 + -150.33)
 	await page.getByLabel('Type').click();
 	await page.getByRole('option', { name: 'Debits only' }).click();
 
 	await expect(summaryRegion.getByText('2', { exact: true })).toBeVisible();
-	await expect(summaryRegion.getByText('-$350.00')).toBeVisible();
+	await expect(summaryRegion.getByText('-$350.58')).toBeVisible();
 
 	// Change filter to "Excluded only"
 	// Expected: count = 1, net balance = $0.00 (excluded transactions don't count toward net)
