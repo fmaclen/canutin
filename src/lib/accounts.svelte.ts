@@ -94,7 +94,9 @@ class AccountsContext {
 		const newValue = e.record.value ?? 0;
 
 		if (e.action === 'create' || e.action === 'update') {
-			// Optimistic update: use the value from the event directly
+			// Optimistic update: use the value from the event directly.
+			// If account isn't loaded yet (event arrived during initial fetch), we ignore it.
+			// This is safe because init() fetches the latest balance for each account after loading.
 			const account = this.accounts.find((x) => x.id === accountId);
 			if (!account) return;
 

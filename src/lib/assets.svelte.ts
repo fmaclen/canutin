@@ -131,7 +131,9 @@ class AssetsContext {
 		const newAsOf = e.record.asOf;
 
 		if (e.action === 'create' || e.action === 'update') {
-			// Optimistic update: use the value from the event directly
+			// Optimistic update: use the value from the event directly.
+			// If asset isn't loaded yet (event arrived during initial fetch), we ignore it.
+			// This is safe because init() fetches the latest balance for each asset after loading.
 			const asset = this.assets.find((x) => x.id === assetId);
 			if (!asset) return;
 
