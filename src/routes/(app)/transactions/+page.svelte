@@ -11,6 +11,7 @@
 	import { setTransactionsContext } from '$lib/transactions.svelte';
 
 	import TransactionFilters from './transaction-filters.svelte';
+	import TransactionSummary from './transaction-summary.svelte';
 	import TransactionTable from './transaction-table.svelte';
 
 	const pb = getPocketBaseContext();
@@ -51,6 +52,7 @@
 	<Section>
 		<div class="flex flex-col gap-4">
 			<TransactionFilters />
+			<TransactionSummary />
 			{#if txContext.isLoading && txContext.rawTransactions.length === 0}
 				<Skeleton class="min-h-32" />
 			{:else}

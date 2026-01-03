@@ -619,11 +619,12 @@ test('user can add a new transaction', async ({ page }) => {
 	await page.getByRole('button', { name: 'Add' }).click();
 	await expect(page.getByText('Transaction added').first()).toBeVisible();
 	await expect(page.url()).toContain('/transactions');
-	await expect(page.getByText('Moonbeam Cafe')).toBeVisible();
-	await expect(page.getByText('-$45.50')).toBeVisible();
-	await expect(page.getByText('Meridian Checking').first()).toBeVisible();
-	await expect(page.getByText('Food & Dining').first()).toBeVisible();
-	await expect(page.getByText('Personal').first()).toBeVisible();
+	const moonbeamRow = page.getByRole('row', { name: /Moonbeam Cafe/ });
+	await expect(moonbeamRow).toBeVisible();
+	await expect(moonbeamRow.getByText('-$45.50')).toBeVisible();
+	await expect(moonbeamRow.getByText('Meridian Checking')).toBeVisible();
+	await expect(moonbeamRow.getByText('Food & Dining')).toBeVisible();
+	await expect(moonbeamRow.getByText('Personal')).toBeVisible();
 
 	await page.getByRole('link', { name: 'Add transaction' }).click();
 	await expect(page).toHaveURL('/transactions/add');
@@ -646,9 +647,10 @@ test('user can add a new transaction', async ({ page }) => {
 	await page.getByRole('button', { name: 'Add' }).click();
 	await expect(page.getByText('Transaction added').first()).toBeVisible();
 	await expect(page.url()).toContain('/transactions');
-	await expect(page.getByText('Credit Card Payment')).toBeVisible();
-	await expect(page.getByText('-$500.00')).toBeVisible();
-	await expect(page.getByText('Apex Credit Card')).toBeVisible();
+	const creditCardRow = page.getByRole('row', { name: /Credit Card Payment/ });
+	await expect(creditCardRow).toBeVisible();
+	await expect(creditCardRow.getByText('-$500.00')).toBeVisible();
+	await expect(creditCardRow.getByText('Apex Credit Card')).toBeVisible();
 });
 
 test('user can edit transaction details', async ({ page }) => {
@@ -701,10 +703,11 @@ test('user can edit transaction details', async ({ page }) => {
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Transactions');
 
-	await expect(page.getByText('Paperclip Office Supply Co')).toBeVisible();
-	await expect(page.getByText('-$150.00')).toBeVisible();
-	await expect(page.getByText('Northwind Business').first()).toBeVisible();
-	await expect(page.getByText('Office Supplies').first()).toBeVisible();
+	const paperclipRow = page.getByRole('row', { name: /Paperclip Office Supply Co/ });
+	await expect(paperclipRow).toBeVisible();
+	await expect(paperclipRow.getByText('-$150.00')).toBeVisible();
+	await expect(paperclipRow.getByText('Northwind Business')).toBeVisible();
+	await expect(paperclipRow.getByText('Office Supplies')).toBeVisible();
 
 	await page.getByRole('link', { name: 'Paperclip Office Supply Co' }).click();
 	await expect(page).toHaveURL(`/transactions/${transaction.id}`);
@@ -727,11 +730,12 @@ test('user can edit transaction details', async ({ page }) => {
 	await expect(page.url()).toContain('/transactions');
 	await expect(page.getByText('Paperclip Office Supply Co')).not.toBeVisible();
 
-	await expect(page.getByText('Skyward Airlines Conference Trip')).toBeVisible();
-	await expect(page.getByText('-$450.00')).toBeVisible();
-	await expect(page.getByText('Eastgate Savings').first()).toBeVisible();
-	await expect(page.getByText('Business Travel').first()).toBeVisible();
-	await expect(page.getByText('Conference').first()).toBeVisible();
+	const skywardRow = page.getByRole('row', { name: /Skyward Airlines Conference Trip/ });
+	await expect(skywardRow).toBeVisible();
+	await expect(skywardRow.getByText('-$450.00')).toBeVisible();
+	await expect(skywardRow.getByText('Eastgate Savings')).toBeVisible();
+	await expect(skywardRow.getByText('Business Travel')).toBeVisible();
+	await expect(skywardRow.getByText('Conference', { exact: true })).toBeVisible();
 
 	await page.getByRole('link', { name: 'Skyward Airlines Conference Trip' }).click();
 	await expect(page).toHaveURL(`/transactions/${transaction.id}`);
