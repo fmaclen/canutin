@@ -16,6 +16,17 @@ type AssetBalanceData = {
 	balanceAsOf: string;
 };
 
+const DEFAULT_BALANCE_DATA: AssetBalanceData = {
+	marketValue: 0,
+	bookValue: 0,
+	gain: 0,
+	gainPercent: 0,
+	quantity: undefined,
+	bookPrice: undefined,
+	marketPrice: undefined,
+	balanceAsOf: ''
+};
+
 export type AssetWithBalance = AssetsResponse & AssetBalanceData;
 
 class AssetsContext {
@@ -53,17 +64,7 @@ class AssetsContext {
 			this.realtimeSubscribe();
 
 			const list = await this._pb.authedClient.collection('assets').getFullList<AssetsResponse>();
-			this.assets = list.map((a) => ({
-				...a,
-				marketValue: 0,
-				bookValue: 0,
-				gain: 0,
-				gainPercent: 0,
-				quantity: undefined,
-				bookPrice: undefined,
-				marketPrice: undefined,
-				balanceAsOf: ''
-			}));
+			this.assets = list.map((a) => ({ ...a, ...DEFAULT_BALANCE_DATA }));
 			for (const a of this.assets) {
 				const balanceData = await this.getLatestAssetBalance(a.id);
 				this.assets = this.assets.map((x) => (x.id === a.id ? { ...x, ...balanceData } : x));
@@ -90,20 +91,7 @@ class AssetsContext {
 	private async onAssetEvent(e: RecordSubscription<AssetsResponse>) {
 		if (e.action === 'create') {
 			await this.balanceTypesContext.ensureLoaded(e.record.balanceType);
-			this.assets = [
-				...this.assets,
-				{
-					...e.record,
-					marketValue: 0,
-					bookValue: 0,
-					gain: 0,
-					gainPercent: 0,
-					quantity: undefined,
-					bookPrice: undefined,
-					marketPrice: undefined,
-					balanceAsOf: ''
-				}
-			];
+			this.assets = [...this.assets, { ...e.record, ...DEFAULT_BALANCE_DATA }];
 		} else if (e.action === 'update') {
 			const existing = this.assets.find((a) => a.id === e.record.id);
 			const balanceData: AssetBalanceData = {
@@ -184,18 +172,7 @@ class AssetsContext {
 				sort: '-asOf,-created,-id'
 			});
 		const balance = res.items[0];
-		if (!balance) {
-			return {
-				marketValue: 0,
-				bookValue: 0,
-				gain: 0,
-				gainPercent: 0,
-				quantity: undefined,
-				bookPrice: undefined,
-				marketPrice: undefined,
-				balanceAsOf: ''
-			};
-		}
+		if (!balance) return DEFAULT_BALANCE_DATA;
 		return this.computeBalanceData(balance);
 	}
 
