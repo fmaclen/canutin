@@ -330,15 +330,26 @@ async function main() {
 			data.balanceType = await upsertBalanceType(typeName);
 		}
 
-		const created = await pb.collection('accounts').create(data);
-		pbAccountIdByOldId.set(a.id, created.id);
+		try {
+			const created = await pb.collection('accounts').create(data);
+			pbAccountIdByOldId.set(a.id, created.id);
+		} catch (e) {
+			error(`Failed to create account: ${JSON.stringify(data)}`);
+			throw e;
+		}
 	}
 
 	for (const a of assets) {
+		const typeName = a.assetTypeId ? assetTypeNameById.get(a.assetTypeId) : undefined;
+		// Assets with Security or Cryptocurrency types are SHARES, others are WHOLE
+		const assetType =
+			typeName && ['Security', 'Cryptocurrency'].includes(typeName) ? 'SHARES' : 'WHOLE';
+
 		const data: Record<string, unknown> = {
 			name: a.name,
 			symbol: a.symbol ?? undefined,
 			balanceGroup: mapBalanceGroup(a.balanceGroup),
+			type: assetType,
 			// If sold, prefer updatedAt then createdAt; fallback to now for determinism
 			sold: a.isSold
 				? (normalizeDateOr(a.updatedAt, a.createdAt) ?? toISODate(new Date().toISOString()))
@@ -346,36 +357,52 @@ async function main() {
 			excluded: a.isExcludedFromNetWorth ? toISODate(a.updatedAt) : undefined,
 			owner: importUserId
 		};
-		const typeName = a.assetTypeId ? assetTypeNameById.get(a.assetTypeId) : undefined;
 		if (typeName) data.balanceType = await upsertBalanceType(typeName);
 
-		const created = await pb.collection('assets').create(data);
-		pbAssetIdByOldId.set(a.id, created.id);
+		try {
+			const created = await pb.collection('assets').create(data);
+			pbAssetIdByOldId.set(a.id, created.id);
+		} catch (e) {
+			error(`Failed to create asset: ${JSON.stringify(data)}`);
+			throw e;
+		}
 	}
 
 	// Create balance records with direct relations to parent
 	for (const s of accountBalances) {
 		const pbAccountId = pbAccountIdByOldId.get(s.accountId);
 		if (!pbAccountId) continue;
-		await pb.collection('accountBalances').create({
+		const balData = {
 			account: pbAccountId,
 			value: s.value,
 			asOf: toISODate(s.createdAt),
 			owner: importUserId
-		});
+		};
+		try {
+			await pb.collection('accountBalances').create(balData);
+		} catch (e) {
+			error(`Failed to create accountBalance: ${JSON.stringify(balData)}`);
+			throw e;
+		}
 	}
 
 	for (const s of assetBalances) {
 		const pbAssetId = pbAssetIdByOldId.get(s.assetId);
 		if (!pbAssetId) continue;
-		await pb.collection('assetBalances').create({
+		const balData = {
 			asset: pbAssetId,
 			marketValue: s.value,
 			quantity: s.quantity || undefined,
 			bookValue: s.cost || undefined,
 			asOf: toISODate(s.createdAt),
 			owner: importUserId
-		});
+		};
+		try {
+			await pb.collection('assetBalances').create(balData);
+		} catch (e) {
+			error(`Failed to create assetBalance: ${JSON.stringify(balData)}`);
+			throw e;
+		}
 	}
 
 	// Create transactions with direct account relation
@@ -407,7 +434,12 @@ async function main() {
 			labels,
 			owner: importUserId
 		};
-		await pb.collection('transactions').create(data);
+		try {
+			await pb.collection('transactions').create(data);
+		} catch (e) {
+			error(`Failed to create transaction: ${JSON.stringify(data)}`);
+			throw e;
+		}
 	}
 
 	log('Import complete.');

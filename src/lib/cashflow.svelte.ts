@@ -1,5 +1,5 @@
 import { UTCDate } from '@date-fns/utc';
-import { addMonths, startOfMonth, startOfYear } from 'date-fns';
+import { addMonths, endOfMonth, format, startOfMonth, startOfYear } from 'date-fns';
 import { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 
@@ -8,11 +8,25 @@ import type { PocketBaseContext } from './pocketbase.svelte';
 
 type CashflowAverages = { income: number; expenses: number; surplus: number };
 
+export type CashflowPeriod = {
+	id: number;
+	month: Date;
+	income: number;
+	expenses: number;
+	surplus: number;
+	isCurrentPeriod: boolean;
+	periodFrom: string;
+	periodTo: string;
+	periodLabel: string;
+};
+
 class CashflowContext {
 	avg3m: CashflowAverages = $state({ income: 0, expenses: 0, surplus: 0 });
 	avg6m: CashflowAverages = $state({ income: 0, expenses: 0, surplus: 0 });
 	avgYtd: CashflowAverages = $state({ income: 0, expenses: 0, surplus: 0 });
 	avg1y: CashflowAverages = $state({ income: 0, expenses: 0, surplus: 0 });
+
+	periods: CashflowPeriod[] = $state([]);
 
 	private _pb: PocketBaseContext;
 
@@ -51,13 +65,14 @@ class CashflowContext {
 	private async recomputeAll() {
 		const now = new UTCDate();
 		const startOfThisMonth = startOfMonth(now);
+		const start13m = addMonths(startOfThisMonth, -12); // 13 periods: current + 12 previous
 		const start12m = addMonths(startOfThisMonth, -11);
 		const start6m = addMonths(startOfThisMonth, -5);
 		const start3m = addMonths(startOfThisMonth, -2);
 		const startYtd = startOfYear(now);
 
-		// Fetch all needed transactions since the earliest required start
-		const earliest = start12m < startYtd ? start12m : startYtd;
+		// Fetch all needed transactions since the earliest required start (13 months for the chart)
+		const earliest = start13m < startYtd ? start13m : startYtd;
 		const earliestIso = earliest.toISOString();
 
 		const txns = await this._pb.authedClient
@@ -106,6 +121,49 @@ class CashflowContext {
 			expenses: sums1y.expenses / 12,
 			surplus: sums1y.surplus / 12
 		};
+
+		// Compute monthly periods (13 months: current + 12 previous)
+		const CASHFLOW_PERIODS = 13;
+		const periods: CashflowPeriod[] = [];
+
+		for (let i = 0; i < CASHFLOW_PERIODS; i++) {
+			const monthOffset = CASHFLOW_PERIODS - 1 - i;
+			const month = addMonths(startOfThisMonth, -monthOffset);
+			const monthEnd = endOfMonth(month);
+			const isCurrentPeriod = monthOffset === 0;
+
+			// Use YYYY-MM for simpler comparison (avoid timezone issues)
+			const periodKey = format(month, 'yyyy-MM');
+
+			let income = 0;
+			let expenses = 0;
+
+			for (const t of txns) {
+				if (t.excluded) continue;
+				if (!t.date) continue;
+				// Compare by YYYY-MM to avoid timezone edge cases
+				const txMonth = t.date.slice(0, 7);
+				if (txMonth === periodKey) {
+					const v = t.value ?? 0;
+					if (v >= 0) income += v;
+					else expenses += v;
+				}
+			}
+
+			periods.push({
+				id: i,
+				month,
+				income,
+				expenses,
+				surplus: income + expenses,
+				isCurrentPeriod,
+				periodFrom: format(month, 'yyyy-MM-dd'),
+				periodTo: format(monthEnd, 'yyyy-MM-dd'),
+				periodLabel: format(month, 'MMMM yyyy')
+			});
+		}
+
+		this.periods = periods;
 	}
 
 	dispose() {
