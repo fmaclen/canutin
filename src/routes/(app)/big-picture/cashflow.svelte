@@ -141,7 +141,7 @@
 									{#if isPositive}
 										<!-- Positive bar: anchored at zero line, grows upward -->
 										<div
-											class="cashflow-bar cashflow-bar--positive absolute right-0 left-0"
+											class="absolute right-0 left-0 border-t-3 border-t-[#00a36f] bg-[hsl(166,52%,95%)] group-hover:bg-[#00a36f]"
 											style="
 												top: calc({zeroLinePercent}% - max({MIN_BAR_HEIGHT}px, {heightPercent}%));
 												height: max({MIN_BAR_HEIGHT}px, {heightPercent}%);
@@ -149,7 +149,9 @@
 										>
 											<!-- Value label -->
 											{#if shouldShowLabel(i)}
-												<span class="cashflow-label cashflow-label--positive">
+												<span
+													class="pointer-events-none absolute right-0 bottom-[calc(100%+4px)] left-0 truncate text-center font-mono text-xs font-medium text-[#00a36f]"
+												>
 													{formatCurrency(period.surplus)}
 												</span>
 											{/if}
@@ -157,7 +159,7 @@
 									{:else}
 										<!-- Negative bar: anchored at zero line, grows downward -->
 										<div
-											class="cashflow-bar cashflow-bar--negative absolute right-0 left-0"
+											class="absolute right-0 left-0 border-b-3 border-b-[#e75258] bg-[hsl(346,52%,95%)] group-hover:bg-[#e75258]"
 											style="
 												top: {zeroLinePercent}%;
 												height: max({MIN_BAR_HEIGHT}px, {heightPercent}%);
@@ -165,7 +167,9 @@
 										>
 											<!-- Value label -->
 											{#if shouldShowLabel(i)}
-												<span class="cashflow-label cashflow-label--negative">
+												<span
+													class="pointer-events-none absolute top-[calc(100%+4px)] right-0 left-0 truncate text-center font-mono text-xs font-medium text-[#e75258]"
+												>
 													{formatCurrency(period.surplus)}
 												</span>
 											{/if}
@@ -194,48 +198,3 @@
 		{/if}
 	</div>
 </div>
-
-<style>
-	.cashflow-bar--positive {
-		background-color: hsl(166, 52%, 95%);
-		border-top: 3px solid #00a36f;
-	}
-
-	.cashflow-bar--negative {
-		background-color: hsl(346, 52%, 95%);
-		border-bottom: 3px solid #e75258;
-	}
-
-	.group:hover .cashflow-bar--positive {
-		background-color: #00a36f;
-	}
-
-	.group:hover .cashflow-bar--negative {
-		background-color: #e75258;
-	}
-
-	.cashflow-label {
-		position: absolute;
-		left: 0;
-		right: 0;
-		font-family: var(--font-mono);
-		font-size: 0.75rem;
-		font-weight: 500;
-		text-align: center;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		pointer-events: none;
-	}
-
-	.cashflow-label--positive {
-		bottom: calc(100% + 4px);
-		color: #00a36f;
-	}
-
-	.cashflow-label--negative {
-		top: 100%;
-		margin-top: 4px;
-		color: #e75258;
-	}
-</style>
