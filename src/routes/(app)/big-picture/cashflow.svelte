@@ -8,12 +8,6 @@
 	const cashflow = getCashflowContext();
 	const periods = $derived(cashflow.periods);
 
-	// Colors with 25% opacity for bar fill, full color for edge border
-	const COLOR_CASH = 'rgba(0, 163, 111, 0.25)';
-	const COLOR_CASH_SOLID = '#00a36f';
-	const COLOR_DEBT = 'rgba(231, 82, 88, 0.25)';
-	const COLOR_DEBT_SOLID = '#e75258';
-
 	// Minimum bar height in pixels
 	const MIN_BAR_HEIGHT = 3;
 
@@ -78,7 +72,16 @@
 	<div class="bg-background relative overflow-hidden rounded-md shadow-sm">
 		{#if chartData.length > 0}
 			<!-- Custom bar chart with styled bars -->
-			<div class="flex h-80 flex-col">
+			<div class="relative flex h-80 flex-col">
+				<!-- Vertical divider lines (full height including labels) -->
+				<div
+					class="pointer-events-none absolute inset-0 z-10 grid"
+					style="grid-template-columns: repeat({chartData.length}, 1fr);"
+				>
+					{#each chartData as period, i (period.id)}
+						<div class={i < chartData.length - 1 ? 'border-border border-r' : ''}></div>
+					{/each}
+				</div>
 				<!-- Chart area -->
 				<div class="relative flex-1">
 					<!-- Bars container -->
@@ -92,33 +95,27 @@
 							{@const heightPercent = barData.height}
 							<button
 								type="button"
-								class="border-border relative cursor-pointer {i < chartData.length - 1
-									? 'border-r'
-									: ''}"
+								class="group relative cursor-pointer"
 								onclick={(e) => handleBarClick(e, { data: period })}
 							>
-								<!-- Bar with 25% opacity fill and solid edge border -->
+								<!-- Bar with secondary fill, primary on hover -->
 								{#if period.surplus !== 0}
 									{#if isPositive}
 										<!-- Positive bar: anchored at zero line, grows upward -->
 										<div
-											class="absolute right-0 left-0"
+											class="cashflow-bar cashflow-bar--positive absolute right-0 left-0"
 											style="
 												top: calc({zeroLinePercent}% - max({MIN_BAR_HEIGHT}px, {heightPercent}%));
 												height: max({MIN_BAR_HEIGHT}px, {heightPercent}%);
-												background-color: {COLOR_CASH};
-												border-top: 3px solid {COLOR_CASH_SOLID};
 											"
 										></div>
 									{:else}
 										<!-- Negative bar: anchored at zero line, grows downward -->
 										<div
-											class="absolute right-0 left-0"
+											class="cashflow-bar cashflow-bar--negative absolute right-0 left-0"
 											style="
 												top: {zeroLinePercent}%;
 												height: max({MIN_BAR_HEIGHT}px, {heightPercent}%);
-												background-color: {COLOR_DEBT};
-												border-bottom: 3px solid {COLOR_DEBT_SOLID};
 											"
 										></div>
 									{/if}
@@ -145,3 +142,23 @@
 		{/if}
 	</div>
 </div>
+
+<style>
+	.cashflow-bar--positive {
+		background-color: hsl(166, 52%, 95%);
+		border-top: 3px solid #00a36f;
+	}
+
+	.cashflow-bar--negative {
+		background-color: hsl(346, 52%, 95%);
+		border-bottom: 3px solid #e75258;
+	}
+
+	.group:hover .cashflow-bar--positive {
+		background-color: #00a36f;
+	}
+
+	.group:hover .cashflow-bar--negative {
+		background-color: #e75258;
+	}
+</style>
