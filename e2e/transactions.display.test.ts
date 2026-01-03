@@ -219,9 +219,17 @@ test('transactions display edge cases correctly (empty labels, no account name, 
 	await expect(hasLabelsCell.getByText('Groceries')).toBeVisible();
 	await expect(hasLabelsCell.getByText('Personal')).toBeVisible();
 
-	// Verify account name is displayed
+	// Verify account name is displayed as a link
 	const accountCell = hasLabelsRow.locator('td').nth(3); // Account column is 4th
 	await expect(accountCell).toContainText('Edge Case Account');
+
+	// Click on account name link and verify navigation to account page
+	await accountCell.getByRole('link', { name: 'Edge Case Account' }).click();
+	await expect(page).toHaveURL(/\/accounts\/[a-z0-9]+$/);
+	await expect(page.getByText('Edge Case Account')).toBeVisible();
+
+	// Navigate back to transactions to continue testing
+	await goToPageViaSidebar(page, 'Transactions');
 
 	// Verify excluded transaction has muted styling and dashed underline on amount
 	const excludedRow = page.getByRole('row', { name: /Excluded Transaction/ });

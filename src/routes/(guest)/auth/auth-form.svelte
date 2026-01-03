@@ -5,6 +5,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { getAuthContext } from '$lib/auth.svelte';
+	import Link from '$lib/components/link.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -94,7 +95,7 @@
 		</form>
 		<div class="mt-4 text-center text-sm">
 			{altCtaText}
-			<a href={resolve(altCtaHref)} class="underline"> {altCtaLinkText} </a>
+			<Link href={altCtaHref}>{altCtaLinkText}</Link>
 		</div>
 	</Card.Content>
 </Card.Root>
