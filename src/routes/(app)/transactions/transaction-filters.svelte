@@ -80,7 +80,7 @@
 			<button
 				type="button"
 				onclick={clearSearch}
-				aria-label="Clear search"
+				aria-label={m.transactions_clear_search()}
 				class="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 cursor-pointer"
 			>
 				<XIcon class="size-4" />
