@@ -101,100 +101,98 @@
 	}
 </script>
 
-<div class="flex flex-col gap-4">
-	<SectionTitle title="Cashflow" />
+<SectionTitle title="Cashflow" />
 
-	<div class="bg-background relative overflow-hidden rounded-md shadow-sm">
-		{#if chartData.length > 0}
-			<!-- Custom bar chart with styled bars -->
-			<div class="relative flex h-80 flex-col pt-5">
-				<!-- Vertical divider lines (full height including labels) -->
+<div class="bg-background relative overflow-hidden rounded-md shadow-md">
+	{#if chartData.length > 0}
+		<!-- Custom bar chart with styled bars -->
+		<div class="relative flex h-80 flex-col pt-5">
+			<!-- Vertical divider lines (full height including labels) -->
+			<div
+				class="pointer-events-none absolute inset-0 z-10 grid"
+				style="grid-template-columns: repeat({chartData.length}, 1fr);"
+			>
+				{#each chartData as period, i (period.id)}
+					<div class={i < chartData.length - 1 ? 'border-border border-r' : ''}></div>
+				{/each}
+			</div>
+			<!-- Chart area -->
+			<div class="relative flex-1">
+				<!-- Bars container -->
 				<div
-					class="pointer-events-none absolute inset-0 z-10 grid"
+					class="absolute top-0 right-0 bottom-5 left-0 grid"
 					style="grid-template-columns: repeat({chartData.length}, 1fr);"
 				>
 					{#each chartData as period, i (period.id)}
-						<div class={i < chartData.length - 1 ? 'border-border border-r' : ''}></div>
-					{/each}
-				</div>
-				<!-- Chart area -->
-				<div class="relative flex-1">
-					<!-- Bars container -->
-					<div
-						class="absolute top-0 right-0 bottom-5 left-0 grid"
-						style="grid-template-columns: repeat({chartData.length}, 1fr);"
-					>
-						{#each chartData as period, i (period.id)}
-							{@const barData = barHeights[i]}
-							{@const isPositive = barData.isPositive}
-							{@const heightPercent = barData.height}
-							<button
-								type="button"
-								class="group relative cursor-pointer"
-								onclick={(e) => handleBarClick(e, { data: period })}
-								onmouseenter={() => (hoveredIndex = i)}
-								onmouseleave={() => (hoveredIndex = null)}
-								title="See transactions in {period.periodLabel}"
-							>
-								<!-- Bar with secondary fill, primary on hover -->
-								{#if period.surplus !== 0}
-									{#if isPositive}
-										<!-- Positive bar: anchored at zero line, grows upward -->
-										<div
-											class="absolute right-0 left-0 border-t-3 border-t-[#00a36f] bg-[hsl(166,52%,95%)] group-hover:bg-[#00a36f]"
-											style="
+						{@const barData = barHeights[i]}
+						{@const isPositive = barData.isPositive}
+						{@const heightPercent = barData.height}
+						<button
+							type="button"
+							class="group relative cursor-pointer"
+							onclick={(e) => handleBarClick(e, { data: period })}
+							onmouseenter={() => (hoveredIndex = i)}
+							onmouseleave={() => (hoveredIndex = null)}
+							title="See transactions in {period.periodLabel}"
+						>
+							<!-- Bar with secondary fill, primary on hover -->
+							{#if period.surplus !== 0}
+								{#if isPositive}
+									<!-- Positive bar: anchored at zero line, grows upward -->
+									<div
+										class="absolute right-0 left-0 border-t-3 border-t-[#00a36f] bg-[hsl(166,52%,95%)] group-hover:bg-[#00a36f]"
+										style="
 												top: calc({zeroLinePercent}% - max({MIN_BAR_HEIGHT}px, {heightPercent}%));
 												height: max({MIN_BAR_HEIGHT}px, {heightPercent}%);
 											"
-										>
-											<!-- Value label -->
-											{#if shouldShowLabel(i)}
-												<span
-													class="pointer-events-none absolute right-0 bottom-[calc(100%+4px)] left-0 truncate text-center font-mono text-xs font-medium text-[#00a36f]"
-												>
-													{formatCurrency(period.surplus)}
-												</span>
-											{/if}
-										</div>
-									{:else}
-										<!-- Negative bar: anchored at zero line, grows downward -->
-										<div
-											class="absolute right-0 left-0 border-b-3 border-b-[#e75258] bg-[hsl(346,52%,95%)] group-hover:bg-[#e75258]"
-											style="
+									>
+										<!-- Value label -->
+										{#if shouldShowLabel(i)}
+											<span
+												class="pointer-events-none absolute right-0 bottom-[calc(100%+4px)] left-0 truncate text-center font-mono text-xs font-medium text-[#00a36f]"
+											>
+												{formatCurrency(period.surplus)}
+											</span>
+										{/if}
+									</div>
+								{:else}
+									<!-- Negative bar: anchored at zero line, grows downward -->
+									<div
+										class="absolute right-0 left-0 border-b-3 border-b-[#e75258] bg-[hsl(346,52%,95%)] group-hover:bg-[#e75258]"
+										style="
 												top: {zeroLinePercent}%;
 												height: max({MIN_BAR_HEIGHT}px, {heightPercent}%);
 											"
-										>
-											<!-- Value label -->
-											{#if shouldShowLabel(i)}
-												<span
-													class="pointer-events-none absolute top-[calc(100%+4px)] right-0 left-0 truncate text-center font-mono text-xs font-medium text-[#e75258]"
-												>
-													{formatCurrency(period.surplus)}
-												</span>
-											{/if}
-										</div>
-									{/if}
+									>
+										<!-- Value label -->
+										{#if shouldShowLabel(i)}
+											<span
+												class="pointer-events-none absolute top-[calc(100%+4px)] right-0 left-0 truncate text-center font-mono text-xs font-medium text-[#e75258]"
+											>
+												{formatCurrency(period.surplus)}
+											</span>
+										{/if}
+									</div>
 								{/if}
-							</button>
-						{/each}
-					</div>
-					<!-- Horizontal zero line -->
-					<div
-						class="border-border pointer-events-none absolute right-0 left-0 z-10 border-t"
-						style="top: {zeroLinePercent}%"
-					></div>
-				</div>
-				<!-- X-axis labels -->
-				<div
-					class="grid h-8 items-center"
-					style="grid-template-columns: repeat({chartData.length}, 1fr);"
-				>
-					{#each chartData as period (period.id)}
-						<div class="text-muted-foreground text-center text-xs">{period.label}</div>
+							{/if}
+						</button>
 					{/each}
 				</div>
+				<!-- Horizontal zero line -->
+				<div
+					class="border-border pointer-events-none absolute right-0 left-0 z-10 border-t"
+					style="top: {zeroLinePercent}%"
+				></div>
 			</div>
-		{/if}
-	</div>
+			<!-- X-axis labels -->
+			<div
+				class="grid h-8 items-center"
+				style="grid-template-columns: repeat({chartData.length}, 1fr);"
+			>
+				{#each chartData as period (period.id)}
+					<div class="text-muted-foreground text-center text-xs">{period.label}</div>
+				{/each}
+			</div>
+		</div>
+	{/if}
 </div>
