@@ -124,52 +124,55 @@
 				>
 					<!-- Chart area -->
 					<div class="relative flex-1">
-						{#if period.surplus !== 0}
-							{#if isPositive}
-								<div
-									class="absolute right-0 left-0 border-t-3 border-t-[#00a36f] {isHovered
-										? 'bg-[#00a36f]'
-										: 'bg-[hsl(166,52%,95%)]'}"
-									style="
-										top: calc({zeroLinePercent}% - max({MIN_BAR_HEIGHT}px, {heightPercent}%));
-										height: max({MIN_BAR_HEIGHT}px, {heightPercent}%);
-									"
-								>
-									<!-- Value label (positive) -->
-									{#if shouldShowLabel(i)}
-										<span
-											class="pointer-events-none absolute right-0 bottom-full left-0 hidden truncate p-2 text-center font-mono text-xs font-medium text-[#00a36f] sm:block"
-										>
-											{formatCurrency(period.surplus)}
-										</span>
-									{/if}
-								</div>
-							{:else}
-								<div
-									class="absolute right-0 left-0 border-b-3 border-b-[#e75258] {isHovered
-										? 'bg-[#e75258]'
-										: 'bg-[hsl(346,52%,95%)]'}"
-									style="
-										top: {zeroLinePercent}%;
-										height: max({MIN_BAR_HEIGHT}px, {heightPercent}%);
-									"
-								>
-									<!-- Value label (negative) -->
-									{#if shouldShowLabel(i)}
-										<span
-											class="pointer-events-none absolute top-full right-0 left-0 hidden truncate p-2 text-center font-mono text-xs font-medium text-[#e75258] sm:block"
-										>
-											{formatCurrency(period.surplus)}
-										</span>
-									{/if}
-								</div>
+						<!-- Inner container for bars, inset to leave room for labels -->
+						<div class="absolute inset-x-0 top-0 bottom-0 sm:bottom-8">
+							{#if period.surplus !== 0}
+								{#if isPositive}
+									<div
+										class="absolute right-0 left-0 border-t-3 border-t-[#00a36f] {isHovered
+											? 'bg-[#00a36f]'
+											: 'bg-[hsl(166,52%,95%)]'}"
+										style="
+											top: calc({zeroLinePercent}% - max({MIN_BAR_HEIGHT}px, {heightPercent}%));
+											height: max({MIN_BAR_HEIGHT}px, {heightPercent}%);
+										"
+									>
+										<!-- Value label (positive) -->
+										{#if shouldShowLabel(i)}
+											<span
+												class="pointer-events-none absolute right-0 bottom-full left-0 hidden truncate p-2 text-center font-mono text-xs font-medium text-[#00a36f] sm:block"
+											>
+												{formatCurrency(period.surplus)}
+											</span>
+										{/if}
+									</div>
+								{:else}
+									<div
+										class="absolute right-0 left-0 border-b-3 border-b-[#e75258] {isHovered
+											? 'bg-[#e75258]'
+											: 'bg-[hsl(346,52%,95%)]'}"
+										style="
+											top: {zeroLinePercent}%;
+											height: max({MIN_BAR_HEIGHT}px, {heightPercent}%);
+										"
+									>
+										<!-- Value label (negative) -->
+										{#if shouldShowLabel(i)}
+											<span
+												class="pointer-events-none absolute top-full right-0 left-0 hidden truncate p-2 text-center font-mono text-xs font-medium text-[#e75258] sm:block"
+											>
+												{formatCurrency(period.surplus)}
+											</span>
+										{/if}
+									</div>
+								{/if}
 							{/if}
-						{/if}
-						<!-- Zero line -->
-						<div
-							class="border-border pointer-events-none absolute right-0 left-0 border-t"
-							style="top: {zeroLinePercent}%"
-						></div>
+							<!-- Zero line -->
+							<div
+								class="border-border pointer-events-none absolute right-0 left-0 border-t"
+								style="top: {zeroLinePercent}%"
+							></div>
+						</div>
 					</div>
 
 					<!-- X-axis label -->
