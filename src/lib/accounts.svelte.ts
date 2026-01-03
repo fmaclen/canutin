@@ -100,7 +100,8 @@ class AccountsContext {
 			const account = this.accounts.find((x) => x.id === accountId);
 			if (!account) return;
 
-			// Only update if this balance is newer than what we have
+			// Only update if this balance is newer than what we have.
+			// String comparison works because ISO 8601 dates are lexicographically sortable.
 			if (!account.balanceAsOf || newAsOf >= account.balanceAsOf) {
 				this.accounts = this.accounts.map((x) =>
 					x.id === accountId ? { ...x, balance: newValue, balanceAsOf: newAsOf } : x

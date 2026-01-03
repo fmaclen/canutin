@@ -125,7 +125,8 @@ class AssetsContext {
 			const asset = this.assets.find((x) => x.id === assetId);
 			if (!asset) return;
 
-			// Only update if this balance is newer than what we have
+			// Only update if this balance is newer than what we have.
+			// String comparison works because ISO 8601 dates are lexicographically sortable.
 			if (!asset.balanceAsOf || newAsOf >= asset.balanceAsOf) {
 				const balanceData = this.computeBalanceData(e.record);
 				this.assets = this.assets.map((x) => (x.id === assetId ? { ...x, ...balanceData } : x));
