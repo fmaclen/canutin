@@ -5,7 +5,7 @@ import { setBalanceTypesContext } from './balance-types.svelte';
 import type { AccountBalancesResponse, AccountsResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
 
-type AccountWithBalance = AccountsResponse & { balance: number };
+type AccountWithBalance = AccountsResponse & { balance: number; balanceAsOf: string };
 
 class AccountsContext {
 	accounts: AccountWithBalance[] = $state([]);
@@ -38,16 +38,20 @@ class AccountsContext {
 
 	private async init() {
 		try {
+			// Subscribe FIRST to avoid missing events during initial fetch
+			this.realtimeSubscribe();
+
 			const list = await this._pb.authedClient
 				.collection('accounts')
 				.getFullList<AccountsResponse>();
-			this.accounts = list.map((a) => ({ ...a, balance: 0 }));
+			this.accounts = list.map((a) => ({ ...a, balance: 0, balanceAsOf: '' }));
 			for (const a of this.accounts) {
-				const value = await this.getLatestAccountBalance(a.id);
-				this.accounts = this.accounts.map((x) => (x.id === a.id ? { ...x, balance: value } : x));
+				const balanceData = await this.getLatestAccountBalance(a.id);
+				this.accounts = this.accounts.map((x) =>
+					x.id === a.id ? { ...x, balance: balanceData.value, balanceAsOf: balanceData.asOf } : x
+				);
 			}
 			this.lastBalanceEvent = Date.now();
-			this.realtimeSubscribe();
 			this.isLoading = false;
 		} catch (error) {
 			this._pb.handleConnectionError(error, 'accounts', 'init');
@@ -69,27 +73,56 @@ class AccountsContext {
 	private async onAccountEvent(e: RecordSubscription<AccountsResponse>) {
 		if (e.action === 'create') {
 			await this.balanceTypesContext.ensureLoaded(e.record.balanceType);
-			this.accounts = [...this.accounts, { ...e.record, balance: 0 }];
+			this.accounts = [...this.accounts, { ...e.record, balance: 0, balanceAsOf: '' }];
 		} else if (e.action === 'update') {
-			const balance = this.accounts.find((a) => a.id === e.record.id)?.balance ?? 0;
+			const existing = this.accounts.find((a) => a.id === e.record.id);
+			const balance = existing?.balance ?? 0;
+			const balanceAsOf = existing?.balanceAsOf ?? '';
 			await this.balanceTypesContext.ensureLoaded(e.record.balanceType);
 			this.accounts = this.accounts.map((x) =>
-				x.id === e.record.id ? { ...e.record, balance } : x
+				x.id === e.record.id ? { ...e.record, balance, balanceAsOf } : x
 			);
 		} else if (e.action === 'delete') {
 			this.accounts = this.accounts.filter((x) => x.id !== e.record.id);
 		}
 	}
 
-	private async onAccountBalanceEvent(e: RecordSubscription<AccountBalancesResponse>) {
+	private onAccountBalanceEvent(e: RecordSubscription<AccountBalancesResponse>) {
 		if (!e.action) return;
 		const accountId = e.record.account;
+		const newAsOf = e.record.asOf;
+		const newValue = e.record.value ?? 0;
+
+		if (e.action === 'create' || e.action === 'update') {
+			// Optimistic update: use the value from the event directly.
+			// If account isn't loaded yet (event arrived during initial fetch), we ignore it.
+			// This is safe because init() fetches the latest balance for each account after loading.
+			const account = this.accounts.find((x) => x.id === accountId);
+			if (!account) return;
+
+			// Only update if this balance is newer than what we have.
+			// String comparison works because ISO 8601 dates are lexicographically sortable.
+			if (!account.balanceAsOf || newAsOf >= account.balanceAsOf) {
+				this.accounts = this.accounts.map((x) =>
+					x.id === accountId ? { ...x, balance: newValue, balanceAsOf: newAsOf } : x
+				);
+				this.lastBalanceEvent = Date.now();
+			}
+		} else if (e.action === 'delete') {
+			// When a balance is deleted, we need to re-fetch to get the next most recent
+			void this.refetchAccountBalance(accountId);
+		}
+	}
+
+	private async refetchAccountBalance(accountId: string) {
 		try {
-			const value = await this.getLatestAccountBalance(accountId);
-			this.accounts = this.accounts.map((x) => (x.id === accountId ? { ...x, balance: value } : x));
+			const balanceData = await this.getLatestAccountBalance(accountId);
+			this.accounts = this.accounts.map((x) =>
+				x.id === accountId ? { ...x, balance: balanceData.value, balanceAsOf: balanceData.asOf } : x
+			);
 			this.lastBalanceEvent = Date.now();
 		} catch (error) {
-			console.error('[accounts:update_balance_on_event]', error);
+			console.error('[accounts:refetch_balance]', error);
 		}
 	}
 
@@ -100,7 +133,8 @@ class AccountsContext {
 				filter: `account='${accountId}'`,
 				sort: '-asOf,-created,-id'
 			});
-		return res.items[0]?.value ?? 0;
+		const item = res.items[0];
+		return { value: item?.value ?? 0, asOf: item?.asOf ?? '' };
 	}
 
 	dispose() {

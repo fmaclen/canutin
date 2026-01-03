@@ -15,6 +15,8 @@ class BalanceTypesContext {
 	}
 
 	private async init() {
+		// Subscribe FIRST to avoid missing events during initial fetch
+		this.realtimeSubscribe();
 		try {
 			const list = await this._pb.authedClient
 				.collection('balanceTypes')
@@ -22,7 +24,6 @@ class BalanceTypesContext {
 			const map: Record<string, BalanceTypesResponse> = {};
 			for (const bt of list) map[bt.id] = bt;
 			this.byId = map;
-			this.realtimeSubscribe();
 		} catch (error) {
 			this._pb.handleConnectionError(error, 'balance_types', 'init');
 		}
