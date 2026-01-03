@@ -66,11 +66,11 @@
 				<BarChart
 					data={chartData}
 					x="label"
-					xScale={scaleBand().padding(0.2)}
+					xScale={scaleBand().padding(0)}
 					yScale={scaleLinear()}
 					{yDomain}
 					yBaseline={0}
-					padding={{ top: 40, right: 16, bottom: 32, left: 16 }}
+					padding={{ top: 0, right: 0, bottom: 32, left: 0 }}
 					onBarClick={handleBarClick}
 					series={[
 						{ key: 'positive', color: COLOR_CASH },
