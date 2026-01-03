@@ -390,6 +390,12 @@ class TransactionsContext {
 		return this.filteredRows.slice(start, start + this.pageSize);
 	}
 
+	get netBalance() {
+		return this.filteredRows
+			.filter((row) => !row.excluded)
+			.reduce((sum, row) => sum + row.value, 0);
+	}
+
 	dispose() {
 		this._pb.authedClient.collection('transactions').unsubscribe();
 	}

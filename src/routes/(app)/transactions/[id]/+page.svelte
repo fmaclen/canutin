@@ -52,7 +52,7 @@
 		},
 		[AccountsBalanceGroupOptions.OTHER]: {
 			label: m.accounts_group_other_label(),
-			color: 'bg-other'
+			color: 'bg-other-assets'
 		}
 	} satisfies Record<AccountsBalanceGroupOptions, { label: string; color: string }>;
 

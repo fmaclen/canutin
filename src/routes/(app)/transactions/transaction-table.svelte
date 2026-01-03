@@ -86,7 +86,11 @@
 							{/if}
 						</Table.Cell>
 						<Table.Cell>
-							{#if row.accountName}
+							{#if row.accountName && row.accountId}
+								<Link href="/accounts/{row.accountId}" class="text-foreground/80 text-sm">
+									{row.accountName}
+								</Link>
+							{:else if row.accountName}
 								<span class="text-foreground/80 text-sm">{row.accountName}</span>
 							{:else}
 								<span class="text-muted-foreground text-sm">~</span>

@@ -1,0 +1,355 @@
+import { UTCDate } from '@date-fns/utc';
+import { expect, test } from '@playwright/test';
+import { endOfMonth, setHours, startOfMonth, subDays, subMonths } from 'date-fns';
+
+import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
+import { goToPageViaSidebar, signIn } from './playwright.helpers';
+import {
+	seedAccount,
+	seedAccountBalance,
+	seedTransaction,
+	seedTransactionLabel,
+	seedUser
+} from './pocketbase.helpers';
+
+test('transactions are sorted by date DESC, then amount DESC, then id ASC', async ({ page }) => {
+	const user = await seedUser('jordan');
+
+	const account = await seedAccount({
+		name: 'Sort Test Account',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 1000
+	});
+
+	const now = new UTCDate();
+	const date1 = setHours(subDays(now, 1), 12);
+	const date2 = setHours(subDays(now, 5), 12);
+	const date3 = setHours(subDays(now, 10), 12);
+
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: date1.toISOString(),
+		description: 'Recent - Small',
+		value: 100
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: date1.toISOString(),
+		description: 'Recent - Large',
+		value: 500
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: date2.toISOString(),
+		description: 'Middle - Medium',
+		value: 300
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: date3.toISOString(),
+		description: 'Oldest - Entry',
+		value: 200
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	const rows = page.locator('tbody tr');
+	await expect(rows).toHaveCount(4);
+
+	const expectedOrder = ['Recent - Large', 'Recent - Small', 'Middle - Medium', 'Oldest - Entry'];
+
+	for (let i = 0; i < expectedOrder.length; i++) {
+		const row = rows.nth(i);
+		await expect(row).toContainText(expectedOrder[i]!);
+	}
+});
+
+test('transactions correctly handle UTC dates regardless of local timezone', async ({
+	browser
+}) => {
+	const context = await browser.newContext({
+		timezoneId: 'Pacific/Pago_Pago',
+		locale: 'en-US'
+	});
+	const page = await context.newPage();
+
+	const user = await seedUser('samoa');
+
+	const account = await seedAccount({
+		name: 'Island Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 2000
+	});
+
+	const now = new UTCDate();
+	const startOfThisMonthUtc = startOfMonth(now);
+	const endOfLastMonthUtc = endOfMonth(subMonths(now, 1));
+
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: startOfThisMonthUtc.toISOString(),
+		description: 'Early This Month UTC Transaction',
+		value: 500
+	});
+
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: endOfLastMonthUtc.toISOString(),
+		description: 'Late Last Month UTC Transaction',
+		value: -300
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	await expect(page.getByText('Early This Month UTC Transaction')).toHaveCount(1);
+	await expect(page.getByText('Late Last Month UTC Transaction')).toHaveCount(1);
+
+	await page.getByLabel('Period').click();
+	await page.getByRole('option', { name: 'This month' }).click();
+	await expect(page.getByText('Early This Month UTC Transaction')).toHaveCount(1);
+	await expect(page.getByText('Late Last Month UTC Transaction')).toHaveCount(0);
+
+	await page.getByLabel('Period').click();
+	await page.getByRole('option', { name: 'Last month' }).click();
+	await expect(page.getByText('Late Last Month UTC Transaction')).toHaveCount(1);
+	await expect(page.getByText('Early This Month UTC Transaction')).toHaveCount(0);
+
+	await context.close();
+});
+
+test('transactions display edge cases correctly (empty labels, no account name, excluded)', async ({
+	page
+}) => {
+	const user = await seedUser('alex');
+
+	const account = await seedAccount({
+		name: 'Edge Case Account',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 1000
+	});
+
+	const now = new UTCDate();
+
+	// Create some transaction labels
+	const groceriesLabel = await seedTransactionLabel({
+		name: 'Groceries',
+		owner: user.id
+	});
+	const personalLabel = await seedTransactionLabel({
+		name: 'Personal',
+		owner: user.id
+	});
+
+	// Transaction with no labels (empty array)
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'No Labels Transaction',
+		value: 100
+		// labels field omitted (will be empty array)
+	});
+
+	// Transaction with multiple labels
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Has Labels Transaction',
+		value: 200,
+		labels: [groceriesLabel.id, personalLabel.id]
+	});
+
+	// Excluded transaction
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Excluded Transaction',
+		value: 300,
+		excluded: new Date().toISOString()
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	// Verify empty labels shows "~"
+	const noLabelsRow = page.getByRole('row', { name: /No Labels Transaction/ });
+	await expect(noLabelsRow).toBeVisible();
+	const labelsCell = noLabelsRow.locator('td').nth(2); // Labels column is 3rd
+	await expect(labelsCell).toContainText('~');
+
+	// Verify transaction with labels displays all labels as badges
+	const hasLabelsRow = page.getByRole('row', { name: /Has Labels Transaction/ });
+	await expect(hasLabelsRow).toBeVisible();
+	const hasLabelsCell = hasLabelsRow.locator('td').nth(2); // Labels column is 3rd
+	// Labels should be sorted alphabetically: Groceries, Personal
+	await expect(hasLabelsCell.getByText('Groceries')).toBeVisible();
+	await expect(hasLabelsCell.getByText('Personal')).toBeVisible();
+
+	// Verify account name is displayed as a link
+	const accountCell = hasLabelsRow.locator('td').nth(3); // Account column is 4th
+	await expect(accountCell).toContainText('Edge Case Account');
+
+	// Click on account name link and verify navigation to account page
+	await accountCell.getByRole('link', { name: 'Edge Case Account' }).click();
+	await expect(page).toHaveURL(/\/accounts\/[a-z0-9]+$/);
+	await expect(page.getByText('Edge Case Account')).toBeVisible();
+
+	// Navigate back to transactions to continue testing
+	await goToPageViaSidebar(page, 'Transactions');
+
+	// Verify excluded transaction has muted styling and dashed underline on amount
+	const excludedRow = page.getByRole('row', { name: /Excluded Transaction/ });
+	await expect(excludedRow).toBeVisible();
+	await expect(excludedRow).toHaveClass(/bg-muted/);
+	const amountCell = excludedRow.locator('td').nth(4); // Amount column is 5th
+	const dashedAmount = amountCell.locator('.border-dashed');
+	await expect(dashedAmount).toBeVisible();
+
+	// Verify tooltip on excluded amount (only test hover on desktop)
+	const info = test.info();
+	const isMobile = info.project.name?.toLowerCase().includes('mobile') ?? false;
+	if (!isMobile) {
+		await dashedAmount.hover();
+		// Tooltip should appear with exact exclusion message
+		await expect(page.getByText('Excluded transactions do not affect reports')).toBeVisible();
+	}
+});
+
+test('transactions page shows correct count and net balance in summary', async ({ page }) => {
+	const user = await seedUser('quinn');
+
+	const account = await seedAccount({
+		name: 'Summary Test Account',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 10000
+	});
+
+	const now = new UTCDate();
+
+	// Seed 5 transactions:
+	// - 2 credits: +500.75, +300.50 = +801.25
+	// - 2 debits: -200.25, -150.33 = -350.58
+	// - 1 excluded credit: +1000 (should not affect net balance)
+	// Expected count: 5
+	// Expected net balance: 500.75 + 300.50 - 200.25 - 150.33 = 450.67
+
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Freelance Payment',
+		value: 500.75
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Refund Received',
+		value: 300.5
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Grocery Shopping',
+		value: -200.25
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Utility Bill',
+		value: -150.33
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Excluded Transfer',
+		value: 1000,
+		excluded: new Date().toISOString()
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	// Verify all 5 transactions are visible
+	await expect(page.getByText('Freelance Payment')).toBeVisible();
+	await expect(page.getByText('Refund Received')).toBeVisible();
+	await expect(page.getByText('Grocery Shopping')).toBeVisible();
+	await expect(page.getByText('Utility Bill')).toBeVisible();
+	await expect(page.getByText('Excluded Transfer')).toBeVisible();
+
+	// Verify summary shows correct count and net balance
+	const summaryRegion = page.getByRole('region', { name: 'Transactions summary' });
+	await expect(summaryRegion.getByText('Transactions')).toBeVisible();
+	await expect(summaryRegion.getByText('5', { exact: true })).toBeVisible();
+	await expect(summaryRegion.getByText('Net balance')).toBeVisible();
+	await expect(summaryRegion.getByText('$450.67')).toBeVisible();
+
+	// Change filter to "Credits only"
+	// Expected: count = 3 (2 regular credits + 1 excluded credit), net balance = $801.25 (500.75 + 300.50)
+	await page.getByLabel('Type').click();
+	await page.getByRole('option', { name: 'Credits only' }).click();
+
+	await expect(summaryRegion.getByText('3', { exact: true })).toBeVisible();
+	await expect(summaryRegion.getByText('$801.25')).toBeVisible();
+
+	// Change filter to "Debits only"
+	// Expected: count = 2, net balance = -$350.58 (-200.25 + -150.33)
+	await page.getByLabel('Type').click();
+	await page.getByRole('option', { name: 'Debits only' }).click();
+
+	await expect(summaryRegion.getByText('2', { exact: true })).toBeVisible();
+	await expect(summaryRegion.getByText('-$350.58')).toBeVisible();
+
+	// Change filter to "Excluded only"
+	// Expected: count = 1, net balance = $0.00 (excluded transactions don't count toward net)
+	await page.getByLabel('Type').click();
+	await page.getByRole('option', { name: 'Excluded only' }).click();
+
+	await expect(summaryRegion.getByText('1', { exact: true })).toBeVisible();
+	await expect(summaryRegion.getByText('$0.00')).toBeVisible();
+});
