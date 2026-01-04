@@ -466,6 +466,30 @@ class TransactionsContext {
 		this.refreshTransactions();
 	}
 
+	setPresetPeriod(option: PeriodOption) {
+		this._customFromDate = null;
+		this._customToDate = null;
+		this._customLabel = null;
+		this.period = option;
+
+		const currentPage = get(page);
+		const params = new SvelteURLSearchParams(currentPage.url.searchParams);
+
+		params.delete('periodFrom');
+		params.delete('periodTo');
+		params.delete('periodLabel');
+		params.set('period', option);
+
+		const search = params.toString();
+		const newUrl = `${currentPage.url.pathname}${search ? `?${search}` : ''}`;
+
+		if (newUrl !== `${currentPage.url.pathname}${currentPage.url.search}`) {
+			history.replaceState(history.state, '', newUrl);
+		}
+
+		this.refreshTransactions();
+	}
+
 	dispose() {
 		this._pb.authedClient.collection('transactions').unsubscribe();
 	}

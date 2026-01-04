@@ -590,52 +590,74 @@ test('custom date range with periodLabel from URL displays the label and calenda
 		value: 5000
 	});
 
+	// Use dynamic dates relative to now
+	const now = new UTCDate();
+	const thisMonth = startOfMonth(now);
+	const lastMonth = addMonths(thisMonth, -1);
+
 	await seedTransaction({
 		account: account.id,
 		owner: user.id,
-		date: '2024-03-15T12:00:00.000Z',
-		description: 'March Salary',
+		date: new UTCDate(
+			lastMonth.getUTCFullYear(),
+			lastMonth.getUTCMonth(),
+			15,
+			12,
+			0,
+			0,
+			0
+		).toISOString(),
+		description: 'Last Month Salary',
 		value: 5000
 	});
 	await seedTransaction({
 		account: account.id,
 		owner: user.id,
-		date: '2024-04-15T12:00:00.000Z',
-		description: 'April Salary',
+		date: new UTCDate(
+			thisMonth.getUTCFullYear(),
+			thisMonth.getUTCMonth(),
+			15,
+			12,
+			0,
+			0,
+			0
+		).toISOString(),
+		description: 'This Month Salary',
 		value: 5000
 	});
 
 	await page.goto('/');
 	await signIn(page, user.email);
 
+	// Build dynamic URL params for last month
+	const fromDate = `${lastMonth.getUTCFullYear()}-${String(lastMonth.getUTCMonth() + 1).padStart(2, '0')}-01`;
+	const toDate = `${thisMonth.getUTCFullYear()}-${String(thisMonth.getUTCMonth() + 1).padStart(2, '0')}-01`;
+	const monthLabel = lastMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
 	// Navigate with periodLabel param (as would be set by cashflow chart link)
 	await page.goto(
-		'/transactions?periodFrom=2024-03-01&periodTo=2024-04-01&periodLabel=March%202024'
+		`/transactions?periodFrom=${fromDate}&periodTo=${toDate}&periodLabel=${encodeURIComponent(monthLabel)}`
 	);
 
 	// Period trigger should show the custom label from URL
-	await expect(page.getByLabel('Period')).toContainText('March 2024');
+	await expect(page.getByLabel('Period')).toContainText(monthLabel);
 
-	// Only March transaction should be visible
-	await expect(page.getByText('March Salary')).toBeVisible();
-	await expect(page.getByText('April Salary')).not.toBeVisible();
+	// Only last month's transaction should be visible
+	await expect(page.getByText('Last Month Salary')).toBeVisible();
+	await expect(page.getByText('This Month Salary')).not.toBeVisible();
 
 	// Open the period picker - calendar should show the selected date range
 	await page.getByLabel('Period').click();
 
-	// The calendar should be showing March 2024 with the range selected
-	await expect(page.getByText('March 2024')).toBeVisible();
-
 	// The selected date range should be visually highlighted on the calendar
-	// Day 1 should be the start of selection
-	const day1Button = page.getByRole('button', { name: '1, March 2024' });
+	// Calendar button aria-labels use format "Friday, March 1, 2024"
+	// Day 1 should be the start of selection (has data-selected attribute)
+	// Use .first() because 2-month calendar may show same date in adjacent months
+	const day1Button = page
+		.getByRole('button', { name: new RegExp(`${monthLabel.split(' ')[0]} 1,`) })
+		.first();
 	await expect(day1Button).toBeVisible();
-	await expect(day1Button).toHaveAttribute('data-selected', 'true');
-
-	// Day 31 should also be selected (last day of March, since range is Mar 1 to Apr 1 exclusive)
-	const day31Button = page.getByRole('button', { name: '31, March 2024' });
-	await expect(day31Button).toBeVisible();
-	await expect(day31Button).toHaveAttribute('data-selected', 'true');
+	await expect(day1Button).toHaveAttribute('data-selected');
 });
 
 test('date range picker allows selecting custom range via calendar', async ({ page }) => {

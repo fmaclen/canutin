@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { DateValue } from '@internationalized/date';
+	import { CalendarDate, type DateValue } from '@internationalized/date';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -21,7 +21,23 @@
 	const txContext = getTransactionsContext();
 
 	let periodPopoverOpen = $state(false);
-	let calendarValue: DateRange | undefined = $state(undefined);
+
+	function dateToCalendarDate(date: Date): CalendarDate {
+		return new CalendarDate(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+	}
+
+	// Derive calendar value from context's custom range (for URL param initialization)
+	// or use local selection state
+	let calendarValue: DateRange | undefined = $derived.by(() => {
+		if (txContext.isCustomRange && txContext.customFromDate && txContext.customToDate) {
+			const toInclusive = subDays(txContext.customToDate, 1);
+			return {
+				start: dateToCalendarDate(txContext.customFromDate),
+				end: dateToCalendarDate(toInclusive)
+			};
+		}
+		return undefined;
+	});
 
 	function formatCustomDateRange(from: Date, to: Date, label: string | null): string {
 		if (label) return label;
@@ -75,9 +91,8 @@
 	}
 
 	function handlePresetClick(option: PeriodOption) {
-		txContext.period = option;
+		txContext.setPresetPeriod(option);
 		periodPopoverOpen = false;
-		calendarValue = undefined;
 	}
 
 	function dateValueToDate(dateValue: DateValue): Date {
@@ -85,7 +100,6 @@
 	}
 
 	function handleCalendarChange(value: DateRange | undefined) {
-		calendarValue = value;
 		if (value?.start && value?.end) {
 			const fromDate = dateValueToDate(value.start);
 			const toDate = addDays(dateValueToDate(value.end), 1);
@@ -168,6 +182,7 @@
 						value={calendarValue}
 						onValueChange={handleCalendarChange}
 						numberOfMonths={2}
+						placeholder={calendarValue?.start}
 					/>
 				</div>
 			</div>
