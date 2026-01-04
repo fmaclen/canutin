@@ -9,6 +9,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 
+	import CashflowGrid from './cashflow-grid.svelte';
 	import Cashflow from './cashflow.svelte';
 	import Summary from './summary.svelte';
 	import TrailingCashflow from './trailing-cashflow.svelte';
@@ -35,6 +36,10 @@
 	<Section>
 		<SectionTitle title="Summary" />
 		<Summary />
+	</Section>
+
+	<Section>
+		<CashflowGrid />
 	</Section>
 
 	<Section>
