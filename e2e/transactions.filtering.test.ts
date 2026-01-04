@@ -572,7 +572,9 @@ test('"Last year" filter correctly handles period boundaries', async ({ page }) 
 	await expect(page.getByText('Before Period End Boundary')).toBeVisible();
 });
 
-test('custom date range with periodLabel from URL displays the label', async ({ page }) => {
+test('custom date range with periodLabel from URL displays the label and calendar shows selection', async ({
+	page
+}) => {
 	const user = await seedUser('riley');
 
 	const account = await seedAccount({
@@ -617,6 +619,23 @@ test('custom date range with periodLabel from URL displays the label', async ({ 
 	// Only March transaction should be visible
 	await expect(page.getByText('March Salary')).toBeVisible();
 	await expect(page.getByText('April Salary')).not.toBeVisible();
+
+	// Open the period picker - calendar should show the selected date range
+	await page.getByLabel('Period').click();
+
+	// The calendar should be showing March 2024 with the range selected
+	await expect(page.getByText('March 2024')).toBeVisible();
+
+	// The selected date range should be visually highlighted on the calendar
+	// Day 1 should be the start of selection
+	const day1Button = page.getByRole('button', { name: '1, March 2024' });
+	await expect(day1Button).toBeVisible();
+	await expect(day1Button).toHaveAttribute('data-selected', 'true');
+
+	// Day 31 should also be selected (last day of March, since range is Mar 1 to Apr 1 exclusive)
+	const day31Button = page.getByRole('button', { name: '31, March 2024' });
+	await expect(day31Button).toBeVisible();
+	await expect(day31Button).toHaveAttribute('data-selected', 'true');
 });
 
 test('date range picker allows selecting custom range via calendar', async ({ page }) => {
@@ -718,7 +737,9 @@ test('date range picker allows selecting custom range via calendar', async ({ pa
 	await expect(page.getByText('This Month Payment')).not.toBeVisible();
 });
 
-test('switching from custom range back to preset clears custom URL params', async ({ page }) => {
+test('switching from custom range back to preset clears custom URL params and updates transactions', async ({
+	page
+}) => {
 	const user = await seedUser('jordan');
 
 	const account = await seedAccount({
@@ -736,7 +757,10 @@ test('switching from custom range back to preset clears custom URL params', asyn
 
 	const now = new UTCDate();
 	const thisMonth = startOfMonth(now);
+	const lastMonth = addMonths(thisMonth, -1);
+	const twoMonthsAgo = addMonths(thisMonth, -2);
 
+	// Transaction this month
 	await seedTransaction({
 		account: account.id,
 		owner: user.id,
@@ -749,34 +773,74 @@ test('switching from custom range back to preset clears custom URL params', asyn
 			0,
 			0
 		).toISOString(),
-		description: 'Recent Transaction',
+		description: 'This Month Transaction',
 		value: 500
+	});
+
+	// Transaction last month
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: new UTCDate(
+			lastMonth.getUTCFullYear(),
+			lastMonth.getUTCMonth(),
+			15,
+			12,
+			0,
+			0,
+			0
+		).toISOString(),
+		description: 'Last Month Transaction',
+		value: 200
+	});
+
+	// Transaction two months ago
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: new UTCDate(
+			twoMonthsAgo.getUTCFullYear(),
+			twoMonthsAgo.getUTCMonth(),
+			20,
+			12,
+			0,
+			0,
+			0
+		).toISOString(),
+		description: 'Two Months Ago Transaction',
+		value: 300
 	});
 
 	await page.goto('/');
 	await signIn(page, user.email);
 
-	// Start with custom date range in URL
-	await page.goto(
-		'/transactions?periodFrom=2024-01-01&periodTo=2024-02-01&periodLabel=January%202024'
-	);
-	await expect(page.getByLabel('Period')).toContainText('January 2024');
+	// Start with custom date range in URL (last month only)
+	const fromDate = `${lastMonth.getUTCFullYear()}-${String(lastMonth.getUTCMonth() + 1).padStart(2, '0')}-01`;
+	const toDate = `${thisMonth.getUTCFullYear()}-${String(thisMonth.getUTCMonth() + 1).padStart(2, '0')}-01`;
+	await page.goto(`/transactions?periodFrom=${fromDate}&periodTo=${toDate}`);
 
-	// Open period picker and select a preset
+	// Only last month's transaction should be visible initially
+	await expect(page.getByText('Last Month Transaction')).toBeVisible();
+	await expect(page.getByText('This Month Transaction')).not.toBeVisible();
+	await expect(page.getByText('Two Months Ago Transaction')).not.toBeVisible();
+
+	// Open period picker and select "Last 3 months" preset
 	await page.getByLabel('Period').click();
-	await page.getByRole('button', { name: 'This month' }).click();
+	await page.getByRole('button', { name: 'Last 3 months' }).click();
 
-	// URL should now have period=this-month, not periodFrom/periodTo
-	await expect(page).toHaveURL(/period=this-month/);
+	// URL should now have period=last-3-months, not periodFrom/periodTo
+	await expect(page).toHaveURL(/period=last-3-months/);
 	await expect(page).not.toHaveURL(/periodFrom=/);
 	await expect(page).not.toHaveURL(/periodTo=/);
 	await expect(page).not.toHaveURL(/periodLabel=/);
 
 	// Period trigger should show preset label
-	await expect(page.getByLabel('Period')).toContainText('This month');
+	await expect(page.getByLabel('Period')).toContainText('Last 3 months');
 
-	// Recent transaction should be visible
-	await expect(page.getByText('Recent Transaction')).toBeVisible();
+	// All 3 transactions should now be visible (they're all within last 3 months)
+	await expect(page.getByText('This Month Transaction')).toBeVisible();
+	await expect(page.getByText('Last Month Transaction')).toBeVisible();
+	await expect(page.getByText('Two Months Ago Transaction')).toBeVisible();
 });
 
 test('invalid date range params fall back to default period', async ({ page }) => {
