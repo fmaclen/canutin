@@ -118,6 +118,7 @@
 
 					<Tooltip.Root delayDuration={50}>
 						<Tooltip.Trigger
+							aria-label="{period.periodLabel}: {formatCurrency(period.surplus)}"
 							class="flex flex-col pt-2 {!isLastColumn
 								? isDecember
 									? 'border-border border-r border-dashed'
