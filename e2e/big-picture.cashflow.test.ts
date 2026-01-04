@@ -280,4 +280,18 @@ test('clicking cashflow chart bar navigates to transactions filtered by that mon
 	await expect(page.getByText('Target Month Income')).toBeVisible();
 	await expect(page.getByText('Target Month Expense')).toBeVisible();
 	await expect(page.getByText('Current Month Transaction')).not.toBeVisible();
+
+	// Switch to a preset period - custom URL params should be cleared
+	await page.getByLabel('Period').click();
+	await page.getByRole('option', { name: 'Lifetime' }).click();
+
+	await expect(page).toHaveURL(/period=lifetime/);
+	await expect(page).not.toHaveURL(/periodFrom=/);
+	await expect(page).not.toHaveURL(/periodTo=/);
+	await expect(page).not.toHaveURL(/periodLabel=/);
+
+	// All transactions should now be visible
+	await expect(page.getByText('Target Month Income')).toBeVisible();
+	await expect(page.getByText('Target Month Expense')).toBeVisible();
+	await expect(page.getByText('Current Month Transaction')).toBeVisible();
 });

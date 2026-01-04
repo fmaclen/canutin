@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { UTCDate } from '@date-fns/utc';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import XIcon from '@lucide/svelte/icons/x';

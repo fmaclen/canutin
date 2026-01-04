@@ -125,6 +125,7 @@
 					<Tooltip.Root delayDuration={50}>
 						<Tooltip.Trigger>
 							{#snippet child({ props })}
+								<!-- eslint-disable svelte/no-navigation-without-resolve -->
 								<a
 									{...props}
 									href={period.transactionsUrl}

@@ -144,10 +144,14 @@ class TransactionsContext {
 
 			this._customFromDate = null;
 			this._customToDate = null;
+			this._customLabel = null;
 
 			const currentPage = get(page);
 			const params = new SvelteURLSearchParams(currentPage.url.searchParams);
 
+			params.delete('periodFrom');
+			params.delete('periodTo');
+			params.delete('periodLabel');
 			params.set('period', this.period);
 			params.set('amount', this.kind);
 
