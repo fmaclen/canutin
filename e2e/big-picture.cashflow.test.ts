@@ -190,8 +190,8 @@ test.describe('big picture cashflow chart', () => {
 
 			// aria-label format: "{periodLabel}: {surplus}"
 			const ariaLabel = `${periodLabel}: ${surplus}`;
-			await page.getByRole('button', { name: ariaLabel }).hover();
-			await expect(page.getByRole('button', { name: ariaLabel })).toBeVisible();
+			await page.getByRole('link', { name: ariaLabel }).hover();
+			await expect(page.getByRole('link', { name: ariaLabel })).toBeVisible();
 		}
 
 		await expect(page.getByText('$9,999')).not.toBeVisible();

@@ -702,10 +702,11 @@ test('date range picker allows selecting custom range via calendar', async ({ pa
 	await page.getByRole('button', { name: 'Previous' }).click();
 
 	// Select a custom date range using the calendar
+	// The calendar shows 2 months side-by-side, use .first() to select from the left month
 	// Click on day 10 of last month (start of range)
-	await page.getByRole('button', { name: /10,/ }).click();
+	await page.getByRole('button', { name: /10,/ }).first().click();
 	// Click on day 20 of last month (end of range)
-	await page.getByRole('button', { name: /20,/ }).click();
+	await page.getByRole('button', { name: /20,/ }).first().click();
 
 	// URL should be updated with periodFrom and periodTo
 	await expect(page).toHaveURL(/periodFrom=/);
