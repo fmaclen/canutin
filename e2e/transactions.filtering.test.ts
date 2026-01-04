@@ -1,6 +1,6 @@
 import { UTCDate } from '@date-fns/utc';
 import { expect, test, type Page } from '@playwright/test';
-import { addMonths, startOfMonth } from 'date-fns';
+import { addMonths, startOfMonth, startOfYear, subYears } from 'date-fns';
 
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
@@ -474,3 +474,98 @@ async function expectRowVisibility(page: Page, description: string, shouldBeVisi
 function escapeRegex(value: string) {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, (match) => `\\${match}`);
 }
+
+// Regression test for https://github.com/fmaclen/canutin/issues/289
+// PocketBase stores dates with space separator but JS toISOString() uses 'T'.
+// This causes string comparison failures at period boundaries.
+test('"Last year" filter correctly handles period boundaries', async ({ page }) => {
+	const user = await seedUser('ivy');
+
+	const account = await seedAccount({
+		name: 'Date Filter Test Account',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 1000
+	});
+
+	// Calculate dates relative to now for time-independent testing
+	// "Last year" filter range: [Jan 1 of lastYear 00:00:00, Jan 1 of thisYear 00:00:00)
+	const now = new UTCDate();
+	const thisYearStart = startOfYear(now);
+	const lastYearStart = startOfYear(subYears(now, 1));
+
+	// BOUNDARY: 1 second BEFORE period start - should NOT be visible
+	const beforePeriod = new UTCDate(lastYearStart.getTime() - 1000);
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: beforePeriod.toISOString(),
+		description: 'Before Period Boundary',
+		value: 100
+	});
+
+	// BOUNDARY: Exactly at period start (Jan 1 00:00:00.000Z) - should be visible
+	// This is the edge case most likely to fail due to T vs space comparison
+	const atPeriodStart = new UTCDate(lastYearStart.getTime());
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: atPeriodStart.toISOString(),
+		description: 'At Period Start Boundary',
+		value: 200
+	});
+
+	// INSIDE: Mid-year transaction - should be visible
+	const midYear = new UTCDate(lastYearStart.getUTCFullYear(), 6, 15, 12, 0, 0, 0);
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: midYear.toISOString(),
+		description: 'Mid Year Payment',
+		value: 300
+	});
+
+	// BOUNDARY: 1 second BEFORE period end - should be visible
+	const beforePeriodEnd = new UTCDate(thisYearStart.getTime() - 1000);
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: beforePeriodEnd.toISOString(),
+		description: 'Before Period End Boundary',
+		value: 400
+	});
+
+	// BOUNDARY: Exactly at period end (Jan 1 of this year) - should NOT be visible (exclusive)
+	const atPeriodEnd = new UTCDate(thisYearStart.getTime());
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: atPeriodEnd.toISOString(),
+		description: 'At Period End Boundary',
+		value: 500
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	// Apply "Last year" filter
+	await page.getByLabel('Period').click();
+	await page.getByRole('option', { name: 'Last year' }).click();
+	await expect(page.getByLabel('Period')).toContainText('Last year');
+
+	// Transactions INSIDE the period (inclusive start, exclusive end)
+	await expect(page.getByText('At Period Start Boundary')).toBeVisible();
+	await expect(page.getByText('Mid Year Payment')).toBeVisible();
+	await expect(page.getByText('Before Period End Boundary')).toBeVisible();
+
+	// Transactions OUTSIDE the period
+	await expect(page.getByText('Before Period Boundary')).not.toBeVisible();
+	await expect(page.getByText('At Period End Boundary')).not.toBeVisible();
+});
