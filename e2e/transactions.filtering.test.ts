@@ -1,6 +1,6 @@
 import { UTCDate } from '@date-fns/utc';
 import { expect, test, type Page } from '@playwright/test';
-import { addMonths, startOfMonth, startOfYear, subYears } from 'date-fns';
+import { addMonths, format, startOfMonth, startOfYear, subYears } from 'date-fns';
 
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
@@ -673,9 +673,8 @@ test('custom date range with periodLabel from URL displays the label and calenda
 	// Calendar button aria-labels use format "Friday, March 1, 2024"
 	// Day 1 should be the start of selection (has data-selected attribute)
 	// Use .first() because 2-month calendar may show same date in adjacent months
-	const day1Button = page
-		.getByRole('button', { name: new RegExp(`${monthLabel.split(' ')[0]} 1,`) })
-		.first();
+	const monthName = format(lastMonth, 'MMMM');
+	const day1Button = page.getByRole('button', { name: new RegExp(`${monthName} 1,`) }).first();
 	await expect(day1Button).toBeVisible();
 	await expect(day1Button).toHaveAttribute('data-selected');
 });
