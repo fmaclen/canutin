@@ -283,7 +283,7 @@ test('clicking cashflow chart bar navigates to transactions filtered by that mon
 
 	// Switch to a preset period - custom URL params should be cleared
 	await page.getByLabel('Period').click();
-	await page.getByRole('option', { name: 'Lifetime' }).click();
+	await page.getByRole('button', { name: 'Lifetime' }).click();
 
 	await expect(page).toHaveURL(/period=lifetime/);
 	await expect(page).not.toHaveURL(/periodFrom=/);

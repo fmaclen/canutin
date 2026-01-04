@@ -698,17 +698,14 @@ test('date range picker allows selecting custom range via calendar', async ({ pa
 	await expect(page.getByRole('button', { name: 'Last month' })).toBeVisible();
 	await expect(page.getByRole('button', { name: 'This month' })).toBeVisible();
 
+	// Navigate to last month to select a date range
+	await page.getByRole('button', { name: 'Previous' }).click();
+
 	// Select a custom date range using the calendar
 	// Click on day 10 of last month (start of range)
-	await page.getByRole('gridcell', { name: '10', exact: true }).first().click();
+	await page.getByRole('button', { name: /10,/ }).click();
 	// Click on day 20 of last month (end of range)
-	await page.getByRole('gridcell', { name: '20', exact: true }).first().click();
-
-	// Apply the custom range (if there's an apply button) or it auto-applies
-	const applyButton = page.getByRole('button', { name: 'Apply' });
-	if (await applyButton.isVisible()) {
-		await applyButton.click();
-	}
+	await page.getByRole('button', { name: /20,/ }).click();
 
 	// URL should be updated with periodFrom and periodTo
 	await expect(page).toHaveURL(/periodFrom=/);

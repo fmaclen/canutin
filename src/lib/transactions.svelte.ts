@@ -443,6 +443,29 @@ class TransactionsContext {
 		return this._customFromDate !== null && this._customToDate !== null;
 	}
 
+	setCustomRange(from: Date, to: Date) {
+		this._customFromDate = from;
+		this._customToDate = to;
+		this._customLabel = null;
+
+		const currentPage = get(page);
+		const params = new SvelteURLSearchParams(currentPage.url.searchParams);
+
+		params.delete('period');
+		params.set('periodFrom', toPocketBaseDateString(from).split(' ')[0]);
+		params.set('periodTo', toPocketBaseDateString(to).split(' ')[0]);
+		params.delete('periodLabel');
+
+		const search = params.toString();
+		const newUrl = `${currentPage.url.pathname}${search ? `?${search}` : ''}`;
+
+		if (newUrl !== `${currentPage.url.pathname}${currentPage.url.search}`) {
+			history.replaceState(history.state, '', newUrl);
+		}
+
+		this.refreshTransactions();
+	}
+
 	dispose() {
 		this._pb.authedClient.collection('transactions').unsubscribe();
 	}
