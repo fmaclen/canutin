@@ -560,12 +560,12 @@ test('"Last year" filter correctly handles period boundaries', async ({ page }) 
 	await page.getByRole('option', { name: 'Last year' }).click();
 	await expect(page.getByLabel('Period')).toContainText('Last year');
 
+	// Transactions OUTSIDE the period
+	await expect(page.getByText('Before Period Boundary')).not.toBeVisible();
+	await expect(page.getByText('At Period End Boundary')).not.toBeVisible();
+
 	// Transactions INSIDE the period (inclusive start, exclusive end)
 	await expect(page.getByText('At Period Start Boundary')).toBeVisible();
 	await expect(page.getByText('Mid Year Payment')).toBeVisible();
 	await expect(page.getByText('Before Period End Boundary')).toBeVisible();
-
-	// Transactions OUTSIDE the period
-	await expect(page.getByText('Before Period Boundary')).not.toBeVisible();
-	await expect(page.getByText('At Period End Boundary')).not.toBeVisible();
 });
