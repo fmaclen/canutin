@@ -53,10 +53,9 @@ function isoOneHourBeforeMonthEnd(monthsAgo: number) {
 	return subHours(endOfDayUtc, 1).toISOString();
 }
 
-function getExpectedLabel(monthsAgo: number) {
+function getExpectedPeriodLabel(monthsAgo: number) {
 	const monthStart = getMonthStart(monthsAgo);
-	const isJanuary = monthStart.getMonth() === 0;
-	return isJanuary ? `Jan '${format(monthStart, 'yy')}` : format(monthStart, 'MMM');
+	return format(monthStart, 'MMMM yyyy');
 }
 
 test.describe('big picture cashflow chart', () => {
@@ -186,11 +185,13 @@ test.describe('big picture cashflow chart', () => {
 		}
 
 		for (let monthsAgo = 12; monthsAgo >= 0; monthsAgo--) {
-			const label = getExpectedLabel(monthsAgo);
+			const periodLabel = getExpectedPeriodLabel(monthsAgo);
 			const surplus = formatSurplus(expectedSurplus[monthsAgo]);
 
-			await page.getByRole('button', { name: label }).first().hover();
-			await expect(page.getByRole('button', { name: `${surplus} ${label}` })).toBeVisible();
+			// aria-label format: "{periodLabel}: {surplus}"
+			const ariaLabel = `${periodLabel}: ${surplus}`;
+			await page.getByRole('button', { name: ariaLabel }).hover();
+			await expect(page.getByRole('button', { name: ariaLabel })).toBeVisible();
 		}
 
 		await expect(page.getByText('$9,999')).not.toBeVisible();
