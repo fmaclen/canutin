@@ -26,6 +26,7 @@
 
 {#if collapsible === 'none'}
 	<div
+		aria-label="Sidebar"
 		class={cn(
 			'bg-sidebar text-sidebar-foreground flex h-full w-(--sidebar-width) flex-col',
 			className
@@ -38,6 +39,7 @@
 {:else if sidebar.isMobile}
 	<Sheet.Root bind:open={() => sidebar.openMobile, (v) => sidebar.setOpenMobile(v)} {...restProps}>
 		<Sheet.Content
+			aria-label="Sidebar"
 			data-sidebar="sidebar"
 			data-slot="sidebar"
 			data-mobile="true"
@@ -56,6 +58,7 @@
 	</Sheet.Root>
 {:else}
 	<div
+		aria-label="Sidebar"
 		bind:this={ref}
 		class="group peer text-sidebar-foreground hidden md:block"
 		data-state={sidebar.state}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { afterNavigate } from '$app/navigation';
 	import Link from '$lib/components/link.svelte';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
@@ -17,6 +18,11 @@
 
 	const pb = getPocketBaseContext();
 	const txContext = setTransactionsContext(pb);
+
+	// Sync filters from URL after navigation (e.g., clicking sidebar link)
+	afterNavigate(() => {
+		txContext.syncFromUrl();
+	});
 
 	// Keep page within valid bounds
 	$effect(() => {

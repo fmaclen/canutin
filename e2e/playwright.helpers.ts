@@ -14,7 +14,8 @@ export async function signIn(page: Page, email: string) {
 }
 
 export async function goToPageViaSidebar(page: Page, label: string) {
-	const link = page.getByRole('link', { name: label });
+	const sidebar = page.getByLabel('Sidebar');
+	const link = sidebar.getByRole('link', { name: label });
 	// On mobile the sidebar is collapsed; open it first
 	if (!(await link.isVisible())) {
 		await page.getByRole('button', { name: 'Toggle Sidebar' }).click();

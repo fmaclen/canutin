@@ -102,6 +102,13 @@ test('transactions table responds to period and type filters', async ({ page }) 
 		await page.getByLabel('Period').click();
 		await page.getByRole('button', { name: label }).click();
 		await expect(page.getByLabel('Period')).toContainText(label);
+
+		// After selecting, re-open popover and verify the selected preset is highlighted
+		await page.getByLabel('Period').click();
+		const selectedPresetButton = page.getByRole('button', { name: label, exact: true });
+		await expect(selectedPresetButton).toHaveAttribute('data-selected');
+		await page.keyboard.press('Escape');
+
 		for (const txn of transactions) {
 			const shouldBeVisible = isWithinPeriod(txn.date, value, now);
 			await expectRowVisibility(page, txn.description, shouldBeVisible);
@@ -117,6 +124,19 @@ test('transactions table responds to period and type filters', async ({ page }) 
 			await expectRowVisibility(page, txn.description, shouldBeVisible);
 		}
 	}
+
+	// Test that sidebar navigation resets filter to match URL state
+	// Currently showing "Lifetime" from previous loop iteration
+	await expect(page.getByLabel('Period')).toContainText('Lifetime');
+	await goToPageViaSidebar(page, 'Transactions');
+	// URL has no period param, so filter should reset to default "Last 3 months"
+	await expect(page).not.toHaveURL(/period=/);
+	await expect(page.getByLabel('Period')).toContainText('Last 3 months');
+
+	// Set period to "Lifetime" so type filter tests can check all transactions
+	await page.getByLabel('Period').click();
+	await page.getByRole('button', { name: 'Lifetime' }).click();
+	await expect(page.getByLabel('Period')).toContainText('Lifetime');
 
 	const typeFilters: Array<{
 		label: string;

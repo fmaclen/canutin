@@ -95,6 +95,10 @@
 		periodPopoverOpen = false;
 	}
 
+	function isPresetSelected(option: PeriodOption): boolean {
+		return !txContext.isCustomRange && txContext.period === option;
+	}
+
 	function dateValueToDate(dateValue: DateValue): Date {
 		return new Date(dateValue.year, dateValue.month - 1, dateValue.day);
 	}
@@ -168,11 +172,16 @@
 				<path d="m6 9 6 6 6-6" />
 			</svg>
 		</Popover.Trigger>
-		<Popover.Content class="w-auto p-0" align="start">
+		<Popover.Content class="w-auto p-0" align="start" collisionPadding={16}>
 			<div class="flex">
 				<div class="flex flex-col border-r p-2">
 					{#each txContext.periodOptions as option (option)}
-						<Button variant="ghost" class="justify-start" onclick={() => handlePresetClick(option)}>
+						<Button
+							variant="ghost"
+							class="justify-start font-normal"
+							data-selected={isPresetSelected(option) ? '' : undefined}
+							onclick={() => handlePresetClick(option)}
+						>
 							{periodLabel(option)}
 						</Button>
 					{/each}
@@ -188,7 +197,11 @@
 			</div>
 		</Popover.Content>
 	</Popover.Root>
-	<Select.Root type="single" bind:value={txContext.kind}>
+	<Select.Root
+		type="single"
+		value={txContext.kind}
+		onValueChange={(v) => txContext.setKind(v as KindFilter)}
+	>
 		<Select.Trigger aria-label={m.transactions_filter_kind_label()} class="bg-background sm:w-48">
 			{kindLabel(txContext.kind)}
 		</Select.Trigger>

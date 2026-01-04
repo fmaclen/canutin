@@ -4,6 +4,7 @@ import { getContext, setContext } from 'svelte';
 import { SvelteMap, SvelteURLSearchParams } from 'svelte/reactivity';
 import { get } from 'svelte/store';
 
+import { replaceState } from '$app/navigation';
 import { page } from '$app/stores';
 
 import { getAccountsContext } from './accounts.svelte';
@@ -73,18 +74,34 @@ class TransactionsContext {
 
 	private _pb: PocketBaseContext;
 	private _accountsContext: ReturnType<typeof getAccountsContext>;
+	private _lastSyncedSearch: string | null = null;
 
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
 		this._accountsContext = getAccountsContext();
-		this.initFromUrlParams();
+		this.syncFromUrl(false);
 		this.init();
-		this.setupUrlSync();
 	}
 
-	private initFromUrlParams() {
+	syncFromUrl(shouldRefresh = true) {
 		const currentPage = get(page);
+		const currentSearch = currentPage.url.search;
+
+		// Skip if URL hasn't changed since last sync
+		if (currentSearch === this._lastSyncedSearch) {
+			return;
+		}
+		this._lastSyncedSearch = currentSearch;
+
 		const params = currentPage.url.searchParams;
+
+		// Reset to defaults first
+		this._customFromDate = null;
+		this._customToDate = null;
+		this._customLabel = null;
+		this.period = 'last-3-months';
+		this.kind = 'all';
+		this.search = '';
 
 		const periodFromParam = params.get('periodFrom');
 		const periodToParam = params.get('periodTo');
@@ -117,6 +134,10 @@ class TransactionsContext {
 		if (searchParam) {
 			this.search = searchParam;
 		}
+
+		if (shouldRefresh) {
+			this.refreshTransactions();
+		}
 	}
 
 	private parseDate(dateString: string): Date | null {
@@ -127,43 +148,20 @@ class TransactionsContext {
 		return parsed;
 	}
 
-	private setupUrlSync() {
-		let isFirstRun = true;
+	private updateUrl(params: SvelteURLSearchParams) {
+		const currentPage = get(page);
+		const search = params.toString();
+		// Using URL to build the new href (not reactive, just for string building)
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const newUrl = new URL(currentPage.url.href);
+		newUrl.search = search;
 
-		$effect(() => {
-			const currentPeriod = this.period;
-			const currentKind = this.kind;
-
-			if (isFirstRun) {
-				isFirstRun = false;
-				return;
-			}
-
-			void currentPeriod;
-			void currentKind;
-
-			this._customFromDate = null;
-			this._customToDate = null;
-			this._customLabel = null;
-
-			const currentPage = get(page);
-			const params = new SvelteURLSearchParams(currentPage.url.searchParams);
-
-			params.delete('periodFrom');
-			params.delete('periodTo');
-			params.delete('periodLabel');
-			params.set('period', this.period);
-			params.set('amount', this.kind);
-
-			const search = params.toString();
-			const newUrl = `${currentPage.url.pathname}${search ? `?${search}` : ''}`;
-
-			if (newUrl !== `${currentPage.url.pathname}${currentPage.url.search}`) {
-				history.replaceState(history.state, '', newUrl);
-			}
-
-			this.refreshTransactions();
-		});
+		if (newUrl.href !== currentPage.url.href) {
+			// Track this so afterNavigate doesn't trigger a re-sync
+			this._lastSyncedSearch = newUrl.search;
+			// eslint-disable-next-line svelte/no-navigation-without-resolve
+			replaceState(newUrl.href, {});
+		}
 	}
 
 	private async init() {
@@ -196,12 +194,7 @@ class TransactionsContext {
 			params.delete('q');
 		}
 
-		const searchStr = params.toString();
-		const newUrl = `${currentPage.url.pathname}${searchStr ? `?${searchStr}` : ''}`;
-
-		if (newUrl !== `${currentPage.url.pathname}${currentPage.url.search}`) {
-			history.replaceState(history.state, '', newUrl);
-		}
+		this.updateUrl(params);
 	}
 
 	async refreshTransactions() {
@@ -456,13 +449,7 @@ class TransactionsContext {
 		params.set('periodTo', toPocketBaseDateString(to).split(' ')[0]);
 		params.delete('periodLabel');
 
-		const search = params.toString();
-		const newUrl = `${currentPage.url.pathname}${search ? `?${search}` : ''}`;
-
-		if (newUrl !== `${currentPage.url.pathname}${currentPage.url.search}`) {
-			history.replaceState(history.state, '', newUrl);
-		}
-
+		this.updateUrl(params);
 		this.refreshTransactions();
 	}
 
@@ -479,14 +466,20 @@ class TransactionsContext {
 		params.delete('periodTo');
 		params.delete('periodLabel');
 		params.set('period', option);
+		params.set('amount', this.kind);
 
-		const search = params.toString();
-		const newUrl = `${currentPage.url.pathname}${search ? `?${search}` : ''}`;
+		this.updateUrl(params);
+		this.refreshTransactions();
+	}
 
-		if (newUrl !== `${currentPage.url.pathname}${currentPage.url.search}`) {
-			history.replaceState(history.state, '', newUrl);
-		}
+	setKind(option: KindFilter) {
+		this.kind = option;
 
+		const currentPage = get(page);
+		const params = new SvelteURLSearchParams(currentPage.url.searchParams);
+		params.set('amount', option);
+
+		this.updateUrl(params);
 		this.refreshTransactions();
 	}
 
