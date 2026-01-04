@@ -104,6 +104,7 @@
 
 	function shouldShowLabel(index: number): boolean {
 		if (hoveredIndex === index) return true;
+		if (periods[index].isCurrentPeriod && periods[index].surplus !== 0) return true;
 		if (index === extremeIndices.highestIndex && periods[index].surplus > 0) return true;
 		if (index === extremeIndices.lowestIndex && periods[index].surplus < 0) return true;
 		return false;

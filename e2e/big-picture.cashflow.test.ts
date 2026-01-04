@@ -1,17 +1,76 @@
+import { UTCDate } from '@date-fns/utc';
 import { expect, test } from '@playwright/test';
-import { addDays, format, setHours, startOfMonth, subMonths } from 'date-fns';
+import { addMonths, endOfMonth, format, setHours, startOfMonth, subHours } from 'date-fns';
 
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
 import { signIn } from './playwright.helpers';
 import { seedAccount, seedTransaction, seedUser } from './pocketbase.helpers';
 
-// Pick the 15th at local noon for stable month inclusion across timezones
-function isoMidOfMonthMonthsAgo(monthsAgo: number) {
-	const startThisMonth = startOfMonth(new Date());
-	const targetStart = subMonths(startThisMonth, monthsAgo);
-	const mid = addDays(targetStart, 14); // 15th
-	const atNoon = setHours(mid, 12);
-	return atNoon.toISOString();
+// The cashflow chart displays 13 periods: current month + 12 previous months
+const CASHFLOW_PERIODS = 13;
+
+// Seed definition for a transaction in a specific period
+type PeriodSeed = {
+	monthsAgo: number;
+	income: number;
+	expenses: number;
+};
+
+// Get the start of a month N months ago (in UTC for stable comparison)
+function getMonthStart(monthsAgo: number) {
+	const now = new UTCDate();
+	const startOfThisMonth = startOfMonth(now);
+	return addMonths(startOfThisMonth, -monthsAgo);
+}
+
+// Create a date on the first of a month (1st at 01:00 UTC)
+// Using the 1st tests boundary conditions where timezone bugs could shift transactions to adjacent months
+function isoFirstOfMonth(monthsAgo: number) {
+	const monthStart = getMonthStart(monthsAgo);
+	const first = new UTCDate(monthStart.getUTCFullYear(), monthStart.getUTCMonth(), 1, 1, 0, 0, 0);
+	return first.toISOString();
+}
+
+// Create a date at the very end of a month (last day, 23:00 UTC)
+// This tests the boundary case where a transaction is near the end of a period
+function isoEndOfMonth(monthsAgo: number) {
+	const monthStart = getMonthStart(monthsAgo);
+	const monthEnd = endOfMonth(monthStart);
+	const atNight = setHours(monthEnd, 23);
+	return atNight.toISOString();
+}
+
+// Create a date at the very start of a month (1st, 01:00 UTC)
+// This tests the boundary case where a transaction is near the start of a period
+function isoStartOfMonth(monthsAgo: number) {
+	const monthStart = getMonthStart(monthsAgo);
+	const atMorning = setHours(monthStart, 1);
+	return atMorning.toISOString();
+}
+
+// Create a date 1 hour before a month ends
+// This tests extreme boundary where a transaction could leak to the next month
+function isoOneHourBeforeMonthEnd(monthsAgo: number) {
+	const monthStart = getMonthStart(monthsAgo);
+	const monthEnd = endOfMonth(monthStart);
+	const endOfDayUtc = new UTCDate(
+		monthEnd.getUTCFullYear(),
+		monthEnd.getUTCMonth(),
+		monthEnd.getUTCDate(),
+		23,
+		59,
+		59,
+		999
+	);
+	return subHours(endOfDayUtc, 1).toISOString();
+}
+
+// Get the expected month label for a period (e.g., "Jan '25" for January, "Feb" for other months)
+// Uses date-fns format to match frontend formatting exactly
+function getExpectedLabel(monthsAgo: number) {
+	const monthStart = getMonthStart(monthsAgo);
+	const isJanuary = monthStart.getMonth() === 0;
+	return isJanuary ? `Jan '${format(monthStart, 'yy')}` : format(monthStart, 'MMM');
 }
 
 // Cashflow chart tests are desktop-only because:
@@ -21,167 +80,173 @@ function isoMidOfMonthMonthsAgo(monthsAgo: number) {
 test.describe('big picture cashflow chart', () => {
 	test.skip(({ isMobile }) => isMobile, 'Cashflow chart interactions are desktop-only');
 
-	test('displays bars for months with transactions', async ({ page }) => {
-		const user = await seedUser('evan');
+	test('displays correct data for all 13 periods with boundary transactions', async ({ page }) => {
+		const user = await seedUser('zara');
 
 		const account = await seedAccount({
-			name: 'Primary Checking',
+			name: 'Comprehensive Test Account',
 			balanceGroup: AccountsBalanceGroupOptions.CASH,
 			owner: user.id,
 			balanceType: 'Checking',
 			autoCalculated: new Date().toISOString()
 		});
 
-		// Seed a positive transaction 1 month ago (surplus)
+		// Define transactions for all 13 visible periods
+		// Each period has a unique income/expense combination for verification
+		// Mix of positive surpluses (income > expenses) and negative surpluses (deficits)
+		// Values are chosen to be easily identifiable and not overlap
+		const periodSeeds: PeriodSeed[] = [
+			{ monthsAgo: 0, income: 1000, expenses: -400 }, // Current month: surplus +600
+			{ monthsAgo: 1, income: 500, expenses: -800 }, // 1 month ago: deficit -300
+			{ monthsAgo: 2, income: 1200, expenses: -300 }, // 2 months ago: surplus +900
+			{ monthsAgo: 3, income: 400, expenses: -1100 }, // 3 months ago: deficit -700 (+ boundary)
+			{ monthsAgo: 4, income: 1400, expenses: -500 }, // 4 months ago: surplus +900
+			{ monthsAgo: 5, income: 300, expenses: -1500 }, // 5 months ago: deficit -1200 (lowest)
+			{ monthsAgo: 6, income: 1600, expenses: -200 }, // 6 months ago: surplus +1400 (+ boundary)
+			{ monthsAgo: 7, income: 600, expenses: -900 }, // 7 months ago: deficit -300
+			{ monthsAgo: 8, income: 1800, expenses: -100 }, // 8 months ago: surplus +1700 (highest)
+			{ monthsAgo: 9, income: 700, expenses: -1000 }, // 9 months ago: deficit -300 (+ boundary)
+			{ monthsAgo: 10, income: 1100, expenses: -600 }, // 10 months ago: surplus +500
+			{ monthsAgo: 11, income: 200, expenses: -700 }, // 11 months ago: deficit -500
+			{ monthsAgo: 12, income: 900, expenses: -400 } // 12 months ago: surplus +500
+		];
+
+		// Seed transactions for all 13 visible periods using mid-month dates
+		for (const seed of periodSeeds) {
+			await seedTransaction({
+				account: account.id,
+				owner: user.id,
+				date: isoFirstOfMonth(seed.monthsAgo),
+				description: `Income ${seed.monthsAgo}m ago`,
+				value: seed.income
+			});
+
+			await seedTransaction({
+				account: account.id,
+				owner: user.id,
+				date: isoFirstOfMonth(seed.monthsAgo),
+				description: `Expense ${seed.monthsAgo}m ago`,
+				value: seed.expenses
+			});
+		}
+
+		// Seed boundary transactions to test timezone edge cases
+		// These should be included in their respective months
 		await seedTransaction({
 			account: account.id,
 			owner: user.id,
-			date: isoMidOfMonthMonthsAgo(1),
-			description: 'Salary',
-			value: 5000
+			date: isoEndOfMonth(3),
+			description: 'End of month 3m ago',
+			value: 50
 		});
 
-		// Seed a negative transaction 2 months ago (deficit)
 		await seedTransaction({
 			account: account.id,
 			owner: user.id,
-			date: isoMidOfMonthMonthsAgo(2),
-			description: 'Big purchase',
-			value: -3000
+			date: isoStartOfMonth(6),
+			description: 'Start of month 6m ago',
+			value: 75
+		});
+
+		await seedTransaction({
+			account: account.id,
+			owner: user.id,
+			date: isoOneHourBeforeMonthEnd(9),
+			description: 'One hour before end of month 9m ago',
+			value: 25
+		});
+
+		// Seed transactions OUTSIDE the visible range (should NOT appear)
+		// 13 months ago is just outside the visible range
+		await seedTransaction({
+			account: account.id,
+			owner: user.id,
+			date: isoFirstOfMonth(13),
+			description: 'Transaction 13m ago - should not appear',
+			value: 9999
+		});
+
+		// 14 months ago
+		await seedTransaction({
+			account: account.id,
+			owner: user.id,
+			date: isoFirstOfMonth(14),
+			description: 'Transaction 14m ago - should not appear',
+			value: 8888
+		});
+
+		// Seed an excluded transaction (should NOT be counted)
+		await seedTransaction({
+			account: account.id,
+			owner: user.id,
+			date: isoFirstOfMonth(1),
+			description: 'Excluded transaction',
+			value: 7777,
+			excluded: new Date().toISOString()
+		});
+
+		// Seed a FUTURE transaction (next month) - should NOT appear
+		await seedTransaction({
+			account: account.id,
+			owner: user.id,
+			date: isoFirstOfMonth(-1), // negative = future
+			description: 'Future transaction - should not appear',
+			value: 6666
 		});
 
 		await page.goto('/');
 		await signIn(page, user.email);
 
-		// The highest surplus ($5,000) and lowest deficit (-$3,000) should show value labels
-		await expect(page.getByText('$5,000')).toBeVisible();
-		await expect(page.getByText('-$3,000')).toBeVisible();
-	});
+		// Wait for all 13 period columns to be present
+		for (let i = 0; i < CASHFLOW_PERIODS; i++) {
+			const monthsAgo = CASHFLOW_PERIODS - 1 - i;
+			const label = getExpectedLabel(monthsAgo);
+			await expect(page.getByRole('button', { name: label }).first()).toBeVisible();
+		}
 
-	test('shows tooltip with income, expenses, and surplus on hover', async ({ page }) => {
-		const user = await seedUser('fiona');
+		// 1. VISIBLE VALUE LABELS (always shown without hover)
+		// Current month (monthsAgo=0): 1000 - 400 = +600
+		const currentMonthLabel = getExpectedLabel(0);
+		await expect(page.getByRole('button', { name: `$600 ${currentMonthLabel}` })).toBeVisible();
 
-		const account = await seedAccount({
-			name: 'Savings Account',
-			balanceGroup: AccountsBalanceGroupOptions.CASH,
-			owner: user.id,
-			balanceType: 'Savings',
-			autoCalculated: new Date().toISOString()
-		});
+		// Highest surplus (monthsAgo=8): 1800 - 100 = +1700
+		const highestSurplusLabel = getExpectedLabel(8);
+		await expect(page.getByRole('button', { name: `$1,700 ${highestSurplusLabel}` })).toBeVisible();
 
-		const oneMonthAgoDate = subMonths(startOfMonth(new Date()), 1);
-		const expectedPeriodLabel = format(oneMonthAgoDate, 'MMMM yyyy');
-		const monthLabel = format(oneMonthAgoDate, 'MMM');
+		// Lowest deficit (monthsAgo=5): 300 - 1500 = -1200
+		const lowestDeficitLabel = getExpectedLabel(5);
+		await expect(page.getByRole('button', { name: `-$1,200 ${lowestDeficitLabel}` })).toBeVisible();
 
-		// Income transaction
+		// 2. HOVER FIRST PERIOD AND CHECK FULL TOOLTIP CONTENTS
+		// Month 6 has boundary transaction: base 1600 + 75 = 1675 income, -200 expenses, +1475 surplus
+		const month6Label = getExpectedLabel(6);
+		await page.getByRole('button', { name: month6Label }).first().hover();
+
+		const tooltip = page.locator('[data-slot="tooltip-content"]');
+		await expect(tooltip.getByText('$1,675')).toBeVisible(); // income
+		await expect(tooltip.getByText('-$200')).toBeVisible(); // expenses
+		await expect(tooltip.getByText('$1,475')).toBeVisible(); // surplus
+
+		// 4. NEGATIVE ASSERTIONS - out of range, excluded, and future transactions
+		await expect(page.getByText('$9,999')).not.toBeVisible(); // 13 months ago
+		await expect(page.getByText('$8,888')).not.toBeVisible(); // 14 months ago
+		await expect(page.getByText('$7,777')).not.toBeVisible(); // excluded
+		await expect(page.getByText('$6,666')).not.toBeVisible(); // future (next month)
+
+		// 5. REAL-TIME UPDATE - add transaction and verify chart updates
+		// Month 11 currently has surplus of -500 (200 - 700)
+		// Adding 2000 income should change it to +1500 (2200 - 700)
+		const month11Label = getExpectedLabel(11);
+
 		await seedTransaction({
 			account: account.id,
 			owner: user.id,
-			date: isoMidOfMonthMonthsAgo(1),
-			description: 'Paycheck',
-			value: 3000
-		});
-
-		// Expense transaction
-		await seedTransaction({
-			account: account.id,
-			owner: user.id,
-			date: isoMidOfMonthMonthsAgo(1),
-			description: 'Rent',
-			value: -1500
-		});
-
-		await page.goto('/');
-		await signIn(page, user.email);
-
-		// Find and hover over the bar for the month with transactions
-		const barColumn = page.getByRole('button', { name: monthLabel }).first();
-		await barColumn.hover();
-
-		// Tooltip should appear with the period label and values
-		await expect(page.getByText(expectedPeriodLabel)).toBeVisible();
-		await expect(page.getByText('$3,000')).toBeVisible();
-		await expect(page.getByText('-$1,500')).toBeVisible();
-	});
-
-	test('updates in real-time when transactions are added', async ({ page }) => {
-		const user = await seedUser('george');
-
-		const oneMonthAgoDate = subMonths(startOfMonth(new Date()), 1);
-		const monthLabel = format(oneMonthAgoDate, 'MMM');
-
-		const account = await seedAccount({
-			name: 'Daily Account',
-			balanceGroup: AccountsBalanceGroupOptions.CASH,
-			owner: user.id,
-			balanceType: 'Checking',
-			autoCalculated: new Date().toISOString()
-		});
-
-		await page.goto('/');
-		await signIn(page, user.email);
-
-		// Initially no transactions, the cashflow bar button should just show the month label
-		const cashflowBar = page.getByRole('button', { name: monthLabel, exact: true });
-		await expect(cashflowBar).toBeVisible();
-
-		// Add a transaction while on the page
-		await seedTransaction({
-			account: account.id,
-			owner: user.id,
-			date: isoMidOfMonthMonthsAgo(1),
+			date: isoFirstOfMonth(11),
 			description: 'Real-time income',
 			value: 2000
 		});
 
-		// The bar button should now include the value label via real-time update
-		await expect(page.getByRole('button', { name: '$2,000 ' + monthLabel })).toBeVisible();
-	});
-
-	test('excluded transactions are not included in cashflow calculations', async ({ page }) => {
-		const user = await seedUser('hannah');
-
-		const account = await seedAccount({
-			name: 'Main Account',
-			balanceGroup: AccountsBalanceGroupOptions.CASH,
-			owner: user.id,
-			balanceType: 'Checking',
-			autoCalculated: new Date().toISOString()
-		});
-
-		const oneMonthAgoDate = subMonths(startOfMonth(new Date()), 1);
-		const monthLabel = format(oneMonthAgoDate, 'MMM');
-
-		// Regular income transaction
-		await seedTransaction({
-			account: account.id,
-			owner: user.id,
-			date: isoMidOfMonthMonthsAgo(1),
-			description: 'Regular income',
-			value: 1000
-		});
-
-		// Excluded transaction (should not be counted)
-		await seedTransaction({
-			account: account.id,
-			owner: user.id,
-			date: isoMidOfMonthMonthsAgo(1),
-			description: 'Excluded transfer',
-			value: 5000,
-			excluded: new Date().toISOString()
-		});
-
-		await page.goto('/');
-		await signIn(page, user.email);
-
-		// Hover over the month to see tooltip
-		const barColumn = page.getByRole('button', { name: monthLabel }).first();
-		await barColumn.hover();
-
-		// Tooltip should show $1,000 income (not $6,000 which would include excluded)
-		await expect(page.getByText('$1,000').first()).toBeVisible();
-		// $5,000 and $6,000 should NOT be visible anywhere
-		await expect(page.getByText('$5,000')).not.toBeVisible();
-		await expect(page.getByText('$6,000')).not.toBeVisible();
+		// The bar button should now show the updated surplus via real-time update
+		await expect(page.getByRole('button', { name: `$1,500 ${month11Label}` })).toBeVisible();
 	});
 });
