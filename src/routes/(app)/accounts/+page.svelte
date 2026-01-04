@@ -301,7 +301,7 @@
 														{/if}
 													</div>
 												</Table.Cell>
-												<Table.Cell class="font-jetbrains-mono text-right text-xs tabular-nums">
+												<Table.Cell class="text-right font-mono tabular-nums">
 													{@const txnCount = transactionsCounts.get(row.id)}
 													{@const hasTxn = transactionsCounts.has(row.id)}
 													{#if hasTxn}

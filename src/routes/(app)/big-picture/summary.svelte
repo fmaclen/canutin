@@ -25,8 +25,8 @@
 		role="region"
 		aria-label="Net worth"
 	>
-		<div class="text-base font-semibold tracking-tight">Net worth</div>
-		<div class="font-mono text-xl">
+		<div class="text-sm font-semibold tracking-tight">Net worth</div>
+		<div class="font-mono text-4xl leading-none">
 			<Currency value={totals.netWorth} />
 		</div>
 	</div>

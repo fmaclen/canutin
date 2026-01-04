@@ -173,7 +173,7 @@
 												>
 													<!-- Label positioned outside the bar -->
 													<p
-														class="pointer-events-none absolute m-0 hidden w-full overflow-hidden px-1 text-center font-mono text-xs text-ellipsis sm:block
+														class="pointer-events-none absolute m-0 hidden w-full overflow-hidden px-1 text-center font-mono text-ellipsis sm:block
 													{trend === 'positive' ? 'bottom-full pb-3' : 'top-full pt-3'}
 													{shouldShowLabel(i) ? 'opacity-100' : 'opacity-0'}"
 													>

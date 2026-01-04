@@ -295,8 +295,7 @@
 							<Table.Cell class="font-medium">{rowLabels.net}</Table.Cell>
 							{#each table.columns as c (c.key)}
 								<Table.Cell
-									class={'font-jetbrains-mono text-right text-xs ' +
-										percentClassName(c.values.net.pct, 'net')}
+									class={'text-right font-mono ' + percentClassName(c.values.net.pct, 'net')}
 								>
 									{#if c.values.net.pct === null}
 										<span class="text-muted-foreground">~</span>
@@ -309,11 +308,11 @@
 											<Tooltip.Content sideOffset={6}>
 												<p class="font-normal">
 													{m.trends_performance_tooltip_from()}
-													<span class="font-jetbrains-mono tabular-nums">
+													<span class="font-mono tabular-nums">
 														{formatCurrency(c.values.net.prev, 2)}
 													</span>
 													{m.trends_performance_tooltip_to()}
-													<span class="font-jetbrains-mono tabular-nums">
+													<span class="font-mono tabular-nums">
 														{formatCurrency(c.values.net.cur, 2)}
 													</span>
 												</p>
@@ -322,7 +321,7 @@
 									{/if}
 								</Table.Cell>
 							{/each}
-							<Table.Cell class="font-jetbrains-mono text-muted-foreground text-right text-xs">
+							<Table.Cell class="text-muted-foreground text-right font-mono">
 								<Tooltip.Root>
 									<Tooltip.Trigger
 										class="border-border inline-block border-b border-dashed hover:border-current"
@@ -340,8 +339,7 @@
 							<Table.Cell class="font-medium">{rowLabels.cash}</Table.Cell>
 							{#each table.columns as c (c.key)}
 								<Table.Cell
-									class={'font-jetbrains-mono text-right text-xs ' +
-										percentClassName(c.values.cash.pct, 'cash')}
+									class={'text-right font-mono ' + percentClassName(c.values.cash.pct, 'cash')}
 								>
 									{#if c.values.cash.pct === null}
 										<span class="text-muted-foreground">~</span>
@@ -354,11 +352,11 @@
 											<Tooltip.Content sideOffset={6}>
 												<p class="font-normal">
 													{m.trends_performance_tooltip_from()}
-													<span class="font-jetbrains-mono tabular-nums">
+													<span class="font-mono tabular-nums">
 														{formatCurrency(c.values.cash.prev, 2)}
 													</span>
 													to
-													<span class="font-jetbrains-mono tabular-nums">
+													<span class="font-mono tabular-nums">
 														{formatCurrency(c.values.cash.cur, 2)}
 													</span>
 												</p>
@@ -367,7 +365,7 @@
 									{/if}
 								</Table.Cell>
 							{/each}
-							<Table.Cell class="font-jetbrains-mono text-right text-xs">
+							<Table.Cell class="text-right font-mono">
 								<Tooltip.Root>
 									<Tooltip.Trigger
 										class="border-border inline-block border-b border-dashed hover:border-current"
@@ -385,8 +383,7 @@
 							<Table.Cell class="font-medium">{rowLabels.debt}</Table.Cell>
 							{#each table.columns as c (c.key)}
 								<Table.Cell
-									class={'font-jetbrains-mono text-right text-xs ' +
-										percentClassName(c.values.debt.pct, 'debt')}
+									class={'text-right font-mono ' + percentClassName(c.values.debt.pct, 'debt')}
 								>
 									{#if c.values.debt.pct === null}
 										<span class="text-muted-foreground">~</span>
@@ -399,11 +396,11 @@
 											<Tooltip.Content sideOffset={6}>
 												<p class="font-normal">
 													{m.trends_performance_tooltip_from()}
-													<span class="font-jetbrains-mono tabular-nums">
+													<span class="font-mono tabular-nums">
 														{formatCurrency(c.values.debt.prev, 2)}
 													</span>
 													to
-													<span class="font-jetbrains-mono tabular-nums">
+													<span class="font-mono tabular-nums">
 														{formatCurrency(c.values.debt.cur, 2)}
 													</span>
 												</p>
@@ -412,7 +409,7 @@
 									{/if}
 								</Table.Cell>
 							{/each}
-							<Table.Cell class="font-jetbrains-mono text-right text-xs">
+							<Table.Cell class="text-right font-mono">
 								<Tooltip.Root>
 									<Tooltip.Trigger
 										class="border-border inline-block border-b border-dashed hover:border-current"
@@ -430,7 +427,7 @@
 							<Table.Cell class="font-medium">{rowLabels.investment}</Table.Cell>
 							{#each table.columns as c (c.key)}
 								<Table.Cell
-									class={'font-jetbrains-mono text-right text-xs ' +
+									class={'text-right font-mono ' +
 										percentClassName(c.values.investment.pct, 'investment')}
 								>
 									{#if c.values.investment.pct === null}
@@ -444,11 +441,11 @@
 											<Tooltip.Content sideOffset={6}>
 												<p class="font-normal">
 													{m.trends_performance_tooltip_from()}
-													<span class="font-jetbrains-mono tabular-nums">
+													<span class="font-mono tabular-nums">
 														{formatCurrency(c.values.investment.prev, 2)}
 													</span>
 													to
-													<span class="font-jetbrains-mono tabular-nums">
+													<span class="font-mono tabular-nums">
 														{formatCurrency(c.values.investment.cur, 2)}
 													</span>
 												</p>
@@ -457,7 +454,7 @@
 									{/if}
 								</Table.Cell>
 							{/each}
-							<Table.Cell class="font-jetbrains-mono text-right text-xs">
+							<Table.Cell class="text-right font-mono">
 								<Tooltip.Root>
 									<Tooltip.Trigger
 										class="border-border inline-block border-b border-dashed hover:border-current"
@@ -475,8 +472,7 @@
 							<Table.Cell class="font-medium">{rowLabels.other}</Table.Cell>
 							{#each table.columns as c (c.key)}
 								<Table.Cell
-									class={'font-jetbrains-mono text-right text-xs ' +
-										percentClassName(c.values.other.pct, 'other')}
+									class={'text-right font-mono ' + percentClassName(c.values.other.pct, 'other')}
 								>
 									{#if c.values.other.pct === null}
 										<span class="text-muted-foreground">~</span>
@@ -489,11 +485,11 @@
 											<Tooltip.Content sideOffset={6}>
 												<p class="font-normal">
 													{m.trends_performance_tooltip_from()}
-													<span class="font-jetbrains-mono tabular-nums">
+													<span class="font-mono tabular-nums">
 														{formatCurrency(c.values.other.prev, 2)}
 													</span>
 													to
-													<span class="font-jetbrains-mono tabular-nums">
+													<span class="font-mono tabular-nums">
 														{formatCurrency(c.values.other.cur, 2)}
 													</span>
 												</p>
@@ -502,7 +498,7 @@
 									{/if}
 								</Table.Cell>
 							{/each}
-							<Table.Cell class="font-jetbrains-mono text-right text-xs">
+							<Table.Cell class="text-right font-mono">
 								<Tooltip.Root>
 									<Tooltip.Trigger
 										class="border-border inline-block border-b border-dashed hover:border-current"

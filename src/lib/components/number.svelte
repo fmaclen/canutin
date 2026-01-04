@@ -16,4 +16,4 @@
 	};
 </script>
 
-<span class={`font-jetbrains-mono uppercase ${sentimentClass[sentiment]}`}>{value}</span>
+<span class={`font-mono uppercase ${sentimentClass[sentiment]}`}>{value}</span>

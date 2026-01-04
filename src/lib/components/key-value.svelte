@@ -33,7 +33,7 @@
 	aria-label={title}
 >
 	<div class="text-sm font-semibold tracking-tight text-balance">{title}</div>
-	<div class="font-mono text-sm tabular-nums">
+	<div class="font-mono text-lg tabular-nums">
 		{#if format === 'number'}
 			{value ?? 0}
 		{:else}

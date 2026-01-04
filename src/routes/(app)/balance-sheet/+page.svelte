@@ -160,7 +160,7 @@
 						>
 							<div class="flex items-center justify-between border-b p-4">
 								<div class="text-sm font-medium">{balanceType.name}</div>
-								<div class="font-mono text-sm tabular-nums">
+								<div class="font-mono tabular-nums">
 									<Currency value={balanceType.total} />
 								</div>
 							</div>
@@ -177,7 +177,7 @@
 											{item.name}
 										</Link>
 										<span
-											class={'font-mono text-xs tabular-nums ' +
+											class={'font-mono tabular-nums ' +
 												(item.excluded ? 'text-muted-foreground' : '')}
 										>
 											<Currency value={item.balance} />
