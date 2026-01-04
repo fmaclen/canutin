@@ -176,21 +176,9 @@ test.describe('big picture cashflow chart', () => {
 		await signIn(page, user.email);
 
 		// Expected surplus: income + expenses (boundary txs added to months 3, 6, 9)
-		const expectedSurplus: Record<number, number> = {
-			0: 600,
-			1: -300,
-			2: 900,
-			3: -650,
-			4: 900,
-			5: -1200,
-			6: 1475,
-			7: -300,
-			8: 1700,
-			9: -275,
-			10: 500,
-			11: -500,
-			12: 500
-		};
+		const expectedSurplus = [
+			600, -300, 900, -650, 900, -1200, 1475, -300, 1700, -275, 500, -500, 500
+		];
 
 		function formatSurplus(value: number) {
 			const absValue = Math.abs(value).toLocaleString('en-US');
@@ -199,7 +187,7 @@ test.describe('big picture cashflow chart', () => {
 
 		for (let monthsAgo = 12; monthsAgo >= 0; monthsAgo--) {
 			const label = getExpectedLabel(monthsAgo);
-			const surplus = formatSurplus(expectedSurplus[monthsAgo]!);
+			const surplus = formatSurplus(expectedSurplus[monthsAgo]);
 
 			await page.getByRole('button', { name: label }).first().hover();
 			await expect(page.getByRole('button', { name: `${surplus} ${label}` })).toBeVisible();

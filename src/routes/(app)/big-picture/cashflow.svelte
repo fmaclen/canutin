@@ -5,6 +5,7 @@
 	import { formatCurrency } from '$lib/components/currency';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { m } from '$lib/paraglide/messages';
 
 	const cashflow = getCashflowContext();
 	const periods = $derived(cashflow.periods);
@@ -96,7 +97,7 @@
 	}
 </script>
 
-<SectionTitle title="Cashflow" />
+<SectionTitle title={m.cashflow_section_title()} />
 
 <div class="bg-background overflow-hidden rounded-md shadow-md">
 	{#if chartData.length > 0}
@@ -191,14 +192,14 @@
 								<div class="flex items-center justify-between gap-4">
 									<span class="flex items-center gap-1.5">
 										<span class="border-cash size-2 rounded-full border"></span>
-										Income
+										{m.cashflow_income_label()}
 									</span>
 									<span class="font-mono">{formatCurrency(period.income)}</span>
 								</div>
 								<div class="flex items-center justify-between gap-4">
 									<span class="flex items-center gap-1.5">
 										<span class="border-debt size-2 rounded-full border"></span>
-										Expenses
+										{m.cashflow_expenses_label()}
 									</span>
 									<span class="font-mono">{formatCurrency(period.expenses)}</span>
 								</div>
@@ -206,7 +207,7 @@
 									<span class="flex items-center gap-1.5">
 										<span class="size-2 rounded-full {period.surplus >= 0 ? 'bg-cash' : 'bg-debt'}"
 										></span>
-										Surplus
+										{m.cashflow_surplus_label()}
 									</span>
 									<span class="font-mono">{formatCurrency(period.surplus)}</span>
 								</div>

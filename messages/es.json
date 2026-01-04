@@ -260,5 +260,9 @@
 	"transactions_clear_search": "Limpiar búsqueda",
 	"transactions_summary_count_label": "Transacciones",
 	"transactions_summary_net_balance_label": "Balance neto",
-	"transactions_summary_aria_label": "Resumen de transacciones"
+	"transactions_summary_aria_label": "Resumen de transacciones",
+	"cashflow_section_title": "Flujo de caja",
+	"cashflow_income_label": "Ingresos",
+	"cashflow_expenses_label": "Gastos",
+	"cashflow_surplus_label": "Excedente"
 }
