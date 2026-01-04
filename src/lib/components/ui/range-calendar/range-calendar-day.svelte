@@ -22,7 +22,7 @@
 		// range End
 		'data-[range-end]:bg-primary data-[range-end]:text-primary-foreground dark:data-[range-end]:hover:bg-accent',
 		// Outside months
-		'[&[data-outside-month]:not([data-selected])]:text-muted-foreground [&[data-outside-month]:not([data-selected])]:hover:text-accent-foreground',
+		'data-[outside-month]:invisible',
 		// Disabled
 		'data-[disabled]:text-muted-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
 		// Unavailable

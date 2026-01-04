@@ -175,6 +175,7 @@
 						onValueChange={handleCalendarChange}
 						numberOfMonths={2}
 						placeholder={calendarValue?.start}
+						disableDaysOutsideMonth
 					/>
 				</div>
 			</div>
