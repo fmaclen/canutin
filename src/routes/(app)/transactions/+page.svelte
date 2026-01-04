@@ -58,7 +58,7 @@
 <Page pageTitle={m.sidebar_transactions()}>
 	<Section>
 		<SectionTitle title={m.transactions_section_title()} />
-		<div class="flex flex-col gap-3">
+		<div class="flex flex-col gap-2">
 			<TransactionFilters />
 			<TransactionSummary />
 			{#if txContext.isLoading && txContext.rawTransactions.length === 0}
