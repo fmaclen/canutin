@@ -496,6 +496,8 @@ test('"Last year" filter correctly handles period boundaries', async ({ page }) 
 
 	// Calculate dates relative to now for time-independent testing
 	// "Last year" filter range: [Jan 1 of lastYear 00:00:00, Jan 1 of thisYear 00:00:00)
+	// NOTE: This test could theoretically fail if run exactly at midnight on Dec 31st,
+	// as the test's "thisYear" and the backend's "thisYear" could differ by one year.
 	const now = new UTCDate();
 	const thisYearStart = startOfYear(now);
 	const lastYearStart = startOfYear(subYears(now, 1));
