@@ -6,10 +6,10 @@
 	import { m } from '$lib/paraglide/messages';
 
 	const cashflow = getCashflowContext();
-	const avg3m = $derived.by(() => cashflow.avg3m);
-	const avg6m = $derived.by(() => cashflow.avg6m);
-	const avgYtd = $derived.by(() => cashflow.avgYtd);
-	const avg1y = $derived.by(() => cashflow.avg1y);
+	const avg3m = $derived(cashflow.avg3m);
+	const avg6m = $derived(cashflow.avg6m);
+	const avgYtd = $derived(cashflow.avgYtd);
+	const avg1y = $derived(cashflow.avg1y);
 </script>
 
 <Tabs.Root value="six-months">

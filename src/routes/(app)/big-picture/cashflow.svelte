@@ -21,7 +21,6 @@
 		})
 	);
 
-	// Calculate chart ratios using the old logic
 	const chartRatios = $derived.by(() => {
 		if (!periods.length) {
 			return { positiveRatio: 1, negativeRatio: 1, highestSurplus: 0, lowestSurplus: 0 };
@@ -79,27 +78,13 @@
 		}
 	}
 
-	// Find indices of highest and lowest surplus values
 	const extremeIndices = $derived.by(() => {
 		if (!periods.length) return { highestIndex: -1, lowestIndex: -1 };
-
-		let highestIndex = 0;
-		let lowestIndex = 0;
-		let highest = periods[0].surplus;
-		let lowest = periods[0].surplus;
-
-		periods.forEach((p, i) => {
-			if (p.surplus > highest) {
-				highest = p.surplus;
-				highestIndex = i;
-			}
-			if (p.surplus < lowest) {
-				lowest = p.surplus;
-				lowestIndex = i;
-			}
-		});
-
-		return { highestIndex, lowestIndex };
+		const surpluses = periods.map((p) => p.surplus);
+		return {
+			highestIndex: surpluses.indexOf(Math.max(...surpluses)),
+			lowestIndex: surpluses.indexOf(Math.min(...surpluses))
+		};
 	});
 
 	function shouldShowLabel(index: number): boolean {

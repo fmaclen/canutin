@@ -1,5 +1,5 @@
 import { UTCDate } from '@date-fns/utc';
-import { addMonths, endOfMonth, format, startOfMonth, startOfYear } from 'date-fns';
+import { addMonths, format, startOfMonth, startOfYear } from 'date-fns';
 import { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 
@@ -8,6 +8,8 @@ import type { PocketBaseContext } from './pocketbase.svelte';
 
 type CashflowAverages = { income: number; expenses: number; surplus: number };
 
+export const CASHFLOW_PERIODS = 13;
+
 export type CashflowPeriod = {
 	id: number;
 	month: Date;
@@ -15,8 +17,6 @@ export type CashflowPeriod = {
 	expenses: number;
 	surplus: number;
 	isCurrentPeriod: boolean;
-	periodFrom: string;
-	periodTo: string;
 	periodLabel: string;
 };
 
@@ -65,7 +65,7 @@ class CashflowContext {
 	private async recomputeAll() {
 		const now = new UTCDate();
 		const startOfThisMonth = startOfMonth(now);
-		const start13m = addMonths(startOfThisMonth, -12); // 13 periods: current + 12 previous
+		const start13m = addMonths(startOfThisMonth, -(CASHFLOW_PERIODS - 1));
 		const start12m = addMonths(startOfThisMonth, -11);
 		const start6m = addMonths(startOfThisMonth, -5);
 		const start3m = addMonths(startOfThisMonth, -2);
@@ -124,14 +124,11 @@ class CashflowContext {
 			surplus: sums1y.surplus / 12
 		};
 
-		// Compute monthly periods (13 months: current + 12 previous)
-		const CASHFLOW_PERIODS = 13;
 		const periods: CashflowPeriod[] = [];
 
 		for (let i = 0; i < CASHFLOW_PERIODS; i++) {
 			const monthOffset = CASHFLOW_PERIODS - 1 - i;
 			const month = addMonths(startOfThisMonth, -monthOffset);
-			const monthEnd = endOfMonth(month);
 			const isCurrentPeriod = monthOffset === 0;
 
 			// Use YYYY-MM for simpler comparison (avoid timezone issues)
@@ -159,8 +156,6 @@ class CashflowContext {
 				expenses,
 				surplus: income + expenses,
 				isCurrentPeriod,
-				periodFrom: format(month, 'yyyy-MM-dd'),
-				periodTo: format(monthEnd, 'yyyy-MM-dd'),
 				periodLabel: format(month, 'MMMM yyyy')
 			});
 		}
