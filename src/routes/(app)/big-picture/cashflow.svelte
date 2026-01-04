@@ -82,7 +82,7 @@
 	}
 
 	const extremeIndices = $derived.by(() => {
-		if (!periods.length) return { highestIndex: -1, lowestIndex: -1 };
+		if (!periods.length) return { highestIndex: null, lowestIndex: null };
 		const surpluses = periods.map((p) => p.surplus);
 		return {
 			highestIndex: surpluses.indexOf(Math.max(...surpluses)),
