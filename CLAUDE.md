@@ -128,8 +128,6 @@ This project uses Svelte 5's runes syntax exclusively. See [Svelte 5 Migration G
   {@render children?.()}
   ```
 
-See AGENTS.md lines 30-41 for additional patterns.
-
 #### Route Structure
 
 - `src/routes/(app)/` - Protected app routes (requires auth)
@@ -194,6 +192,22 @@ Sort order (handled by Prettier):
 - Configuration in `project.inlang/settings.json`
 - Message files in `messages/{locale}.json`
 
+## Code Review Guidelines
+
+When reviewing code, look for the following issues:
+
+- **Code smells** - Signs of deeper problems (long functions, deep nesting, god objects)
+- **Duplicated logic** - Code that should be extracted into shared utilities or components
+- **Unnecessary complexity** - Overly clever solutions when simpler alternatives exist
+- **Framework misuse** - Not doing things "the Svelte 5 way" (e.g., using stores instead of runes, `on:click` instead of `onclick`) or "the PocketBase way"
+- **Anti-patterns** - Patterns inconsistent with the rest of the codebase
+- **Dead code** - Unused variables, functions, imports, or unreachable code paths
+- **Comment quality**:
+  - Remove redundant comments that explain self-explanatory logic
+  - Add comments for tricky or non-obvious logic paths that need explanation
+
+Also verify compliance with all guidelines in this file (TypeScript standards, testing strategy, code style, etc.).
+
 ## Development Workflow
 
 ### Development Standards
@@ -246,7 +260,6 @@ Always run: `bun run quality && bun run test`
 
 - `src/lib/pocketbase.schema.ts` - PocketBase collections and type definitions (auto-generated)
 - `src/routes/(app)/+layout.svelte` - App-level context initialization
-- `AGENTS.md` - Detailed coding guidelines and conventions (reference for complex patterns)
 - `playwright.config.ts` - Test configuration with desktop/mobile projects
 - `scripts/pb-server.ts` - PocketBase server management script
 - `docker-compose.yml` - Docker Compose setup for deployment
@@ -260,7 +273,6 @@ Always run: `bun run quality && bun run test`
 
 ## Notes
 
-- Avoid defining return types, use type inference as much as possible
 - PocketBase v0.30.0 is automatically downloaded and managed by scripts
 - Frozen lockfile (`bun.lock`) ensures reproducible builds
 - All dependencies should be devDependencies (SvelteKit bundles everything at build time)
