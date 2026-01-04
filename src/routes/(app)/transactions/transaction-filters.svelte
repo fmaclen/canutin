@@ -152,26 +152,12 @@
 		{/if}
 	</div>
 	<Popover.Root bind:open={periodPopoverOpen}>
-		<Popover.Trigger
+		<Popover.SelectTrigger
 			aria-label={m.transactions_filter_period_label()}
-			class="border-input focus-visible:border-ring focus-visible:ring-ring/50 data-[state=open]:border-ring data-[state=open]:ring-ring/50 data-[placeholder]:text-muted-foreground dark:bg-input/30 dark:hover:bg-input/50 [&_svg:not([class*='text-'])]:text-muted-foreground bg-background flex h-9 w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none select-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 data-[state=open]:ring-[3px] sm:w-48"
+			class="bg-background w-full sm:w-48"
 		>
 			<span class="truncate">{getPeriodTriggerText()}</span>
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				width="16"
-				height="16"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				class="size-4 shrink-0 opacity-50"
-			>
-				<path d="m6 9 6 6 6-6" />
-			</svg>
-		</Popover.Trigger>
+		</Popover.SelectTrigger>
 		<Popover.Content class="w-auto p-0" align="start" collisionPadding={16}>
 			<div class="flex">
 				<div class="flex flex-col border-r p-2">
