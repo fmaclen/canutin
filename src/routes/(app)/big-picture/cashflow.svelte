@@ -9,58 +9,75 @@
 	const cashflow = getCashflowContext();
 	const periods = $derived(cashflow.periods);
 
-	// Minimum bar height in pixels
-	const MIN_BAR_HEIGHT = 3;
-
-	// Track hovered period index
 	let hoveredIndex = $state<number | null>(null);
 
-	// Transform data for the chart - split positive/negative for different colors
 	const chartData = $derived.by(() =>
 		periods.map((p) => {
 			const isJanuary = p.month.getMonth() === 0;
 			return {
 				...p,
-				// Make label unique - include year for January to avoid duplicate x-axis keys
-				label: isJanuary ? `Jan '${format(p.month, 'yy')}` : format(p.month, 'MMM'),
-				positive: p.surplus > 0 ? p.surplus : 0,
-				negative: p.surplus < 0 ? p.surplus : 0
+				label: isJanuary ? `Jan '${format(p.month, 'yy')}` : format(p.month, 'MMM')
 			};
 		})
 	);
 
-	// Calculate y domain to include 0 with no padding
-	const yDomain = $derived.by(() => {
-		if (!periods.length) return [-100, 100] as [number, number];
-		const surpluses = periods.map((p) => p.surplus);
-		const min = Math.min(0, ...surpluses);
-		const max = Math.max(0, ...surpluses);
-		return [min, max] as [number, number];
+	// Calculate chart ratios using the old logic
+	const chartRatios = $derived.by(() => {
+		if (!periods.length) {
+			return { positiveRatio: 1, negativeRatio: 1, highestSurplus: 0, lowestSurplus: 0 };
+		}
+
+		// Get highest positive surplus
+		const positiveSurpluses = periods.filter((p) => p.surplus > 0).map((p) => p.surplus);
+		const highestSurplus = positiveSurpluses.length > 0 ? Math.max(...positiveSurpluses) : 0;
+
+		// Get lowest negative surplus
+		const negativeSurpluses = periods.filter((p) => p.surplus < 0).map((p) => p.surplus);
+		const lowestSurplus = negativeSurpluses.length > 0 ? Math.min(...negativeSurpluses) : 0;
+
+		// Calculate the range and initial ratios
+		const surplusRange = highestSurplus + Math.abs(lowestSurplus);
+
+		// proportionBetween: (a * 100) / b, or 0 if either is 0
+		const proportionBetween = (num1: number, num2: number) => {
+			return num1 !== 0 && num2 !== 0 ? Math.round(((num1 * 100) / num2) * 100) / 100 : 0;
+		};
+
+		let positiveRatio = proportionBetween(highestSurplus, surplusRange);
+		let negativeRatio = proportionBetween(Math.abs(lowestSurplus), surplusRange);
+
+		// Normalize so the larger ratio is relative to 1
+		if (positiveRatio > negativeRatio) {
+			const isNegativeRatioZero = negativeRatio === 0;
+			positiveRatio = isNegativeRatioZero ? 1 : positiveRatio / negativeRatio;
+			negativeRatio = isNegativeRatioZero ? 0 : 1;
+		} else {
+			const isPositiveRatioZero = positiveRatio === 0;
+			negativeRatio = isPositiveRatioZero ? 1 : negativeRatio / positiveRatio;
+			positiveRatio = isPositiveRatioZero ? 0 : 1;
+		}
+
+		// Handle edge case where both are equal (e.g., all zeros)
+		if (positiveRatio === negativeRatio) {
+			positiveRatio = 1;
+			negativeRatio = 1;
+		}
+
+		return { positiveRatio, negativeRatio, highestSurplus, lowestSurplus };
 	});
 
-	// Calculate zero line position as percentage from top
-	const zeroLinePercent = $derived.by(() => {
-		const [min, max] = yDomain;
-		const range = max - min;
-		if (range === 0) return 50;
-		return ((max - 0) / range) * 100;
-	});
+	// Calculate bar height as percentage within its zone
+	function getBarHeight(surplus: number) {
+		if (surplus === 0) return 0;
 
-	// Calculate bar heights as percentages, with minimum height enforcement
-	const barHeights = $derived.by(() => {
-		const [min, max] = yDomain;
-		const range = max - min;
-		if (range === 0) return periods.map(() => ({ height: 0, isPositive: true }));
+		const { highestSurplus, lowestSurplus } = chartRatios;
 
-		return periods.map((p) => {
-			const absValue = Math.abs(p.surplus);
-			const heightPercent = (absValue / range) * 100;
-			return {
-				height: heightPercent,
-				isPositive: p.surplus >= 0
-			};
-		});
-	});
+		if (surplus > 0) {
+			return highestSurplus !== 0 ? (surplus / highestSurplus) * 100 : 0;
+		} else {
+			return lowestSurplus !== 0 ? (Math.abs(surplus) / Math.abs(lowestSurplus)) * 100 : 0;
+		}
+	}
 
 	// Find indices of highest and lowest surplus values
 	const extremeIndices = $derived.by(() => {
@@ -85,7 +102,6 @@
 		return { highestIndex, lowestIndex };
 	});
 
-	// Determine which bars should show their value label
 	function shouldShowLabel(index: number): boolean {
 		if (hoveredIndex === index) return true;
 		if (index === extremeIndices.highestIndex && periods[index].surplus > 0) return true;
@@ -96,22 +112,24 @@
 
 <SectionTitle title="Cashflow" />
 
-<div class="bg-background relative overflow-hidden rounded-md shadow-md">
+<div class="bg-background overflow-hidden rounded-md shadow-md">
 	{#if chartData.length > 0}
 		<Tooltip.Provider>
-			<!-- Grid layout: columns for each period -->
+			<!-- Outer grid: one column per period -->
 			<div class="grid" style="grid-template-columns: repeat({chartData.length}, minmax(0, 1fr));">
 				{#each chartData as period, i (period.id)}
-					{@const barData = barHeights[i]}
-					{@const isPositive = barData.isPositive}
-					{@const heightPercent = barData.height}
 					{@const isHovered = hoveredIndex === i}
 					{@const isDecember = period.month.getMonth() === 11}
 					{@const isLastColumn = i === chartData.length - 1}
+					{@const isPositive = period.surplus > 0}
+					{@const isNegative = period.surplus < 0}
+					{@const barHeight = getBarHeight(period.surplus)}
 					{@const isCurrentPeriod = period.isCurrentPeriod}
+					{@const trend = isPositive ? 'positive' : isNegative ? 'negative' : null}
+
 					<Tooltip.Root delayDuration={50}>
 						<Tooltip.Trigger
-							class="relative flex h-80 flex-col pt-2 sm:pt-8 {!isLastColumn
+							class="flex flex-col pt-2 {!isLastColumn
 								? isDecember
 									? 'border-border border-r border-dashed'
 									: 'border-border border-r'
@@ -119,63 +137,61 @@
 							onmouseenter={() => (hoveredIndex = i)}
 							onmouseleave={() => (hoveredIndex = null)}
 						>
-							<!-- Chart area -->
-							<div class="relative flex-1">
-								<!-- Inner container for bars, inset to leave room for labels -->
-								<div class="absolute inset-x-0 top-0 bottom-0 sm:bottom-8">
-									{#if period.surplus !== 0}
-										{#if isPositive}
-											<div
-												class="absolute right-0 left-0 border-t-3 border-t-[#00a36f] transition-all duration-200 ease-out {isCurrentPeriod
-													? ''
-													: isHovered
-														? 'bg-[#00a36f]'
-														: 'bg-[hsl(166,52%,95%)]'}"
-												style="
-											top: calc({zeroLinePercent}% - max({MIN_BAR_HEIGHT}px, {heightPercent}%));
-											height: max({MIN_BAR_HEIGHT}px, {heightPercent}%);
-											{isCurrentPeriod ? 'background-image: url(/chart-current-background.svg);' : ''}
-										"
-											>
-												<!-- Value label (positive) -->
-												{#if shouldShowLabel(i)}
-													<span
-														class="pointer-events-none absolute right-0 bottom-full left-0 hidden truncate p-2 text-center font-mono text-xs font-medium text-[#00a36f] sm:block"
-													>
-														{formatCurrency(period.surplus)}
-													</span>
-												{/if}
-											</div>
-										{:else}
-											<div
-												class="absolute right-0 left-0 border-b-3 border-b-[#e75258] transition-all duration-200 ease-out {isCurrentPeriod
-													? ''
-													: isHovered
-														? 'bg-[#e75258]'
-														: 'bg-[hsl(346,52%,95%)]'}"
-												style="
-											top: {zeroLinePercent}%;
-											height: max({MIN_BAR_HEIGHT}px, {heightPercent}%);
-											{isCurrentPeriod ? 'background-image: url(/chart-current-background.svg);' : ''}
-										"
-											>
-												<!-- Value label (negative) -->
-												{#if shouldShowLabel(i)}
-													<span
-														class="pointer-events-none absolute top-full right-0 left-0 hidden truncate p-2 text-center font-mono text-xs font-medium text-[#e75258] sm:block"
-													>
-														{formatCurrency(period.surplus)}
-													</span>
-												{/if}
-											</div>
-										{/if}
-									{/if}
-									<!-- Zero line -->
+							<!-- Chart area: match old design height (50vh, min 256px, max 320px, 32px padding) -->
+							<div
+								class="box-border grid h-[50vh] max-h-80 min-h-64 py-7"
+								style="grid-template-rows: {chartRatios.positiveRatio}fr 1px {chartRatios.negativeRatio}fr;"
+							>
+								<!-- Negative trend: placeholder, hr, then bar -->
+								{#if trend === 'negative'}
+									<div></div>
+									<hr class="bg-border m-0 h-px border-none" />
+								{/if}
+
+								<!-- The bar zone (positive or negative) -->
+								{#if trend === 'positive' || trend === 'negative'}
 									<div
-										class="border-border pointer-events-none absolute right-0 left-0 border-t"
-										style="top: {zeroLinePercent}%"
-									></div>
-								</div>
+										class="flex flex-col {trend === 'positive' ? 'text-cash' : 'text-debt'}"
+										style="height: 100%;"
+									>
+										<div
+											class="relative box-content transition-colors duration-200
+												{trend === 'positive' ? 'border-t-cash mt-auto border-t-3' : 'border-b-debt mb-auto border-b-3'}
+												{isCurrentPeriod
+												? ''
+												: isHovered
+													? trend === 'positive'
+														? 'bg-cash'
+														: 'bg-debt'
+													: trend === 'positive'
+														? 'bg-cash/10'
+														: 'bg-debt/10'}"
+											style="height: {barHeight}%; {isCurrentPeriod
+												? 'background-image: url(/chart-current-background.svg);'
+												: ''}"
+										>
+											<!-- Label positioned outside the bar -->
+											<p
+												class="pointer-events-none absolute m-0 hidden w-full overflow-hidden px-1 text-center font-mono text-xs text-ellipsis sm:block
+													{trend === 'positive' ? 'bottom-full pb-3' : 'top-full pt-3'}
+													{shouldShowLabel(i) ? 'opacity-100' : 'opacity-0'}"
+											>
+												{formatCurrency(period.surplus)}
+											</p>
+										</div>
+									</div>
+								{:else}
+									<!-- No trend (zero): placeholder, hr, placeholder -->
+									<div></div>
+									<hr class="bg-border m-0 h-px border-none" />
+									<div></div>
+								{/if}
+
+								<!-- Positive trend: hr, then placeholder -->
+								{#if trend === 'positive'}
+									<hr class="bg-border m-0 h-px border-none" />
+									<div></div>
+								{/if}
 							</div>
 
 							<!-- X-axis label -->
@@ -188,24 +204,21 @@
 								<div class="font-semibold">{period.periodLabel}</div>
 								<div class="flex items-center justify-between gap-4">
 									<span class="flex items-center gap-1.5">
-										<span class="size-2 rounded-full border border-[#00a36f]"></span>
+										<span class="border-cash size-2 rounded-full border"></span>
 										Income
 									</span>
 									<span class="font-mono">{formatCurrency(period.income)}</span>
 								</div>
 								<div class="flex items-center justify-between gap-4">
 									<span class="flex items-center gap-1.5">
-										<span class="size-2 rounded-full border border-[#e75258]"></span>
+										<span class="border-debt size-2 rounded-full border"></span>
 										Expenses
 									</span>
 									<span class="font-mono">{formatCurrency(period.expenses)}</span>
 								</div>
 								<div class="flex items-center justify-between gap-4">
 									<span class="flex items-center gap-1.5">
-										<span
-											class="size-2 rounded-full {period.surplus >= 0
-												? 'bg-[#00a36f]'
-												: 'bg-[#e75258]'}"
+										<span class="size-2 rounded-full {period.surplus >= 0 ? 'bg-cash' : 'bg-debt'}"
 										></span>
 										Surplus
 									</span>
