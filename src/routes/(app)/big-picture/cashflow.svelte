@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { addMonths, format } from 'date-fns';
+
 	import { getCashflowContext } from '$lib/cashflow.svelte';
 	import { formatCurrency } from '$lib/components/currency';
 	import SectionTitle from '$lib/components/section-title.svelte';
@@ -17,9 +19,13 @@
 		periods.map((p) => {
 			const isJanuary = p.month.getMonth() === 0;
 			const month = monthFormatter.format(p.month);
+			const periodFrom = format(p.month, 'yyyy-MM-dd');
+			const periodTo = format(addMonths(p.month, 1), 'yyyy-MM-dd');
+			const periodLabel = encodeURIComponent(p.periodLabel);
 			return {
 				...p,
-				label: isJanuary ? `${month} '${yearFormatter.format(p.month)}` : month
+				label: isJanuary ? `${month} '${yearFormatter.format(p.month)}` : month,
+				transactionsUrl: `/transactions?periodFrom=${periodFrom}&periodTo=${periodTo}&periodLabel=${periodLabel}`
 			};
 		})
 	);
@@ -117,77 +123,83 @@
 					{@const trend = isPositive ? 'positive' : isNegative ? 'negative' : null}
 
 					<Tooltip.Root delayDuration={50}>
-						<Tooltip.Trigger
-							aria-label="{period.periodLabel}: {formatCurrency(period.surplus)}"
-							class="flex flex-col pt-2 {!isLastColumn
-								? isDecember
-									? 'border-border border-r border-dashed'
-									: 'border-border border-r'
-								: ''} {isHovered ? 'bg-muted/50' : ''}"
-							onmouseenter={() => (hoveredIndex = i)}
-							onmouseleave={() => (hoveredIndex = null)}
-						>
-							<!-- Chart area: match old design height (50vh, min 256px, max 320px, 32px padding) -->
-							<div
-								class="box-border grid h-[50vh] max-h-80 min-h-64 py-7"
-								style="grid-template-rows: {chartRatios.positiveRatio}fr 1px {chartRatios.negativeRatio}fr;"
-							>
-								<!-- Negative trend: placeholder, hr, then bar -->
-								{#if trend === 'negative'}
-									<div></div>
-									<hr class="bg-border m-0 h-px border-none" />
-								{/if}
-
-								<!-- The bar zone (positive or negative) -->
-								{#if trend === 'positive' || trend === 'negative'}
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<a
+									{...props}
+									href={period.transactionsUrl}
+									aria-label="{period.periodLabel}: {formatCurrency(period.surplus)}"
+									class="flex flex-col pt-2 {!isLastColumn
+										? isDecember
+											? 'border-border border-r border-dashed'
+											: 'border-border border-r'
+										: ''} {isHovered ? 'bg-muted/50' : ''}"
+									onmouseenter={() => (hoveredIndex = i)}
+									onmouseleave={() => (hoveredIndex = null)}
+								>
+									<!-- Chart area: match old design height (50vh, min 256px, max 320px, 32px padding) -->
 									<div
-										class="flex flex-col {trend === 'positive' ? 'text-cash' : 'text-debt'}"
-										style="height: 100%;"
+										class="box-border grid h-[50vh] max-h-80 min-h-64 py-7"
+										style="grid-template-rows: {chartRatios.positiveRatio}fr 1px {chartRatios.negativeRatio}fr;"
 									>
-										<div
-											class="relative box-content transition-colors duration-200
+										<!-- Negative trend: placeholder, hr, then bar -->
+										{#if trend === 'negative'}
+											<div></div>
+											<hr class="bg-border m-0 h-px border-none" />
+										{/if}
+
+										<!-- The bar zone (positive or negative) -->
+										{#if trend === 'positive' || trend === 'negative'}
+											<div
+												class="flex flex-col {trend === 'positive' ? 'text-cash' : 'text-debt'}"
+												style="height: 100%;"
+											>
+												<div
+													class="relative box-content transition-colors duration-200
 												{trend === 'positive' ? 'border-t-cash mt-auto border-t-3' : 'border-b-debt mb-auto border-b-3'}
 												{isCurrentPeriod
-												? ''
-												: isHovered
-													? trend === 'positive'
-														? 'bg-cash'
-														: 'bg-debt'
-													: trend === 'positive'
-														? 'bg-cash/10'
-														: 'bg-debt/10'}"
-											style="height: {barHeight}%; {isCurrentPeriod
-												? 'background-image: url(/chart-current-background.svg);'
-												: ''}"
-										>
-											<!-- Label positioned outside the bar -->
-											<p
-												class="pointer-events-none absolute m-0 hidden w-full overflow-hidden px-1 text-center font-mono text-xs text-ellipsis sm:block
+														? ''
+														: isHovered
+															? trend === 'positive'
+																? 'bg-cash'
+																: 'bg-debt'
+															: trend === 'positive'
+																? 'bg-cash/10'
+																: 'bg-debt/10'}"
+													style="height: {barHeight}%; {isCurrentPeriod
+														? 'background-image: url(/chart-current-background.svg);'
+														: ''}"
+												>
+													<!-- Label positioned outside the bar -->
+													<p
+														class="pointer-events-none absolute m-0 hidden w-full overflow-hidden px-1 text-center font-mono text-xs text-ellipsis sm:block
 													{trend === 'positive' ? 'bottom-full pb-3' : 'top-full pt-3'}
 													{shouldShowLabel(i) ? 'opacity-100' : 'opacity-0'}"
-											>
-												{formatCurrency(period.surplus)}
-											</p>
-										</div>
+													>
+														{formatCurrency(period.surplus)}
+													</p>
+												</div>
+											</div>
+										{:else}
+											<!-- No trend (zero): placeholder, hr, placeholder -->
+											<div></div>
+											<hr class="bg-border m-0 h-px border-none" />
+											<div></div>
+										{/if}
+
+										<!-- Positive trend: hr, then placeholder -->
+										{#if trend === 'positive'}
+											<hr class="bg-border m-0 h-px border-none" />
+											<div></div>
+										{/if}
 									</div>
-								{:else}
-									<!-- No trend (zero): placeholder, hr, placeholder -->
-									<div></div>
-									<hr class="bg-border m-0 h-px border-none" />
-									<div></div>
-								{/if}
 
-								<!-- Positive trend: hr, then placeholder -->
-								{#if trend === 'positive'}
-									<hr class="bg-border m-0 h-px border-none" />
-									<div></div>
-								{/if}
-							</div>
-
-							<!-- X-axis label -->
-							<div class="text-muted-foreground flex h-8 items-center justify-center text-xs">
-								{period.label}
-							</div>
+									<!-- X-axis label -->
+									<div class="text-muted-foreground flex h-8 items-center justify-center text-xs">
+										{period.label}
+									</div>
+								</a>
+							{/snippet}
 						</Tooltip.Trigger>
 						<Tooltip.Content>
 							<div class="flex flex-col gap-1">

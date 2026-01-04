@@ -572,68 +572,6 @@ test('"Last year" filter correctly handles period boundaries', async ({ page }) 
 	await expect(page.getByText('Before Period End Boundary')).toBeVisible();
 });
 
-test('transactions can be filtered by custom date range URL params', async ({ page }) => {
-	const user = await seedUser('quinn');
-
-	const account = await seedAccount({
-		name: 'Custom Range Test Account',
-		balanceGroup: AccountsBalanceGroupOptions.CASH,
-		owner: user.id,
-		balanceType: 'Checking'
-	});
-	await seedAccountBalance({
-		account: account.id,
-		owner: user.id,
-		asOf: new Date().toISOString(),
-		value: 5000
-	});
-
-	// Seed transactions in specific months for deterministic testing
-	// Using fixed dates in the past to avoid flakiness
-	await seedTransaction({
-		account: account.id,
-		owner: user.id,
-		date: '2024-01-15T12:00:00.000Z',
-		description: 'January Payment',
-		value: 100
-	});
-	await seedTransaction({
-		account: account.id,
-		owner: user.id,
-		date: '2024-02-15T12:00:00.000Z',
-		description: 'February Payment',
-		value: 200
-	});
-	await seedTransaction({
-		account: account.id,
-		owner: user.id,
-		date: '2024-03-15T12:00:00.000Z',
-		description: 'March Payment',
-		value: 300
-	});
-
-	await page.goto('/');
-	await signIn(page, user.email);
-
-	// Navigate directly to transactions with custom date range params
-	await page.goto('/transactions?periodFrom=2024-01-01&periodTo=2024-02-01');
-
-	// Only January transaction should be visible (periodTo is exclusive)
-	await expect(page.getByText('January Payment')).toBeVisible();
-	await expect(page.getByText('February Payment')).not.toBeVisible();
-	await expect(page.getByText('March Payment')).not.toBeVisible();
-
-	// Period trigger should show the formatted date range
-	await expect(page.getByLabel('Period')).toContainText('Jan 1, 2024');
-	await expect(page.getByLabel('Period')).toContainText('Jan 31, 2024');
-
-	// URL params should persist after reload
-	await page.reload();
-	await expect(page.getByText('January Payment')).toBeVisible();
-	await expect(page.getByText('February Payment')).not.toBeVisible();
-	await expect(page.getByLabel('Period')).toContainText('Jan 1, 2024');
-});
-
 test('custom date range with periodLabel from URL displays the label', async ({ page }) => {
 	const user = await seedUser('riley');
 

@@ -54,6 +54,7 @@ class TransactionsContext {
 
 	private _customFromDate: Date | null = $state(null);
 	private _customToDate: Date | null = $state(null);
+	private _customLabel: string | null = $state(null);
 	private _searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 	private _loadingDelayTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -85,9 +86,26 @@ class TransactionsContext {
 		const currentPage = get(page);
 		const params = currentPage.url.searchParams;
 
-		const periodParam = params.get('period');
-		if (periodParam && this.periodOptions.includes(periodParam as PeriodOption)) {
-			this.period = periodParam as PeriodOption;
+		const periodFromParam = params.get('periodFrom');
+		const periodToParam = params.get('periodTo');
+		const periodLabelParam = params.get('periodLabel');
+
+		if (periodFromParam && periodToParam) {
+			const fromDate = this.parseDate(periodFromParam);
+			const toDate = this.parseDate(periodToParam);
+
+			if (fromDate && toDate && fromDate < toDate) {
+				this._customFromDate = fromDate;
+				this._customToDate = toDate;
+				this._customLabel = periodLabelParam;
+			}
+		}
+
+		if (this._customFromDate === null) {
+			const periodParam = params.get('period');
+			if (periodParam && this.periodOptions.includes(periodParam as PeriodOption)) {
+				this.period = periodParam as PeriodOption;
+			}
 		}
 
 		const amountParam = params.get('amount');
@@ -99,6 +117,14 @@ class TransactionsContext {
 		if (searchParam) {
 			this.search = searchParam;
 		}
+	}
+
+	private parseDate(dateString: string): Date | null {
+		const parsed = new UTCDate(dateString);
+		if (isNaN(parsed.getTime())) {
+			return null;
+		}
+		return parsed;
 	}
 
 	private setupUrlSync() {
@@ -395,6 +421,22 @@ class TransactionsContext {
 		return this.filteredRows
 			.filter((row) => !row.excluded)
 			.reduce((sum, row) => sum + row.value, 0);
+	}
+
+	get customFromDate() {
+		return this._customFromDate;
+	}
+
+	get customToDate() {
+		return this._customToDate;
+	}
+
+	get customLabel() {
+		return this._customLabel;
+	}
+
+	get isCustomRange() {
+		return this._customFromDate !== null && this._customToDate !== null;
 	}
 
 	dispose() {

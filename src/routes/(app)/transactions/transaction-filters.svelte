@@ -1,7 +1,9 @@
 <script lang="ts">
+	import { UTCDate } from '@date-fns/utc';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import XIcon from '@lucide/svelte/icons/x';
+	import { format, subDays } from 'date-fns';
 
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
@@ -13,6 +15,12 @@
 	} from '$lib/transactions.svelte';
 
 	const txContext = getTransactionsContext();
+
+	function formatCustomDateRange(from: Date, to: Date, label: string | null): string {
+		if (label) return label;
+		const toInclusive = subDays(to, 1);
+		return `${format(from, 'MMM d, yyyy')} – ${format(toInclusive, 'MMM d, yyyy')}`;
+	}
 
 	function handleSearchInput(e: Event) {
 		const target = e.target as HTMLInputElement;
@@ -89,7 +97,15 @@
 	</div>
 	<Select.Root type="single" bind:value={txContext.period}>
 		<Select.Trigger aria-label={m.transactions_filter_period_label()} class="bg-background sm:w-48">
-			{periodLabel(txContext.period)}
+			{#if txContext.isCustomRange && txContext.customFromDate && txContext.customToDate}
+				{formatCustomDateRange(
+					txContext.customFromDate,
+					txContext.customToDate,
+					txContext.customLabel
+				)}
+			{:else}
+				{periodLabel(txContext.period)}
+			{/if}
 		</Select.Trigger>
 		<Select.Content>
 			{#each txContext.periodOptions as option (option)}
