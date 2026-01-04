@@ -436,6 +436,13 @@ class TransactionsContext {
 		return this._customFromDate !== null && this._customToDate !== null;
 	}
 
+	get customRange(): { from: Date; to: Date; label: string | null } | null {
+		if (this._customFromDate && this._customToDate) {
+			return { from: this._customFromDate, to: this._customToDate, label: this._customLabel };
+		}
+		return null;
+	}
+
 	setCustomRange(from: Date, to: Date) {
 		this._customFromDate = from;
 		this._customToDate = to;

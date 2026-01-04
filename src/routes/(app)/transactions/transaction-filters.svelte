@@ -27,12 +27,12 @@
 	}
 
 	// Derive calendar value from context's custom range (for URL param initialization)
-	// or use local selection state
 	let calendarValue: DateRange | undefined = $derived.by(() => {
-		if (txContext.isCustomRange && txContext.customFromDate && txContext.customToDate) {
-			const toInclusive = subDays(txContext.customToDate, 1);
+		const range = txContext.customRange;
+		if (range) {
+			const toInclusive = subDays(range.to, 1);
 			return {
-				start: dateToCalendarDate(txContext.customFromDate),
+				start: dateToCalendarDate(range.from),
 				end: dateToCalendarDate(toInclusive)
 			};
 		}
@@ -113,12 +113,9 @@
 	}
 
 	function getPeriodTriggerText(): string {
-		if (txContext.isCustomRange && txContext.customFromDate && txContext.customToDate) {
-			return formatCustomDateRange(
-				txContext.customFromDate,
-				txContext.customToDate,
-				txContext.customLabel
-			);
+		const range = txContext.customRange;
+		if (range) {
+			return formatCustomDateRange(range.from, range.to, range.label);
 		}
 		return periodLabel(txContext.period);
 	}
