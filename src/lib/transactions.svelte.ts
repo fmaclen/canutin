@@ -476,7 +476,11 @@ class TransactionsContext {
 		params.delete('periodTo');
 		params.delete('periodLabel');
 		params.set('period', option);
-		params.set('amount', this.kind);
+		if (this.kind === 'all') {
+			params.delete('amount');
+		} else {
+			params.set('amount', this.kind);
+		}
 
 		this.updateUrl(params);
 		this.refreshTransactions();
@@ -487,7 +491,11 @@ class TransactionsContext {
 
 		const currentPage = get(page);
 		const params = new SvelteURLSearchParams(currentPage.url.searchParams);
-		params.set('amount', option);
+		if (option === 'all') {
+			params.delete('amount');
+		} else {
+			params.set('amount', option);
+		}
 
 		this.updateUrl(params);
 		this.refreshTransactions();
