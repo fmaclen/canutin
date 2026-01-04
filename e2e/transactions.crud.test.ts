@@ -318,7 +318,7 @@ test('transactions list updates in real-time when new transaction is added', asy
 	await goToPageViaSidebar(page, 'Transactions');
 
 	await page.getByLabel('Period').click();
-	await page.getByRole('option', { name: 'Last year' }).click();
+	await page.getByRole('button', { name: 'Last year' }).click();
 	await expect(page.getByLabel('Period')).toContainText('Last year');
 
 	await page.getByLabel('Type').click();

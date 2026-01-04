@@ -129,12 +129,12 @@ test('transactions correctly handle UTC dates regardless of local timezone', asy
 	await expect(page.getByText('Late Last Month UTC Transaction')).toHaveCount(1);
 
 	await page.getByLabel('Period').click();
-	await page.getByRole('option', { name: 'This month' }).click();
+	await page.getByRole('button', { name: 'This month' }).click();
 	await expect(page.getByText('Early This Month UTC Transaction')).toHaveCount(1);
 	await expect(page.getByText('Late Last Month UTC Transaction')).toHaveCount(0);
 
 	await page.getByLabel('Period').click();
-	await page.getByRole('option', { name: 'Last month' }).click();
+	await page.getByRole('button', { name: 'Last month' }).click();
 	await expect(page.getByText('Late Last Month UTC Transaction')).toHaveCount(1);
 	await expect(page.getByText('Early This Month UTC Transaction')).toHaveCount(0);
 
