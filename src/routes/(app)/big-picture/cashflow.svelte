@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { format } from 'date-fns';
-
 	import { getCashflowContext } from '$lib/cashflow.svelte';
 	import { formatCurrency } from '$lib/components/currency';
 	import SectionTitle from '$lib/components/section-title.svelte';
@@ -12,12 +10,16 @@
 
 	let hoveredIndex = $state<number | null>(null);
 
+	const monthFormatter = new Intl.DateTimeFormat(undefined, { month: 'short', timeZone: 'UTC' });
+	const yearFormatter = new Intl.DateTimeFormat(undefined, { year: '2-digit', timeZone: 'UTC' });
+
 	const chartData = $derived.by(() =>
 		periods.map((p) => {
 			const isJanuary = p.month.getMonth() === 0;
+			const month = monthFormatter.format(p.month);
 			return {
 				...p,
-				label: isJanuary ? `Jan '${format(p.month, 'yy')}` : format(p.month, 'MMM')
+				label: isJanuary ? `${month} '${yearFormatter.format(p.month)}` : month
 			};
 		})
 	);
