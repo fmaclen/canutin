@@ -2,6 +2,7 @@
 	import type { HTMLAttributes } from 'svelte/elements';
 
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
+	import { m } from '$lib/paraglide/messages.js';
 	import { cn, type WithElementRef } from '$lib/utils.js';
 
 	import { SIDEBAR_WIDTH_MOBILE } from './constants.js';
@@ -26,6 +27,7 @@
 
 {#if collapsible === 'none'}
 	<div
+		aria-label={m.ui_sidebar_label()}
 		class={cn(
 			'bg-sidebar text-sidebar-foreground flex h-full w-(--sidebar-width) flex-col',
 			className
@@ -38,6 +40,7 @@
 {:else if sidebar.isMobile}
 	<Sheet.Root bind:open={() => sidebar.openMobile, (v) => sidebar.setOpenMobile(v)} {...restProps}>
 		<Sheet.Content
+			aria-label={m.ui_sidebar_label()}
 			data-sidebar="sidebar"
 			data-slot="sidebar"
 			data-mobile="true"
@@ -46,8 +49,8 @@
 			{side}
 		>
 			<Sheet.Header class="sr-only">
-				<Sheet.Title>Sidebar</Sheet.Title>
-				<Sheet.Description>Displays the mobile sidebar.</Sheet.Description>
+				<Sheet.Title>{m.ui_sidebar_label()}</Sheet.Title>
+				<Sheet.Description>{m.ui_sidebar_description()}</Sheet.Description>
 			</Sheet.Header>
 			<div class="flex h-full w-full flex-col">
 				{@render children?.()}
@@ -56,6 +59,7 @@
 	</Sheet.Root>
 {:else}
 	<div
+		aria-label={m.ui_sidebar_label()}
 		bind:this={ref}
 		class="group peer text-sidebar-foreground hidden md:block"
 		data-state={sidebar.state}

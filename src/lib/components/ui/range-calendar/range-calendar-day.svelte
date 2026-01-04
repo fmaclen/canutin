@@ -16,13 +16,13 @@
 	class={cn(
 		buttonVariants({ variant: 'ghost' }),
 		'flex size-(--cell-size) flex-col items-center justify-center gap-1 p-0 leading-none font-normal whitespace-nowrap select-none',
-		'[&[data-today]:not([data-selected])]:bg-accent [&[data-today]:not([data-selected])]:text-accent-foreground [&[data-today][data-disabled]]:text-muted-foreground data-[range-middle]:rounded-none',
+		'data-[today]:border-ring data-[range-middle]:rounded-none data-[today]:border',
 		// range Start
 		'data-[range-start]:bg-primary data-[range-start]:text-primary-foreground dark:data-[range-start]:hover:bg-accent',
 		// range End
 		'data-[range-end]:bg-primary data-[range-end]:text-primary-foreground dark:data-[range-end]:hover:bg-accent',
 		// Outside months
-		'[&[data-outside-month]:not([data-selected])]:text-muted-foreground [&[data-outside-month]:not([data-selected])]:hover:text-accent-foreground',
+		'data-[outside-month]:invisible',
 		// Disabled
 		'data-[disabled]:text-muted-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
 		// Unavailable

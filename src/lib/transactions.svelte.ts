@@ -4,6 +4,7 @@ import { getContext, setContext } from 'svelte';
 import { SvelteMap, SvelteURLSearchParams } from 'svelte/reactivity';
 import { get } from 'svelte/store';
 
+import { replaceState } from '$app/navigation';
 import { page } from '$app/stores';
 
 import { getAccountsContext } from './accounts.svelte';
@@ -54,8 +55,12 @@ class TransactionsContext {
 
 	private _customFromDate: Date | null = $state(null);
 	private _customToDate: Date | null = $state(null);
+	private _customLabel: string | null = $state(null);
 	private _searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 	private _loadingDelayTimer: ReturnType<typeof setTimeout> | null = null;
+
+	private static readonly LOADING_DELAY_MS = 150;
+	private static readonly SEARCH_DEBOUNCE_MS = 300;
 
 	readonly periodOptions: PeriodOption[] = [
 		'this-month',
@@ -72,22 +77,55 @@ class TransactionsContext {
 
 	private _pb: PocketBaseContext;
 	private _accountsContext: ReturnType<typeof getAccountsContext>;
+	private _lastSyncedSearch: string | null = null;
 
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
 		this._accountsContext = getAccountsContext();
-		this.initFromUrlParams();
+		this.syncFromUrl(false);
 		this.init();
-		this.setupUrlSync();
 	}
 
-	private initFromUrlParams() {
+	syncFromUrl(shouldRefresh = true) {
 		const currentPage = get(page);
+		const currentSearch = currentPage.url.search;
+
+		// Skip if URL hasn't changed since last sync
+		if (currentSearch === this._lastSyncedSearch) {
+			return;
+		}
+		this._lastSyncedSearch = currentSearch;
+
 		const params = currentPage.url.searchParams;
 
-		const periodParam = params.get('period');
-		if (periodParam && this.periodOptions.includes(periodParam as PeriodOption)) {
-			this.period = periodParam as PeriodOption;
+		// Reset to defaults first
+		this._customFromDate = null;
+		this._customToDate = null;
+		this._customLabel = null;
+		this.period = 'last-3-months';
+		this.kind = 'all';
+		this.search = '';
+
+		const periodFromParam = params.get('periodFrom');
+		const periodToParam = params.get('periodTo');
+		const periodLabelParam = params.get('periodLabel');
+
+		if (periodFromParam && periodToParam) {
+			const fromDate = this.parseDate(periodFromParam);
+			const toDate = this.parseDate(periodToParam);
+
+			if (fromDate && toDate && fromDate < toDate) {
+				this._customFromDate = fromDate;
+				this._customToDate = toDate;
+				this._customLabel = periodLabelParam;
+			}
+		}
+
+		if (this._customFromDate === null) {
+			const periodParam = params.get('period');
+			if (periodParam && this.periodOptions.includes(periodParam as PeriodOption)) {
+				this.period = periodParam as PeriodOption;
+			}
 		}
 
 		const amountParam = params.get('amount');
@@ -99,41 +137,34 @@ class TransactionsContext {
 		if (searchParam) {
 			this.search = searchParam;
 		}
+
+		if (shouldRefresh) {
+			this.refreshTransactions();
+		}
 	}
 
-	private setupUrlSync() {
-		let isFirstRun = true;
+	private parseDate(dateString: string): Date | null {
+		const parsed = new UTCDate(dateString);
+		if (isNaN(parsed.getTime())) {
+			return null;
+		}
+		return parsed;
+	}
 
-		$effect(() => {
-			const currentPeriod = this.period;
-			const currentKind = this.kind;
+	private updateUrl(params: SvelteURLSearchParams) {
+		const currentPage = get(page);
+		const search = params.toString();
+		// Using URL to build the new href (not reactive, just for string building)
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const newUrl = new URL(currentPage.url.href);
+		newUrl.search = search;
 
-			if (isFirstRun) {
-				isFirstRun = false;
-				return;
-			}
-
-			void currentPeriod;
-			void currentKind;
-
-			this._customFromDate = null;
-			this._customToDate = null;
-
-			const currentPage = get(page);
-			const params = new SvelteURLSearchParams(currentPage.url.searchParams);
-
-			params.set('period', this.period);
-			params.set('amount', this.kind);
-
-			const search = params.toString();
-			const newUrl = `${currentPage.url.pathname}${search ? `?${search}` : ''}`;
-
-			if (newUrl !== `${currentPage.url.pathname}${currentPage.url.search}`) {
-				history.replaceState(history.state, '', newUrl);
-			}
-
-			this.refreshTransactions();
-		});
+		if (newUrl.href !== currentPage.url.href) {
+			// Track this so afterNavigate doesn't trigger a re-sync
+			this._lastSyncedSearch = newUrl.search;
+			// eslint-disable-next-line svelte/no-navigation-without-resolve
+			replaceState(newUrl.href, {});
+		}
 	}
 
 	private async init() {
@@ -153,7 +184,7 @@ class TransactionsContext {
 
 		this._searchDebounceTimer = setTimeout(() => {
 			this.refreshTransactions();
-		}, 300);
+		}, TransactionsContext.SEARCH_DEBOUNCE_MS);
 	}
 
 	private syncSearchToUrl() {
@@ -166,12 +197,7 @@ class TransactionsContext {
 			params.delete('q');
 		}
 
-		const searchStr = params.toString();
-		const newUrl = `${currentPage.url.pathname}${searchStr ? `?${searchStr}` : ''}`;
-
-		if (newUrl !== `${currentPage.url.pathname}${currentPage.url.search}`) {
-			history.replaceState(history.state, '', newUrl);
-		}
+		this.updateUrl(params);
 	}
 
 	async refreshTransactions() {
@@ -182,7 +208,7 @@ class TransactionsContext {
 
 		this._loadingDelayTimer = setTimeout(() => {
 			this.isLoading = true;
-		}, 150);
+		}, TransactionsContext.LOADING_DELAY_MS);
 
 		try {
 			const filterParts: string[] = [];
@@ -395,6 +421,84 @@ class TransactionsContext {
 		return this.filteredRows
 			.filter((row) => !row.excluded)
 			.reduce((sum, row) => sum + row.value, 0);
+	}
+
+	get customFromDate() {
+		return this._customFromDate;
+	}
+
+	get customToDate() {
+		return this._customToDate;
+	}
+
+	get customLabel() {
+		return this._customLabel;
+	}
+
+	get isCustomRange() {
+		return this._customFromDate !== null && this._customToDate !== null;
+	}
+
+	get customRange(): { from: Date; to: Date; label: string | null } | null {
+		if (this._customFromDate && this._customToDate) {
+			return { from: this._customFromDate, to: this._customToDate, label: this._customLabel };
+		}
+		return null;
+	}
+
+	setCustomRange(from: Date, to: Date) {
+		this._customFromDate = from;
+		this._customToDate = to;
+		this._customLabel = null;
+
+		const currentPage = get(page);
+		const params = new SvelteURLSearchParams(currentPage.url.searchParams);
+
+		params.delete('period');
+		params.set('periodFrom', toPocketBaseDateString(from).split(' ')[0]);
+		params.set('periodTo', toPocketBaseDateString(to).split(' ')[0]);
+		params.delete('periodLabel');
+
+		this.updateUrl(params);
+		this.refreshTransactions();
+	}
+
+	setPresetPeriod(option: PeriodOption) {
+		this._customFromDate = null;
+		this._customToDate = null;
+		this._customLabel = null;
+		this.period = option;
+
+		const currentPage = get(page);
+		const params = new SvelteURLSearchParams(currentPage.url.searchParams);
+
+		params.delete('periodFrom');
+		params.delete('periodTo');
+		params.delete('periodLabel');
+		params.set('period', option);
+		if (this.kind === 'all') {
+			params.delete('amount');
+		} else {
+			params.set('amount', this.kind);
+		}
+
+		this.updateUrl(params);
+		this.refreshTransactions();
+	}
+
+	setKind(option: KindFilter) {
+		this.kind = option;
+
+		const currentPage = get(page);
+		const params = new SvelteURLSearchParams(currentPage.url.searchParams);
+		if (option === 'all') {
+			params.delete('amount');
+		} else {
+			params.set('amount', option);
+		}
+
+		this.updateUrl(params);
+		this.refreshTransactions();
 	}
 
 	dispose() {

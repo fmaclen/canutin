@@ -163,6 +163,7 @@ This project uses Svelte 5's runes syntax exclusively. See [Svelte 5 Migration G
 - **Avoid explicit return types** - Let TypeScript infer return types (better for refactoring)
 - **Explicit parameter and export types required**
 - **Never disable linter rules** - Fix the underlying issue instead of suppressing warnings
+  - Exception: `svelte/no-navigation-without-resolve` can be disabled for dynamic links/hrefs that are computed at runtime, as this rule is incompatible with that pattern
 - **Resolve type errors properly** - Don't use `@ts-ignore` or `@ts-expect-error`
 - **Use proper type narrowing** - Use type guards instead of type assertions when possible
 - Context stores use class-based patterns with private methods/properties

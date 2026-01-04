@@ -210,6 +210,8 @@
 	"transactions_amount_tooltip_excluded": "Excluded transactions do not affect reports",
 	"transactions_error_loading": "Failed to load transactions",
 	"auth_signup_success": "Your account has been created, you can now log in",
+	"ui_sidebar_label": "Sidebar",
+	"ui_sidebar_description": "Displays the mobile sidebar",
 	"ui_toggle_sidebar": "Toggle Sidebar",
 	"ui_close": "Close",
 	"user_settings": "Settings",

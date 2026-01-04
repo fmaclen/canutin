@@ -210,6 +210,8 @@
 	"transactions_amount_tooltip_excluded": "Las transacciones excluidas no afectan los reportes",
 	"transactions_error_loading": "No se pudieron cargar las transacciones",
 	"auth_signup_success": "Tu cuenta ha sido creada, ahora puedes iniciar sesión",
+	"ui_sidebar_label": "Barra lateral",
+	"ui_sidebar_description": "Muestra la barra lateral móvil",
 	"ui_toggle_sidebar": "Alternar barra lateral",
 	"ui_close": "Cerrar",
 	"user_settings": "Configuración",

@@ -14,6 +14,8 @@
 	bind:ref
 	class={cn(
 		'dark:[&:has([data-range-end])]:hover:bg-accent [&:has([data-range-middle])]:bg-accent dark:[&:has([data-range-middle])]:hover:bg-accent/50 dark:[&:has([data-range-start])]:hover:bg-accent [&:has([data-selected])]:bg-accent relative size-(--cell-size) p-0 text-center text-sm focus-within:z-20 data-[range-middle]:rounded-r-md [&:first-child[data-selected]_[data-bits-day]]:rounded-l-md [&:has([data-range-end])]:rounded-r-md [&:has([data-range-middle])]:rounded-none first:[&:has([data-range-middle])]:rounded-l-md last:[&:has([data-range-middle])]:rounded-r-md [&:has([data-range-start])]:rounded-l-md [&:last-child[data-selected]_[data-bits-day]]:rounded-r-md',
+		// Hide outside month cells
+		'data-[outside-month]:!bg-transparent',
 		className
 	)}
 	{...restProps}

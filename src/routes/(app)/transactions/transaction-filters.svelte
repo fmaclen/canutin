@@ -1,9 +1,15 @@
 <script lang="ts">
+	import { CalendarDate, type DateValue } from '@internationalized/date';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import XIcon from '@lucide/svelte/icons/x';
+	import type { DateRange } from 'bits-ui';
+	import { addDays, format, subDays } from 'date-fns';
 
+	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import * as Popover from '$lib/components/ui/popover/index.js';
+	import { RangeCalendar } from '$lib/components/ui/range-calendar/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import {
@@ -13,6 +19,31 @@
 	} from '$lib/transactions.svelte';
 
 	const txContext = getTransactionsContext();
+
+	let periodPopoverOpen = $state(false);
+
+	function dateToCalendarDate(date: Date): CalendarDate {
+		return new CalendarDate(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+	}
+
+	// Derive calendar value from context's custom range (for URL param initialization)
+	let calendarValue: DateRange | undefined = $derived.by(() => {
+		const range = txContext.customRange;
+		if (range) {
+			const toInclusive = subDays(range.to, 1);
+			return {
+				start: dateToCalendarDate(range.from),
+				end: dateToCalendarDate(toInclusive)
+			};
+		}
+		return undefined;
+	});
+
+	function formatCustomDateRange(from: Date, to: Date, label: string | null): string {
+		if (label) return label;
+		const toInclusive = subDays(to, 1);
+		return `${format(from, 'MMM d, yyyy')} – ${format(toInclusive, 'MMM d, yyyy')}`;
+	}
 
 	function handleSearchInput(e: Event) {
 		const target = e.target as HTMLInputElement;
@@ -58,6 +89,36 @@
 				return m.transactions_filter_kind_any_amounts();
 		}
 	}
+
+	function handlePresetClick(option: PeriodOption) {
+		txContext.setPresetPeriod(option);
+		periodPopoverOpen = false;
+	}
+
+	function isPresetSelected(option: PeriodOption): boolean {
+		return !txContext.isCustomRange && txContext.period === option;
+	}
+
+	function dateValueToDate(dateValue: DateValue): Date {
+		return new Date(dateValue.year, dateValue.month - 1, dateValue.day);
+	}
+
+	function handleCalendarChange(value: DateRange | undefined) {
+		if (value?.start && value?.end) {
+			const fromDate = dateValueToDate(value.start);
+			const toDate = addDays(dateValueToDate(value.end), 1);
+			txContext.setCustomRange(fromDate, toDate);
+			periodPopoverOpen = false;
+		}
+	}
+
+	function getPeriodTriggerText(): string {
+		const range = txContext.customRange;
+		if (range) {
+			return formatCustomDateRange(range.from, range.to, range.label);
+		}
+		return periodLabel(txContext.period);
+	}
 </script>
 
 <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -87,17 +148,44 @@
 			</button>
 		{/if}
 	</div>
-	<Select.Root type="single" bind:value={txContext.period}>
-		<Select.Trigger aria-label={m.transactions_filter_period_label()} class="bg-background sm:w-48">
-			{periodLabel(txContext.period)}
-		</Select.Trigger>
-		<Select.Content>
-			{#each txContext.periodOptions as option (option)}
-				<Select.Item value={option}>{periodLabel(option)}</Select.Item>
-			{/each}
-		</Select.Content>
-	</Select.Root>
-	<Select.Root type="single" bind:value={txContext.kind}>
+	<Popover.Root bind:open={periodPopoverOpen}>
+		<Popover.SelectTrigger
+			aria-label={m.transactions_filter_period_label()}
+			class="bg-background w-full sm:w-48"
+		>
+			<span class="truncate">{getPeriodTriggerText()}</span>
+		</Popover.SelectTrigger>
+		<Popover.Content class="w-auto p-0" align="start" collisionPadding={16}>
+			<div class="flex">
+				<div class="flex flex-col border-r p-2">
+					{#each txContext.periodOptions as option (option)}
+						<Button
+							variant="ghost"
+							class="data-[selected]:bg-accent data-[selected]:text-accent-foreground justify-start font-normal"
+							data-selected={isPresetSelected(option) ? '' : undefined}
+							onclick={() => handlePresetClick(option)}
+						>
+							{periodLabel(option)}
+						</Button>
+					{/each}
+				</div>
+				<div class="p-2">
+					<RangeCalendar
+						value={calendarValue}
+						onValueChange={handleCalendarChange}
+						numberOfMonths={2}
+						placeholder={calendarValue?.start}
+						disableDaysOutsideMonth
+					/>
+				</div>
+			</div>
+		</Popover.Content>
+	</Popover.Root>
+	<Select.Root
+		type="single"
+		value={txContext.kind}
+		onValueChange={(v) => txContext.setKind(v as KindFilter)}
+	>
 		<Select.Trigger aria-label={m.transactions_filter_kind_label()} class="bg-background sm:w-48">
 			{kindLabel(txContext.kind)}
 		</Select.Trigger>

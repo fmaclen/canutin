@@ -1,6 +1,6 @@
 import { UTCDate } from '@date-fns/utc';
 import { expect, test, type Page } from '@playwright/test';
-import { addMonths, startOfMonth, startOfYear, subYears } from 'date-fns';
+import { addMonths, format, startOfMonth, startOfYear, subYears } from 'date-fns';
 
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
@@ -100,8 +100,15 @@ test('transactions table responds to period and type filters', async ({ page }) 
 
 	for (const { label, value } of periodFilters) {
 		await page.getByLabel('Period').click();
-		await page.getByRole('option', { name: label }).click();
+		await page.getByRole('button', { name: label }).click();
 		await expect(page.getByLabel('Period')).toContainText(label);
+
+		// After selecting, re-open popover and verify the selected preset is highlighted
+		await page.getByLabel('Period').click();
+		const selectedPresetButton = page.getByRole('button', { name: label, exact: true });
+		await expect(selectedPresetButton).toHaveAttribute('data-selected');
+		await page.keyboard.press('Escape');
+
 		for (const txn of transactions) {
 			const shouldBeVisible = isWithinPeriod(txn.date, value, now);
 			await expectRowVisibility(page, txn.description, shouldBeVisible);
@@ -117,6 +124,19 @@ test('transactions table responds to period and type filters', async ({ page }) 
 			await expectRowVisibility(page, txn.description, shouldBeVisible);
 		}
 	}
+
+	// Test that sidebar navigation resets filter to match URL state
+	// Currently showing "Lifetime" from previous loop iteration
+	await expect(page.getByLabel('Period')).toContainText('Lifetime');
+	await goToPageViaSidebar(page, 'Transactions');
+	// URL has no period param, so filter should reset to default "Last 3 months"
+	await expect(page).not.toHaveURL(/period=/);
+	await expect(page.getByLabel('Period')).toContainText('Last 3 months');
+
+	// Set period to "Lifetime" so type filter tests can check all transactions
+	await page.getByLabel('Period').click();
+	await page.getByRole('button', { name: 'Lifetime' }).click();
+	await expect(page.getByLabel('Period')).toContainText('Lifetime');
 
 	const typeFilters: Array<{
 		label: string;
@@ -559,7 +579,7 @@ test('"Last year" filter correctly handles period boundaries', async ({ page }) 
 
 	// Apply "Last year" filter
 	await page.getByLabel('Period').click();
-	await page.getByRole('option', { name: 'Last year' }).click();
+	await page.getByRole('button', { name: 'Last year' }).click();
 	await expect(page.getByLabel('Period')).toContainText('Last year');
 
 	// Transactions OUTSIDE the period
@@ -570,4 +590,349 @@ test('"Last year" filter correctly handles period boundaries', async ({ page }) 
 	await expect(page.getByText('At Period Start Boundary')).toBeVisible();
 	await expect(page.getByText('Mid Year Payment')).toBeVisible();
 	await expect(page.getByText('Before Period End Boundary')).toBeVisible();
+});
+
+test('custom date range with periodLabel from URL displays the label and calendar shows selection', async ({
+	page
+}) => {
+	const user = await seedUser('riley');
+
+	const account = await seedAccount({
+		name: 'Period Label Test Account',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 5000
+	});
+
+	// Use dynamic dates relative to now
+	const now = new UTCDate();
+	const thisMonth = startOfMonth(now);
+	const lastMonth = addMonths(thisMonth, -1);
+
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: new UTCDate(
+			lastMonth.getUTCFullYear(),
+			lastMonth.getUTCMonth(),
+			15,
+			12,
+			0,
+			0,
+			0
+		).toISOString(),
+		description: 'Last Month Salary',
+		value: 5000
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: new UTCDate(
+			thisMonth.getUTCFullYear(),
+			thisMonth.getUTCMonth(),
+			15,
+			12,
+			0,
+			0,
+			0
+		).toISOString(),
+		description: 'This Month Salary',
+		value: 5000
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+
+	// Build dynamic URL params for last month
+	const fromDate = `${lastMonth.getUTCFullYear()}-${String(lastMonth.getUTCMonth() + 1).padStart(2, '0')}-01`;
+	const toDate = `${thisMonth.getUTCFullYear()}-${String(thisMonth.getUTCMonth() + 1).padStart(2, '0')}-01`;
+	const monthLabel = lastMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+	// Navigate with periodLabel param (as would be set by cashflow chart link)
+	await page.goto(
+		`/transactions?periodFrom=${fromDate}&periodTo=${toDate}&periodLabel=${encodeURIComponent(monthLabel)}`
+	);
+
+	// Period trigger should show the custom label from URL
+	await expect(page.getByLabel('Period')).toContainText(monthLabel);
+
+	// Only last month's transaction should be visible
+	await expect(page.getByText('Last Month Salary')).toBeVisible();
+	await expect(page.getByText('This Month Salary')).not.toBeVisible();
+
+	// Open the period picker - calendar should show the selected date range
+	await page.getByLabel('Period').click();
+
+	// The selected date range should be visually highlighted on the calendar
+	// Calendar button aria-labels use format "Friday, March 1, 2024"
+	// Day 1 should be the start of selection (has data-selected attribute)
+	// Use .first() because 2-month calendar may show same date in adjacent months
+	const monthName = format(lastMonth, 'MMMM');
+	const day1Button = page.getByRole('button', { name: new RegExp(`${monthName} 1,`) }).first();
+	await expect(day1Button).toBeVisible();
+	await expect(day1Button).toHaveAttribute('data-selected');
+});
+
+test('date range picker allows selecting custom range via calendar', async ({ page }) => {
+	const user = await seedUser('skyler');
+
+	const account = await seedAccount({
+		name: 'Calendar Picker Test Account',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 5000
+	});
+
+	// Seed transactions across several months
+	const now = new UTCDate();
+	const thisMonth = startOfMonth(now);
+	const lastMonth = addMonths(thisMonth, -1);
+	const twoMonthsAgo = addMonths(thisMonth, -2);
+
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: new UTCDate(
+			twoMonthsAgo.getUTCFullYear(),
+			twoMonthsAgo.getUTCMonth(),
+			10,
+			12,
+			0,
+			0,
+			0
+		).toISOString(),
+		description: 'Two Months Ago Payment',
+		value: 100
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: new UTCDate(
+			lastMonth.getUTCFullYear(),
+			lastMonth.getUTCMonth(),
+			15,
+			12,
+			0,
+			0,
+			0
+		).toISOString(),
+		description: 'Last Month Payment',
+		value: 200
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: new UTCDate(
+			thisMonth.getUTCFullYear(),
+			thisMonth.getUTCMonth(),
+			5,
+			12,
+			0,
+			0,
+			0
+		).toISOString(),
+		description: 'This Month Payment',
+		value: 300
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	// Open the period picker popover
+	await page.getByLabel('Period').click();
+
+	// The popover should show both presets and a calendar
+	await expect(page.getByRole('button', { name: 'Last month' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'This month' })).toBeVisible();
+
+	// Navigate to last month to select a date range
+	await page.getByRole('button', { name: 'Previous' }).click();
+
+	// Select a custom date range using the calendar
+	// The calendar shows 2 months side-by-side, use .first() to select from the left month
+	// Click on day 10 of last month (start of range)
+	await page.getByRole('button', { name: /10,/ }).first().click();
+	// Click on day 20 of last month (end of range)
+	await page.getByRole('button', { name: /20,/ }).first().click();
+
+	// URL should be updated with periodFrom and periodTo
+	await expect(page).toHaveURL(/periodFrom=/);
+	await expect(page).toHaveURL(/periodTo=/);
+
+	// Transactions should be filtered to the selected range
+	await expect(page.getByText('Last Month Payment')).toBeVisible();
+	await expect(page.getByText('Two Months Ago Payment')).not.toBeVisible();
+	await expect(page.getByText('This Month Payment')).not.toBeVisible();
+});
+
+test('switching from custom range back to preset clears custom URL params and updates transactions', async ({
+	page
+}) => {
+	const user = await seedUser('jordan');
+
+	const account = await seedAccount({
+		name: 'Preset Switch Test Account',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 5000
+	});
+
+	const now = new UTCDate();
+	const thisMonth = startOfMonth(now);
+	const lastMonth = addMonths(thisMonth, -1);
+	const twoMonthsAgo = addMonths(thisMonth, -2);
+
+	// Transaction this month
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: new UTCDate(
+			thisMonth.getUTCFullYear(),
+			thisMonth.getUTCMonth(),
+			5,
+			12,
+			0,
+			0,
+			0
+		).toISOString(),
+		description: 'This Month Transaction',
+		value: 500
+	});
+
+	// Transaction last month
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: new UTCDate(
+			lastMonth.getUTCFullYear(),
+			lastMonth.getUTCMonth(),
+			15,
+			12,
+			0,
+			0,
+			0
+		).toISOString(),
+		description: 'Last Month Transaction',
+		value: 200
+	});
+
+	// Transaction two months ago
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: new UTCDate(
+			twoMonthsAgo.getUTCFullYear(),
+			twoMonthsAgo.getUTCMonth(),
+			20,
+			12,
+			0,
+			0,
+			0
+		).toISOString(),
+		description: 'Two Months Ago Transaction',
+		value: 300
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+
+	// Start with custom date range in URL (last month only)
+	const fromDate = `${lastMonth.getUTCFullYear()}-${String(lastMonth.getUTCMonth() + 1).padStart(2, '0')}-01`;
+	const toDate = `${thisMonth.getUTCFullYear()}-${String(thisMonth.getUTCMonth() + 1).padStart(2, '0')}-01`;
+	await page.goto(`/transactions?periodFrom=${fromDate}&periodTo=${toDate}`);
+
+	// Only last month's transaction should be visible initially
+	await expect(page.getByText('Last Month Transaction')).toBeVisible();
+	await expect(page.getByText('This Month Transaction')).not.toBeVisible();
+	await expect(page.getByText('Two Months Ago Transaction')).not.toBeVisible();
+
+	// Open period picker and select "Last 3 months" preset
+	await page.getByLabel('Period').click();
+	await page.getByRole('button', { name: 'Last 3 months' }).click();
+
+	// URL should now have period=last-3-months, not periodFrom/periodTo
+	await expect(page).toHaveURL(/period=last-3-months/);
+	await expect(page).not.toHaveURL(/periodFrom=/);
+	await expect(page).not.toHaveURL(/periodTo=/);
+	await expect(page).not.toHaveURL(/periodLabel=/);
+
+	// Period trigger should show preset label
+	await expect(page.getByLabel('Period')).toContainText('Last 3 months');
+
+	// All 3 transactions should now be visible (they're all within last 3 months)
+	await expect(page.getByText('This Month Transaction')).toBeVisible();
+	await expect(page.getByText('Last Month Transaction')).toBeVisible();
+	await expect(page.getByText('Two Months Ago Transaction')).toBeVisible();
+});
+
+test('invalid date range params fall back to default period', async ({ page }) => {
+	const user = await seedUser('alex');
+
+	const account = await seedAccount({
+		name: 'Invalid Params Test Account',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 5000
+	});
+
+	const now = new UTCDate();
+
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Current Transaction',
+		value: 100
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+
+	// Test with invalid date format
+	await page.goto('/transactions?periodFrom=invalid-date&periodTo=2024-01-31');
+
+	// Should fall back to default period (Last 3 months) or show error
+	// The page should not crash and should show the default view
+	await expect(page.getByLabel('Period')).toBeVisible();
+	await expect(page.getByLabel('Period')).toContainText('Last 3 months');
+
+	// Test with end date before start date
+	await page.goto('/transactions?periodFrom=2024-03-01&periodTo=2024-01-01');
+
+	// Should fall back to default or show error message
+	await expect(page.getByLabel('Period')).toBeVisible();
+	// Either shows error message or falls back to default
+	const hasError = await page
+		.getByText(/invalid|error/i)
+		.isVisible()
+		.catch(() => false);
+	if (!hasError) {
+		// If no error shown, should fall back to default
+		await expect(page.getByLabel('Period')).toContainText('Last 3 months');
+	}
 });

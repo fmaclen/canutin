@@ -190,8 +190,8 @@ test.describe('big picture cashflow chart', () => {
 
 			// aria-label format: "{periodLabel}: {surplus}"
 			const ariaLabel = `${periodLabel}: ${surplus}`;
-			await page.getByRole('button', { name: ariaLabel }).hover();
-			await expect(page.getByRole('button', { name: ariaLabel })).toBeVisible();
+			await page.getByRole('link', { name: ariaLabel }).hover();
+			await expect(page.getByRole('link', { name: ariaLabel })).toBeVisible();
 		}
 
 		await expect(page.getByText('$9,999')).not.toBeVisible();
@@ -199,4 +199,99 @@ test.describe('big picture cashflow chart', () => {
 		await expect(page.getByText('$7,777')).not.toBeVisible();
 		await expect(page.getByText('$6,666')).not.toBeVisible();
 	});
+});
+
+test('clicking cashflow chart bar navigates to transactions filtered by that month', async ({
+	page
+}) => {
+	const user = await seedUser('morgan');
+
+	const account = await seedAccount({
+		name: 'Cashflow Link Test Account',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking',
+		autoCalculated: new Date().toISOString()
+	});
+
+	// Seed transactions in a specific month (2 months ago to ensure it's in the chart)
+	const now = new UTCDate();
+	const targetMonth = addMonths(startOfMonth(now), -2);
+	const targetMonthLabel = format(targetMonth, 'MMMM yyyy');
+
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: new UTCDate(
+			targetMonth.getUTCFullYear(),
+			targetMonth.getUTCMonth(),
+			10,
+			12,
+			0,
+			0,
+			0
+		).toISOString(),
+		description: 'Target Month Income',
+		value: 1500
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: new UTCDate(
+			targetMonth.getUTCFullYear(),
+			targetMonth.getUTCMonth(),
+			15,
+			12,
+			0,
+			0,
+			0
+		).toISOString(),
+		description: 'Target Month Expense',
+		value: -500
+	});
+
+	// Seed a transaction in the current month (should NOT be visible after filtering)
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: new UTCDate(now.getUTCFullYear(), now.getUTCMonth(), 5, 12, 0, 0, 0).toISOString(),
+		description: 'Current Month Transaction',
+		value: 200
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+
+	// Click on the target month's bar in the cashflow chart
+	// The bar has aria-label "{periodLabel}: {surplus}" format
+	const expectedSurplus = '$1,000'; // 1500 - 500 = 1000
+	const ariaLabel = `${targetMonthLabel}: ${expectedSurplus}`;
+	await page.getByRole('link', { name: ariaLabel }).click();
+
+	// Should navigate to transactions page with custom date range params
+	await expect(page).toHaveURL(/\/transactions/);
+	await expect(page).toHaveURL(/periodFrom=/);
+	await expect(page).toHaveURL(/periodTo=/);
+
+	// Period filter should show the month label
+	await expect(page.getByLabel('Period')).toContainText(targetMonthLabel);
+
+	// Only transactions from the target month should be visible
+	await expect(page.getByText('Target Month Income')).toBeVisible();
+	await expect(page.getByText('Target Month Expense')).toBeVisible();
+	await expect(page.getByText('Current Month Transaction')).not.toBeVisible();
+
+	// Switch to a preset period - custom URL params should be cleared
+	await page.getByLabel('Period').click();
+	await page.getByRole('button', { name: 'Lifetime' }).click();
+
+	await expect(page).toHaveURL(/period=lifetime/);
+	await expect(page).not.toHaveURL(/periodFrom=/);
+	await expect(page).not.toHaveURL(/periodTo=/);
+	await expect(page).not.toHaveURL(/periodLabel=/);
+
+	// All transactions should now be visible
+	await expect(page.getByText('Target Month Income')).toBeVisible();
+	await expect(page.getByText('Target Month Expense')).toBeVisible();
+	await expect(page.getByText('Current Month Transaction')).toBeVisible();
 });
