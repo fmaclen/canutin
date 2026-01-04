@@ -59,6 +59,9 @@ class TransactionsContext {
 	private _searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 	private _loadingDelayTimer: ReturnType<typeof setTimeout> | null = null;
 
+	private static readonly LOADING_DELAY_MS = 150;
+	private static readonly SEARCH_DEBOUNCE_MS = 300;
+
 	readonly periodOptions: PeriodOption[] = [
 		'this-month',
 		'last-month',
@@ -181,7 +184,7 @@ class TransactionsContext {
 
 		this._searchDebounceTimer = setTimeout(() => {
 			this.refreshTransactions();
-		}, 300);
+		}, TransactionsContext.SEARCH_DEBOUNCE_MS);
 	}
 
 	private syncSearchToUrl() {
@@ -205,7 +208,7 @@ class TransactionsContext {
 
 		this._loadingDelayTimer = setTimeout(() => {
 			this.isLoading = true;
-		}, 150);
+		}, TransactionsContext.LOADING_DELAY_MS);
 
 		try {
 			const filterParts: string[] = [];
