@@ -5,6 +5,7 @@ import { getContext, setContext } from 'svelte';
 
 import type { TransactionsResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
+import { toPocketBaseDateString } from './utils';
 
 type CashflowAverages = { income: number; expenses: number; surplus: number };
 
@@ -72,14 +73,13 @@ class CashflowContext {
 		const startYtd = startOfYear(now);
 
 		// Fetch all needed transactions since the earliest required start (13 months for the chart)
-		// IMPORTANT: PocketBase date filters require space instead of 'T' separator
-		// See: https://github.com/fmaclen/canutin/issues/289
 		const earliest = start13m < startYtd ? start13m : startYtd;
-		const earliestIso = earliest.toISOString().replace('T', ' ');
 
 		const txns = await this._pb.authedClient
 			.collection('transactions')
-			.getFullList<TransactionsResponse>({ filter: `date >= '${earliestIso}'` });
+			.getFullList<TransactionsResponse>({
+				filter: `date >= '${toPocketBaseDateString(earliest)}'`
+			});
 
 		const compute = (from: Date) => {
 			let income = 0;

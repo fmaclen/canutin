@@ -13,6 +13,7 @@ import type {
 	TransactionsResponse
 } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
+import { toPocketBaseDateString } from './utils';
 
 export type PeriodOption =
 	| 'this-month'
@@ -198,10 +199,10 @@ class TransactionsContext {
 			}
 
 			if (from) {
-				filterParts.push(`date >= '${from.toISOString()}'`);
+				filterParts.push(`date >= '${toPocketBaseDateString(from)}'`);
 			}
 			if (to) {
-				filterParts.push(`date < '${to.toISOString()}'`);
+				filterParts.push(`date < '${toPocketBaseDateString(to)}'`);
 			}
 
 			if (this.kind === 'credits') {
