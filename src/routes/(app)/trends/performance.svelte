@@ -308,10 +308,10 @@
 											>
 											<Tooltip.Content sideOffset={6}>
 												<p class="text-sm">
-													{m.trends_performance_tooltip_from()}
-													<Currency value={c.values.net.prev} decimalScale={2} />
-													{m.trends_performance_tooltip_to()}
-													<Currency value={c.values.net.cur} decimalScale={2} />
+													{m.trends_performance_tooltip_range({
+														prev: formatCurrency(c.values.net.prev, 2),
+														cur: formatCurrency(c.values.net.cur, 2)
+													})}
 												</p>
 											</Tooltip.Content>
 										</Tooltip.Root>
@@ -325,7 +325,7 @@
 										>{formatPercent(table.allocation.net)}</Tooltip.Trigger
 									>
 									<Tooltip.Content sideOffset={6}>
-										<p class="font-normal">
+										<p class="text-sm">
 											{formatCurrency(table.current.net, 2)}
 										</p>
 									</Tooltip.Content>
@@ -347,15 +347,11 @@
 												>{formatPercent(c.values.cash.pct)}</Tooltip.Trigger
 											>
 											<Tooltip.Content sideOffset={6}>
-												<p class="font-normal">
-													{m.trends_performance_tooltip_from()}
-													<span class="font-mono tabular-nums">
-														{formatCurrency(c.values.cash.prev, 2)}
-													</span>
-													to
-													<span class="font-mono tabular-nums">
-														{formatCurrency(c.values.cash.cur, 2)}
-													</span>
+												<p class="text-sm">
+													{m.trends_performance_tooltip_range({
+														prev: formatCurrency(c.values.cash.prev, 2),
+														cur: formatCurrency(c.values.cash.cur, 2)
+													})}
 												</p>
 											</Tooltip.Content>
 										</Tooltip.Root>
@@ -369,7 +365,7 @@
 										>{formatPercent(table.allocation.cash)}</Tooltip.Trigger
 									>
 									<Tooltip.Content sideOffset={6}>
-										<p class="font-normal">
+										<p class="text-sm">
 											{formatCurrency(table.current.cash, 2)}
 										</p>
 									</Tooltip.Content>
@@ -391,15 +387,11 @@
 												>{formatPercent(c.values.debt.pct)}</Tooltip.Trigger
 											>
 											<Tooltip.Content sideOffset={6}>
-												<p class="font-normal">
-													{m.trends_performance_tooltip_from()}
-													<span class="font-mono tabular-nums">
-														{formatCurrency(c.values.debt.prev, 2)}
-													</span>
-													to
-													<span class="font-mono tabular-nums">
-														{formatCurrency(c.values.debt.cur, 2)}
-													</span>
+												<p class="text-sm">
+													{m.trends_performance_tooltip_range({
+														prev: formatCurrency(c.values.debt.prev, 2),
+														cur: formatCurrency(c.values.debt.cur, 2)
+													})}
 												</p>
 											</Tooltip.Content>
 										</Tooltip.Root>
@@ -436,15 +428,11 @@
 												>{formatPercent(c.values.investment.pct)}</Tooltip.Trigger
 											>
 											<Tooltip.Content sideOffset={6}>
-												<p class="font-normal">
-													{m.trends_performance_tooltip_from()}
-													<span class="font-mono tabular-nums">
-														{formatCurrency(c.values.investment.prev, 2)}
-													</span>
-													to
-													<span class="font-mono tabular-nums">
-														{formatCurrency(c.values.investment.cur, 2)}
-													</span>
+												<p class="text-sm">
+													{m.trends_performance_tooltip_range({
+														prev: formatCurrency(c.values.investment.prev, 2),
+														cur: formatCurrency(c.values.investment.cur, 2)
+													})}
 												</p>
 											</Tooltip.Content>
 										</Tooltip.Root>
@@ -480,15 +468,11 @@
 												>{formatPercent(c.values.other.pct)}</Tooltip.Trigger
 											>
 											<Tooltip.Content sideOffset={6}>
-												<p class="font-normal">
-													{m.trends_performance_tooltip_from()}
-													<span class="font-mono tabular-nums">
-														{formatCurrency(c.values.other.prev, 2)}
-													</span>
-													to
-													<span class="font-mono tabular-nums">
-														{formatCurrency(c.values.other.cur, 2)}
-													</span>
+												<p class="text-sm">
+													{m.trends_performance_tooltip_range({
+														prev: formatCurrency(c.values.other.prev, 2),
+														cur: formatCurrency(c.values.other.cur, 2)
+													})}
 												</p>
 											</Tooltip.Content>
 										</Tooltip.Root>
