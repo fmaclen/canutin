@@ -21,12 +21,12 @@
 
 <div class="text-background grid gap-2 lg:grid-cols-[1.3fr_1fr_1fr]">
 	<div
-		class="flex flex-col justify-between rounded-sm bg-stone-700 p-5 shadow-md md:row-span-2"
+		class="flex flex-col justify-between rounded-sm bg-stone-700 p-4 shadow-md md:row-span-2"
 		role="region"
 		aria-label="Net worth"
 	>
-		<div class="text-base font-semibold tracking-tight">Net worth</div>
-		<div class="font-mono text-xl">
+		<div class="text-sm leading-none font-semibold tracking-tight">Net worth</div>
+		<div class="translate-y-1.5 text-4xl">
 			<Currency value={totals.netWorth} />
 		</div>
 	</div>

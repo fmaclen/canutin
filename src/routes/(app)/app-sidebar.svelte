@@ -66,7 +66,7 @@
 					{#snippet child({ props })}
 						<a href={resolve('/')} {...props}>
 							<div
-								class="bg-brand text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded"
+								class="bg-brand text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center"
 							>
 								<CanutinIcon class="size-4" />
 							</div>

@@ -3,6 +3,7 @@
 
 	import { getCashflowContext } from '$lib/cashflow.svelte';
 	import { formatCurrency } from '$lib/components/currency';
+	import Currency from '$lib/components/currency.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
@@ -107,7 +108,7 @@
 
 <SectionTitle title={m.cashflow_section_title()} />
 
-<div class="bg-background overflow-hidden rounded-md shadow-md">
+<div class="bg-background overflow-hidden rounded shadow-md">
 	{#if chartData.length > 0}
 		<Tooltip.Provider>
 			<!-- Outer grid: one column per period -->
@@ -173,8 +174,8 @@
 												>
 													<!-- Label positioned outside the bar -->
 													<p
-														class="pointer-events-none absolute m-0 hidden w-full overflow-hidden px-1 text-center font-mono text-xs text-ellipsis sm:block
-													{trend === 'positive' ? 'bottom-full pb-3' : 'top-full pt-3'}
+														class="pointer-events-none absolute m-0 hidden w-full overflow-hidden px-1 text-center font-mono text-ellipsis sm:block
+													{trend === 'positive' ? 'bottom-full pb-2' : 'top-full pt-2'}
 													{shouldShowLabel(i) ? 'opacity-100' : 'opacity-0'}"
 													>
 														{formatCurrency(period.surplus)}
@@ -202,30 +203,41 @@
 								</a>
 							{/snippet}
 						</Tooltip.Trigger>
-						<Tooltip.Content>
-							<div class="flex flex-col gap-1">
-								<div class="font-semibold">{period.periodLabel}</div>
-								<div class="flex items-center justify-between gap-4">
-									<span class="flex items-center gap-1.5">
-										<span class="border-cash size-2 rounded-full border"></span>
-										{m.cashflow_income_label()}
-									</span>
-									<span class="font-mono">{formatCurrency(period.income)}</span>
+						<Tooltip.Content class="grid min-w-[9rem] items-start gap-1.5">
+							<p class="border-border -mx-2.5 border-b px-2.5 pb-1.5 text-sm font-medium">
+								{period.periodLabel}
+							</p>
+							<div class="grid gap-1.5">
+								<div class="flex items-center gap-2">
+									<span class="border-cash size-2.5 shrink-0 rounded-full border-2"></span>
+									<div
+										class="flex flex-1 items-center justify-between gap-4 text-base leading-none"
+									>
+										<span class="text-muted-foreground text-sm">{m.cashflow_income_label()}</span>
+										<Currency value={period.income} />
+									</div>
 								</div>
-								<div class="flex items-center justify-between gap-4">
-									<span class="flex items-center gap-1.5">
-										<span class="border-debt size-2 rounded-full border"></span>
-										{m.cashflow_expenses_label()}
-									</span>
-									<span class="font-mono">{formatCurrency(period.expenses)}</span>
+								<div class="flex items-center gap-2">
+									<span class="border-debt size-2.5 shrink-0 rounded-full border-2"></span>
+									<div
+										class="flex flex-1 items-center justify-between gap-4 text-base leading-none"
+									>
+										<span class="text-muted-foreground text-sm">{m.cashflow_expenses_label()}</span>
+										<Currency value={period.expenses} />
+									</div>
 								</div>
-								<div class="flex items-center justify-between gap-4">
-									<span class="flex items-center gap-1.5">
-										<span class="size-2 rounded-full {period.surplus >= 0 ? 'bg-cash' : 'bg-debt'}"
-										></span>
-										{m.cashflow_surplus_label()}
-									</span>
-									<span class="font-mono">{formatCurrency(period.surplus)}</span>
+								<div class="flex items-center gap-2">
+									<span
+										class="size-2.5 shrink-0 rounded-full {period.surplus >= 0
+											? 'bg-cash'
+											: 'bg-debt'}"
+									></span>
+									<div
+										class="flex flex-1 items-center justify-between gap-4 text-base leading-none"
+									>
+										<span class="text-muted-foreground text-sm">{m.cashflow_surplus_label()}</span>
+										<Currency value={period.surplus} />
+									</div>
 								</div>
 							</div>
 						</Tooltip.Content>

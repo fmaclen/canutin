@@ -137,7 +137,7 @@
 <Page pageTitle={m.transactions_add_page_title()}>
 	<Section>
 		<SectionTitle title={m.transactions_section_details()} />
-		<div class="bg-muted border-border overflow-hidden rounded-md border">
+		<div class="bg-muted border-border overflow-hidden rounded border">
 			<form
 				onsubmit={(e) => {
 					e.preventDefault();
@@ -172,7 +172,7 @@
 							>{m.transactions_label_account()}</Label
 						>
 						<Select.Root type="single" bind:value={accountId}>
-							<Select.Trigger id="account" class="bg-background w-full">
+							<Select.Trigger id="account" class="bg-background w-full pl-3">
 								{#if selectedAccount}
 									<div class="flex items-center gap-2">
 										<div
@@ -232,7 +232,7 @@
 						<div class="space-y-2">
 							<Label
 								for="excluded"
-								class="flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 py-1 font-normal"
+								class="flex h-9 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
 							>
 								<Checkbox id="excluded" bind:checked={excluded} class="bg-background" />
 								<span>{m.transactions_label_excluded_from_totals()}</span>

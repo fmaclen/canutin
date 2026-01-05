@@ -14,10 +14,7 @@
 <td
 	bind:this={ref}
 	data-slot="table-cell"
-	class={cn(
-		'bg-clip-padding px-4 py-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0',
-		className
-	)}
+	class={cn('bg-clip-padding px-4 py-2 align-middle [&:has([role=checkbox])]:pr-0', className)}
 	{...restProps}
 >
 	{@render children?.()}

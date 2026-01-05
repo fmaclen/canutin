@@ -77,7 +77,9 @@
 
 {#snippet TooltipLabel()}
 	{#if formattedLabel}
-		<div class={cn('text-muted-foreground -mx-3 mb-1 border-b px-3 pb-1', labelClassName)}>
+		<div
+			class={cn('border-border -mx-2.5 border-b px-2.5 pb-1.5 text-sm font-medium', labelClassName)}
+		>
 			{#if typeof formattedLabel === 'function'}
 				{@render formattedLabel()}
 			{:else}
@@ -90,7 +92,7 @@
 <TooltipPrimitive.Root variant="none">
 	<div
 		class={cn(
-			'border-border/50 bg-background grid min-w-[9rem] items-start gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs shadow-xl',
+			'bg-background grid min-w-[9rem] items-start gap-1.5 rounded-lg px-2.5 py-1.5 shadow-xl',
 			className
 		)}
 		{...restProps}
@@ -133,7 +135,7 @@
 						{/if}
 						<div
 							class={cn(
-								'flex flex-1 shrink-0 justify-between gap-4 leading-none',
+								'flex flex-1 shrink-0 justify-between gap-4 text-base leading-none',
 								nestLabel ? 'items-end' : 'items-center'
 							)}
 						>
@@ -141,7 +143,7 @@
 								{#if nestLabel}
 									{@render TooltipLabel()}
 								{/if}
-								<span class="text-muted-foreground">
+								<span class="text-muted-foreground text-sm">
 									{itemConfig?.label || item.name}
 								</span>
 							</div>

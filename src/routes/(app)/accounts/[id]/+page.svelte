@@ -269,7 +269,7 @@
 			<Skeleton class="h-24" />
 		{:else}
 			<div
-				class="bg-muted border-border overflow-hidden rounded-md border md:grayscale md:hover:grayscale-0"
+				class="bg-muted border-border overflow-hidden rounded border md:grayscale md:hover:grayscale-0"
 			>
 				<div class="flex items-center justify-between p-4">
 					<div>

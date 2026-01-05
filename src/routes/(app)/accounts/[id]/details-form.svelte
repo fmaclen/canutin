@@ -24,7 +24,7 @@
 	let { formData, onSubmit }: Props = $props();
 </script>
 
-<div class="bg-muted border-border overflow-hidden rounded-md border">
+<div class="bg-muted border-border overflow-hidden rounded border">
 	<form
 		onsubmit={(e) => {
 			e.preventDefault();
@@ -134,14 +134,14 @@
 				<div class="space-y-2">
 					<Label
 						for="excluded"
-						class="flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 py-1 font-normal"
+						class="flex h-9 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
 					>
 						<Checkbox id="excluded" bind:checked={formData.excluded} class="bg-background" />
 						<span>{m.accounts_label_exclude_from_net_worth()}</span>
 					</Label>
 					<Label
 						for="closed"
-						class="flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 py-1 font-normal"
+						class="flex h-9 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
 					>
 						<Checkbox id="closed" bind:checked={formData.closed} class="bg-background" />
 						<span>{m.accounts_label_closed()}</span>

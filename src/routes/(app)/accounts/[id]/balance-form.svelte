@@ -16,7 +16,7 @@
 	let { formData, onSubmit }: Props = $props();
 </script>
 
-<div class="bg-muted border-border overflow-hidden rounded-md border">
+<div class="bg-muted border-border overflow-hidden rounded border">
 	<form
 		onsubmit={(e) => {
 			e.preventDefault();

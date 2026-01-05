@@ -4,13 +4,38 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@font-face {
+	font-family: 'Decima Mono Pro';
+	src:
+		url('$lib/fonts/DecimaMonoPro-Regular.woff2') format('woff2'),
+		url('$lib/fonts/DecimaMonoPro-Regular.woff') format('woff');
+	font-weight: normal;
+	font-style: normal;
+	font-display: swap;
+	size-adjust: 77%;
+}
+
 @theme {
 	--font-inter: 'Inter', ui-sans-serif, system-ui, sans-serif;
-	--font-jetbrains-mono: 'JetBrains Mono', ui-monospace, monospace;
+	--font-mono: 'Decima Mono Pro', ui-monospace, monospace;
+
+	--text-xs: 0.6875rem;
+	--text-sm: 0.8125rem;
+	--text-base: 0.9375rem;
+	--text-lg: 1.0625rem;
+	--text-xl: 1.1875rem;
+	--text-2xl: 1.4375rem;
+	--text-3xl: 1.8125rem;
+	--text-4xl: 2.1875rem;
+	--text-5xl: 2.9375rem;
+	--text-6xl: 3.6875rem;
+	--text-7xl: 4.4375rem;
+	--text-8xl: 5.9375rem;
+	--text-9xl: 7.9375rem;
 }
 
 :root {
-	--brand: oklch(0.627 0.265 251.78);
+	--brand: hsl(212, 97%, 43%);
 	--brand-secondary: hsl(210, 100%, 97%);
 
 	--cash: #00a36f;
@@ -25,7 +50,7 @@
 	--card-foreground: oklch(0.145 0 0);
 	--popover: oklch(1 0 0);
 	--popover-foreground: oklch(0.145 0 0);
-	--primary: oklch(0.205 0 0);
+	--primary: var(--brand);
 	--primary-foreground: oklch(0.985 0 0);
 	--secondary: oklch(0.97 0 0);
 	--secondary-foreground: oklch(0.205 0 0);
@@ -59,8 +84,8 @@
 	--card-foreground: oklch(0.985 0 0);
 	--popover: oklch(0.205 0 0);
 	--popover-foreground: oklch(0.985 0 0);
-	--primary: oklch(0.922 0 0);
-	--primary-foreground: oklch(0.205 0 0);
+	--primary: var(--brand);
+	--primary-foreground: oklch(0.985 0 0);
 	--secondary: oklch(0.269 0 0);
 	--secondary-foreground: oklch(0.985 0 0);
 	--muted: oklch(0.269 0 0);
@@ -143,6 +168,7 @@
 
 @layer utilities {
 	.font-mono {
-		@apply font-jetbrains-mono;
+		font-family: var(--font-mono);
+		line-height: 1em;
 	}
 }
