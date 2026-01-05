@@ -292,7 +292,7 @@
 					</Table.Header>
 					<Table.Body>
 						<Table.Row>
-							<Table.Cell class="font-medium">{rowLabels.net}</Table.Cell>
+							<Table.Cell class="text-sm font-medium">{rowLabels.net}</Table.Cell>
 							{#each table.columns as c (c.key)}
 								<Table.Cell
 									class={'text-right font-mono ' + percentClassName(c.values.net.pct, 'net')}
@@ -336,7 +336,7 @@
 							</Table.Cell>
 						</Table.Row>
 						<Table.Row>
-							<Table.Cell class="font-medium">{rowLabels.cash}</Table.Cell>
+							<Table.Cell class="text-sm font-medium">{rowLabels.cash}</Table.Cell>
 							{#each table.columns as c (c.key)}
 								<Table.Cell
 									class={'text-right font-mono ' + percentClassName(c.values.cash.pct, 'cash')}
@@ -380,7 +380,7 @@
 							</Table.Cell>
 						</Table.Row>
 						<Table.Row>
-							<Table.Cell class="font-medium">{rowLabels.debt}</Table.Cell>
+							<Table.Cell class="text-sm font-medium">{rowLabels.debt}</Table.Cell>
 							{#each table.columns as c (c.key)}
 								<Table.Cell
 									class={'text-right font-mono ' + percentClassName(c.values.debt.pct, 'debt')}
@@ -424,7 +424,7 @@
 							</Table.Cell>
 						</Table.Row>
 						<Table.Row>
-							<Table.Cell class="font-medium">{rowLabels.investment}</Table.Cell>
+							<Table.Cell class="text-sm font-medium">{rowLabels.investment}</Table.Cell>
 							{#each table.columns as c (c.key)}
 								<Table.Cell
 									class={'text-right font-mono ' +
@@ -469,7 +469,7 @@
 							</Table.Cell>
 						</Table.Row>
 						<Table.Row>
-							<Table.Cell class="font-medium">{rowLabels.other}</Table.Cell>
+							<Table.Cell class="text-sm font-medium">{rowLabels.other}</Table.Cell>
 							{#each table.columns as c (c.key)}
 								<Table.Cell
 									class={'text-right font-mono ' + percentClassName(c.values.other.pct, 'other')}

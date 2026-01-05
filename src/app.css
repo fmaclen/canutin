@@ -35,7 +35,7 @@
 }
 
 :root {
-	--brand: oklch(0.627 0.265 251.78);
+	--brand: hsl(212, 97%, 43%);
 	--brand-secondary: hsl(210, 100%, 97%);
 
 	--cash: #00a36f;

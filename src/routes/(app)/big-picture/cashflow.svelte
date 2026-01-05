@@ -3,6 +3,7 @@
 
 	import { getCashflowContext } from '$lib/cashflow.svelte';
 	import { formatCurrency } from '$lib/components/currency';
+	import Currency from '$lib/components/currency.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
@@ -205,27 +206,27 @@
 						<Tooltip.Content>
 							<div class="flex flex-col gap-1">
 								<div class="font-semibold">{period.periodLabel}</div>
-								<div class="flex items-center justify-between gap-4">
-									<span class="flex items-center gap-1.5">
+								<div class="flex items-center justify-between gap-4 text-base">
+									<span class="flex items-center gap-1.5 text-sm">
 										<span class="border-cash size-2 rounded-full border"></span>
 										{m.cashflow_income_label()}
 									</span>
-									<span class="font-mono">{formatCurrency(period.income)}</span>
+									<Currency value={period.income} />
 								</div>
-								<div class="flex items-center justify-between gap-4">
-									<span class="flex items-center gap-1.5">
+								<div class="flex items-center justify-between gap-4 text-base">
+									<span class="flex items-center gap-1.5 text-sm">
 										<span class="border-debt size-2 rounded-full border"></span>
 										{m.cashflow_expenses_label()}
 									</span>
-									<span class="font-mono">{formatCurrency(period.expenses)}</span>
+									<Currency value={period.expenses} />
 								</div>
-								<div class="flex items-center justify-between gap-4">
-									<span class="flex items-center gap-1.5">
+								<div class="flex items-center justify-between gap-4 text-base">
+									<span class="flex items-center gap-1.5 text-sm">
 										<span class="size-2 rounded-full {period.surplus >= 0 ? 'bg-cash' : 'bg-debt'}"
 										></span>
 										{m.cashflow_surplus_label()}
 									</span>
-									<span class="font-mono">{formatCurrency(period.surplus)}</span>
+									<Currency value={period.surplus} />
 								</div>
 							</div>
 						</Tooltip.Content>

@@ -90,7 +90,7 @@
 <TooltipPrimitive.Root variant="none">
 	<div
 		class={cn(
-			'border-border/50 bg-background grid min-w-[9rem] items-start gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs shadow-xl',
+			'border-border/50 bg-background grid min-w-[9rem] items-start gap-1.5 rounded-lg border px-2.5 py-1.5 shadow-xl',
 			className
 		)}
 		{...restProps}
@@ -133,11 +133,11 @@
 						{/if}
 						<div
 							class={cn(
-								'flex flex-1 shrink-0 justify-between gap-4 leading-none',
+								'flex flex-1 shrink-0 justify-between gap-4 text-base leading-none',
 								nestLabel ? 'items-end' : 'items-center'
 							)}
 						>
-							<div class="grid gap-1.5">
+							<div class="grid gap-1.5 text-sm">
 								{#if nestLabel}
 									{@render TooltipLabel()}
 								{/if}

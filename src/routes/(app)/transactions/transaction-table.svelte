@@ -58,7 +58,9 @@
 			<Table.Body>
 				{#each txContext.paginatedRows as row (row.id)}
 					<Table.Row class={row.excluded ? 'bg-muted/30' : ''}>
-						<Table.Cell class="text-muted-foreground font-mono uppercase tabular-nums">
+						<Table.Cell
+							class="text-muted-foreground font-mono whitespace-nowrap uppercase tabular-nums"
+						>
 							{formatDate(row.date)}
 						</Table.Cell>
 						<Table.Cell>
@@ -95,13 +97,13 @@
 							{/if}
 						</Table.Cell>
 						<Table.Cell
-							class={'text-right tabular-nums ' +
+							class={'text-right whitespace-nowrap tabular-nums ' +
 								(row.excluded ? 'text-muted-foreground' : amountClass(row.value))}
 						>
 							{#if row.excluded}
 								<Tooltip.Root>
 									<Tooltip.Trigger
-										class="border-border inline-block border-b border-dashed hover:border-current"
+										class="border-border inline-block border-b border-dashed leading-none hover:border-current"
 									>
 										<Currency value={row.value} decimalScale={2} />
 									</Tooltip.Trigger>
