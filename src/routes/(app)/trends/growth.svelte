@@ -166,13 +166,13 @@
 
 {#if series.length}
 	<div class="bg-background overflow-visible rounded-sm shadow-md">
-		<Chart.Container config={chartConfig} class="h-128 w-full">
+		<Chart.Container config={chartConfig} class="h-96 w-full">
 			<LineChart
 				data={series}
 				x="date"
 				xScale={scaleUtc()}
 				yDomain={yDomain ?? undefined}
-				padding={{ top: 32, right: 0, bottom: 24, left: leftPadding }}
+				padding={{ top: 32, right: 48, bottom: 24, left: leftPadding }}
 				series={[
 					{ key: 'net', label: chartConfig.net.label, color: chartConfig.net.color },
 					{ key: 'cash', label: chartConfig.cash.label, color: chartConfig.cash.color },
@@ -211,5 +211,5 @@
 		</Chart.Container>
 	</div>
 {:else}
-	<Skeleton class="h-128" />
+	<Skeleton class="h-96" />
 {/if}
