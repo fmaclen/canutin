@@ -169,5 +169,6 @@
 @layer utilities {
 	.font-mono {
 		font-family: var(--font-mono);
+		line-height: 1em;
 	}
 }
