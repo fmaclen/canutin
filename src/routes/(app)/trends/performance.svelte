@@ -2,7 +2,6 @@
 	import { endOfDay, startOfYear, subDays, subMonths, subYears } from 'date-fns';
 
 	import { formatCurrency } from '$lib/components/currency';
-	import Currency from '$lib/components/currency.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton/index';
 	import * as Table from '$lib/components/ui/table/index';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
