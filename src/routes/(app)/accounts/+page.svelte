@@ -301,16 +301,16 @@
 														{/if}
 													</div>
 												</Table.Cell>
-												<Table.Cell class="text-right font-mono tabular-nums">
+												<Table.Cell class="text-right tabular-nums">
 													{@const txnCount = transactionsCounts.get(row.id)}
 													{@const hasTxn = transactionsCounts.has(row.id)}
 													{#if hasTxn}
-														<span>{txnCount}</span>
+														<span class="font-mono">{txnCount}</span>
 													{:else}
-														<span class="text-muted-foreground">~</span>
+														<span class="text-muted-foreground font-mono">~</span>
 													{/if}
 												</Table.Cell>
-												<Table.Cell class="text-right text-xs tabular-nums">
+												<Table.Cell class="text-right tabular-nums">
 													{#if row.excluded || row.closed}
 														<Tooltip.Root>
 															<Tooltip.Trigger
@@ -346,7 +346,7 @@
 											<Table.Cell colspan={6} class="text-muted-foreground text-xs font-normal">
 												{m.accounts_aggregate_total_label()}
 											</Table.Cell>
-											<Table.Cell class="text-foreground text-right text-xs tabular-nums">
+											<Table.Cell class="text-foreground text-right tabular-nums">
 												{@const total = totalsByFilter.get(option.key) ?? 0}
 												<Currency
 													value={total}

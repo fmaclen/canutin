@@ -3,7 +3,7 @@
 </script>
 
 <div
-	class="text-muted-foreground flex h-8 w-full items-center font-mono font-normal tracking-widest uppercase"
+	class="text-muted-foreground flex h-7 w-full items-center font-mono font-normal tracking-widest uppercase"
 >
 	{title}
 </div>

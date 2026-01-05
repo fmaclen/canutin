@@ -279,10 +279,10 @@
 														{/if}
 													</div>
 												</Table.Cell>
-												<Table.Cell class="text-muted-foreground text-right text-xs tabular-nums">
+												<Table.Cell class="text-muted-foreground text-right tabular-nums">
 													<Currency value={row.bookValue} decimalScale={2} sentiment="neutral" />
 												</Table.Cell>
-												<Table.Cell class="text-right text-xs tabular-nums">
+												<Table.Cell class="text-right tabular-nums">
 													<Currency
 														value={row.gain}
 														decimalScale={2}
@@ -293,7 +293,7 @@
 																: 'neutral'}
 													/>
 												</Table.Cell>
-												<Table.Cell class="text-right text-xs tabular-nums">
+												<Table.Cell class="text-right tabular-nums">
 													<Number
 														value={`${row.gainPercent > 0 ? '+' : ''}${row.gainPercent.toFixed(1)}%`}
 														sentiment={row.gainPercent > 0
@@ -303,7 +303,7 @@
 																: 'neutral'}
 													/>
 												</Table.Cell>
-												<Table.Cell class="text-right text-xs tabular-nums">
+												<Table.Cell class="text-right tabular-nums">
 													{#if row.excluded || row.sold}
 														<Tooltip.Root>
 															<Tooltip.Trigger
@@ -342,7 +342,7 @@
 											<Table.Cell></Table.Cell>
 											<Table.Cell></Table.Cell>
 											<Table.Cell></Table.Cell>
-											<Table.Cell class="text-foreground text-right text-xs tabular-nums">
+											<Table.Cell class="text-foreground text-right tabular-nums">
 												{@const total = totalsByFilter.get(option.key) ?? 0}
 												<Currency
 													value={total}
