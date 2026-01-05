@@ -172,7 +172,7 @@
 							>{m.transactions_label_account()}</Label
 						>
 						<Select.Root type="single" bind:value={accountId}>
-							<Select.Trigger id="account" class="bg-background w-full">
+							<Select.Trigger id="account" class="bg-background w-full pl-3">
 								{#if selectedAccount}
 									<div class="flex items-center gap-2">
 										<div

@@ -9,7 +9,7 @@
 		children: Snippet;
 	} = $props();
 
-	const gapClass = itemsAlignment === 'items-start' ? 'gap-4' : 'gap-2';
+	const gapClass = itemsAlignment === 'items-start' ? 'gap-4' : 'gap-1.5';
 </script>
 
 <div

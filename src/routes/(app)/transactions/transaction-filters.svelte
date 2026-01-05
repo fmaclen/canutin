@@ -155,7 +155,7 @@
 		>
 			<span class="truncate">{getPeriodTriggerText()}</span>
 		</Popover.SelectTrigger>
-		<Popover.Content class="w-auto p-0" align="start" collisionPadding={16}>
+		<Popover.Content class="w-auto p-0" align="start" collisionPadding={32}>
 			<div class="flex">
 				<div class="flex flex-col border-r p-2">
 					{#each txContext.periodOptions as option (option)}
@@ -186,7 +186,10 @@
 		value={txContext.kind}
 		onValueChange={(v) => txContext.setKind(v as KindFilter)}
 	>
-		<Select.Trigger aria-label={m.transactions_filter_kind_label()} class="bg-background sm:w-48">
+		<Select.Trigger
+			aria-label={m.transactions_filter_kind_label()}
+			class="bg-background w-full sm:w-48"
+		>
 			{kindLabel(txContext.kind)}
 		</Select.Trigger>
 		<Select.Content>
