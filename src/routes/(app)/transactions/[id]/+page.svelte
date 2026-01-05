@@ -213,7 +213,7 @@
 		{#if isLoading || !transaction}
 			<Skeleton class="h-96" />
 		{:else}
-			<div class="bg-muted border-border overflow-hidden rounded-md border">
+			<div class="bg-muted border-border overflow-hidden rounded border">
 				<form
 					onsubmit={(e) => {
 						e.preventDefault();
@@ -308,7 +308,7 @@
 							<div class="space-y-2">
 								<Label
 									for="excluded"
-									class="flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 py-1 font-normal"
+									class="flex h-9 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
 								>
 									<Checkbox id="excluded" bind:checked={formData.excluded} class="bg-background" />
 									<span>{m.transactions_label_excluded_from_totals()}</span>
@@ -333,7 +333,7 @@
 			<Skeleton class="h-24" />
 		{:else}
 			<div
-				class="bg-muted border-border overflow-hidden rounded-md border md:grayscale md:hover:grayscale-0"
+				class="bg-muted border-border overflow-hidden rounded border md:grayscale md:hover:grayscale-0"
 			>
 				<div class="flex items-center justify-between p-4">
 					<div>

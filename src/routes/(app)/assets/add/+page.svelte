@@ -123,7 +123,7 @@
 <Page pageTitle={m.assets_add_page_title()}>
 	<Section>
 		<SectionTitle title={m.assets_section_details()} />
-		<div class="bg-muted border-border overflow-hidden rounded-md border">
+		<div class="bg-muted border-border overflow-hidden rounded border">
 			<form
 				onsubmit={(e) => {
 					e.preventDefault();
@@ -312,14 +312,14 @@
 						<div class="space-y-2">
 							<Label
 								for="excluded"
-								class="flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 py-1 font-normal"
+								class="flex h-9 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
 							>
 								<Checkbox id="excluded" bind:checked={excluded} class="bg-background" />
 								<span>{m.assets_label_exclude_from_net_worth()}</span>
 							</Label>
 							<Label
 								for="sold"
-								class="flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 py-1 font-normal"
+								class="flex h-9 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
 							>
 								<Checkbox id="sold" bind:checked={sold} class="bg-background" />
 								<span>{m.assets_label_sold()}</span>

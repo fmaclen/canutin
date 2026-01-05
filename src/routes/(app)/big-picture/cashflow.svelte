@@ -107,7 +107,7 @@
 
 <SectionTitle title={m.cashflow_section_title()} />
 
-<div class="bg-background overflow-hidden rounded-md shadow-md">
+<div class="bg-background overflow-hidden rounded shadow-md">
 	{#if chartData.length > 0}
 		<Tooltip.Provider>
 			<!-- Outer grid: one column per period -->
