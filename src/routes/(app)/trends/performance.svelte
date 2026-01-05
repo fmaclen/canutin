@@ -2,6 +2,7 @@
 	import { endOfDay, startOfYear, subDays, subMonths, subYears } from 'date-fns';
 
 	import { formatCurrency } from '$lib/components/currency';
+	import Currency from '$lib/components/currency.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton/index';
 	import * as Table from '$lib/components/ui/table/index';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
@@ -306,15 +307,11 @@
 												>{formatPercent(c.values.net.pct)}</Tooltip.Trigger
 											>
 											<Tooltip.Content sideOffset={6}>
-												<p class="font-normal">
+												<p class="text-sm">
 													{m.trends_performance_tooltip_from()}
-													<span class="font-mono tabular-nums">
-														{formatCurrency(c.values.net.prev, 2)}
-													</span>
+													<Currency value={c.values.net.prev} decimalScale={2} />
 													{m.trends_performance_tooltip_to()}
-													<span class="font-mono tabular-nums">
-														{formatCurrency(c.values.net.cur, 2)}
-													</span>
+													<Currency value={c.values.net.cur} decimalScale={2} />
 												</p>
 											</Tooltip.Content>
 										</Tooltip.Root>
