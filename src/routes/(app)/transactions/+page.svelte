@@ -5,6 +5,7 @@
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index';
@@ -60,14 +61,15 @@
 			<TransactionFilters />
 			<TransactionSummary />
 			{#if txContext.selectedCount > 0}
-				<div class="flex items-center gap-2 text-sm">
-					<span class="text-primary font-medium">
-						{txContext.selectedCount === 1
-							? m.transactions_selected_count_one()
-							: m.transactions_selected_count_other({ count: txContext.selectedCount })}
+				<div class="border-border flex items-center justify-between rounded-sm border px-4 py-2.5">
+					<span class="text-sm font-semibold tracking-tight">
+						{m.transactions_batch_page_title()}
 					</span>
-					<span class="text-muted-foreground">&mdash;</span>
-					<Link href="/transactions/batch">{m.transactions_edit_together()}</Link>
+					<Button href="/transactions/batch">
+						{txContext.selectedCount === 1
+							? m.transactions_batch_edit_button_one()
+							: m.transactions_batch_edit_button_other({ count: txContext.selectedCount })}
+					</Button>
 				</div>
 			{/if}
 			{#if txContext.isLoading && txContext.rawTransactions.length === 0}

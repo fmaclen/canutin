@@ -71,10 +71,13 @@
 			</Table.Header>
 			<Table.Body>
 				{#each txContext.paginatedRows as row (row.id)}
-					<Table.Row class={row.excluded ? 'bg-muted/30' : ''}>
+					{@const isSelected = txContext.selectedIds.has(row.id)}
+					<Table.Row
+						class={row.excluded ? 'bg-muted/30' : isSelected ? '[&>td]:bg-brand-secondary' : ''}
+					>
 						<Table.Cell class="w-10 pl-4">
 							<Checkbox
-								checked={txContext.selectedIds.has(row.id)}
+								checked={isSelected}
 								onCheckedChange={() => txContext.toggleSelection(row.id)}
 							/>
 						</Table.Cell>

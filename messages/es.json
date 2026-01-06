@@ -268,6 +268,8 @@
 	"transactions_batch_page_title": "Editor masivo",
 	"transactions_batch_section_title_one": "Actualizar 1 transacción",
 	"transactions_batch_section_title_other": "Actualizar {count} transacciones",
+	"transactions_batch_edit_button_one": "Editar 1 transacción",
+	"transactions_batch_edit_button_other": "Editar {count} transacciones",
 	"transactions_batch_multiple_descriptions": "Múltiples descripciones",
 	"transactions_batch_multiple_labels": "Múltiples etiquetas",
 	"transactions_batch_multiple_dates": "Múltiples fechas",
