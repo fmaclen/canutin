@@ -9,7 +9,6 @@
 	import CurrencyField from '$lib/components/currency-field.svelte';
 	import Fieldset from '$lib/components/fieldset.svelte';
 	import FormFieldRow from '$lib/components/form-field-row.svelte';
-	import Link from '$lib/components/link.svelte';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
@@ -272,93 +271,111 @@
 							<Label for="account" class="justify-start pr-0 md:justify-end"
 								>{m.transactions_label_account()}</Label
 							>
-							<Select.Root type="single" bind:value={formData.accountId} disabled={!editAccount}>
-								<Select.Trigger id="account" class="bg-background w-full pl-3">
-									{#if selectedAccount}
-										<div class="flex items-center gap-2">
-											<div
-												class="size-2 rounded-full {groupMeta[
-													selectedAccount.balanceGroup as AccountsBalanceGroupOptions
-												].color}"
-											></div>
-											{selectedAccount.name}
-										</div>
-									{:else if commonAccountId === null}
-										<span class="text-muted-foreground"
-											>{m.transactions_batch_multiple_accounts()}</span
-										>
-									{:else}
-										<span class="text-muted-foreground"
-											>{m.transactions_account_select_placeholder()}</span
-										>
-									{/if}
-								</Select.Trigger>
-								<Select.Content>
-									{#each balanceGroupOrder as group (group)}
-										{@const accountsInGroup = accountsByGroup.get(group) ?? []}
-										{#if accountsInGroup.length > 0}
-											<Select.Group>
-												<Select.Label>
-													<div class="flex items-center gap-2">
-														<div class="size-2 rounded-full {groupMeta[group].color}"></div>
-														{groupMeta[group].label}
-													</div>
-												</Select.Label>
-												{#each accountsInGroup as account (account.id)}
-													<Select.Item value={account.id}>{account.name}</Select.Item>
-												{/each}
-											</Select.Group>
+							<div class="flex gap-2">
+								<Select.Root type="single" bind:value={formData.accountId} disabled={!editAccount}>
+									<Select.Trigger id="account" class="bg-background w-full pl-3">
+										{#if selectedAccount}
+											<div class="flex items-center gap-2">
+												<div
+													class="size-2 rounded-full {groupMeta[
+														selectedAccount.balanceGroup as AccountsBalanceGroupOptions
+													].color}"
+												></div>
+												{selectedAccount.name}
+											</div>
+										{:else if commonAccountId === null}
+											<span class="text-muted-foreground"
+												>{m.transactions_batch_multiple_accounts()}</span
+											>
+										{:else}
+											<span class="text-muted-foreground"
+												>{m.transactions_account_select_placeholder()}</span
+											>
 										{/if}
-									{/each}
-								</Select.Content>
-							</Select.Root>
-							<Label class="flex cursor-pointer items-center gap-2">
-								<Checkbox
-									bind:checked={editAccount}
-									aria-label={m.transactions_batch_edit_label()}
-								/>
-								<span class="text-sm font-normal">{m.transactions_batch_edit_label()}</span>
-							</Label>
+									</Select.Trigger>
+									<Select.Content>
+										{#each balanceGroupOrder as group (group)}
+											{@const accountsInGroup = accountsByGroup.get(group) ?? []}
+											{#if accountsInGroup.length > 0}
+												<Select.Group>
+													<Select.Label>
+														<div class="flex items-center gap-2">
+															<div class="size-2 rounded-full {groupMeta[group].color}"></div>
+															{groupMeta[group].label}
+														</div>
+													</Select.Label>
+													{#each accountsInGroup as account (account.id)}
+														<Select.Item value={account.id}>{account.name}</Select.Item>
+													{/each}
+												</Select.Group>
+											{/if}
+										{/each}
+									</Select.Content>
+								</Select.Root>
+								<Label
+									class="flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
+								>
+									<Checkbox
+										bind:checked={editAccount}
+										aria-label={m.transactions_batch_edit_label()}
+										class="bg-background"
+									/>
+									<span class="text-sm">{m.transactions_batch_edit_label()}</span>
+								</Label>
+							</div>
 						</FormFieldRow>
 
 						<FormFieldRow>
 							<Label for="description" class="justify-start pr-0 md:justify-end"
 								>{m.transactions_label_description()}</Label
 							>
-							<Input
-								id="description"
-								bind:value={formData.description}
-								disabled={!editDescription}
-								placeholder={commonDescription === null
-									? m.transactions_batch_multiple_descriptions()
-									: undefined}
-							/>
-							<Label class="flex cursor-pointer items-center gap-2">
-								<Checkbox
-									bind:checked={editDescription}
-									aria-label={m.transactions_batch_edit_label()}
+							<div class="flex gap-2">
+								<Input
+									id="description"
+									bind:value={formData.description}
+									disabled={!editDescription}
+									placeholder={commonDescription === null
+										? m.transactions_batch_multiple_descriptions()
+										: undefined}
 								/>
-								<span class="text-sm font-normal">{m.transactions_batch_edit_label()}</span>
-							</Label>
+								<Label
+									class="flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
+								>
+									<Checkbox
+										bind:checked={editDescription}
+										aria-label={m.transactions_batch_edit_label()}
+										class="bg-background"
+									/>
+									<span class="text-sm">{m.transactions_batch_edit_label()}</span>
+								</Label>
+							</div>
 						</FormFieldRow>
 
 						<FormFieldRow>
 							<Label for="date" class="justify-start pr-0 md:justify-end"
 								>{m.transactions_label_date()}</Label
 							>
-							<Input
-								id="date"
-								type="date"
-								bind:value={formData.date}
-								disabled={!editDate}
-								placeholder={commonDate === null
-									? m.transactions_batch_multiple_dates()
-									: undefined}
-							/>
-							<Label class="flex cursor-pointer items-center gap-2">
-								<Checkbox bind:checked={editDate} aria-label={m.transactions_batch_edit_label()} />
-								<span class="text-sm font-normal">{m.transactions_batch_edit_label()}</span>
-							</Label>
+							<div class="flex gap-2">
+								<Input
+									id="date"
+									type="date"
+									bind:value={formData.date}
+									disabled={!editDate}
+									placeholder={commonDate === null
+										? m.transactions_batch_multiple_dates()
+										: undefined}
+								/>
+								<Label
+									class="flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
+								>
+									<Checkbox
+										bind:checked={editDate}
+										aria-label={m.transactions_batch_edit_label()}
+										class="bg-background"
+									/>
+									<span class="text-sm">{m.transactions_batch_edit_label()}</span>
+								</Label>
+							</div>
 						</FormFieldRow>
 
 						<FormFieldRow>
@@ -368,55 +385,65 @@
 								>
 								<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
 							</div>
-							<Input
-								id="labels"
-								bind:value={formData.labelsInput}
-								disabled={!editLabels}
-								placeholder={commonLabels === null
-									? m.transactions_batch_multiple_labels()
-									: m.transactions_labels_placeholder()}
-							/>
-							<Label class="flex cursor-pointer items-center gap-2">
-								<Checkbox
-									bind:checked={editLabels}
-									aria-label={m.transactions_batch_edit_label()}
+							<div class="flex gap-2">
+								<Input
+									id="labels"
+									bind:value={formData.labelsInput}
+									disabled={!editLabels}
+									placeholder={commonLabels === null
+										? m.transactions_batch_multiple_labels()
+										: m.transactions_labels_placeholder()}
 								/>
-								<span class="text-sm font-normal">{m.transactions_batch_edit_label()}</span>
-							</Label>
+								<Label
+									class="flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
+								>
+									<Checkbox
+										bind:checked={editLabels}
+										aria-label={m.transactions_batch_edit_label()}
+										class="bg-background"
+									/>
+									<span class="text-sm">{m.transactions_batch_edit_label()}</span>
+								</Label>
+							</div>
 						</FormFieldRow>
 
 						<FormFieldRow>
 							<Label for="amount" class="justify-start pr-0 md:justify-end"
 								>{m.transactions_label_amount()}</Label
 							>
-							<CurrencyField
-								id="amount"
-								name="amount"
-								bind:value={formData.amount}
-								disabled={!editAmount}
-								placeholder={commonAmount === null
-									? m.transactions_batch_multiple_amounts()
-									: undefined}
-							/>
-							<Label class="flex cursor-pointer items-center gap-2">
-								<Checkbox
-									bind:checked={editAmount}
-									aria-label={m.transactions_batch_edit_label()}
+							<div class="flex gap-2">
+								<CurrencyField
+									id="amount"
+									name="amount"
+									bind:value={formData.amount}
+									disabled={!editAmount}
+									placeholder={commonAmount === null
+										? m.transactions_batch_multiple_amounts()
+										: undefined}
 								/>
-								<span class="text-sm font-normal">{m.transactions_batch_edit_label()}</span>
-							</Label>
+								<Label
+									class="flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
+								>
+									<Checkbox
+										bind:checked={editAmount}
+										aria-label={m.transactions_batch_edit_label()}
+										class="bg-background"
+									/>
+									<span class="text-sm">{m.transactions_batch_edit_label()}</span>
+								</Label>
+							</div>
 						</FormFieldRow>
 					</Fieldset>
 
 					<Fieldset>
-						<FormFieldRow itemsAlignment="items-start">
-							<Label class="justify-start pr-0 md:justify-end md:pt-2.5"
+						<FormFieldRow>
+							<Label class="justify-start pr-0 md:justify-end"
 								>{m.transactions_label_mark_as()}</Label
 							>
-							<div class="space-y-2">
+							<div class="flex gap-2">
 								<Label
 									for="excluded"
-									class="flex h-9 items-center gap-2 rounded border px-3 py-1 font-normal {!editExcluded
+									class="flex h-9 grow items-center gap-2 rounded border px-3 py-1 font-normal {!editExcluded
 										? 'cursor-not-allowed opacity-50'
 										: 'cursor-pointer'}"
 								>
@@ -428,19 +455,24 @@
 									/>
 									<span>{m.transactions_label_excluded_from_totals()}</span>
 								</Label>
+								<Label
+									class="flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
+								>
+									<Checkbox
+										bind:checked={editExcluded}
+										aria-label={m.transactions_batch_edit_label()}
+										class="bg-background"
+									/>
+									<span class="text-sm">{m.transactions_batch_edit_label()}</span>
+								</Label>
 							</div>
-							<Label class="flex cursor-pointer items-center gap-2">
-								<Checkbox
-									bind:checked={editExcluded}
-									aria-label={m.transactions_batch_edit_label()}
-								/>
-								<span class="text-sm font-normal">{m.transactions_batch_edit_label()}</span>
-							</Label>
 						</FormFieldRow>
 					</Fieldset>
 
-					<footer class="border-border bg-border flex items-center justify-end gap-4 border-t p-2">
-						<Link onclick={handleDiscard} class="text-sm">{m.transactions_batch_discard()}</Link>
+					<footer class="border-border bg-border flex items-center justify-end gap-2 border-t p-2">
+						<Button variant="secondary" type="button" onclick={handleDiscard}
+							>{m.transactions_batch_discard()}</Button
+						>
 						<Button type="submit" disabled={!hasAnyEditEnabled}
 							>{m.transactions_batch_apply()}</Button
 						>
