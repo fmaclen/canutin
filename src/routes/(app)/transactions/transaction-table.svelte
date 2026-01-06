@@ -73,7 +73,11 @@
 				{#each txContext.paginatedRows as row (row.id)}
 					{@const isSelected = txContext.selectedIds.has(row.id)}
 					<Table.Row
-						class={row.excluded ? 'bg-muted/30' : isSelected ? '[&>td]:bg-brand-secondary' : ''}
+						class={row.excluded
+							? 'bg-muted/30'
+							: isSelected
+								? '[&>td]:bg-brand-secondary odd:[&>td]:bg-brand-secondary'
+								: ''}
 					>
 						<Table.Cell class="w-10 pl-4">
 							<Checkbox

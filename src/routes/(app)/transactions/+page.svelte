@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { slide } from 'svelte/transition';
+
 	import { afterNavigate } from '$app/navigation';
 	import Link from '$lib/components/link.svelte';
 	import Page from '$lib/components/page.svelte';
@@ -57,15 +59,18 @@
 <Page pageTitle={m.sidebar_transactions()}>
 	<Section>
 		<SectionTitle title={m.transactions_section_title()} />
-		<div class="flex flex-col gap-2">
+		<div class="flex flex-col space-y-2">
 			<TransactionFilters />
 			<TransactionSummary />
 			{#if txContext.selectedCount > 0}
-				<div class="border-border flex items-center justify-between rounded-sm border px-4 py-2.5">
+				<div
+					class="bg-brand-secondary border-border flex h-12 items-center justify-between rounded-sm border pr-2 pl-4"
+					transition:slide={{ duration: 150 }}
+				>
 					<span class="text-sm font-semibold tracking-tight">
 						{m.transactions_batch_page_title()}
 					</span>
-					<Button href="/transactions/batch">
+					<Button href="/transactions/batch" size="sm">
 						{txContext.selectedCount === 1
 							? m.transactions_batch_edit_button_one()
 							: m.transactions_batch_edit_button_other({ count: txContext.selectedCount })}
