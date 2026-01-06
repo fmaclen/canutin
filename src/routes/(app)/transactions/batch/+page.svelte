@@ -108,6 +108,7 @@
 	let editAmount = $state(false);
 	let editExcluded = $state(false);
 	let excludedTouched = $state(false);
+	let isSubmitting = $state(false);
 
 	// Form state - values
 	let formData = $state({
@@ -140,7 +141,10 @@
 
 	async function handleApply() {
 		const currentOwnerId = ownerId;
-		if (!currentOwnerId) return;
+		if (!currentOwnerId || isSubmitting) return;
+
+		isSubmitting = true;
+		const loadingToast = toast.loading(m.transactions_batch_updating());
 
 		try {
 			for (const tx of selectedTransactions) {
@@ -189,6 +193,7 @@
 
 			const count = selectedCount;
 			txContext.clearSelection();
+			toast.dismiss(loadingToast);
 
 			if (count === 1) {
 				toast.success(m.transactions_batch_update_success_one());
@@ -199,11 +204,19 @@
 			goto(resolve('/transactions'));
 		} catch (error) {
 			console.error('Failed to batch update transactions:', error);
+			toast.dismiss(loadingToast);
 			toast.error(m.transactions_edit_failed());
+		} finally {
+			isSubmitting = false;
 		}
 	}
 
 	async function handleDelete() {
+		if (isSubmitting) return;
+
+		isSubmitting = true;
+		const loadingToast = toast.loading(m.transactions_batch_deleting());
+
 		try {
 			for (const tx of selectedTransactions) {
 				await pb.authedClient.collection('transactions').delete(tx.id);
@@ -211,6 +224,7 @@
 
 			const count = selectedCount;
 			txContext.clearSelection();
+			toast.dismiss(loadingToast);
 
 			if (count === 1) {
 				toast.success(m.transactions_batch_delete_success_one());
@@ -221,7 +235,10 @@
 			goto(resolve('/transactions'));
 		} catch (error) {
 			console.error('Failed to batch delete transactions:', error);
+			toast.dismiss(loadingToast);
 			toast.error(m.transactions_delete_failed());
+		} finally {
+			isSubmitting = false;
 		}
 	}
 
@@ -434,10 +451,13 @@
 					</Fieldset>
 
 					<footer class="border-border bg-border flex items-center justify-end gap-2 border-t p-2">
-						<Button variant="secondary" type="button" onclick={handleDiscard}
-							>{m.transactions_batch_discard()}</Button
+						<Button
+							variant="secondary"
+							type="button"
+							onclick={handleDiscard}
+							disabled={isSubmitting}>{m.transactions_batch_discard()}</Button
 						>
-						<Button type="submit" disabled={!hasAnyEditEnabled}
+						<Button type="submit" disabled={!hasAnyEditEnabled || isSubmitting}
 							>{m.transactions_batch_apply()}</Button
 						>
 					</footer>
@@ -460,8 +480,10 @@
 						<p class="text-destructive text-sm">{m.transactions_delete_subtext()}</p>
 					</div>
 					<AlertDialog.Root>
-						<AlertDialog.Trigger>
-							<Button variant="destructive">{m.transactions_delete_button()}</Button>
+						<AlertDialog.Trigger disabled={isSubmitting}>
+							<Button variant="destructive" disabled={isSubmitting}
+								>{m.transactions_delete_button()}</Button
+							>
 						</AlertDialog.Trigger>
 						<AlertDialog.Content>
 							<AlertDialog.Header>
