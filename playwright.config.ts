@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 const isCI = process.env.CI === 'true';
 
-const BASE_URL = 'http://localhost:4173';
+const BASE_URL = 'http://localhost:42069';
 
 export enum Projects {
 	DESKTOP_CHROMIUM = 'desktop',
@@ -19,7 +19,7 @@ export default defineConfig({
 		},
 		{
 			command: 'bun run build && bun run preview',
-			port: 4173,
+			port: 42069,
 			env: {
 				...process.env,
 				PUBLIC_PLAYWRIGHT_TESTING: 'true'

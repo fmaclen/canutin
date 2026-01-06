@@ -9,15 +9,13 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index';
 	import { m } from '$lib/paraglide/messages';
-	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
-	import { setTransactionsContext } from '$lib/transactions.svelte';
+	import { getTransactionsContext } from '$lib/transactions.svelte';
 
 	import TransactionFilters from './transaction-filters.svelte';
 	import TransactionSummary from './transaction-summary.svelte';
 	import TransactionTable from './transaction-table.svelte';
 
-	const pb = getPocketBaseContext();
-	const txContext = setTransactionsContext(pb);
+	const txContext = getTransactionsContext();
 
 	// Sync filters from URL after navigation (e.g., clicking sidebar link)
 	afterNavigate(() => {
@@ -61,6 +59,17 @@
 		<div class="flex flex-col gap-2">
 			<TransactionFilters />
 			<TransactionSummary />
+			{#if txContext.selectedCount > 0}
+				<div class="flex items-center gap-2 text-sm">
+					<span class="text-primary font-medium">
+						{txContext.selectedCount === 1
+							? m.transactions_selected_count_one()
+							: m.transactions_selected_count_other({ count: txContext.selectedCount })}
+					</span>
+					<span class="text-muted-foreground">&mdash;</span>
+					<Link href="/transactions/batch">{m.transactions_edit_together()}</Link>
+				</div>
+			{/if}
 			{#if txContext.isLoading && txContext.rawTransactions.length === 0}
 				<Skeleton class="min-h-32" />
 			{:else}

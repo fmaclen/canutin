@@ -3,6 +3,7 @@
 	import Empty from '$lib/components/empty.svelte';
 	import Link from '$lib/components/link.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
+	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import * as Pagination from '$lib/components/ui/pagination/index';
 	import * as Table from '$lib/components/ui/table/index';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
@@ -38,6 +39,19 @@
 		<Table.Root>
 			<Table.Header>
 				<Table.Row>
+					<Table.Head class="w-10 pl-4">
+						<Checkbox
+							checked={txContext.isAllVisibleSelected}
+							indeterminate={txContext.isIndeterminate}
+							onCheckedChange={() => {
+								if (txContext.isAllVisibleSelected) {
+									txContext.deselectAllVisible();
+								} else {
+									txContext.selectAllVisible();
+								}
+							}}
+						/>
+					</Table.Head>
 					<Table.Head class="text-left whitespace-nowrap">
 						{m.transactions_table_header_date()}
 					</Table.Head>
@@ -58,6 +72,12 @@
 			<Table.Body>
 				{#each txContext.paginatedRows as row (row.id)}
 					<Table.Row class={row.excluded ? 'bg-muted/30' : ''}>
+						<Table.Cell class="w-10 pl-4">
+							<Checkbox
+								checked={txContext.selectedIds.has(row.id)}
+								onCheckedChange={() => txContext.toggleSelection(row.id)}
+							/>
+						</Table.Cell>
 						<Table.Cell
 							class="text-muted-foreground font-mono whitespace-nowrap uppercase tabular-nums"
 						>
@@ -123,7 +143,7 @@
 			{#if txContext.totalPages > 1}
 				<Table.Footer>
 					<Table.Row class="border-t">
-						<Table.Cell colspan={5} class="bg-background px-0 py-3 whitespace-normal">
+						<Table.Cell colspan={6} class="bg-background px-0 py-3 whitespace-normal">
 							<Pagination.Root
 								count={txContext.filteredRows.length}
 								perPage={txContext.pageSize}
