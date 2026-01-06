@@ -147,48 +147,53 @@
 		const loadingToast = toast.loading(m.transactions_batch_updating());
 
 		try {
-			for (const tx of selectedTransactions) {
-				const updates: Record<string, unknown> = {};
+			// Build the updates object once (same for all transactions)
+			const updates: Record<string, unknown> = {};
 
-				if (editAccount && formData.accountId) {
-					updates.account = formData.accountId;
-				}
+			if (editAccount && formData.accountId) {
+				updates.account = formData.accountId;
+			}
 
-				if (editDescription) {
-					updates.description = formData.description.trim() || undefined;
-				}
+			if (editDescription) {
+				updates.description = formData.description.trim() || undefined;
+			}
 
-				if (editDate && formData.date) {
-					updates.date = new Date(formData.date + 'T12:00:00Z').toISOString();
-				}
+			if (editDate && formData.date) {
+				updates.date = new Date(formData.date + 'T12:00:00Z').toISOString();
+			}
 
-				if (editLabels) {
-					const labelIds: string[] = [];
-					if (formData.labelsInput.trim()) {
-						const labelNames = formData.labelsInput
-							.split(',')
-							.map((l) => l.trim())
-							.filter(Boolean);
+			if (editLabels) {
+				// Resolve labels sequentially to avoid creating duplicates
+				const labelIds: string[] = [];
+				if (formData.labelsInput.trim()) {
+					const labelNames = formData.labelsInput
+						.split(',')
+						.map((l) => l.trim())
+						.filter(Boolean);
 
-						for (const labelName of labelNames) {
-							const labelId = await pb.findOrCreateLabel(labelName, currentOwnerId);
-							labelIds.push(labelId);
-						}
+					for (const labelName of labelNames) {
+						const labelId = await pb.findOrCreateLabel(labelName, currentOwnerId);
+						labelIds.push(labelId);
 					}
-					updates.labels = labelIds.length > 0 ? labelIds : [];
 				}
+				updates.labels = labelIds.length > 0 ? labelIds : [];
+			}
 
-				if (editAmount && formData.amount) {
-					updates.value = parseFloat(formData.amount);
-				}
+			if (editAmount && formData.amount) {
+				updates.value = parseFloat(formData.amount);
+			}
 
-				if (editExcluded) {
-					updates.excluded = formData.excluded ? new Date().toISOString() : null;
-				}
+			if (editExcluded) {
+				updates.excluded = formData.excluded ? new Date().toISOString() : null;
+			}
 
-				if (Object.keys(updates).length > 0) {
-					await pb.authedClient.collection('transactions').update(tx.id, updates);
-				}
+			// Update all transactions in parallel
+			if (Object.keys(updates).length > 0) {
+				await Promise.all(
+					selectedTransactions.map((tx) =>
+						pb.authedClient.collection('transactions').update(tx.id, updates)
+					)
+				);
 			}
 
 			const count = selectedCount;
@@ -218,9 +223,9 @@
 		const loadingToast = toast.loading(m.transactions_batch_deleting());
 
 		try {
-			for (const tx of selectedTransactions) {
-				await pb.authedClient.collection('transactions').delete(tx.id);
-			}
+			await Promise.all(
+				selectedTransactions.map((tx) => pb.authedClient.collection('transactions').delete(tx.id))
+			);
 
 			const count = selectedCount;
 			txContext.clearSelection();
