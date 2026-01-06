@@ -550,6 +550,21 @@ class TransactionsContext {
 		this._selectedIds.clear();
 	}
 
+	get filteredCount() {
+		return this.filteredRows.length;
+	}
+
+	get isAllFilteredSelected() {
+		if (this.filteredRows.length === 0) return false;
+		return this.filteredRows.every((row) => this._selectedIds.has(row.id));
+	}
+
+	selectAllFiltered() {
+		for (const row of this.filteredRows) {
+			this._selectedIds.add(row.id);
+		}
+	}
+
 	dispose() {
 		this._pb.authedClient.collection('transactions').unsubscribe();
 	}

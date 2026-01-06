@@ -190,6 +190,71 @@ test('selection persists across pagination', async ({ page }) => {
 	await expect(page.getByRole('link', { name: 'Edit 3 transactions' })).toBeVisible();
 });
 
+test('user can select all results across pages', async ({ page }) => {
+	const user = await seedUser('nadia');
+
+	const checkingAccount = await seedAccount({
+		name: 'Valleyview Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: checkingAccount.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 10000
+	});
+
+	// Seed 60 transactions to get 2 pages (50 per page)
+	const baseDate = new UTCDate();
+	for (let i = 0; i < 60; i++) {
+		await seedTransaction({
+			account: checkingAccount.id,
+			owner: user.id,
+			date: setHours(subDays(baseDate, i), 12).toISOString(),
+			description: `Bulk Transaction ${String(i + 1).padStart(2, '0')}`,
+			value: -(i + 1) * 10
+		});
+	}
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	await page.getByLabel('Period').click();
+	await page.getByRole('button', { name: 'Lifetime' }).click();
+
+	await expect(page.getByRole('row', { name: 'Bulk Transaction 01' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Go to next page' })).toBeVisible();
+
+	// Select all on current page using header checkbox
+	const tableHeader = page.getByRole('rowgroup').first();
+	const headerCheckbox = tableHeader.getByRole('checkbox');
+	await headerCheckbox.check();
+	await expect(page.getByRole('link', { name: 'Edit 50 transactions' })).toBeVisible();
+
+	// "Select all X results" button should appear when there are more results than selected
+	await expect(page.getByRole('button', { name: 'Select all 60 results' })).toBeVisible();
+
+	// Click to select all results across pages
+	await page.getByRole('button', { name: 'Select all 60 results' }).click();
+	await expect(page.getByRole('link', { name: 'Edit 60 transactions' })).toBeVisible();
+
+	// "Select all" button should no longer be visible since all are selected
+	await expect(page.getByRole('button', { name: 'Select all 60 results' })).not.toBeVisible();
+
+	// Navigate to page 2 - all should be selected there too
+	await page.getByRole('button', { name: 'Go to next page' }).click();
+	await expect(page.getByRole('row', { name: 'Bulk Transaction 51' })).toBeVisible();
+
+	const tx51Row = page.getByRole('row', { name: 'Bulk Transaction 51' });
+	const tx60Row = page.getByRole('row', { name: 'Bulk Transaction 60' });
+	await expect(tx51Row.getByRole('checkbox')).toBeChecked();
+	await expect(tx60Row.getByRole('checkbox')).toBeChecked();
+	await expect(page.getByRole('link', { name: 'Edit 60 transactions' })).toBeVisible();
+});
+
 test('batch editor displays mixed values correctly', async ({ page }) => {
 	const user = await seedUser('irene');
 

@@ -70,11 +70,18 @@
 					<span class="text-sm font-semibold tracking-tight">
 						{m.transactions_batch_page_title()}
 					</span>
-					<Button href="/transactions/batch" size="sm">
-						{txContext.selectedCount === 1
-							? m.transactions_batch_edit_button_one()
-							: m.transactions_batch_edit_button_other({ count: txContext.selectedCount })}
-					</Button>
+					<div class="flex gap-2">
+						{#if txContext.totalPages > 1 && !txContext.isAllFilteredSelected}
+							<Button variant="secondary" size="sm" onclick={() => txContext.selectAllFiltered()}>
+								Select all {txContext.filteredCount} results
+							</Button>
+						{/if}
+						<Button href="/transactions/batch" size="sm">
+							{txContext.selectedCount === 1
+								? m.transactions_batch_edit_button_one()
+								: m.transactions_batch_edit_button_other({ count: txContext.selectedCount })}
+						</Button>
+					</div>
 				</div>
 			{/if}
 			{#if txContext.isLoading && txContext.rawTransactions.length === 0}
