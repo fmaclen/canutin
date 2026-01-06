@@ -253,6 +253,22 @@ test('user can select all results across pages', async ({ page }) => {
 	await expect(tx51Row.getByRole('checkbox')).toBeChecked();
 	await expect(tx60Row.getByRole('checkbox')).toBeChecked();
 	await expect(page.getByRole('link', { name: 'Edit 60 transactions' })).toBeVisible();
+
+	// Uncheck the header checkbox to deselect all
+	await tableHeader.getByRole('checkbox').uncheck();
+
+	// All transactions should be deselected, including those on other pages
+	await expect(page.getByRole('link', { name: 'Edit 60 transactions' })).not.toBeVisible();
+	await expect(page.getByText('Batch editor')).not.toBeVisible();
+	await expect(tx51Row.getByRole('checkbox')).not.toBeChecked();
+	await expect(tx60Row.getByRole('checkbox')).not.toBeChecked();
+
+	// Navigate back to page 1 and verify those are also deselected
+	await page.getByRole('button', { name: 'Go to previous page' }).click();
+	await expect(page.getByRole('row', { name: 'Bulk Transaction 01' })).toBeVisible();
+
+	const tx01Row = page.getByRole('row', { name: 'Bulk Transaction 01' });
+	await expect(tx01Row.getByRole('checkbox')).not.toBeChecked();
 });
 
 test('batch editor displays mixed values correctly', async ({ page }) => {

@@ -45,7 +45,11 @@
 							indeterminate={txContext.isIndeterminate}
 							onCheckedChange={() => {
 								if (txContext.isAllVisibleSelected) {
-									txContext.deselectAllVisible();
+									if (txContext.isAllFilteredSelected) {
+										txContext.clearSelection();
+									} else {
+										txContext.deselectAllVisible();
+									}
 								} else {
 									txContext.selectAllVisible();
 								}

@@ -72,7 +72,7 @@
 					</span>
 					<div class="flex gap-2">
 						{#if txContext.totalPages > 1 && !txContext.isAllFilteredSelected}
-							<Button variant="secondary" size="sm" onclick={() => txContext.selectAllFiltered()}>
+							<Button variant="outline" size="sm" onclick={() => txContext.selectAllFiltered()}>
 								Select all {txContext.filteredCount} results
 							</Button>
 						{/if}
