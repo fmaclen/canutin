@@ -14,7 +14,6 @@ const projectRoot = process.cwd();
 const pbDir = path.join(projectRoot, 'pocketbase');
 const migrationsDir = path.join(pbDir, 'pb_migrations');
 const TYPEGEN_OUT = path.join(projectRoot, 'src', 'lib', 'pocketbase.schema.ts');
-const DB_PATH = path.join(pbDir, 'pb_data', 'data.db');
 
 function log(msg: string) {
 	console.log(`[pocketbase] ${msg}`);
@@ -344,37 +343,6 @@ function watchMigrationsAndTypegen(): void {
 	}
 }
 
-function watchDbAndTypegen(): void {
-	if (!existsSync(DB_PATH)) {
-		// DB may not exist on first run; skip quietly
-		return;
-	}
-	log(`Watching database for changes: ${path.relative(projectRoot, DB_PATH)}`);
-	let idleTimer: NodeJS.Timeout | null = null;
-	let lastRun = 0;
-	const minIntervalMs = 10_000; // avoid thrashing on active dev DB
-	const schedule = () => {
-		const now = Date.now();
-		if (now - lastRun < minIntervalMs) return; // too soon since last run
-		if (idleTimer) clearTimeout(idleTimer);
-		idleTimer = setTimeout(async () => {
-			lastRun = Date.now();
-			try {
-				await generateTypesWithRetry(5, 500);
-			} catch (e) {
-				error(`Typegen (db change) failed: ${(e as Error).message}`);
-			}
-		}, 1500);
-	};
-	try {
-		fscore.watch(DB_PATH, { persistent: true }, () => {
-			schedule();
-		});
-	} catch (e) {
-		error(`Failed to watch database file: ${(e as Error).message}`);
-	}
-}
-
 (async () => {
 	try {
 		// Helpful environment note
@@ -392,8 +360,6 @@ function watchDbAndTypegen(): void {
 
 		// Watch migrations to keep types fresh during development
 		watchMigrationsAndTypegen();
-		// Also watch the local database for schema changes made via Admin UI
-		watchDbAndTypegen();
 	} catch (e) {
 		error((e as Error).message);
 		process.exit(1);
