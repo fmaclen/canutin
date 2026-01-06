@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { CurrencyInput, formatValue } from '@canutin/svelte-currency-input';
 
+	import { cn } from '$lib/utils';
+
 	import { intlConfig } from './currency';
 
 	interface Props {
@@ -10,6 +12,7 @@
 		required?: boolean;
 		disabled?: boolean;
 		placeholder?: string;
+		class?: string;
 	}
 
 	let {
@@ -18,7 +21,8 @@
 		value = $bindable(),
 		required = false,
 		disabled = false,
-		placeholder
+		placeholder,
+		class: className
 	}: Props = $props();
 
 	const defaultPlaceholder = formatValue({ value: '0', intlConfig, decimalScale: 2 });
@@ -43,5 +47,5 @@
 	{intlConfig}
 	placeholder={placeholder ?? defaultPlaceholder}
 	decimalScale={2}
-	class="{baseClass} {getValueColor(value)}"
+	class={cn(baseClass, getValueColor(value), className)}
 />

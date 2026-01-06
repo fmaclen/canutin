@@ -6,6 +6,7 @@
 	import { resolve } from '$app/paths';
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAuthContext } from '$lib/auth.svelte';
+	import CheckboxLabel from '$lib/components/checkbox-label.svelte';
 	import CurrencyField from '$lib/components/currency-field.svelte';
 	import Fieldset from '$lib/components/fieldset.svelte';
 	import FormFieldRow from '$lib/components/form-field-row.svelte';
@@ -15,7 +16,6 @@
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
@@ -107,6 +107,7 @@
 	let editLabels = $state(false);
 	let editAmount = $state(false);
 	let editExcluded = $state(false);
+	let excludedTouched = $state(false);
 
 	// Form state - values
 	let formData = $state({
@@ -312,16 +313,10 @@
 										{/each}
 									</Select.Content>
 								</Select.Root>
-								<Label
-									class="flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
-								>
-									<Checkbox
-										bind:checked={editAccount}
-										aria-label={m.transactions_batch_edit_label()}
-										class="bg-background"
-									/>
-									<span class="text-sm">{m.transactions_batch_edit_label()}</span>
-								</Label>
+								<CheckboxLabel
+									bind:checked={editAccount}
+									label={m.transactions_batch_edit_label()}
+								/>
 							</div>
 						</FormFieldRow>
 
@@ -338,16 +333,10 @@
 										? m.transactions_batch_multiple_descriptions()
 										: undefined}
 								/>
-								<Label
-									class="flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
-								>
-									<Checkbox
-										bind:checked={editDescription}
-										aria-label={m.transactions_batch_edit_label()}
-										class="bg-background"
-									/>
-									<span class="text-sm">{m.transactions_batch_edit_label()}</span>
-								</Label>
+								<CheckboxLabel
+									bind:checked={editDescription}
+									label={m.transactions_batch_edit_label()}
+								/>
 							</div>
 						</FormFieldRow>
 
@@ -365,16 +354,7 @@
 										? m.transactions_batch_multiple_dates()
 										: undefined}
 								/>
-								<Label
-									class="flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
-								>
-									<Checkbox
-										bind:checked={editDate}
-										aria-label={m.transactions_batch_edit_label()}
-										class="bg-background"
-									/>
-									<span class="text-sm">{m.transactions_batch_edit_label()}</span>
-								</Label>
+								<CheckboxLabel bind:checked={editDate} label={m.transactions_batch_edit_label()} />
 							</div>
 						</FormFieldRow>
 
@@ -394,16 +374,10 @@
 										? m.transactions_batch_multiple_labels()
 										: m.transactions_labels_placeholder()}
 								/>
-								<Label
-									class="flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
-								>
-									<Checkbox
-										bind:checked={editLabels}
-										aria-label={m.transactions_batch_edit_label()}
-										class="bg-background"
-									/>
-									<span class="text-sm">{m.transactions_batch_edit_label()}</span>
-								</Label>
+								<CheckboxLabel
+									bind:checked={editLabels}
+									label={m.transactions_batch_edit_label()}
+								/>
 							</div>
 						</FormFieldRow>
 
@@ -412,25 +386,24 @@
 								>{m.transactions_label_amount()}</Label
 							>
 							<div class="flex gap-2">
-								<CurrencyField
-									id="amount"
-									name="amount"
-									bind:value={formData.amount}
-									disabled={!editAmount}
-									placeholder={commonAmount === null
-										? m.transactions_batch_multiple_amounts()
-										: undefined}
-								/>
-								<Label
-									class="flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
-								>
-									<Checkbox
-										bind:checked={editAmount}
-										aria-label={m.transactions_batch_edit_label()}
-										class="bg-background"
+								{#if commonAmount === null && !editAmount}
+									<Input
+										id="amount"
+										value={m.transactions_batch_multiple_amounts()}
+										disabled={true}
 									/>
-									<span class="text-sm">{m.transactions_batch_edit_label()}</span>
-								</Label>
+								{:else}
+									<CurrencyField
+										id="amount"
+										name="amount"
+										bind:value={formData.amount}
+										disabled={!editAmount}
+									/>
+								{/if}
+								<CheckboxLabel
+									bind:checked={editAmount}
+									label={m.transactions_batch_edit_label()}
+								/>
 							</div>
 						</FormFieldRow>
 					</Fieldset>
@@ -441,30 +414,19 @@
 								>{m.transactions_label_mark_as()}</Label
 							>
 							<div class="flex gap-2">
-								<Label
-									for="excluded"
-									class="flex h-9 grow items-center gap-2 rounded border px-3 py-1 font-normal {!editExcluded
-										? 'cursor-not-allowed opacity-50'
-										: 'cursor-pointer'}"
-								>
-									<Checkbox
-										id="excluded"
-										bind:checked={formData.excluded}
-										disabled={!editExcluded}
-										class="bg-background"
-									/>
-									<span>{m.transactions_label_excluded_from_totals()}</span>
-								</Label>
-								<Label
-									class="flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
-								>
-									<Checkbox
-										bind:checked={editExcluded}
-										aria-label={m.transactions_batch_edit_label()}
-										class="bg-background"
-									/>
-									<span class="text-sm">{m.transactions_batch_edit_label()}</span>
-								</Label>
+								<CheckboxLabel
+									id="excluded"
+									bind:checked={formData.excluded}
+									disabled={!editExcluded}
+									indeterminate={commonExcluded === null && !excludedTouched}
+									onCheckedChange={() => (excludedTouched = true)}
+									label={m.transactions_label_excluded_from_totals()}
+									class="grow"
+								/>
+								<CheckboxLabel
+									bind:checked={editExcluded}
+									label={m.transactions_batch_edit_label()}
+								/>
 							</div>
 						</FormFieldRow>
 					</Fieldset>
