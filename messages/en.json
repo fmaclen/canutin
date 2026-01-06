@@ -287,6 +287,7 @@
 	"transactions_batch_update_success_one": "Transaction updated",
 	"transactions_batch_update_success_other": "{count} transactions updated",
 	"transactions_batch_no_selection": "No transactions selected",
+	"transactions_batch_select_all_results": "Select all {count} results",
 	"cashflow_section_title": "Cashflow",
 	"cashflow_income_label": "Income",
 	"cashflow_expenses_label": "Expenses",

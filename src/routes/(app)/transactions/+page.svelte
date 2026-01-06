@@ -73,7 +73,7 @@
 					<div class="flex gap-2">
 						{#if txContext.totalPages > 1 && !txContext.isAllFilteredSelected}
 							<Button variant="outline" size="sm" onclick={() => txContext.selectAllFiltered()}>
-								Select all {txContext.filteredCount} results
+								{m.transactions_batch_select_all_results({ count: txContext.filteredCount })}
 							</Button>
 						{/if}
 						<Button href="/transactions/batch" size="sm">

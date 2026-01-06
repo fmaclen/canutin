@@ -287,6 +287,7 @@
 	"transactions_batch_update_success_one": "Transacción actualizada",
 	"transactions_batch_update_success_other": "{count} transacciones actualizadas",
 	"transactions_batch_no_selection": "No hay transacciones seleccionadas",
+	"transactions_batch_select_all_results": "Seleccionar los {count} resultados",
 	"cashflow_section_title": "Flujo de caja",
 	"cashflow_income_label": "Ingresos",
 	"cashflow_expenses_label": "Gastos",
