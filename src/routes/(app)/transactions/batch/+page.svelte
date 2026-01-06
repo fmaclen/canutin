@@ -119,14 +119,19 @@
 		excluded: false
 	});
 
-	// Initialize form data from common values
+	// Initialize form data from common values (only once to avoid overwriting user edits)
+	let formInitialized = false;
 	$effect(() => {
+		if (formInitialized) return;
+		if (selectedTransactions.length === 0) return;
+
 		formData.accountId = commonAccountId ?? '';
 		formData.description = commonDescription ?? '';
 		formData.date = commonDate ?? '';
 		formData.labelsInput = commonLabels ?? '';
 		formData.amount = commonAmount !== null ? commonAmount.toString() : '';
 		formData.excluded = commonExcluded ?? false;
+		formInitialized = true;
 	});
 
 	const hasAnyEditEnabled = $derived(
