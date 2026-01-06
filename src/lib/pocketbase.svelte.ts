@@ -20,6 +20,22 @@ export class PocketBaseContext {
 		this.authedClient = new PocketBase(env.PUBLIC_PB_URL || 'http://127.0.0.1:42070');
 	}
 
+	async findOrCreateLabel(name: string, ownerId: string) {
+		const existing = await this.authedClient.collection('transactionLabels').getList(1, 1, {
+			filter: `name = "${name}" && owner = "${ownerId}"`
+		});
+
+		if (existing.items.length > 0) {
+			return existing.items[0].id;
+		}
+
+		const label = await this.authedClient.collection('transactionLabels').create({
+			name,
+			owner: ownerId
+		});
+		return label.id;
+	}
+
 	private captureError(error: unknown, context: string, operation: string) {
 		console.error(`[${context}:${operation}]`, error);
 	}

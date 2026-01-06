@@ -87,11 +87,8 @@
 					.filter(Boolean);
 
 				for (const labelName of labelNames) {
-					const label = await pb.authedClient.collection('transactionLabels').create({
-						name: labelName,
-						owner: currentOwnerId
-					});
-					labelIds.push(label.id);
+					const labelId = await pb.findOrCreateLabel(labelName, currentOwnerId);
+					labelIds.push(labelId);
 				}
 			}
 
