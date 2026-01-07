@@ -1,9 +1,13 @@
 <script lang="ts">
 	import { toast } from 'svelte-sonner';
-	import { SvelteMap } from 'svelte/reactivity';
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import {
+		BALANCE_GROUP_ORDER,
+		getBalanceGroupMeta,
+		groupAccountsByBalanceGroup
+	} from '$lib/account-utils';
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAuthContext } from '$lib/auth.svelte';
 	import CheckboxLabel from '$lib/components/checkbox-label.svelte';
@@ -31,38 +35,8 @@
 	const ownerId = $derived(auth.currentUser?.record?.id);
 	const openAccounts = $derived(accountsContext.accounts.filter((a) => !a.closed));
 
-	const balanceGroupOrder = Object.values(AccountsBalanceGroupOptions);
-
-	const groupMeta = {
-		[AccountsBalanceGroupOptions.CASH]: {
-			label: m.accounts_group_cash_label(),
-			color: 'bg-cash'
-		},
-		[AccountsBalanceGroupOptions.DEBT]: {
-			label: m.accounts_group_debt_label(),
-			color: 'bg-debt'
-		},
-		[AccountsBalanceGroupOptions.INVESTMENT]: {
-			label: m.accounts_group_investment_label(),
-			color: 'bg-investment'
-		},
-		[AccountsBalanceGroupOptions.OTHER]: {
-			label: m.accounts_group_other_label(),
-			color: 'bg-other-assets'
-		}
-	} satisfies Record<AccountsBalanceGroupOptions, { label: string; color: string }>;
-
-	const accountsByGroup = $derived.by(() => {
-		const grouped = new SvelteMap<AccountsBalanceGroupOptions, typeof openAccounts>();
-		for (const account of openAccounts) {
-			const group = account.balanceGroup as AccountsBalanceGroupOptions;
-			if (!grouped.has(group)) {
-				grouped.set(group, []);
-			}
-			grouped.get(group)!.push(account);
-		}
-		return grouped;
-	});
+	const groupMeta = getBalanceGroupMeta();
+	const accountsByGroup = $derived(groupAccountsByBalanceGroup(openAccounts));
 
 	const selectedAccount = $derived(openAccounts.find((a) => a.id === accountId));
 
@@ -186,7 +160,7 @@
 								{/if}
 							</Select.Trigger>
 							<Select.Content>
-								{#each balanceGroupOrder as group (group)}
+								{#each BALANCE_GROUP_ORDER as group (group)}
 									{@const accountsInGroup = accountsByGroup.get(group) ?? []}
 									{#if accountsInGroup.length > 0}
 										<Select.Group>
