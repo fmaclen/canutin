@@ -260,6 +260,7 @@ test('user can add a new asset with type WHOLE or SHARES', async ({ page }) => {
 	await page.getByRole('button', { name: 'Add' }).click();
 	await expect(page.getByText('Asset added successfully')).toBeVisible();
 	await expect(page).toHaveURL('/assets');
+	await expect(page.getByText('Asset added successfully')).not.toBeVisible();
 
 	const wholeAssetRow = page.getByRole('row', { name: 'Gold Coins' });
 	await expect(wholeAssetRow).toBeVisible();

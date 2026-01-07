@@ -230,9 +230,7 @@ test('transactions pagination navigates between pages', async ({ page }) => {
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Transactions');
 
-	const rowsForBatch = page.getByRole('row', {
-		name: new RegExp(escapeRegex(prefix))
-	});
+	const rowsForBatch = page.getByRole('row', { name: prefix });
 	const previousButton = page.getByRole('button', { name: 'Previous' });
 	const nextButton = page.getByRole('button', { name: 'Next' });
 	await expect(previousButton).toBeDisabled();
@@ -240,25 +238,17 @@ test('transactions pagination navigates between pages', async ({ page }) => {
 	await expect(rowsForBatch).toHaveCount(50);
 
 	const lastDescription = seededDescriptions[seededDescriptions.length - 1] ?? '';
-	await expect(
-		page.getByRole('row', { name: new RegExp(escapeRegex(lastDescription)) })
-	).toHaveCount(0);
+	await expect(page.getByRole('row', { name: lastDescription })).toHaveCount(0);
 
 	await nextButton.click();
 	await expect(rowsForBatch).toHaveCount(5);
-	await expect(
-		page.getByRole('row', { name: new RegExp(escapeRegex(lastDescription)) })
-	).toBeVisible();
+	await expect(page.getByRole('row', { name: lastDescription })).toBeVisible();
 	await expect(nextButton).toBeDisabled();
 	await expect(previousButton).toBeEnabled();
 
 	await previousButton.click();
 	await expect(rowsForBatch).toHaveCount(50);
-	await expect(
-		page.getByRole('row', {
-			name: new RegExp(escapeRegex(`${prefix} 010`))
-		})
-	).toBeVisible();
+	await expect(page.getByRole('row', { name: `${prefix} 010` })).toBeVisible();
 	await expect(previousButton).toBeDisabled();
 	await expect(nextButton).toBeEnabled();
 
@@ -277,9 +267,7 @@ test('transactions pagination navigates between pages', async ({ page }) => {
 	await expect(page.getByRole('button', { name: 'Next' })).toHaveCount(0);
 
 	// Should be showing transactions now (not an empty page)
-	const creditRows = page.getByRole('row', {
-		name: new RegExp(escapeRegex(prefix))
-	});
+	const creditRows = page.getByRole('row', { name: prefix });
 	await expect(creditRows.first()).toBeVisible();
 });
 
@@ -482,18 +470,13 @@ function isWithinPeriod(date: Date, option: PeriodOption, reference: Date) {
 }
 
 async function expectRowVisibility(page: Page, description: string, shouldBeVisible: boolean) {
-	const pattern = new RegExp(escapeRegex(description));
-	const row = page.getByRole('row', { name: pattern });
+	const row = page.getByRole('row', { name: description });
 	if (shouldBeVisible) {
 		await expect(row).toHaveCount(1);
 		await expect(row).toBeVisible();
 	} else {
 		await expect(row).toHaveCount(0);
 	}
-}
-
-function escapeRegex(value: string) {
-	return value.replace(/[.*+?^${}()|[\]\\]/g, (match) => `\\${match}`);
 }
 
 // Regression test for https://github.com/fmaclen/canutin/issues/289
