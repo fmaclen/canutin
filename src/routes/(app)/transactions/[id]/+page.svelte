@@ -7,6 +7,7 @@
 	import { page } from '$app/state';
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAuthContext } from '$lib/auth.svelte';
+	import CheckboxLabel from '$lib/components/checkbox-label.svelte';
 	import CurrencyField from '$lib/components/currency-field.svelte';
 	import Fieldset from '$lib/components/fieldset.svelte';
 	import FormFieldRow from '$lib/components/form-field-row.svelte';
@@ -16,7 +17,6 @@
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
@@ -298,19 +298,15 @@
 					</Fieldset>
 
 					<Fieldset>
-						<FormFieldRow itemsAlignment="items-start">
-							<Label class="justify-start pr-0 md:justify-end md:pt-2.5"
+						<FormFieldRow>
+							<Label class="justify-start pr-0 md:justify-end"
 								>{m.transactions_label_mark_as()}</Label
 							>
-							<div class="space-y-2">
-								<Label
-									for="excluded"
-									class="flex h-9 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
-								>
-									<Checkbox id="excluded" bind:checked={formData.excluded} class="bg-background" />
-									<span>{m.transactions_label_excluded_from_totals()}</span>
-								</Label>
-							</div>
+							<CheckboxLabel
+								id="excluded"
+								bind:checked={formData.excluded}
+								label={m.transactions_label_excluded_from_totals()}
+							/>
 						</FormFieldRow>
 					</Fieldset>
 
