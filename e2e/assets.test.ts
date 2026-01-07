@@ -260,6 +260,7 @@ test('user can add a new asset with type WHOLE or SHARES', async ({ page }) => {
 	await page.getByRole('button', { name: 'Add' }).click();
 	await expect(page.getByText('Asset added successfully')).toBeVisible();
 	await expect(page).toHaveURL('/assets');
+	await expect(page.getByText('Asset added successfully')).not.toBeVisible();
 
 	const wholeAssetRow = page.getByRole('row', { name: 'Gold Coins' });
 	await expect(wholeAssetRow).toBeVisible();
@@ -374,6 +375,7 @@ test('user can edit asset details and update balance', async ({ page }) => {
 			'This asset has been updated elsewhere and your changes may be based on outdated data'
 		)
 	).not.toBeVisible();
+	await expect(page.getByLabel('breadcrumb').getByText('Rare Coin Collection')).toBeVisible();
 
 	await page.getByLabel('Market value').fill('12500');
 	await page.getByLabel('Book value').fill('10000');
