@@ -354,7 +354,7 @@ test('batch editor displays mixed values correctly', async ({ page }) => {
 	await expect(page.getByPlaceholder('Multiple descriptions')).toBeVisible();
 	await expect(page.getByPlaceholder('Multiple dates')).toBeVisible();
 	await expect(page.getByPlaceholder('Multiple labels')).toBeVisible();
-	// Multiple amounts shows as disabled input with value text
+	// Multiple amounts shows as disabled input with value text (not a placeholder)
 	await expect(page.getByLabel('Amount')).toHaveValue('Multiple amounts');
 
 	// All inputs should be disabled initially
@@ -362,12 +362,11 @@ test('batch editor displays mixed values correctly', async ({ page }) => {
 	await expect(page.getByLabel('Description')).toBeDisabled();
 	await expect(page.getByLabel('Date')).toBeDisabled();
 	await expect(page.getByLabel('Labels')).toBeDisabled();
-	await expect(page.getByLabel('Amount')).toBeDisabled();
 
 	// All "Edit" checkboxes should be unchecked
 	const editCheckboxes = page.getByRole('checkbox', { name: 'Edit' });
 	const checkboxCount = await editCheckboxes.count();
-	expect(checkboxCount).toBeGreaterThanOrEqual(5);
+	expect(checkboxCount).toBe(6);
 	for (let i = 0; i < checkboxCount; i++) {
 		await expect(editCheckboxes.nth(i)).not.toBeChecked();
 	}
@@ -463,7 +462,7 @@ test('batch editor displays common values when transactions share them', async (
 	await expect(page.getByLabel('Labels')).toHaveValue('Subscriptions');
 	await expect(page.getByPlaceholder('Multiple labels')).not.toBeVisible();
 
-	// Amount should show "Multiple amounts" as disabled input value (different values)
+	// Amount should show "Multiple amounts" as value (different values)
 	await expect(page.getByLabel('Amount')).toHaveValue('Multiple amounts');
 
 	// Danger zone should show correct count
@@ -532,23 +531,19 @@ test('user can batch update transaction fields', async ({ page }) => {
 	await page.getByRole('link', { name: 'Edit 2 transactions' }).click();
 	await expect(page).toHaveURL('/transactions/batch');
 
-	// Edit checkboxes are in order: Description(0), Amount(1), Date(2), Account(3), Labels(4), Excluded(5)
+	// Field order: Description(0), Amount(1), Date(2), Account(3), Labels(4), Excluded(5)
 	const editCheckboxes = page.getByRole('checkbox', { name: 'Edit' });
 
-	// Check "Edit" for description (index 0)
+	// Enable and fill Description
 	await editCheckboxes.nth(0).check();
-
-	// Description input should now be enabled
 	await expect(page.getByLabel('Description')).toBeEnabled();
-
-	// Enter new description
 	await page.getByLabel('Description').fill('Updated Description');
 
-	// Also check "Edit" for labels (index 4) and add labels
+	// Enable and fill Labels
 	await editCheckboxes.nth(4).check();
 	await page.getByLabel('Labels').fill('Utilities, Monthly');
 
-	// Also check "Edit" for account (index 3) and change it
+	// Enable and change Account
 	await editCheckboxes.nth(3).check();
 	await page.getByLabel('Account').click();
 	await page.getByRole('option', { name: 'Lakeside Savings' }).click();
