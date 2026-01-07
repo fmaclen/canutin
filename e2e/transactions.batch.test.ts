@@ -66,7 +66,6 @@ test('user can select transactions and see selection toolbar', async ({ page }) 
 	// Initially no batch editor bar visible
 	await expect(page.getByText('Batch editor')).not.toBeVisible();
 
-	// Get checkboxes - header checkbox and row checkboxes
 	const tableHeader = page.getByRole('rowgroup').first();
 	const headerCheckbox = tableHeader.getByRole('checkbox');
 	const sunriseRow = page.getByRole('row', { name: 'Sunrise Bakery' });

@@ -43,14 +43,12 @@
 	const groupMeta = getBalanceGroupMeta();
 	const accountsByGroup = $derived(groupAccountsByBalanceGroup(openAccounts));
 
-	// Redirect if no selection
 	$effect(() => {
 		if (selectedCount === 0) {
 			goto(resolve('/transactions'));
 		}
 	});
 
-	// Helper to detect common value across selected transactions
 	function getCommonValue<T>(getter: (tx: TransactionRow) => T): T | null {
 		if (selectedTransactions.length === 0) return null;
 		const first = getter(selectedTransactions[0]);
@@ -64,7 +62,6 @@
 		return allSame ? first : null;
 	}
 
-	// Detect common values
 	const commonAccountId = $derived(getCommonValue((tx) => tx.accountId));
 	const commonDescription = $derived(getCommonValue((tx) => tx.description));
 	const commonDate = $derived(getCommonValue((tx) => tx.dateIso.split('T')[0]));
@@ -74,7 +71,6 @@
 
 	const selectedAccount = $derived(openAccounts.find((a) => a.id === formData.accountId));
 
-	// Form state - edit flags
 	let editAccount = $state(false);
 	let editDescription = $state(false);
 	let editDate = $state(false);
@@ -84,7 +80,6 @@
 	let excludedTouched = $state(false);
 	let isSubmitting = $state(false);
 
-	// Form state - values
 	let formData = $state({
 		accountId: '',
 		description: '',
@@ -121,7 +116,6 @@
 		const loadingToast = toast.loading(m.transactions_batch_updating());
 
 		try {
-			// Build the updates object once (same for all transactions)
 			const updates: Record<string, unknown> = {};
 
 			if (editAccount && formData.accountId) {
@@ -161,7 +155,6 @@
 				updates.excluded = formData.excluded ? new Date().toISOString() : null;
 			}
 
-			// Update all transactions in parallel
 			const total = selectedTransactions.length;
 			let succeeded = 0;
 

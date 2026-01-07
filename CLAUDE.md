@@ -203,9 +203,23 @@ When reviewing code, look for the following issues:
 - **Framework misuse** - Not doing things "the Svelte 5 way" (e.g., using stores instead of runes, `on:click` instead of `onclick`) or "the PocketBase way"
 - **Anti-patterns** - Patterns inconsistent with the rest of the codebase
 - **Dead code** - Unused variables, functions, imports, or unreachable code paths
-- **Comment quality**:
-  - Remove redundant comments that explain self-explanatory logic
-  - Add comments for tricky or non-obvious logic paths that need explanation
+
+### Comments and Return Types (IMPORTANT)
+
+These are commonly overlooked during reviews - always check for them:
+
+- **Redundant comments** - Remove comments that explain self-explanatory code:
+  - Bad: `// Loop through users` above `for (const user of users)`
+  - Bad: `// Check if empty` above `if (items.length === 0)`
+  - Bad: `// Form state` above a variable named `formState`
+- **Useful comments** - Keep comments that explain the "why", not the "what":
+  - Good: `// Process sequentially to avoid creating duplicate labels`
+  - Good: `// Subscribe FIRST to avoid missing events during initial fetch`
+  - Good: Comments that justify eslint-disable directives
+- **Unnecessary return types** - Remove explicit return types that TypeScript can infer:
+  - Bad: `function getUsers(): User[]` when the return is obviously `User[]`
+  - Bad: `private parseDate(s: string): Date | null` when inference works
+  - Exception: Complex inline types on getters may improve readability
 
 Also verify compliance with all guidelines in this file (TypeScript standards, testing strategy, code style, etc.).
 

@@ -91,7 +91,6 @@ class TransactionsContext {
 		const currentPage = get(page);
 		const currentSearch = currentPage.url.search;
 
-		// Skip if URL hasn't changed since last sync
 		if (currentSearch === this._lastSyncedSearch) {
 			return;
 		}
@@ -99,7 +98,6 @@ class TransactionsContext {
 
 		const params = currentPage.url.searchParams;
 
-		// Reset to defaults first
 		this._customFromDate = null;
 		this._customToDate = null;
 		this._customLabel = null;
@@ -144,7 +142,7 @@ class TransactionsContext {
 		}
 	}
 
-	private parseDate(dateString: string): Date | null {
+	private parseDate(dateString: string) {
 		const parsed = new UTCDate(dateString);
 		if (isNaN(parsed.getTime())) {
 			return null;
@@ -502,7 +500,6 @@ class TransactionsContext {
 		this.refreshTransactions();
 	}
 
-	// Selection methods
 	get selectedIds() {
 		return this._selectedIds;
 	}

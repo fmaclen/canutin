@@ -8,7 +8,7 @@ export type BalanceGroupMeta = {
 	color: string;
 };
 
-export function getBalanceGroupMeta(): Record<AccountsBalanceGroupOptions, BalanceGroupMeta> {
+export function getBalanceGroupMeta() {
 	return {
 		[AccountsBalanceGroupOptions.CASH]: {
 			label: m.accounts_group_cash_label(),
