@@ -285,6 +285,70 @@
 				>
 					<Fieldset isFirst={true}>
 						<FormFieldRow>
+							<Label for="description" class="justify-start pr-0 md:justify-end"
+								>{m.transactions_label_description()}</Label
+							>
+							<div class="flex gap-2">
+								<Input
+									id="description"
+									bind:value={formData.description}
+									disabled={!editDescription}
+									placeholder={commonDescription === null
+										? m.transactions_batch_multiple_descriptions()
+										: undefined}
+								/>
+								<CheckboxLabel
+									bind:checked={editDescription}
+									label={m.transactions_batch_edit_label()}
+								/>
+							</div>
+						</FormFieldRow>
+
+						<FormFieldRow>
+							<Label for="amount" class="justify-start pr-0 md:justify-end"
+								>{m.transactions_label_amount()}</Label
+							>
+							<div class="flex gap-2">
+								{#if commonAmount === null && !editAmount}
+									<Input
+										id="amount"
+										value={m.transactions_batch_multiple_amounts()}
+										disabled={true}
+									/>
+								{:else}
+									<CurrencyField
+										id="amount"
+										name="amount"
+										bind:value={formData.amount}
+										disabled={!editAmount}
+									/>
+								{/if}
+								<CheckboxLabel
+									bind:checked={editAmount}
+									label={m.transactions_batch_edit_label()}
+								/>
+							</div>
+						</FormFieldRow>
+
+						<FormFieldRow>
+							<Label for="date" class="justify-start pr-0 md:justify-end"
+								>{m.transactions_label_date()}</Label
+							>
+							<div class="flex gap-2">
+								<Input
+									id="date"
+									type="date"
+									bind:value={formData.date}
+									disabled={!editDate}
+									placeholder={commonDate === null
+										? m.transactions_batch_multiple_dates()
+										: undefined}
+								/>
+								<CheckboxLabel bind:checked={editDate} label={m.transactions_batch_edit_label()} />
+							</div>
+						</FormFieldRow>
+
+						<FormFieldRow>
 							<Label for="account" class="justify-start pr-0 md:justify-end"
 								>{m.transactions_label_account()}</Label
 							>
@@ -337,44 +401,6 @@
 						</FormFieldRow>
 
 						<FormFieldRow>
-							<Label for="description" class="justify-start pr-0 md:justify-end"
-								>{m.transactions_label_description()}</Label
-							>
-							<div class="flex gap-2">
-								<Input
-									id="description"
-									bind:value={formData.description}
-									disabled={!editDescription}
-									placeholder={commonDescription === null
-										? m.transactions_batch_multiple_descriptions()
-										: undefined}
-								/>
-								<CheckboxLabel
-									bind:checked={editDescription}
-									label={m.transactions_batch_edit_label()}
-								/>
-							</div>
-						</FormFieldRow>
-
-						<FormFieldRow>
-							<Label for="date" class="justify-start pr-0 md:justify-end"
-								>{m.transactions_label_date()}</Label
-							>
-							<div class="flex gap-2">
-								<Input
-									id="date"
-									type="date"
-									bind:value={formData.date}
-									disabled={!editDate}
-									placeholder={commonDate === null
-										? m.transactions_batch_multiple_dates()
-										: undefined}
-								/>
-								<CheckboxLabel bind:checked={editDate} label={m.transactions_batch_edit_label()} />
-							</div>
-						</FormFieldRow>
-
-						<FormFieldRow>
 							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
 								<Label for="labels" class="justify-start pr-0 md:justify-end"
 									>{m.transactions_label_labels()}</Label
@@ -392,32 +418,6 @@
 								/>
 								<CheckboxLabel
 									bind:checked={editLabels}
-									label={m.transactions_batch_edit_label()}
-								/>
-							</div>
-						</FormFieldRow>
-
-						<FormFieldRow>
-							<Label for="amount" class="justify-start pr-0 md:justify-end"
-								>{m.transactions_label_amount()}</Label
-							>
-							<div class="flex gap-2">
-								{#if commonAmount === null && !editAmount}
-									<Input
-										id="amount"
-										value={m.transactions_batch_multiple_amounts()}
-										disabled={true}
-									/>
-								{:else}
-									<CurrencyField
-										id="amount"
-										name="amount"
-										bind:value={formData.amount}
-										disabled={!editAmount}
-									/>
-								{/if}
-								<CheckboxLabel
-									bind:checked={editAmount}
 									label={m.transactions_batch_edit_label()}
 								/>
 							</div>

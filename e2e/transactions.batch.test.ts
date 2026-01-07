@@ -532,11 +532,11 @@ test('user can batch update transaction fields', async ({ page }) => {
 	await page.getByRole('link', { name: 'Edit 2 transactions' }).click();
 	await expect(page).toHaveURL('/transactions/batch');
 
-	// Edit checkboxes are in order: Account(0), Description(1), Date(2), Labels(3), Amount(4), Excluded(5)
+	// Edit checkboxes are in order: Description(0), Amount(1), Date(2), Account(3), Labels(4), Excluded(5)
 	const editCheckboxes = page.getByRole('checkbox', { name: 'Edit' });
 
-	// Check "Edit" for description (index 1)
-	await editCheckboxes.nth(1).check();
+	// Check "Edit" for description (index 0)
+	await editCheckboxes.nth(0).check();
 
 	// Description input should now be enabled
 	await expect(page.getByLabel('Description')).toBeEnabled();
@@ -544,12 +544,12 @@ test('user can batch update transaction fields', async ({ page }) => {
 	// Enter new description
 	await page.getByLabel('Description').fill('Updated Description');
 
-	// Also check "Edit" for labels (index 3) and add labels
-	await editCheckboxes.nth(3).check();
+	// Also check "Edit" for labels (index 4) and add labels
+	await editCheckboxes.nth(4).check();
 	await page.getByLabel('Labels').fill('Utilities, Monthly');
 
-	// Also check "Edit" for account (index 0) and change it
-	await editCheckboxes.nth(0).check();
+	// Also check "Edit" for account (index 3) and change it
+	await editCheckboxes.nth(3).check();
 	await page.getByLabel('Account').click();
 	await page.getByRole('option', { name: 'Lakeside Savings' }).click();
 
