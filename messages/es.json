@@ -290,6 +290,8 @@
 	"transactions_batch_select_all_results": "Seleccionar los {count} resultados",
 	"transactions_batch_updating": "Actualizando transacciones",
 	"transactions_batch_deleting": "Eliminando transacciones",
+	"transactions_batch_partial_update": "{succeeded} de {total} transacciones actualizadas",
+	"transactions_batch_partial_delete": "{succeeded} de {total} transacciones eliminadas",
 	"cashflow_section_title": "Flujo de caja",
 	"cashflow_income_label": "Ingresos",
 	"cashflow_expenses_label": "Gastos",

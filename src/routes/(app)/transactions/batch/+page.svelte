@@ -188,22 +188,33 @@
 			}
 
 			// Update all transactions in parallel
+			const total = selectedTransactions.length;
+			let succeeded = 0;
+
 			if (Object.keys(updates).length > 0) {
-				await Promise.all(
+				const results = await Promise.allSettled(
 					selectedTransactions.map((tx) =>
 						pb.authedClient.collection('transactions').update(tx.id, updates)
 					)
 				);
+				succeeded = results.filter((r) => r.status === 'fulfilled').length;
+			} else {
+				succeeded = total;
 			}
 
-			const count = selectedCount;
 			txContext.clearSelection();
 			toast.dismiss(loadingToast);
 
-			if (count === 1) {
-				toast.success(m.transactions_batch_update_success_one());
+			if (succeeded === total) {
+				if (total === 1) {
+					toast.success(m.transactions_batch_update_success_one());
+				} else {
+					toast.success(m.transactions_batch_update_success_other({ count: total }));
+				}
+			} else if (succeeded > 0) {
+				toast.warning(m.transactions_batch_partial_update({ succeeded, total }));
 			} else {
-				toast.success(m.transactions_batch_update_success_other({ count }));
+				toast.error(m.transactions_edit_failed());
 			}
 
 			goto(resolve('/transactions'));
@@ -223,18 +234,25 @@
 		const loadingToast = toast.loading(m.transactions_batch_deleting());
 
 		try {
-			await Promise.all(
+			const total = selectedTransactions.length;
+			const results = await Promise.allSettled(
 				selectedTransactions.map((tx) => pb.authedClient.collection('transactions').delete(tx.id))
 			);
+			const succeeded = results.filter((r) => r.status === 'fulfilled').length;
 
-			const count = selectedCount;
 			txContext.clearSelection();
 			toast.dismiss(loadingToast);
 
-			if (count === 1) {
-				toast.success(m.transactions_batch_delete_success_one());
+			if (succeeded === total) {
+				if (total === 1) {
+					toast.success(m.transactions_batch_delete_success_one());
+				} else {
+					toast.success(m.transactions_batch_delete_success_other({ count: total }));
+				}
+			} else if (succeeded > 0) {
+				toast.warning(m.transactions_batch_partial_delete({ succeeded, total }));
 			} else {
-				toast.success(m.transactions_batch_delete_success_other({ count }));
+				toast.error(m.transactions_delete_failed());
 			}
 
 			goto(resolve('/transactions'));

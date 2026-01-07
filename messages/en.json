@@ -290,6 +290,8 @@
 	"transactions_batch_select_all_results": "Select all {count} results",
 	"transactions_batch_updating": "Updating transactions",
 	"transactions_batch_deleting": "Deleting transactions",
+	"transactions_batch_partial_update": "{succeeded} of {total} transactions updated",
+	"transactions_batch_partial_delete": "{succeeded} of {total} transactions deleted",
 	"cashflow_section_title": "Cashflow",
 	"cashflow_income_label": "Income",
 	"cashflow_expenses_label": "Expenses",
