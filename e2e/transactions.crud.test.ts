@@ -430,8 +430,9 @@ test('reuses existing labels instead of creating duplicates', async ({ page }) =
 	await page.getByRole('link', { name: 'Edit 2 transactions' }).click();
 	await expect(page).toHaveURL('/transactions/batch');
 
+	// Edit checkboxes order: Description (0), Amount (1), Date (2), Account (3), Labels (4), Excluded (5)
 	const editCheckboxes = page.getByRole('checkbox', { name: 'Edit' });
-	await editCheckboxes.nth(3).check();
+	await editCheckboxes.nth(4).check();
 	await page.getByLabel('Labels').fill('Dining');
 	await page.getByRole('button', { name: 'Apply' }).click();
 	await expect(page.getByText('2 transactions updated')).toBeVisible();
