@@ -178,6 +178,9 @@ test('user can edit transaction details', async ({ page }) => {
 	await page.getByLabel('Labels').fill('Business Travel, Conference');
 	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(page.getByText('Transaction updated')).toBeVisible();
+	await expect(
+		page.getByLabel('breadcrumb').getByText('Skyward Airlines Conference Trip')
+	).toBeVisible();
 
 	await page.getByLabel('breadcrumb').getByRole('link', { name: 'Transactions' }).click();
 	await expect(page.url()).toContain('/transactions');

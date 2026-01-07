@@ -214,6 +214,7 @@ test('user can edit account details and update balance', async ({ page }) => {
 			'This account has been updated elsewhere and your changes may be based on outdated data'
 		)
 	).not.toBeVisible();
+	await expect(page.getByLabel('breadcrumb').getByText('Business Checking')).toBeVisible();
 
 	await page.getByLabel('Balance', { exact: true }).fill('4500');
 	await page.getByRole('button', { name: 'Update' }).click();

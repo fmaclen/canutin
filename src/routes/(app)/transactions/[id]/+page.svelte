@@ -132,6 +132,7 @@
 				.collection('transactions')
 				.update(currentTransactionId, transactionData);
 
+			transaction = { ...transaction!, description: formData.description.trim() };
 			toast.success(m.transactions_edit_success());
 		} catch (error) {
 			console.error('Failed to update transaction:', error);
