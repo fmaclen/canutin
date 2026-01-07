@@ -14,7 +14,14 @@ import type {
 	TransactionsResponse
 } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
-import { toPocketBaseDateString } from './utils';
+import {
+	createSortComparator,
+	toPocketBaseDateString,
+	type SortDirection,
+	type SortState
+} from './utils';
+
+export type TransactionSortColumn = 'date' | 'description' | 'account' | 'amount';
 
 export type PeriodOption =
 	| 'this-month'
@@ -52,6 +59,8 @@ class TransactionsContext {
 	page: number = $state(1);
 	isLoading: boolean = $state(true);
 	rawTransactions: TransactionsResponse<TransactionExpand>[] = $state([]);
+	sortColumn: TransactionSortColumn | null = $state('date');
+	sortDirection: SortDirection | null = $state('desc');
 
 	private _selectedIds: SvelteSet<string> = new SvelteSet();
 	private _customFromDate: Date | null = $state(null);
@@ -104,6 +113,17 @@ class TransactionsContext {
 		this.period = 'last-3-months';
 		this.kind = 'all';
 		this.search = '';
+
+		const sortParam = params.get('sort');
+		const dirParam = params.get('dir');
+		const validSortColumns: TransactionSortColumn[] = ['date', 'description', 'account', 'amount'];
+		if (sortParam && validSortColumns.includes(sortParam as TransactionSortColumn)) {
+			this.sortColumn = sortParam as TransactionSortColumn;
+			this.sortDirection = dirParam === 'asc' || dirParam === 'desc' ? dirParam : 'desc';
+		} else {
+			this.sortColumn = 'date';
+			this.sortDirection = 'desc';
+		}
 
 		const periodFromParam = params.get('periodFrom');
 		const periodToParam = params.get('periodTo');
@@ -388,21 +408,34 @@ class TransactionsContext {
 
 		const fromTime = from?.getTime() ?? null;
 		const toTime = to?.getTime() ?? null;
-		return this.allRows
-			.filter((row) => {
-				const time = row.dateValue;
-				if (fromTime !== null && time < fromTime) return false;
-				if (toTime !== null && time >= toTime) return false;
-				if (this.kind === 'credits') return row.value > 0;
-				if (this.kind === 'debits') return row.value < 0;
-				if (this.kind === 'excluded') return row.excluded;
-				return true;
-			})
-			.sort((a, b) => {
-				if (b.dateValue !== a.dateValue) return b.dateValue - a.dateValue;
-				if (b.value !== a.value) return b.value - a.value;
-				return a.id.localeCompare(b.id);
-			});
+		const filtered = this.allRows.filter((row) => {
+			const time = row.dateValue;
+			if (fromTime !== null && time < fromTime) return false;
+			if (toTime !== null && time >= toTime) return false;
+			if (this.kind === 'credits') return row.value > 0;
+			if (this.kind === 'debits') return row.value < 0;
+			if (this.kind === 'excluded') return row.excluded;
+			return true;
+		});
+
+		if (this.sortColumn && this.sortDirection) {
+			const comparator = createSortComparator<TransactionRow, TransactionSortColumn>(
+				this.sortState,
+				{
+					date: (r) => r.dateValue,
+					description: (r) => r.description,
+					account: (r) => r.accountName,
+					amount: (r) => r.value
+				}
+			);
+			return filtered.sort(comparator);
+		}
+
+		return filtered.sort((a, b) => {
+			if (b.dateValue !== a.dateValue) return b.dateValue - a.dateValue;
+			if (b.value !== a.value) return b.value - a.value;
+			return a.id.localeCompare(b.id);
+		});
 	}
 
 	get totalPages() {
@@ -498,6 +531,29 @@ class TransactionsContext {
 
 		this.updateUrl(params);
 		this.refreshTransactions();
+	}
+
+	get sortState(): SortState<TransactionSortColumn> {
+		return { column: this.sortColumn, direction: this.sortDirection };
+	}
+
+	setSort(column: TransactionSortColumn) {
+		if (this.sortColumn !== column) {
+			this.sortColumn = column;
+			this.sortDirection = 'desc';
+		} else if (this.sortDirection === 'desc') {
+			this.sortDirection = 'asc';
+		} else {
+			this.sortDirection = 'desc';
+		}
+		this.page = 1;
+
+		const currentPage = get(page);
+		const params = new SvelteURLSearchParams(currentPage.url.searchParams);
+		params.set('sort', this.sortColumn);
+		params.set('dir', this.sortDirection);
+
+		this.updateUrl(params);
 	}
 
 	get selectedIds() {

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { SvelteMap } from 'svelte/reactivity';
 
+	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import { getAssetsContext } from '$lib/assets.svelte';
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
@@ -18,6 +20,13 @@
 	import * as Tabs from '$lib/components/ui/tabs/index';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { m } from '$lib/paraglide/messages';
+	import {
+		createSortComparator,
+		getSortFromUrl,
+		setSortInUrl,
+		toggleSort,
+		type SortState
+	} from '$lib/utils';
 
 	type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
 
@@ -77,26 +86,63 @@
 
 	let filter: FilterOption = $state('owned');
 
-	const allRows = $derived.by(() =>
-		assetsContext.assets
-			.map((asset) => ({
-				id: asset.id,
-				name: asset.name,
-				symbol: asset.symbol ?? null,
-				bookValue: asset.bookValue ?? 0,
-				marketValue: asset.marketValue ?? 0,
-				typeName: assetsContext.getTypeName(asset.balanceType),
-				balanceGroup: asset.balanceGroup as BalanceGroup,
-				excluded: Boolean(asset.excluded),
-				sold: Boolean(asset.sold),
-				gain: asset.gain ?? 0,
-				gainPercent: asset.gainPercent ?? 0
-			}))
-			.sort((a, b) => {
-				if (b.marketValue !== a.marketValue) return b.marketValue - a.marketValue;
-				return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-			})
-	);
+	type AssetSortColumn = 'name' | 'symbol' | 'bookValue' | 'gain' | 'gainPercent' | 'marketValue';
+	const validSortColumns: AssetSortColumn[] = [
+		'name',
+		'symbol',
+		'bookValue',
+		'gain',
+		'gainPercent',
+		'marketValue'
+	];
+
+	const defaultSort: SortState<AssetSortColumn> = { column: 'marketValue', direction: 'desc' };
+	const sortState = $derived.by(() => {
+		const urlSort = getSortFromUrl($page.url);
+		if (
+			urlSort.column &&
+			urlSort.direction &&
+			validSortColumns.includes(urlSort.column as AssetSortColumn)
+		) {
+			return urlSort as SortState<AssetSortColumn>;
+		}
+		return defaultSort;
+	});
+
+	function handleSort(column: string) {
+		const newState = toggleSort(sortState, column as AssetSortColumn);
+		const newUrl = setSortInUrl($page.url, newState);
+		// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic URL computed at runtime
+		goto(newUrl, { replaceState: true, keepFocus: true });
+	}
+
+	const sortedRows = $derived.by(() => {
+		const rows = assetsContext.assets.map((asset) => ({
+			id: asset.id,
+			name: asset.name,
+			symbol: asset.symbol ?? null,
+			bookValue: asset.bookValue ?? 0,
+			marketValue: asset.marketValue ?? 0,
+			typeName: assetsContext.getTypeName(asset.balanceType),
+			balanceGroup: asset.balanceGroup as BalanceGroup,
+			excluded: Boolean(asset.excluded),
+			sold: Boolean(asset.sold),
+			gain: asset.gain ?? 0,
+			gainPercent: asset.gainPercent ?? 0
+		}));
+
+		const comparator = createSortComparator<AssetRow, AssetSortColumn>(sortState, {
+			name: (r) => r.name,
+			symbol: (r) => r.symbol,
+			bookValue: (r) => r.bookValue,
+			gain: (r) => r.gain,
+			gainPercent: (r) => r.gainPercent,
+			marketValue: (r) => r.marketValue
+		});
+		return rows.sort(comparator);
+	});
+
+	const allRows = $derived(sortedRows);
 
 	const rowsByFilter = $derived.by(() => {
 		const map = new SvelteMap<FilterOption, AssetRow[]>();
@@ -198,33 +244,69 @@
 								<Table.Root>
 									<Table.Header>
 										<Table.Row>
-											<Table.Head class="text-left whitespace-nowrap"
-												>{m.assets_table_header_asset()}</Table.Head
+											<Table.SortableHead
+												class="text-left whitespace-nowrap"
+												column="name"
+												sortColumn={sortState.column}
+												sortDirection={sortState.direction}
+												onSort={handleSort}
 											>
-											<Table.Head class="text-left whitespace-nowrap"
-												>{m.assets_table_header_symbol()}</Table.Head
+												{m.assets_table_header_asset()}
+											</Table.SortableHead>
+											<Table.SortableHead
+												class="text-left whitespace-nowrap"
+												column="symbol"
+												sortColumn={sortState.column}
+												sortDirection={sortState.direction}
+												onSort={handleSort}
 											>
-											<Table.Head class="text-left whitespace-nowrap"
-												>{m.assets_table_header_group()}</Table.Head
+												{m.assets_table_header_symbol()}
+											</Table.SortableHead>
+											<Table.Head class="text-left whitespace-nowrap">
+												{m.assets_table_header_group()}
+											</Table.Head>
+											<Table.Head class="text-left whitespace-nowrap">
+												{m.assets_table_header_category()}
+											</Table.Head>
+											<Table.Head class="text-left whitespace-nowrap">
+												{m.assets_table_header_status()}
+											</Table.Head>
+											<Table.SortableHead
+												class="text-right whitespace-nowrap"
+												column="bookValue"
+												sortColumn={sortState.column}
+												sortDirection={sortState.direction}
+												onSort={handleSort}
 											>
-											<Table.Head class="text-left whitespace-nowrap"
-												>{m.assets_table_header_category()}</Table.Head
+												{m.assets_table_header_book_value()}
+											</Table.SortableHead>
+											<Table.SortableHead
+												class="text-right whitespace-nowrap"
+												column="gain"
+												sortColumn={sortState.column}
+												sortDirection={sortState.direction}
+												onSort={handleSort}
 											>
-											<Table.Head class="text-left whitespace-nowrap"
-												>{m.assets_table_header_status()}</Table.Head
+												{m.assets_table_header_gain_loss()}
+											</Table.SortableHead>
+											<Table.SortableHead
+												class="text-right whitespace-nowrap"
+												column="gainPercent"
+												sortColumn={sortState.column}
+												sortDirection={sortState.direction}
+												onSort={handleSort}
 											>
-											<Table.Head class="text-right whitespace-nowrap"
-												>{m.assets_table_header_book_value()}</Table.Head
+												{m.assets_table_header_gain_percent()}
+											</Table.SortableHead>
+											<Table.SortableHead
+												class="text-right whitespace-nowrap"
+												column="marketValue"
+												sortColumn={sortState.column}
+												sortDirection={sortState.direction}
+												onSort={handleSort}
 											>
-											<Table.Head class="text-right whitespace-nowrap"
-												>{m.assets_table_header_gain_loss()}</Table.Head
-											>
-											<Table.Head class="text-right whitespace-nowrap"
-												>{m.assets_table_header_gain_percent()}</Table.Head
-											>
-											<Table.Head class="text-right whitespace-nowrap"
-												>{m.assets_table_header_market_value()}</Table.Head
-											>
+												{m.assets_table_header_market_value()}
+											</Table.SortableHead>
 										</Table.Row>
 									</Table.Header>
 									<Table.Body>

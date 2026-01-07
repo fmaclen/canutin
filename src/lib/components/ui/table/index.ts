@@ -1,3 +1,4 @@
+import SortableHead from './sortable-head.svelte';
 import Body from './table-body.svelte';
 import Caption from './table-caption.svelte';
 import Cell from './table-cell.svelte';
@@ -16,6 +17,7 @@ export {
 	Head,
 	Header,
 	Row,
+	SortableHead,
 	//
 	Root as Table,
 	Body as TableBody,
@@ -24,5 +26,6 @@ export {
 	Footer as TableFooter,
 	Head as TableHead,
 	Header as TableHeader,
-	Row as TableRow
+	Row as TableRow,
+	SortableHead as TableSortableHead
 };

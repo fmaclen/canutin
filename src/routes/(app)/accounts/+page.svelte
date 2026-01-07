@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { SvelteMap } from 'svelte/reactivity';
 
+	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
@@ -19,6 +21,13 @@
 	import { m } from '$lib/paraglide/messages';
 	import type { TransactionsResponse } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+	import {
+		createSortComparator,
+		getSortFromUrl,
+		setSortInUrl,
+		toggleSort,
+		type SortState
+	} from '$lib/utils';
 
 	type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
 
@@ -78,24 +87,52 @@
 	const pb = getPocketBaseContext();
 	const transactionsCounts = new SvelteMap<string, number>();
 
-	const allRows = $derived.by(() =>
-		accountsContext.accounts
-			.map((account) => ({
-				id: account.id,
-				name: account.name,
-				institution: account.institution ?? null,
-				balance: account.balance ?? 0,
-				typeName: accountsContext.getTypeName(account.balanceType),
-				balanceGroup: account.balanceGroup as BalanceGroup,
-				autoCalculated: Boolean(account.autoCalculated),
-				excluded: Boolean(account.excluded),
-				closed: Boolean(account.closed)
-			}))
-			.sort((a, b) => {
-				if (b.balance !== a.balance) return b.balance - a.balance;
-				return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-			})
-	);
+	type AccountSortColumn = 'name' | 'institution' | 'balance' | 'transactions';
+	const validSortColumns: AccountSortColumn[] = ['name', 'institution', 'balance', 'transactions'];
+
+	const defaultSort: SortState<AccountSortColumn> = { column: 'balance', direction: 'desc' };
+	const sortState = $derived.by(() => {
+		const urlSort = getSortFromUrl($page.url);
+		if (
+			urlSort.column &&
+			urlSort.direction &&
+			validSortColumns.includes(urlSort.column as AccountSortColumn)
+		) {
+			return urlSort as SortState<AccountSortColumn>;
+		}
+		return defaultSort;
+	});
+
+	function handleSort(column: string) {
+		const newState = toggleSort(sortState, column as AccountSortColumn);
+		const newUrl = setSortInUrl($page.url, newState);
+		// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic URL computed at runtime
+		goto(newUrl, { replaceState: true, keepFocus: true });
+	}
+
+	const sortedRows = $derived.by(() => {
+		const rows = accountsContext.accounts.map((account) => ({
+			id: account.id,
+			name: account.name,
+			institution: account.institution ?? null,
+			balance: account.balance ?? 0,
+			typeName: accountsContext.getTypeName(account.balanceType),
+			balanceGroup: account.balanceGroup as BalanceGroup,
+			autoCalculated: Boolean(account.autoCalculated),
+			excluded: Boolean(account.excluded),
+			closed: Boolean(account.closed)
+		}));
+
+		const comparator = createSortComparator<AccountRow, AccountSortColumn>(sortState, {
+			name: (r) => r.name,
+			institution: (r) => r.institution,
+			balance: (r) => r.balance,
+			transactions: (r) => transactionsCounts.get(r.id) ?? 0
+		});
+		return rows.sort(comparator);
+	});
+
+	const allRows = $derived(sortedRows);
 
 	const rowsByFilter = $derived.by(() => {
 		const map = new SvelteMap<FilterOption, AccountRow[]>();
@@ -226,27 +263,51 @@
 								<Table.Root>
 									<Table.Header>
 										<Table.Row>
-											<Table.Head class="text-left whitespace-nowrap"
-												>{m.accounts_table_header_account()}</Table.Head
+											<Table.SortableHead
+												class="text-left whitespace-nowrap"
+												column="name"
+												sortColumn={sortState.column}
+												sortDirection={sortState.direction}
+												onSort={handleSort}
 											>
-											<Table.Head class="text-left whitespace-nowrap"
-												>{m.accounts_table_header_institution()}</Table.Head
+												{m.accounts_table_header_account()}
+											</Table.SortableHead>
+											<Table.SortableHead
+												class="text-left whitespace-nowrap"
+												column="institution"
+												sortColumn={sortState.column}
+												sortDirection={sortState.direction}
+												onSort={handleSort}
 											>
-											<Table.Head class="text-left whitespace-nowrap"
-												>{m.accounts_table_header_group()}</Table.Head
+												{m.accounts_table_header_institution()}
+											</Table.SortableHead>
+											<Table.Head class="text-left whitespace-nowrap">
+												{m.accounts_table_header_group()}
+											</Table.Head>
+											<Table.Head class="text-left whitespace-nowrap">
+												{m.accounts_table_header_type()}
+											</Table.Head>
+											<Table.Head class="text-left whitespace-nowrap">
+												{m.accounts_table_header_status()}
+											</Table.Head>
+											<Table.SortableHead
+												class="text-right whitespace-nowrap"
+												column="transactions"
+												sortColumn={sortState.column}
+												sortDirection={sortState.direction}
+												onSort={handleSort}
 											>
-											<Table.Head class="text-left whitespace-nowrap"
-												>{m.accounts_table_header_type()}</Table.Head
+												{m.accounts_table_header_transactions()}
+											</Table.SortableHead>
+											<Table.SortableHead
+												class="text-right whitespace-nowrap"
+												column="balance"
+												sortColumn={sortState.column}
+												sortDirection={sortState.direction}
+												onSort={handleSort}
 											>
-											<Table.Head class="text-left whitespace-nowrap"
-												>{m.accounts_table_header_status()}</Table.Head
-											>
-											<Table.Head class="text-right whitespace-nowrap"
-												>{m.accounts_table_header_transactions()}</Table.Head
-											>
-											<Table.Head class="text-right whitespace-nowrap"
-												>{m.accounts_table_header_balance()}</Table.Head
-											>
+												{m.accounts_table_header_balance()}
+											</Table.SortableHead>
 										</Table.Row>
 									</Table.Header>
 									<Table.Body>
