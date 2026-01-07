@@ -1,12 +1,17 @@
 <script lang="ts">
 	import { toast } from 'svelte-sonner';
-	import { SvelteMap } from 'svelte/reactivity';
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import {
+		BALANCE_GROUP_ORDER,
+		getBalanceGroupMeta,
+		groupAccountsByBalanceGroup
+	} from '$lib/account-utils';
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAuthContext } from '$lib/auth.svelte';
+	import CheckboxLabel from '$lib/components/checkbox-label.svelte';
 	import CurrencyField from '$lib/components/currency-field.svelte';
 	import Fieldset from '$lib/components/fieldset.svelte';
 	import FormFieldRow from '$lib/components/form-field-row.svelte';
@@ -16,7 +21,6 @@
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
@@ -35,38 +39,8 @@
 	const ownerId = $derived(auth.currentUser?.record?.id);
 	const openAccounts = $derived(accountsContext.accounts.filter((a) => !a.closed));
 
-	const balanceGroupOrder = Object.values(AccountsBalanceGroupOptions);
-
-	const groupMeta = {
-		[AccountsBalanceGroupOptions.CASH]: {
-			label: m.accounts_group_cash_label(),
-			color: 'bg-cash'
-		},
-		[AccountsBalanceGroupOptions.DEBT]: {
-			label: m.accounts_group_debt_label(),
-			color: 'bg-debt'
-		},
-		[AccountsBalanceGroupOptions.INVESTMENT]: {
-			label: m.accounts_group_investment_label(),
-			color: 'bg-investment'
-		},
-		[AccountsBalanceGroupOptions.OTHER]: {
-			label: m.accounts_group_other_label(),
-			color: 'bg-other-assets'
-		}
-	} satisfies Record<AccountsBalanceGroupOptions, { label: string; color: string }>;
-
-	const accountsByGroup = $derived.by(() => {
-		const grouped = new SvelteMap<AccountsBalanceGroupOptions, typeof openAccounts>();
-		for (const account of openAccounts) {
-			const group = account.balanceGroup as AccountsBalanceGroupOptions;
-			if (!grouped.has(group)) {
-				grouped.set(group, []);
-			}
-			grouped.get(group)!.push(account);
-		}
-		return grouped;
-	});
+	const groupMeta = getBalanceGroupMeta();
+	const accountsByGroup = $derived(groupAccountsByBalanceGroup(openAccounts));
 
 	const selectedAccount = $derived(openAccounts.find((a) => a.id === formData.accountId));
 
@@ -140,11 +114,8 @@
 					.filter(Boolean);
 
 				for (const labelName of labelNames) {
-					const label = await pb.authedClient.collection('transactionLabels').create({
-						name: labelName,
-						owner: currentOwnerId
-					});
-					labelIds.push(label.id);
+					const labelId = await pb.findOrCreateLabel(labelName, currentOwnerId);
+					labelIds.push(labelId);
 				}
 			}
 
@@ -265,7 +236,7 @@
 									{/if}
 								</Select.Trigger>
 								<Select.Content>
-									{#each balanceGroupOrder as group (group)}
+									{#each BALANCE_GROUP_ORDER as group (group)}
 										{@const accountsInGroup = accountsByGroup.get(group) ?? []}
 										{#if accountsInGroup.length > 0}
 											<Select.Group>
@@ -301,19 +272,15 @@
 					</Fieldset>
 
 					<Fieldset>
-						<FormFieldRow itemsAlignment="items-start">
-							<Label class="justify-start pr-0 md:justify-end md:pt-2.5"
+						<FormFieldRow>
+							<Label class="justify-start pr-0 md:justify-end"
 								>{m.transactions_label_mark_as()}</Label
 							>
-							<div class="space-y-2">
-								<Label
-									for="excluded"
-									class="flex h-9 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
-								>
-									<Checkbox id="excluded" bind:checked={formData.excluded} class="bg-background" />
-									<span>{m.transactions_label_excluded_from_totals()}</span>
-								</Label>
-							</div>
+							<CheckboxLabel
+								id="excluded"
+								bind:checked={formData.excluded}
+								label={m.transactions_label_excluded_from_totals()}
+							/>
 						</FormFieldRow>
 					</Fieldset>
 

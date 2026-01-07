@@ -42,8 +42,11 @@ test('trends performance table', async ({ page }) => {
 	const fiveYears = subYears(now, 5);
 	const earliest = subYears(now, 6);
 
-	// Offset by 1 day to avoid collision when test runs on Jan 1st
-	const ytd = subDays(startOfYear(now), 1);
+	// YTD balance should be on Jan 1st to match the app's YTD anchor calculation.
+	// The app uses `endOfDay(startOfYear(new Date()))` for YTD, so a balance at
+	// Jan 1st 12:00 will be found. This avoids collision with the 1W balance
+	// which falls in December when running in the first week of January.
+	const ytd = startOfYear(now);
 
 	const baselineCash: Array<[Date, number]> = [
 		[earliest, 1000],

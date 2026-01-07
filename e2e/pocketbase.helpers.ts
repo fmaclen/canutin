@@ -177,3 +177,10 @@ export async function deleteUser(id: string) {
 	const pb = await getAdminPB();
 	await pb.collection('users').delete(id);
 }
+
+export async function getTransactionLabelsByName(owner: string, name: string) {
+	const pb = await getAdminPB();
+	return await pb.collection('transactionLabels').getFullList({
+		filter: `owner = "${owner}" && name = "${name}"`
+	});
+}

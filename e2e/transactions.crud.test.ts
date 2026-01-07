@@ -5,6 +5,7 @@ import { setHours, subDays, subYears } from 'date-fns';
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
 import { formatDateForInput, goToPageViaSidebar, signIn } from './playwright.helpers';
 import {
+	getTransactionLabelsByName,
 	seedAccount,
 	seedAccountBalance,
 	seedTransaction,
@@ -335,4 +336,111 @@ test('transactions list updates in real-time when new transaction is added', asy
 	});
 
 	await expect(page.getByText('Fresh Groceries Market')).toHaveCount(1);
+});
+
+test('reuses existing labels instead of creating duplicates', async ({ page }) => {
+	const user = await seedUser('marcus');
+
+	const account = await seedAccount({
+		name: 'Pinewood Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 5000
+	});
+
+	const groceriesLabel = await seedTransactionLabel({ name: 'Groceries', owner: user.id });
+	const diningLabel = await seedTransactionLabel({ name: 'Dining', owner: user.id });
+
+	const tx1Date = setHours(subDays(new UTCDate(), 1), 12);
+	const tx2Date = setHours(subDays(new UTCDate(), 2), 12);
+	const tx3Date = setHours(subDays(new UTCDate(), 3), 12);
+
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: tx1Date.toISOString(),
+		description: 'Sunrise Grocery Store',
+		value: -100
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: tx2Date.toISOString(),
+		description: 'Downtown Deli',
+		value: -25
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: tx3Date.toISOString(),
+		description: 'Corner Market',
+		value: -50
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	expect(await getTransactionLabelsByName(user.id, 'Groceries')).toHaveLength(1);
+	expect(await getTransactionLabelsByName(user.id, 'Dining')).toHaveLength(1);
+
+	// Add new transaction with existing label
+	await page.getByRole('link', { name: 'Add transaction' }).click();
+	await page.getByLabel('Description').fill('Farmers Market');
+	await page.getByLabel('Amount').fill('-75');
+	await page.getByLabel('Date').fill(formatDateForInput(new UTCDate()));
+	await page.getByLabel('Account').click();
+	await page.getByRole('option', { name: 'Pinewood Checking' }).click();
+	await page.getByLabel('Labels').fill('Groceries');
+	await page.getByRole('button', { name: 'Add' }).click();
+	await expect(page.getByText('Transaction added').first()).toBeVisible();
+
+	const groceriesAfterAdd = await getTransactionLabelsByName(user.id, 'Groceries');
+	expect(groceriesAfterAdd).toHaveLength(1);
+	expect(groceriesAfterAdd[0].id).toBe(groceriesLabel.id);
+
+	// Edit existing transaction with existing labels
+	await page.getByRole('link', { name: 'Sunrise Grocery Store' }).click();
+	await page.getByLabel('Labels').fill('Groceries, Dining');
+	await page.getByRole('button', { name: 'Save' }).click();
+	await expect(page.getByText('Transaction updated')).toBeVisible();
+
+	const groceriesAfterEdit = await getTransactionLabelsByName(user.id, 'Groceries');
+	const diningAfterEdit = await getTransactionLabelsByName(user.id, 'Dining');
+	expect(groceriesAfterEdit).toHaveLength(1);
+	expect(diningAfterEdit).toHaveLength(1);
+	expect(groceriesAfterEdit[0].id).toBe(groceriesLabel.id);
+	expect(diningAfterEdit[0].id).toBe(diningLabel.id);
+
+	// Batch edit with existing label
+	await page.getByLabel('breadcrumb').getByRole('link', { name: 'Transactions' }).click();
+
+	const deliRow = page.getByRole('row', { name: 'Downtown Deli' });
+	const marketRow = page.getByRole('row', { name: 'Corner Market' });
+	await deliRow.getByRole('checkbox').check();
+	await marketRow.getByRole('checkbox').check();
+	await expect(page.getByRole('link', { name: 'Edit 2 transactions' })).toBeVisible();
+
+	await page.getByRole('link', { name: 'Edit 2 transactions' }).click();
+	await expect(page).toHaveURL('/transactions/batch');
+
+	// Edit checkboxes order: Description (0), Amount (1), Date (2), Account (3), Labels (4), Excluded (5)
+	const editCheckboxes = page.getByRole('checkbox', { name: 'Edit' });
+	await editCheckboxes.nth(4).check();
+	await page.getByLabel('Labels').fill('Dining');
+	await page.getByRole('button', { name: 'Apply' }).click();
+	await expect(page.getByText('2 transactions updated')).toBeVisible();
+
+	const diningAfterBatch = await getTransactionLabelsByName(user.id, 'Dining');
+	expect(diningAfterBatch).toHaveLength(1);
+	expect(diningAfterBatch[0].id).toBe(diningLabel.id);
+
+	expect(await getTransactionLabelsByName(user.id, 'Groceries')).toHaveLength(1);
+	expect(await getTransactionLabelsByName(user.id, 'Dining')).toHaveLength(1);
 });

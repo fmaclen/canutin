@@ -1,7 +1,7 @@
 import { UTCDate } from '@date-fns/utc';
 import type { RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
-import { SvelteMap, SvelteURLSearchParams } from 'svelte/reactivity';
+import { SvelteMap, SvelteSet, SvelteURLSearchParams } from 'svelte/reactivity';
 import { get } from 'svelte/store';
 
 import { replaceState } from '$app/navigation';
@@ -53,6 +53,7 @@ class TransactionsContext {
 	isLoading: boolean = $state(true);
 	rawTransactions: TransactionsResponse<TransactionExpand>[] = $state([]);
 
+	private _selectedIds: SvelteSet<string> = new SvelteSet();
 	private _customFromDate: Date | null = $state(null);
 	private _customToDate: Date | null = $state(null);
 	private _customLabel: string | null = $state(null);
@@ -90,7 +91,6 @@ class TransactionsContext {
 		const currentPage = get(page);
 		const currentSearch = currentPage.url.search;
 
-		// Skip if URL hasn't changed since last sync
 		if (currentSearch === this._lastSyncedSearch) {
 			return;
 		}
@@ -98,7 +98,6 @@ class TransactionsContext {
 
 		const params = currentPage.url.searchParams;
 
-		// Reset to defaults first
 		this._customFromDate = null;
 		this._customToDate = null;
 		this._customLabel = null;
@@ -143,7 +142,7 @@ class TransactionsContext {
 		}
 	}
 
-	private parseDate(dateString: string): Date | null {
+	private parseDate(dateString: string) {
 		const parsed = new UTCDate(dateString);
 		if (isNaN(parsed.getTime())) {
 			return null;
@@ -499,6 +498,68 @@ class TransactionsContext {
 
 		this.updateUrl(params);
 		this.refreshTransactions();
+	}
+
+	get selectedIds() {
+		return this._selectedIds;
+	}
+
+	get selectedCount() {
+		return this._selectedIds.size;
+	}
+
+	get isAllVisibleSelected() {
+		if (this.paginatedRows.length === 0) return false;
+		return this.paginatedRows.every((row) => this._selectedIds.has(row.id));
+	}
+
+	get isIndeterminate() {
+		if (this._selectedIds.size === 0) return false;
+		if (this.isAllVisibleSelected) return false;
+		return this.paginatedRows.some((row) => this._selectedIds.has(row.id));
+	}
+
+	get selectedTransactions() {
+		return this.allRows.filter((row) => this._selectedIds.has(row.id));
+	}
+
+	toggleSelection(id: string) {
+		if (this._selectedIds.has(id)) {
+			this._selectedIds.delete(id);
+		} else {
+			this._selectedIds.add(id);
+		}
+	}
+
+	selectAllVisible() {
+		for (const row of this.paginatedRows) {
+			this._selectedIds.add(row.id);
+		}
+	}
+
+	deselectAllVisible() {
+		for (const row of this.paginatedRows) {
+			this._selectedIds.delete(row.id);
+		}
+	}
+
+	clearSelection() {
+		this._selectedIds.clear();
+	}
+
+	get filteredCount() {
+		return this.filteredRows.length;
+	}
+
+	get isAllFilteredSelected() {
+		if (this.filteredRows.length === 0) return false;
+		return this.filteredRows.every((row) => this._selectedIds.has(row.id));
+	}
+
+	selectAllFiltered() {
+		for (const row of this.filteredRows) {
+			this._selectedIds.add(row.id);
+		}
 	}
 
 	dispose() {

@@ -8,9 +8,10 @@
 		name?: string;
 		value: string;
 		required?: boolean;
+		disabled?: boolean;
 	}
 
-	let { id, name, value = $bindable(), required = false }: Props = $props();
+	let { id, name, value = $bindable(), required = false, disabled = false }: Props = $props();
 
 	const placeholder = formatValue({ value: '0', intlConfig, decimalScale: 2 });
 
@@ -30,6 +31,7 @@
 	{name}
 	bind:value
 	{required}
+	{disabled}
 	{intlConfig}
 	{placeholder}
 	decimalScale={2}

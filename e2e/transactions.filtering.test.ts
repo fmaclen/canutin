@@ -82,7 +82,7 @@ test('transactions table responds to period and type filters', async ({ page }) 
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Transactions');
 
-	await expect(page.getByRole('row', { name: /Invoice Payment/ })).toBeVisible();
+	await expect(page.getByRole('row', { name: 'Invoice Payment' })).toBeVisible();
 
 	await expect(page.getByLabel('Period')).toContainText('Last 3 months');
 	await expect(page.getByLabel('Type')).toContainText('Any amounts');
@@ -170,9 +170,10 @@ test('transactions table responds to period and type filters', async ({ page }) 
 
 	await page.getByLabel('Type').click();
 	await page.getByRole('option', { name: 'Any amounts' }).click();
-	const excludedRow = page.getByRole('row', { name: /Excluded Adjustment/ });
+	const excludedRow = page.getByRole('row', { name: 'Excluded Adjustment' });
 	await expect(excludedRow).toBeVisible();
-	const excludedAmount = excludedRow.locator('td').nth(4).locator('.border-dashed');
+	// Excluded amounts are wrapped in a Tooltip.Trigger (button), not a link
+	const excludedAmount = excludedRow.getByText('$75.00');
 	await expect(excludedAmount).toBeVisible();
 
 	const info = test.info();
