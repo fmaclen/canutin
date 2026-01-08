@@ -6,7 +6,7 @@ import { seedAccount, seedAccountBalance, seedTransaction, seedUser } from './po
 
 test.describe('accounts table sorting', () => {
 	test('clicking Balance header sorts by balance descending then ascending', async ({ page }) => {
-		const user = await seedUser('accountSortAlice');
+		const user = await seedUser('alice');
 
 		await seedAccount({
 			name: 'Low Balance Account',
@@ -95,7 +95,7 @@ test.describe('accounts table sorting', () => {
 	});
 
 	test('clicking Account header sorts alphabetically', async ({ page }) => {
-		const user = await seedUser('accountSortBob');
+		const user = await seedUser('bob');
 
 		await seedAccount({
 			name: 'Zebra Account',
@@ -153,7 +153,7 @@ test.describe('accounts table sorting', () => {
 	});
 
 	test('clicking Institution header sorts by institution', async ({ page }) => {
-		const user = await seedUser('accountSortCarol');
+		const user = await seedUser('carol');
 
 		await seedAccount({
 			name: 'Chase Checking',
@@ -205,7 +205,7 @@ test.describe('accounts table sorting', () => {
 	});
 
 	test('clicking Transactions header sorts by transaction count', async ({ page }) => {
-		const user = await seedUser('accountSortDiana');
+		const user = await seedUser('diana');
 
 		const manyTx = await seedAccount({
 			name: 'Many Transactions',
@@ -277,7 +277,7 @@ test.describe('accounts table sorting', () => {
 	});
 
 	test('sort state persists in URL and survives page reload', async ({ page }) => {
-		const user = await seedUser('accountSortEllie');
+		const user = await seedUser('ellie');
 
 		await seedAccount({
 			name: 'Account One',
@@ -341,7 +341,7 @@ test.describe('accounts table sorting', () => {
 	});
 
 	test('sort indicator shows on active column', async ({ page }) => {
-		const user = await seedUser('accountSortFaith');
+		const user = await seedUser('faith');
 
 		await seedAccount({
 			name: 'Test Account',
@@ -383,7 +383,7 @@ test.describe('accounts table sorting', () => {
 	});
 
 	test('sorting works correctly across filter tabs', async ({ page }) => {
-		const user = await seedUser('accountSortGrace');
+		const user = await seedUser('grace');
 
 		await seedAccount({
 			name: 'Open Account',

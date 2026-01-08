@@ -8,7 +8,7 @@ import { seedAccount, seedAccountBalance, seedTransaction, seedUser } from './po
 
 test.describe('transactions table sorting', () => {
 	test('clicking Date header sorts by date descending then ascending', async ({ page }) => {
-		const user = await seedUser('txSortPeter');
+		const user = await seedUser('peter');
 
 		const account = await seedAccount({
 			name: 'Test Account',
@@ -89,7 +89,7 @@ test.describe('transactions table sorting', () => {
 	});
 
 	test('clicking Description header sorts alphabetically', async ({ page }) => {
-		const user = await seedUser('txSortRosa');
+		const user = await seedUser('rosa');
 
 		const account = await seedAccount({
 			name: 'Test Account',
@@ -152,7 +152,7 @@ test.describe('transactions table sorting', () => {
 	});
 
 	test('clicking Account header sorts by account name', async ({ page }) => {
-		const user = await seedUser('txSortSteve');
+		const user = await seedUser('steve');
 
 		const account1 = await seedAccount({
 			name: 'Alpha Account',
@@ -221,7 +221,7 @@ test.describe('transactions table sorting', () => {
 	});
 
 	test('clicking Amount header sorts by amount descending then ascending', async ({ page }) => {
-		const user = await seedUser('txSortTina');
+		const user = await seedUser('tina');
 
 		const account = await seedAccount({
 			name: 'Test Account',
@@ -291,7 +291,7 @@ test.describe('transactions table sorting', () => {
 	});
 
 	test('sort state persists in URL and survives page reload', async ({ page }) => {
-		const user = await seedUser('txSortUma');
+		const user = await seedUser('uma');
 
 		const account = await seedAccount({
 			name: 'Test Account',
@@ -335,7 +335,7 @@ test.describe('transactions table sorting', () => {
 	});
 
 	test('sort indicator shows on active column', async ({ page }) => {
-		const user = await seedUser('txSortVictor');
+		const user = await seedUser('victor');
 
 		const account = await seedAccount({
 			name: 'Test Account',
@@ -384,7 +384,7 @@ test.describe('transactions table sorting', () => {
 	});
 
 	test('sorting works with filters', async ({ page }) => {
-		const user = await seedUser('txSortXavier');
+		const user = await seedUser('xavier');
 
 		const account = await seedAccount({
 			name: 'Test Account',
