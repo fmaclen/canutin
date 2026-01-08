@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import { setHours, subDays } from 'date-fns';
 
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
-import { goToPageViaSidebar, signIn } from './playwright.helpers';
+import { getRowIndex, goToPageViaSidebar, signIn } from './playwright.helpers';
 import { seedAccount, seedAccountBalance, seedTransaction, seedUser } from './pocketbase.helpers';
 
 test.describe('transactions table sorting', () => {
@@ -53,19 +53,17 @@ test.describe('transactions table sorting', () => {
 		await page.goto('/');
 		await signIn(page, user.email);
 		await goToPageViaSidebar(page, 'Transactions');
-		await expect(page.getByRole('row', { name: /Recent Transaction/ })).toBeVisible();
+		await expect(page.getByRole('row', { name: 'Recent Transaction' })).toBeVisible();
 
 		const rows = page.locator('tbody tr');
 
-		async function getRowIndex(name: string) {
-			return rows.evaluateAll((els, n) => els.findIndex((el) => el.textContent?.includes(n)), name);
-		}
-
 		// Default sort is date DESC (most recent first)
-		expect(await getRowIndex('Recent Transaction')).toBeLessThan(
-			await getRowIndex('Mid Transaction')
+		expect(await getRowIndex(rows, 'Recent Transaction')).toBeLessThan(
+			await getRowIndex(rows, 'Mid Transaction')
 		);
-		expect(await getRowIndex('Mid Transaction')).toBeLessThan(await getRowIndex('Old Transaction'));
+		expect(await getRowIndex(rows, 'Mid Transaction')).toBeLessThan(
+			await getRowIndex(rows, 'Old Transaction')
+		);
 
 		// Click Date header - default is already DESC, so clicking toggles to ASC
 		const dateHeader = page.getByRole('button', { name: 'Date' });
@@ -74,17 +72,19 @@ test.describe('transactions table sorting', () => {
 		await expect(page).toHaveURL(/sort=date/);
 		await expect(page).toHaveURL(/dir=asc/);
 
-		expect(await getRowIndex('Old Transaction')).toBeLessThan(await getRowIndex('Mid Transaction'));
-		expect(await getRowIndex('Mid Transaction')).toBeLessThan(
-			await getRowIndex('Recent Transaction')
+		expect(await getRowIndex(rows, 'Old Transaction')).toBeLessThan(
+			await getRowIndex(rows, 'Mid Transaction')
+		);
+		expect(await getRowIndex(rows, 'Mid Transaction')).toBeLessThan(
+			await getRowIndex(rows, 'Recent Transaction')
 		);
 
 		// Click again - should toggle back to DESC
 		await dateHeader.click();
 		await expect(page).toHaveURL(/dir=desc/);
 
-		expect(await getRowIndex('Recent Transaction')).toBeLessThan(
-			await getRowIndex('Mid Transaction')
+		expect(await getRowIndex(rows, 'Recent Transaction')).toBeLessThan(
+			await getRowIndex(rows, 'Mid Transaction')
 		);
 	});
 
@@ -131,24 +131,24 @@ test.describe('transactions table sorting', () => {
 		await page.goto('/');
 		await signIn(page, user.email);
 		await goToPageViaSidebar(page, 'Transactions');
-		await expect(page.getByRole('row', { name: /Zebra Store/ })).toBeVisible();
+		await expect(page.getByRole('row', { name: 'Zebra Store' })).toBeVisible();
 
 		const rows = page.locator('tbody tr');
-
-		async function getRowIndex(name: string) {
-			return rows.evaluateAll((els, n) => els.findIndex((el) => el.textContent?.includes(n)), name);
-		}
 
 		const descriptionHeader = page.getByRole('button', { name: 'Description' });
 		await descriptionHeader.click();
 
 		await expect(page).toHaveURL(/sort=description/);
 		await expect(page).toHaveURL(/dir=desc/);
-		expect(await getRowIndex('Zebra Store')).toBeLessThan(await getRowIndex('Apple Purchase'));
+		expect(await getRowIndex(rows, 'Zebra Store')).toBeLessThan(
+			await getRowIndex(rows, 'Apple Purchase')
+		);
 
 		await descriptionHeader.click();
 		await expect(page).toHaveURL(/dir=asc/);
-		expect(await getRowIndex('Apple Purchase')).toBeLessThan(await getRowIndex('Zebra Store'));
+		expect(await getRowIndex(rows, 'Apple Purchase')).toBeLessThan(
+			await getRowIndex(rows, 'Zebra Store')
+		);
 	});
 
 	test('clicking Account header sorts by account name', async ({ page }) => {
@@ -200,24 +200,24 @@ test.describe('transactions table sorting', () => {
 		await page.goto('/');
 		await signIn(page, user.email);
 		await goToPageViaSidebar(page, 'Transactions');
-		await expect(page.getByRole('row', { name: /Transaction A/ })).toBeVisible();
+		await expect(page.getByRole('row', { name: 'Transaction A' })).toBeVisible();
 
 		const rows = page.locator('tbody tr');
-
-		async function getRowIndex(name: string) {
-			return rows.evaluateAll((els, n) => els.findIndex((el) => el.textContent?.includes(n)), name);
-		}
 
 		const accountHeader = page.getByRole('button', { name: 'Account' });
 		await accountHeader.click();
 
 		await expect(page).toHaveURL(/sort=account/);
 		await expect(page).toHaveURL(/dir=desc/);
-		expect(await getRowIndex('Zeta Account')).toBeLessThan(await getRowIndex('Alpha Account'));
+		expect(await getRowIndex(rows, 'Zeta Account')).toBeLessThan(
+			await getRowIndex(rows, 'Alpha Account')
+		);
 
 		await accountHeader.click();
 		await expect(page).toHaveURL(/dir=asc/);
-		expect(await getRowIndex('Alpha Account')).toBeLessThan(await getRowIndex('Zeta Account'));
+		expect(await getRowIndex(rows, 'Alpha Account')).toBeLessThan(
+			await getRowIndex(rows, 'Zeta Account')
+		);
 	});
 
 	test('clicking Amount header sorts by amount descending then ascending', async ({ page }) => {
@@ -270,24 +270,24 @@ test.describe('transactions table sorting', () => {
 		await page.goto('/');
 		await signIn(page, user.email);
 		await goToPageViaSidebar(page, 'Transactions');
-		await expect(page.getByRole('row', { name: /Large Credit/ })).toBeVisible();
+		await expect(page.getByRole('row', { name: 'Large Credit' })).toBeVisible();
 
 		const rows = page.locator('tbody tr');
-
-		async function getRowIndex(name: string) {
-			return rows.evaluateAll((els, n) => els.findIndex((el) => el.textContent?.includes(n)), name);
-		}
 
 		const amountHeader = page.getByRole('button', { name: 'Amount' });
 		await amountHeader.click();
 
 		await expect(page).toHaveURL(/sort=amount/);
 		await expect(page).toHaveURL(/dir=desc/);
-		expect(await getRowIndex('Large Credit')).toBeLessThan(await getRowIndex('Large Debit'));
+		expect(await getRowIndex(rows, 'Large Credit')).toBeLessThan(
+			await getRowIndex(rows, 'Large Debit')
+		);
 
 		await amountHeader.click();
 		await expect(page).toHaveURL(/dir=asc/);
-		expect(await getRowIndex('Large Debit')).toBeLessThan(await getRowIndex('Large Credit'));
+		expect(await getRowIndex(rows, 'Large Debit')).toBeLessThan(
+			await getRowIndex(rows, 'Large Credit')
+		);
 	});
 
 	test('sort state persists in URL and survives page reload', async ({ page }) => {
@@ -319,7 +319,7 @@ test.describe('transactions table sorting', () => {
 		await page.goto('/');
 		await signIn(page, user.email);
 		await goToPageViaSidebar(page, 'Transactions');
-		await expect(page.getByRole('row', { name: /Test Transaction/ })).toBeVisible();
+		await expect(page.getByRole('row', { name: 'Test Transaction' })).toBeVisible();
 
 		const amountHeader = page.getByRole('button', { name: 'Amount' });
 		await amountHeader.click();
@@ -363,7 +363,7 @@ test.describe('transactions table sorting', () => {
 		await page.goto('/');
 		await signIn(page, user.email);
 		await goToPageViaSidebar(page, 'Transactions');
-		await expect(page.getByRole('row', { name: /Test Transaction/ })).toBeVisible();
+		await expect(page.getByRole('row', { name: 'Test Transaction' })).toBeVisible();
 
 		const amountButton = page.getByRole('button', { name: 'Amount' });
 		const amountHeader = amountButton.locator('xpath=..');
@@ -426,7 +426,7 @@ test.describe('transactions table sorting', () => {
 		await page.goto('/');
 		await signIn(page, user.email);
 		await goToPageViaSidebar(page, 'Transactions');
-		await expect(page.getByRole('row', { name: /Credit A/ })).toBeVisible();
+		await expect(page.getByRole('row', { name: 'Credit A' })).toBeVisible();
 
 		// Apply Credits only filter first
 		await page.getByLabel('Type').click();
@@ -439,11 +439,7 @@ test.describe('transactions table sorting', () => {
 
 		const rows = page.locator('tbody tr');
 
-		async function getRowIndex(name: string) {
-			return rows.evaluateAll((els, n) => els.findIndex((el) => el.textContent?.includes(n)), name);
-		}
-
 		// With filter applied, only credits visible, sorted by amount DESC (Credit A = 1000 > Credit B = 500)
-		expect(await getRowIndex('Credit A')).toBeLessThan(await getRowIndex('Credit B'));
+		expect(await getRowIndex(rows, 'Credit A')).toBeLessThan(await getRowIndex(rows, 'Credit B'));
 	});
 });

@@ -3,9 +3,7 @@
 	import type { Snippet } from 'svelte';
 	import type { HTMLThAttributes } from 'svelte/elements';
 
-	import { cn, type WithElementRef } from '$lib/utils.js';
-
-	type SortDirection = 'asc' | 'desc';
+	import { cn, type SortDirection, type WithElementRef } from '$lib/utils.js';
 
 	interface Props extends WithElementRef<HTMLThAttributes> {
 		column: string;

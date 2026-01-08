@@ -1,6 +1,10 @@
-import { expect, Page } from '@playwright/test';
+import { expect, Locator, Page } from '@playwright/test';
 
 import { DEFAULT_PASSWORD } from './pocketbase.helpers';
+
+export async function getRowIndex(rows: Locator, name: string) {
+	return rows.evaluateAll((els, n) => els.findIndex((el) => el.textContent?.includes(n)), name);
+}
 
 export function formatDateForInput(date: Date) {
 	return date.toISOString().slice(0, 10);

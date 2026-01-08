@@ -142,14 +142,12 @@
 		return rows.sort(comparator);
 	});
 
-	const allRows = $derived(sortedRows);
-
 	const rowsByFilter = $derived.by(() => {
 		const map = new SvelteMap<FilterOption, AssetRow[]>();
 		for (const option of filters)
 			map.set(
 				option.key,
-				allRows.filter((row) => option.predicate(row))
+				sortedRows.filter((row) => option.predicate(row))
 			);
 		return map;
 	});

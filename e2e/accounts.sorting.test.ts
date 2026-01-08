@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test';
 
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
-import { goToPageViaSidebar, signIn } from './playwright.helpers';
+import { getRowIndex, goToPageViaSidebar, signIn } from './playwright.helpers';
 import { seedAccount, seedAccountBalance, seedTransaction, seedUser } from './pocketbase.helpers';
 
 test.describe('accounts table sorting', () => {
 	test('clicking Balance header sorts by balance descending then ascending', async ({ page }) => {
-		const user = await seedUser('alice');
+		const user = await seedUser('accountSortAlice');
 
 		await seedAccount({
 			name: 'Low Balance Account',
@@ -55,21 +55,16 @@ test.describe('accounts table sorting', () => {
 		await goToPageViaSidebar(page, 'Accounts');
 		await expect(page.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'true');
 
-		await expect(page.getByRole('row', { name: /High Balance Account/ })).toBeVisible();
+		await expect(page.getByRole('row', { name: 'High Balance Account' })).toBeVisible();
 
 		const rows = page.locator('tbody tr');
 
-		// Helper to get row index by name
-		async function getRowIndex(name: string) {
-			return rows.evaluateAll((els, n) => els.findIndex((el) => el.textContent?.includes(n)), name);
-		}
-
 		// Default sort is balance DESC (highest first)
-		expect(await getRowIndex('High Balance Account')).toBeLessThan(
-			await getRowIndex('Mid Balance Account')
+		expect(await getRowIndex(rows, 'High Balance Account')).toBeLessThan(
+			await getRowIndex(rows, 'Mid Balance Account')
 		);
-		expect(await getRowIndex('Mid Balance Account')).toBeLessThan(
-			await getRowIndex('Low Balance Account')
+		expect(await getRowIndex(rows, 'Mid Balance Account')).toBeLessThan(
+			await getRowIndex(rows, 'Low Balance Account')
 		);
 
 		// Click Balance header - default is already Balance DESC, so clicking toggles to ASC
@@ -79,11 +74,11 @@ test.describe('accounts table sorting', () => {
 		await expect(page).toHaveURL(/dir=asc/);
 
 		// Verify order is now ascending (lowest first)
-		expect(await getRowIndex('Low Balance Account')).toBeLessThan(
-			await getRowIndex('Mid Balance Account')
+		expect(await getRowIndex(rows, 'Low Balance Account')).toBeLessThan(
+			await getRowIndex(rows, 'Mid Balance Account')
 		);
-		expect(await getRowIndex('Mid Balance Account')).toBeLessThan(
-			await getRowIndex('High Balance Account')
+		expect(await getRowIndex(rows, 'Mid Balance Account')).toBeLessThan(
+			await getRowIndex(rows, 'High Balance Account')
 		);
 
 		// Click again - should toggle back to DESC
@@ -91,16 +86,16 @@ test.describe('accounts table sorting', () => {
 		await expect(page).toHaveURL(/dir=desc/);
 
 		// Verify order is back to descending (highest first)
-		expect(await getRowIndex('High Balance Account')).toBeLessThan(
-			await getRowIndex('Mid Balance Account')
+		expect(await getRowIndex(rows, 'High Balance Account')).toBeLessThan(
+			await getRowIndex(rows, 'Mid Balance Account')
 		);
-		expect(await getRowIndex('Mid Balance Account')).toBeLessThan(
-			await getRowIndex('Low Balance Account')
+		expect(await getRowIndex(rows, 'Mid Balance Account')).toBeLessThan(
+			await getRowIndex(rows, 'Low Balance Account')
 		);
 	});
 
 	test('clicking Account header sorts alphabetically', async ({ page }) => {
-		const user = await seedUser('bob');
+		const user = await seedUser('accountSortBob');
 
 		await seedAccount({
 			name: 'Zebra Account',
@@ -135,30 +130,30 @@ test.describe('accounts table sorting', () => {
 		await goToPageViaSidebar(page, 'Accounts');
 		await expect(page.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'true');
 
-		await expect(page.getByRole('row', { name: /Zebra Account/ })).toBeVisible();
+		await expect(page.getByRole('row', { name: 'Zebra Account' })).toBeVisible();
 
 		const rows = page.locator('tbody tr');
 
-		async function getRowIndex(name: string) {
-			return rows.evaluateAll((els, n) => els.findIndex((el) => el.textContent?.includes(n)), name);
-		}
-
 		// Click Account header - first click should sort DESC (Z first)
-		const accountHeader = page.getByRole('button', { name: 'Account' });
+		const accountHeader = page.getByRole('button', { name: 'Account', exact: true });
 		await accountHeader.click();
 
 		await expect(page).toHaveURL(/sort=name/);
 		await expect(page).toHaveURL(/dir=desc/);
-		expect(await getRowIndex('Zebra Account')).toBeLessThan(await getRowIndex('Alpha Account'));
+		expect(await getRowIndex(rows, 'Zebra Account')).toBeLessThan(
+			await getRowIndex(rows, 'Alpha Account')
+		);
 
 		// Click again - should toggle to ASC (A first)
 		await accountHeader.click();
 		await expect(page).toHaveURL(/dir=asc/);
-		expect(await getRowIndex('Alpha Account')).toBeLessThan(await getRowIndex('Zebra Account'));
+		expect(await getRowIndex(rows, 'Alpha Account')).toBeLessThan(
+			await getRowIndex(rows, 'Zebra Account')
+		);
 	});
 
 	test('clicking Institution header sorts by institution', async ({ page }) => {
-		const user = await seedUser('carol');
+		const user = await seedUser('accountSortCarol');
 
 		await seedAccount({
 			name: 'Chase Checking',
@@ -195,7 +190,7 @@ test.describe('accounts table sorting', () => {
 		await goToPageViaSidebar(page, 'Accounts');
 		await expect(page.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'true');
 
-		await expect(page.getByRole('row', { name: /Chase Checking/ })).toBeVisible();
+		await expect(page.getByRole('row', { name: 'Chase Checking' })).toBeVisible();
 
 		// Click Institution header
 		const institutionHeader = page.getByRole('button', { name: 'Institution' });
@@ -210,7 +205,7 @@ test.describe('accounts table sorting', () => {
 	});
 
 	test('clicking Transactions header sorts by transaction count', async ({ page }) => {
-		const user = await seedUser('diana');
+		const user = await seedUser('accountSortDiana');
 
 		const manyTx = await seedAccount({
 			name: 'Many Transactions',
@@ -259,13 +254,9 @@ test.describe('accounts table sorting', () => {
 		await goToPageViaSidebar(page, 'Accounts');
 		await expect(page.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'true');
 
-		await expect(page.getByRole('row', { name: /Many Transactions/ })).toBeVisible();
+		await expect(page.getByRole('row', { name: 'Many Transactions' })).toBeVisible();
 
 		const rows = page.locator('tbody tr');
-
-		async function getRowIndex(name: string) {
-			return rows.evaluateAll((els, n) => els.findIndex((el) => el.textContent?.includes(n)), name);
-		}
 
 		// Click Transactions header - DESC first (most transactions first)
 		const txHeader = page.getByRole('button', { name: 'Transactions' });
@@ -273,20 +264,20 @@ test.describe('accounts table sorting', () => {
 
 		await expect(page).toHaveURL(/sort=transactions/);
 		await expect(page).toHaveURL(/dir=desc/);
-		expect(await getRowIndex('Many Transactions')).toBeLessThan(
-			await getRowIndex('Few Transactions')
+		expect(await getRowIndex(rows, 'Many Transactions')).toBeLessThan(
+			await getRowIndex(rows, 'Few Transactions')
 		);
 
 		// Click again - ASC (fewest first)
 		await txHeader.click();
 		await expect(page).toHaveURL(/dir=asc/);
-		expect(await getRowIndex('Few Transactions')).toBeLessThan(
-			await getRowIndex('Many Transactions')
+		expect(await getRowIndex(rows, 'Few Transactions')).toBeLessThan(
+			await getRowIndex(rows, 'Many Transactions')
 		);
 	});
 
 	test('sort state persists in URL and survives page reload', async ({ page }) => {
-		const user = await seedUser('ellie');
+		const user = await seedUser('accountSortEllie');
 
 		await seedAccount({
 			name: 'Account One',
@@ -321,10 +312,10 @@ test.describe('accounts table sorting', () => {
 		await goToPageViaSidebar(page, 'Accounts');
 		await expect(page.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'true');
 
-		await expect(page.getByRole('row', { name: /Account One/ })).toBeVisible();
+		await expect(page.getByRole('row', { name: 'Account One' })).toBeVisible();
 
 		// Sort by name ASC
-		const accountHeader = page.getByRole('button', { name: 'Account' });
+		const accountHeader = page.getByRole('button', { name: 'Account', exact: true });
 		await accountHeader.click(); // DESC
 		await accountHeader.click(); // ASC
 
@@ -333,11 +324,9 @@ test.describe('accounts table sorting', () => {
 
 		const rows = page.locator('tbody tr');
 
-		async function getRowIndex(name: string) {
-			return rows.evaluateAll((els, n) => els.findIndex((el) => el.textContent?.includes(n)), name);
-		}
-
-		expect(await getRowIndex('Account One')).toBeLessThan(await getRowIndex('Account Two'));
+		expect(await getRowIndex(rows, 'Account One')).toBeLessThan(
+			await getRowIndex(rows, 'Account Two')
+		);
 
 		// Reload page
 		await page.reload();
@@ -345,12 +334,14 @@ test.describe('accounts table sorting', () => {
 		// Sort state should persist
 		await expect(page).toHaveURL(/sort=name/);
 		await expect(page).toHaveURL(/dir=asc/);
-		await expect(page.getByRole('row', { name: /Account One/ })).toBeVisible();
-		expect(await getRowIndex('Account One')).toBeLessThan(await getRowIndex('Account Two'));
+		await expect(page.getByRole('row', { name: 'Account One' })).toBeVisible();
+		expect(await getRowIndex(rows, 'Account One')).toBeLessThan(
+			await getRowIndex(rows, 'Account Two')
+		);
 	});
 
 	test('sort indicator shows on active column', async ({ page }) => {
-		const user = await seedUser('faith');
+		const user = await seedUser('accountSortFaith');
 
 		await seedAccount({
 			name: 'Test Account',
@@ -371,7 +362,7 @@ test.describe('accounts table sorting', () => {
 		await goToPageViaSidebar(page, 'Accounts');
 		await expect(page.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'true');
 
-		await expect(page.getByRole('row', { name: /Test Account/ })).toBeVisible();
+		await expect(page.getByRole('row', { name: 'Test Account' })).toBeVisible();
 
 		// Default sort is Balance DESC - the th parent should have aria-sort
 		const balanceButton = page.getByRole('button', { name: 'Balance' });
@@ -383,7 +374,7 @@ test.describe('accounts table sorting', () => {
 		await expect(balanceTh).toHaveAttribute('aria-sort', 'ascending');
 
 		// Click different column - Balance th should lose aria-sort
-		const accountButton = page.getByRole('button', { name: 'Account' });
+		const accountButton = page.getByRole('button', { name: 'Account', exact: true });
 		const accountTh = accountButton.locator('xpath=..');
 		await accountButton.click();
 
@@ -392,7 +383,7 @@ test.describe('accounts table sorting', () => {
 	});
 
 	test('sorting works correctly across filter tabs', async ({ page }) => {
-		const user = await seedUser('grace');
+		const user = await seedUser('accountSortGrace');
 
 		await seedAccount({
 			name: 'Open Account',
@@ -428,10 +419,10 @@ test.describe('accounts table sorting', () => {
 		await goToPageViaSidebar(page, 'Accounts');
 		await expect(page.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'true');
 
-		await expect(page.getByRole('row', { name: /Open Account/ })).toBeVisible();
+		await expect(page.getByRole('row', { name: 'Open Account' })).toBeVisible();
 
 		// Sort by name ASC
-		const accountHeader = page.getByRole('button', { name: 'Account' });
+		const accountHeader = page.getByRole('button', { name: 'Account', exact: true });
 		await accountHeader.click(); // DESC
 		await accountHeader.click(); // ASC
 
@@ -445,11 +436,9 @@ test.describe('accounts table sorting', () => {
 
 		const rows = page.locator('tbody tr');
 
-		async function getRowIndex(name: string) {
-			return rows.evaluateAll((els, n) => els.findIndex((el) => el.textContent?.includes(n)), name);
-		}
-
 		// C comes before O alphabetically
-		expect(await getRowIndex('Closed Account')).toBeLessThan(await getRowIndex('Open Account'));
+		expect(await getRowIndex(rows, 'Closed Account')).toBeLessThan(
+			await getRowIndex(rows, 'Open Account')
+		);
 	});
 });

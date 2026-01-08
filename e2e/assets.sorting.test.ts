@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { AssetsBalanceGroupOptions, AssetsTypeOptions } from '../src/lib/pocketbase.schema';
-import { goToPageViaSidebar, signIn } from './playwright.helpers';
+import { getRowIndex, goToPageViaSidebar, signIn } from './playwright.helpers';
 import { seedAsset, seedAssetBalance, seedUser } from './pocketbase.helpers';
 
 test.describe('assets table sorting', () => {
@@ -56,19 +56,17 @@ test.describe('assets table sorting', () => {
 		await signIn(page, user.email);
 		await goToPageViaSidebar(page, 'Assets');
 		await expect(page.getByRole('tab', { name: 'Owned' })).toHaveAttribute('aria-selected', 'true');
-		await expect(page.getByRole('row', { name: /High Value Asset/ })).toBeVisible();
+		await expect(page.getByRole('row', { name: 'High Value Asset' })).toBeVisible();
 
 		const rows = page.locator('[data-slot="table-body"] tr');
 
-		async function getRowIndex(name: string) {
-			return rows.evaluateAll((els, n) => els.findIndex((el) => el.textContent?.includes(n)), name);
-		}
-
 		// Default sort is market value DESC (highest first)
-		expect(await getRowIndex('High Value Asset')).toBeLessThan(
-			await getRowIndex('Mid Value Asset')
+		expect(await getRowIndex(rows, 'High Value Asset')).toBeLessThan(
+			await getRowIndex(rows, 'Mid Value Asset')
 		);
-		expect(await getRowIndex('Mid Value Asset')).toBeLessThan(await getRowIndex('Low Value Asset'));
+		expect(await getRowIndex(rows, 'Mid Value Asset')).toBeLessThan(
+			await getRowIndex(rows, 'Low Value Asset')
+		);
 
 		// Click Market Value header - default is already DESC, so clicking toggles to ASC
 		const marketValueHeader = page.getByRole('button', { name: 'Market Value' });
@@ -77,19 +75,23 @@ test.describe('assets table sorting', () => {
 		await expect(page).toHaveURL(/sort=marketValue/);
 		await expect(page).toHaveURL(/dir=asc/);
 
-		expect(await getRowIndex('Low Value Asset')).toBeLessThan(await getRowIndex('Mid Value Asset'));
-		expect(await getRowIndex('Mid Value Asset')).toBeLessThan(
-			await getRowIndex('High Value Asset')
+		expect(await getRowIndex(rows, 'Low Value Asset')).toBeLessThan(
+			await getRowIndex(rows, 'Mid Value Asset')
+		);
+		expect(await getRowIndex(rows, 'Mid Value Asset')).toBeLessThan(
+			await getRowIndex(rows, 'High Value Asset')
 		);
 
 		// Click again - should toggle back to DESC
 		await marketValueHeader.click();
 		await expect(page).toHaveURL(/dir=desc/);
 
-		expect(await getRowIndex('High Value Asset')).toBeLessThan(
-			await getRowIndex('Mid Value Asset')
+		expect(await getRowIndex(rows, 'High Value Asset')).toBeLessThan(
+			await getRowIndex(rows, 'Mid Value Asset')
 		);
-		expect(await getRowIndex('Mid Value Asset')).toBeLessThan(await getRowIndex('Low Value Asset'));
+		expect(await getRowIndex(rows, 'Mid Value Asset')).toBeLessThan(
+			await getRowIndex(rows, 'Low Value Asset')
+		);
 	});
 
 	test('clicking Asset header sorts alphabetically', async ({ page }) => {
@@ -127,24 +129,24 @@ test.describe('assets table sorting', () => {
 		await signIn(page, user.email);
 		await goToPageViaSidebar(page, 'Assets');
 		await expect(page.getByRole('tab', { name: 'Owned' })).toHaveAttribute('aria-selected', 'true');
-		await expect(page.getByRole('row', { name: /Zebra Corp/ })).toBeVisible();
+		await expect(page.getByRole('row', { name: 'Zebra Corp' })).toBeVisible();
 
 		const rows = page.locator('[data-slot="table-body"] tr');
-
-		async function getRowIndex(name: string) {
-			return rows.evaluateAll((els, n) => els.findIndex((el) => el.textContent?.includes(n)), name);
-		}
 
 		const assetHeader = page.getByRole('button', { name: 'Asset', exact: true });
 		await assetHeader.click();
 
 		await expect(page).toHaveURL(/sort=name/);
 		await expect(page).toHaveURL(/dir=desc/);
-		expect(await getRowIndex('Zebra Corp')).toBeLessThan(await getRowIndex('Alpha Inc'));
+		expect(await getRowIndex(rows, 'Zebra Corp')).toBeLessThan(
+			await getRowIndex(rows, 'Alpha Inc')
+		);
 
 		await assetHeader.click();
 		await expect(page).toHaveURL(/dir=asc/);
-		expect(await getRowIndex('Alpha Inc')).toBeLessThan(await getRowIndex('Zebra Corp'));
+		expect(await getRowIndex(rows, 'Alpha Inc')).toBeLessThan(
+			await getRowIndex(rows, 'Zebra Corp')
+		);
 	});
 
 	test('clicking Symbol header sorts by symbol', async ({ page }) => {
@@ -198,7 +200,7 @@ test.describe('assets table sorting', () => {
 		await signIn(page, user.email);
 		await goToPageViaSidebar(page, 'Assets');
 		await expect(page.getByRole('tab', { name: 'Owned' })).toHaveAttribute('aria-selected', 'true');
-		await expect(page.getByRole('row', { name: /Real Estate/ })).toBeVisible();
+		await expect(page.getByRole('row', { name: 'Real Estate' })).toBeVisible();
 
 		const symbolHeader = page.getByRole('button', { name: 'Symbol' });
 		await symbolHeader.click();
@@ -243,24 +245,24 @@ test.describe('assets table sorting', () => {
 		await signIn(page, user.email);
 		await goToPageViaSidebar(page, 'Assets');
 		await expect(page.getByRole('tab', { name: 'Owned' })).toHaveAttribute('aria-selected', 'true');
-		await expect(page.getByRole('row', { name: /High Cost Basis/ })).toBeVisible();
+		await expect(page.getByRole('row', { name: 'High Cost Basis' })).toBeVisible();
 
 		const rows = page.locator('[data-slot="table-body"] tr');
-
-		async function getRowIndex(name: string) {
-			return rows.evaluateAll((els, n) => els.findIndex((el) => el.textContent?.includes(n)), name);
-		}
 
 		const bookValueHeader = page.getByRole('button', { name: 'Book Value' });
 		await bookValueHeader.click();
 
 		await expect(page).toHaveURL(/sort=bookValue/);
 		await expect(page).toHaveURL(/dir=desc/);
-		expect(await getRowIndex('High Cost Basis')).toBeLessThan(await getRowIndex('Low Cost Basis'));
+		expect(await getRowIndex(rows, 'High Cost Basis')).toBeLessThan(
+			await getRowIndex(rows, 'Low Cost Basis')
+		);
 
 		await bookValueHeader.click();
 		await expect(page).toHaveURL(/dir=asc/);
-		expect(await getRowIndex('Low Cost Basis')).toBeLessThan(await getRowIndex('High Cost Basis'));
+		expect(await getRowIndex(rows, 'Low Cost Basis')).toBeLessThan(
+			await getRowIndex(rows, 'High Cost Basis')
+		);
 	});
 
 	test('clicking Gain/Loss header sorts by gain amount', async ({ page }) => {
@@ -300,24 +302,24 @@ test.describe('assets table sorting', () => {
 		await signIn(page, user.email);
 		await goToPageViaSidebar(page, 'Assets');
 		await expect(page.getByRole('tab', { name: 'Owned' })).toHaveAttribute('aria-selected', 'true');
-		await expect(page.getByRole('row', { name: /Big Winner/ })).toBeVisible();
+		await expect(page.getByRole('row', { name: 'Big Winner' })).toBeVisible();
 
 		const rows = page.locator('[data-slot="table-body"] tr');
-
-		async function getRowIndex(name: string) {
-			return rows.evaluateAll((els, n) => els.findIndex((el) => el.textContent?.includes(n)), name);
-		}
 
 		const gainHeader = page.getByRole('button', { name: 'Gain/Loss' });
 		await gainHeader.click();
 
 		await expect(page).toHaveURL(/sort=gain/);
 		await expect(page).toHaveURL(/dir=desc/);
-		expect(await getRowIndex('Big Winner')).toBeLessThan(await getRowIndex('Big Loser'));
+		expect(await getRowIndex(rows, 'Big Winner')).toBeLessThan(
+			await getRowIndex(rows, 'Big Loser')
+		);
 
 		await gainHeader.click();
 		await expect(page).toHaveURL(/dir=asc/);
-		expect(await getRowIndex('Big Loser')).toBeLessThan(await getRowIndex('Big Winner'));
+		expect(await getRowIndex(rows, 'Big Loser')).toBeLessThan(
+			await getRowIndex(rows, 'Big Winner')
+		);
 	});
 
 	test('clicking Gain % header sorts by gain percentage', async ({ page }) => {
@@ -357,27 +359,23 @@ test.describe('assets table sorting', () => {
 		await signIn(page, user.email);
 		await goToPageViaSidebar(page, 'Assets');
 		await expect(page.getByRole('tab', { name: 'Owned' })).toHaveAttribute('aria-selected', 'true');
-		await expect(page.getByRole('row', { name: /High Percent Gain/ })).toBeVisible();
+		await expect(page.getByRole('row', { name: 'High Percent Gain' })).toBeVisible();
 
 		const rows = page.locator('[data-slot="table-body"] tr');
-
-		async function getRowIndex(name: string) {
-			return rows.evaluateAll((els, n) => els.findIndex((el) => el.textContent?.includes(n)), name);
-		}
 
 		const gainPercentHeader = page.getByRole('button', { name: 'Gain %' });
 		await gainPercentHeader.click();
 
 		await expect(page).toHaveURL(/sort=gainPercent/);
 		await expect(page).toHaveURL(/dir=desc/);
-		expect(await getRowIndex('High Percent Gain')).toBeLessThan(
-			await getRowIndex('Low Percent Gain')
+		expect(await getRowIndex(rows, 'High Percent Gain')).toBeLessThan(
+			await getRowIndex(rows, 'Low Percent Gain')
 		);
 
 		await gainPercentHeader.click();
 		await expect(page).toHaveURL(/dir=asc/);
-		expect(await getRowIndex('Low Percent Gain')).toBeLessThan(
-			await getRowIndex('High Percent Gain')
+		expect(await getRowIndex(rows, 'Low Percent Gain')).toBeLessThan(
+			await getRowIndex(rows, 'High Percent Gain')
 		);
 	});
 
@@ -402,7 +400,7 @@ test.describe('assets table sorting', () => {
 		await signIn(page, user.email);
 		await goToPageViaSidebar(page, 'Assets');
 		await expect(page.getByRole('tab', { name: 'Owned' })).toHaveAttribute('aria-selected', 'true');
-		await expect(page.getByRole('row', { name: /Test Asset/ })).toBeVisible();
+		await expect(page.getByRole('row', { name: 'Test Asset' })).toBeVisible();
 
 		const assetHeader = page.getByRole('button', { name: 'Asset', exact: true });
 		await assetHeader.click();
@@ -438,7 +436,7 @@ test.describe('assets table sorting', () => {
 		await signIn(page, user.email);
 		await goToPageViaSidebar(page, 'Assets');
 		await expect(page.getByRole('tab', { name: 'Owned' })).toHaveAttribute('aria-selected', 'true');
-		await expect(page.getByRole('row', { name: /Test Asset For Sorting/ })).toBeVisible();
+		await expect(page.getByRole('row', { name: 'Test Asset For Sorting' })).toBeVisible();
 
 		// Market Value is already default sorted DESC, clicking toggles to ASC
 		const marketValueButton = page.getByRole('button', { name: 'Market Value' });
