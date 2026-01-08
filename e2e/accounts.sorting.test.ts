@@ -6,7 +6,7 @@ import { seedAccount, seedAccountBalance, seedTransaction, seedUser } from './po
 
 test.describe('accounts table sorting', () => {
 	test('clicking Balance header sorts by balance descending then ascending', async ({ page }) => {
-		const user = await seedUser('alice');
+		const user = await seedUser('abigail');
 
 		await seedAccount({
 			name: 'Low Balance Account',
@@ -95,7 +95,7 @@ test.describe('accounts table sorting', () => {
 	});
 
 	test('clicking Account header sorts alphabetically', async ({ page }) => {
-		const user = await seedUser('bob');
+		const user = await seedUser('barry');
 
 		await seedAccount({
 			name: 'Zebra Account',
@@ -153,7 +153,7 @@ test.describe('accounts table sorting', () => {
 	});
 
 	test('clicking Institution header sorts by institution', async ({ page }) => {
-		const user = await seedUser('carol');
+		const user = await seedUser('candice');
 
 		await seedAccount({
 			name: 'Chase Checking',
@@ -205,7 +205,7 @@ test.describe('accounts table sorting', () => {
 	});
 
 	test('clicking Transactions header sorts by transaction count', async ({ page }) => {
-		const user = await seedUser('diana');
+		const user = await seedUser('derek');
 
 		const manyTx = await seedAccount({
 			name: 'Many Transactions',
@@ -277,7 +277,7 @@ test.describe('accounts table sorting', () => {
 	});
 
 	test('sort state persists in URL and survives page reload', async ({ page }) => {
-		const user = await seedUser('ellie');
+		const user = await seedUser('emma');
 
 		await seedAccount({
 			name: 'Account One',
@@ -341,7 +341,7 @@ test.describe('accounts table sorting', () => {
 	});
 
 	test('sort indicator shows on active column', async ({ page }) => {
-		const user = await seedUser('faith');
+		const user = await seedUser('felix');
 
 		await seedAccount({
 			name: 'Test Account',
@@ -383,7 +383,7 @@ test.describe('accounts table sorting', () => {
 	});
 
 	test('sorting works correctly across filter tabs', async ({ page }) => {
-		const user = await seedUser('grace');
+		const user = await seedUser('gloria');
 
 		await seedAccount({
 			name: 'Open Account',

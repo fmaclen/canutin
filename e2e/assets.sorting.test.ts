@@ -8,7 +8,7 @@ test.describe('assets table sorting', () => {
 	test('clicking Market Value header sorts by market value descending then ascending', async ({
 		page
 	}) => {
-		const user = await seedUser('henry');
+		const user = await seedUser('harris');
 
 		const lowValue = await seedAsset({
 			name: 'Low Value Asset',
@@ -95,7 +95,7 @@ test.describe('assets table sorting', () => {
 	});
 
 	test('clicking Asset header sorts alphabetically', async ({ page }) => {
-		const user = await seedUser('iris');
+		const user = await seedUser('ingrid');
 
 		const zAsset = await seedAsset({
 			name: 'Zebra Corp',
@@ -150,7 +150,7 @@ test.describe('assets table sorting', () => {
 	});
 
 	test('clicking Symbol header sorts by symbol', async ({ page }) => {
-		const user = await seedUser('jack');
+		const user = await seedUser('jerome');
 
 		const tsla = await seedAsset({
 			name: 'Tesla Inc',
@@ -209,7 +209,7 @@ test.describe('assets table sorting', () => {
 	});
 
 	test('clicking Book Value header sorts by book value', async ({ page }) => {
-		const user = await seedUser('kate');
+		const user = await seedUser('kendall');
 
 		const lowCost = await seedAsset({
 			name: 'Low Cost Basis',
@@ -266,7 +266,7 @@ test.describe('assets table sorting', () => {
 	});
 
 	test('clicking Gain/Loss header sorts by gain amount', async ({ page }) => {
-		const user = await seedUser('liam');
+		const user = await seedUser('logan');
 
 		const bigGain = await seedAsset({
 			name: 'Big Winner',
@@ -323,7 +323,7 @@ test.describe('assets table sorting', () => {
 	});
 
 	test('clicking Gain % header sorts by gain percentage', async ({ page }) => {
-		const user = await seedUser('mia');
+		const user = await seedUser('melinda');
 
 		const highPercent = await seedAsset({
 			name: 'High Percent Gain',
@@ -380,7 +380,7 @@ test.describe('assets table sorting', () => {
 	});
 
 	test('sort state persists in URL and survives page reload', async ({ page }) => {
-		const user = await seedUser('noah');
+		const user = await seedUser('nolan');
 
 		const asset = await seedAsset({
 			name: 'Test Asset',
@@ -416,7 +416,7 @@ test.describe('assets table sorting', () => {
 	});
 
 	test('sort indicator shows on active column', async ({ page }) => {
-		const user = await seedUser('olivia');
+		const user = await seedUser('oscar');
 
 		const asset = await seedAsset({
 			name: 'Test Asset For Sorting',
