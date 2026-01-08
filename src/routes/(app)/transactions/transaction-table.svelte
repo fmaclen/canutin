@@ -8,9 +8,13 @@
 	import * as Table from '$lib/components/ui/table/index';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { m } from '$lib/paraglide/messages';
-	import { getTransactionsContext } from '$lib/transactions.svelte';
+	import { getTransactionsContext, type TransactionSortColumn } from '$lib/transactions.svelte';
 
 	const txContext = getTransactionsContext();
+
+	function handleSort(column: string) {
+		txContext.setSort(column as TransactionSortColumn);
+	}
 
 	const dateFormatter = new Intl.DateTimeFormat(undefined, {
 		year: 'numeric',
@@ -56,21 +60,45 @@
 							}}
 						/>
 					</Table.Head>
-					<Table.Head class="text-left whitespace-nowrap">
+					<Table.SortableHead
+						class="text-left whitespace-nowrap"
+						column="date"
+						sortColumn={txContext.sortState.column}
+						sortDirection={txContext.sortState.direction}
+						onSort={handleSort}
+					>
 						{m.transactions_table_header_date()}
-					</Table.Head>
-					<Table.Head class="text-left whitespace-nowrap">
+					</Table.SortableHead>
+					<Table.SortableHead
+						class="text-left whitespace-nowrap"
+						column="description"
+						sortColumn={txContext.sortState.column}
+						sortDirection={txContext.sortState.direction}
+						onSort={handleSort}
+					>
 						{m.transactions_table_header_description()}
-					</Table.Head>
+					</Table.SortableHead>
 					<Table.Head class="text-left whitespace-nowrap">
 						{m.transactions_table_header_labels()}
 					</Table.Head>
-					<Table.Head class="text-left whitespace-nowrap">
+					<Table.SortableHead
+						class="text-left whitespace-nowrap"
+						column="account"
+						sortColumn={txContext.sortState.column}
+						sortDirection={txContext.sortState.direction}
+						onSort={handleSort}
+					>
 						{m.transactions_table_header_account()}
-					</Table.Head>
-					<Table.Head class="text-right whitespace-nowrap">
+					</Table.SortableHead>
+					<Table.SortableHead
+						class="text-right whitespace-nowrap"
+						column="amount"
+						sortColumn={txContext.sortState.column}
+						sortDirection={txContext.sortState.direction}
+						onSort={handleSort}
+					>
 						{m.transactions_table_header_amount()}
-					</Table.Head>
+					</Table.SortableHead>
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
