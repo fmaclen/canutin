@@ -920,3 +920,239 @@ test('invalid date range params fall back to default period', async ({ page }) =
 		await expect(page.getByLabel('Period')).toContainText('Last 3 months');
 	}
 });
+
+test('transactions can be filtered by account', async ({ page }) => {
+	const user = await seedUser('morgan');
+
+	const checkingAccount = await seedAccount({
+		name: 'Everyday Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: checkingAccount.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 5000
+	});
+
+	const creditAccount = await seedAccount({
+		name: 'Rewards Credit Card',
+		balanceGroup: AccountsBalanceGroupOptions.DEBT,
+		owner: user.id,
+		balanceType: 'Credit card'
+	});
+	await seedAccountBalance({
+		account: creditAccount.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: -1500
+	});
+
+	const now = new UTCDate();
+
+	await seedTransaction({
+		account: checkingAccount.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Paycheck Direct Deposit',
+		value: 3500
+	});
+	await seedTransaction({
+		account: checkingAccount.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'ATM Withdrawal',
+		value: -200
+	});
+	await seedTransaction({
+		account: creditAccount.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Restaurant Dinner',
+		value: -85
+	});
+	await seedTransaction({
+		account: creditAccount.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Online Shopping',
+		value: -150
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	// All transactions should be visible initially
+	await expect(page.getByText('Paycheck Direct Deposit')).toBeVisible();
+	await expect(page.getByText('ATM Withdrawal')).toBeVisible();
+	await expect(page.getByText('Restaurant Dinner')).toBeVisible();
+	await expect(page.getByText('Online Shopping')).toBeVisible();
+
+	// Account filter should show "All accounts" by default
+	await expect(page.getByLabel('Account')).toContainText('All accounts');
+
+	// Open the account filter dropdown
+	await page.getByLabel('Account').click();
+
+	// Dropdown should show accounts grouped by balance type with colored indicators
+	await expect(page.getByText('Cash')).toBeVisible();
+	await expect(page.getByText('Debt')).toBeVisible();
+	await expect(page.getByRole('option', { name: 'Everyday Checking' })).toBeVisible();
+	await expect(page.getByRole('option', { name: 'Rewards Credit Card' })).toBeVisible();
+
+	// Select the checking account
+	await page.getByRole('option', { name: 'Everyday Checking' }).click();
+
+	// Only checking account transactions should be visible
+	await expect(page.getByText('Paycheck Direct Deposit')).toBeVisible();
+	await expect(page.getByText('ATM Withdrawal')).toBeVisible();
+	await expect(page.getByText('Restaurant Dinner')).not.toBeVisible();
+	await expect(page.getByText('Online Shopping')).not.toBeVisible();
+
+	// Filter trigger should show the selected account name
+	await expect(page.getByLabel('Account')).toContainText('Everyday Checking');
+
+	// URL should contain account parameter
+	await expect(page).toHaveURL(/account=/);
+
+	// Reload and verify filter persists
+	await page.reload();
+	await expect(page.getByLabel('Account')).toContainText('Everyday Checking');
+	await expect(page.getByText('Paycheck Direct Deposit')).toBeVisible();
+	await expect(page.getByText('Restaurant Dinner')).not.toBeVisible();
+
+	// Switch to credit card account
+	await page.getByLabel('Account').click();
+	await page.getByRole('option', { name: 'Rewards Credit Card' }).click();
+
+	// Only credit card transactions should be visible
+	await expect(page.getByText('Restaurant Dinner')).toBeVisible();
+	await expect(page.getByText('Online Shopping')).toBeVisible();
+	await expect(page.getByText('Paycheck Direct Deposit')).not.toBeVisible();
+	await expect(page.getByText('ATM Withdrawal')).not.toBeVisible();
+
+	// Clear the filter by selecting "All accounts"
+	await page.getByLabel('Account').click();
+	await page.getByRole('option', { name: 'All accounts' }).click();
+
+	// All transactions should be visible again
+	await expect(page.getByText('Paycheck Direct Deposit')).toBeVisible();
+	await expect(page.getByText('ATM Withdrawal')).toBeVisible();
+	await expect(page.getByText('Restaurant Dinner')).toBeVisible();
+	await expect(page.getByText('Online Shopping')).toBeVisible();
+
+	// URL should no longer contain account parameter
+	await expect(page).not.toHaveURL(/account=/);
+});
+
+test('account filter works with other filters combined', async ({ page }) => {
+	const user = await seedUser('casey');
+
+	const savingsAccount = await seedAccount({
+		name: 'High Yield Savings',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Savings'
+	});
+	await seedAccountBalance({
+		account: savingsAccount.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 10000
+	});
+
+	const brokerageAccount = await seedAccount({
+		name: 'Investment Brokerage',
+		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+		owner: user.id,
+		balanceType: 'Brokerage'
+	});
+	await seedAccountBalance({
+		account: brokerageAccount.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 25000
+	});
+
+	const now = new UTCDate();
+
+	// Savings account: one credit, one debit
+	await seedTransaction({
+		account: savingsAccount.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Interest Payment',
+		value: 50
+	});
+	await seedTransaction({
+		account: savingsAccount.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Transfer to Checking',
+		value: -500
+	});
+
+	// Brokerage account: one credit, one debit
+	await seedTransaction({
+		account: brokerageAccount.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Dividend Income',
+		value: 125
+	});
+	await seedTransaction({
+		account: brokerageAccount.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Stock Purchase',
+		value: -1000
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	// Filter by savings account
+	await page.getByLabel('Account').click();
+	await page.getByRole('option', { name: 'High Yield Savings' }).click();
+
+	// Both savings transactions visible
+	await expect(page.getByText('Interest Payment')).toBeVisible();
+	await expect(page.getByText('Transfer to Checking')).toBeVisible();
+	await expect(page.getByText('Dividend Income')).not.toBeVisible();
+	await expect(page.getByText('Stock Purchase')).not.toBeVisible();
+
+	// Add type filter for credits only
+	await page.getByLabel('Type').click();
+	await page.getByRole('option', { name: 'Credits only' }).click();
+
+	// Only savings credit should be visible
+	await expect(page.getByText('Interest Payment')).toBeVisible();
+	await expect(page.getByText('Transfer to Checking')).not.toBeVisible();
+	await expect(page.getByText('Dividend Income')).not.toBeVisible();
+	await expect(page.getByText('Stock Purchase')).not.toBeVisible();
+
+	// URL should contain both filters
+	await expect(page).toHaveURL(/account=/);
+	await expect(page).toHaveURL(/amount=credits/);
+
+	// Reload and verify both filters persist
+	await page.reload();
+	await expect(page.getByLabel('Account')).toContainText('High Yield Savings');
+	await expect(page.getByLabel('Type')).toContainText('Credits only');
+	await expect(page.getByText('Interest Payment')).toBeVisible();
+	await expect(page.getByText('Transfer to Checking')).not.toBeVisible();
+
+	// Clear account filter while keeping type filter
+	await page.getByLabel('Account').click();
+	await page.getByRole('option', { name: 'All accounts' }).click();
+
+	// Both credit transactions should now be visible
+	await expect(page.getByText('Interest Payment')).toBeVisible();
+	await expect(page.getByText('Dividend Income')).toBeVisible();
+	await expect(page.getByText('Transfer to Checking')).not.toBeVisible();
+	await expect(page.getByText('Stock Purchase')).not.toBeVisible();
+});
