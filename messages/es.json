@@ -200,6 +200,8 @@
 	"transactions_filter_kind_credits_only": "Solo abonos",
 	"transactions_filter_kind_debits_only": "Solo cargos",
 	"transactions_filter_kind_excluded_only": "Solo excluidos",
+	"transactions_filter_account_label": "Cuenta",
+	"transactions_filter_account_all": "Todas las cuentas",
 	"transactions_table_header_date": "Fecha",
 	"transactions_table_header_description": "Descripción",
 	"transactions_table_header_labels": "Etiquetas",

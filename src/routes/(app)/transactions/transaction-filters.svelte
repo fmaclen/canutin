@@ -6,12 +6,19 @@
 	import type { DateRange } from 'bits-ui';
 	import { addDays, format, subDays } from 'date-fns';
 
+	import {
+		BALANCE_GROUP_ORDER,
+		getBalanceGroupMeta,
+		groupAccountsByBalanceGroup
+	} from '$lib/account-utils';
+	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
 	import { RangeCalendar } from '$lib/components/ui/range-calendar/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { m } from '$lib/paraglide/messages';
+	import { AccountsBalanceGroupOptions } from '$lib/pocketbase.schema';
 	import {
 		getTransactionsContext,
 		type KindFilter,
@@ -19,6 +26,15 @@
 	} from '$lib/transactions.svelte';
 
 	const txContext = getTransactionsContext();
+	const accountsContext = getAccountsContext();
+
+	const groupMeta = getBalanceGroupMeta();
+	let accountsByGroup = $derived(groupAccountsByBalanceGroup(accountsContext.accounts));
+	let selectedAccount = $derived(
+		txContext.accountFilter
+			? accountsContext.accounts.find((a) => a.id === txContext.accountFilter)
+			: null
+	);
 
 	let periodPopoverOpen = $state(false);
 
@@ -195,6 +211,48 @@
 		<Select.Content>
 			{#each txContext.kindOptions as option (option)}
 				<Select.Item value={option}>{kindLabel(option)}</Select.Item>
+			{/each}
+		</Select.Content>
+	</Select.Root>
+	<Select.Root
+		type="single"
+		value={txContext.accountFilter ?? ''}
+		onValueChange={(v) => txContext.setAccountFilter(v || null)}
+	>
+		<Select.Trigger
+			aria-label={m.transactions_filter_account_label()}
+			class="bg-background w-full sm:w-48"
+		>
+			{#if selectedAccount}
+				<div class="flex items-center gap-2">
+					<div
+						class="size-2 shrink-0 rounded-full {groupMeta[
+							selectedAccount.balanceGroup as AccountsBalanceGroupOptions
+						].color}"
+					></div>
+					<span class="truncate">{selectedAccount.name}</span>
+				</div>
+			{:else}
+				{m.transactions_filter_account_all()}
+			{/if}
+		</Select.Trigger>
+		<Select.Content>
+			<Select.Item value="">{m.transactions_filter_account_all()}</Select.Item>
+			{#each BALANCE_GROUP_ORDER as group (group)}
+				{@const accountsInGroup = accountsByGroup.get(group) ?? []}
+				{#if accountsInGroup.length > 0}
+					<Select.Group>
+						<Select.Label>
+							<div class="flex items-center gap-2">
+								<div class="size-2 rounded-full {groupMeta[group].color}"></div>
+								{groupMeta[group].label}
+							</div>
+						</Select.Label>
+						{#each accountsInGroup as account (account.id)}
+							<Select.Item value={account.id}>{account.name}</Select.Item>
+						{/each}
+					</Select.Group>
+				{/if}
 			{/each}
 		</Select.Content>
 	</Select.Root>

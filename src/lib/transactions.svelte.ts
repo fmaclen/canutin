@@ -56,6 +56,7 @@ class TransactionsContext {
 	period: PeriodOption = $state('last-3-months');
 	kind: KindFilter = $state('all');
 	search: string = $state('');
+	accountFilter: string | null = $state(null);
 	page: number = $state(1);
 	isLoading: boolean = $state(true);
 	rawTransactions: TransactionsResponse<TransactionExpand>[] = $state([]);
@@ -113,6 +114,7 @@ class TransactionsContext {
 		this.period = 'last-3-months';
 		this.kind = 'all';
 		this.search = '';
+		this.accountFilter = null;
 
 		const sortParam = params.get('sort');
 		const dirParam = params.get('dir');
@@ -155,6 +157,11 @@ class TransactionsContext {
 		const searchParam = params.get('q');
 		if (searchParam) {
 			this.search = searchParam;
+		}
+
+		const accountParam = params.get('account');
+		if (accountParam) {
+			this.accountFilter = accountParam;
 		}
 
 		if (shouldRefresh) {
@@ -262,6 +269,10 @@ class TransactionsContext {
 			if (searchQuery) {
 				const escaped = searchQuery.replace(/'/g, "''");
 				filterParts.push(`description ~ '${escaped}'`);
+			}
+
+			if (this.accountFilter) {
+				filterParts.push(`account = '${this.accountFilter}'`);
 			}
 
 			const filter = filterParts.length > 0 ? filterParts.join(' && ') : undefined;
@@ -415,6 +426,7 @@ class TransactionsContext {
 			if (this.kind === 'credits') return row.value > 0;
 			if (this.kind === 'debits') return row.value < 0;
 			if (this.kind === 'excluded') return row.excluded;
+			if (this.accountFilter && row.accountId !== this.accountFilter) return false;
 			return true;
 		});
 
@@ -513,6 +525,11 @@ class TransactionsContext {
 		} else {
 			params.set('amount', this.kind);
 		}
+		if (this.accountFilter) {
+			params.set('account', this.accountFilter);
+		} else {
+			params.delete('account');
+		}
 
 		this.updateUrl(params);
 		this.refreshTransactions();
@@ -527,6 +544,32 @@ class TransactionsContext {
 			params.delete('amount');
 		} else {
 			params.set('amount', option);
+		}
+		if (this.accountFilter) {
+			params.set('account', this.accountFilter);
+		} else {
+			params.delete('account');
+		}
+
+		this.updateUrl(params);
+		this.refreshTransactions();
+	}
+
+	setAccountFilter(accountId: string | null) {
+		this.accountFilter = accountId;
+		this.page = 1;
+
+		const currentPage = get(page);
+		const params = new SvelteURLSearchParams(currentPage.url.searchParams);
+		if (accountId) {
+			params.set('account', accountId);
+		} else {
+			params.delete('account');
+		}
+		if (this.kind === 'all') {
+			params.delete('amount');
+		} else {
+			params.set('amount', this.kind);
 		}
 
 		this.updateUrl(params);
