@@ -216,7 +216,7 @@
 	>
 		<Select.Trigger
 			aria-label={m.transactions_filter_account_label()}
-			class="bg-background w-full sm:w-48"
+			class="bg-background w-full sm:w-auto sm:max-w-64 sm:min-w-48"
 		>
 			{#if selectedAccount}
 				<div class="flex items-center gap-2">
@@ -225,7 +225,7 @@
 							selectedAccount.balanceGroup as AccountsBalanceGroupOptions
 						].color}"
 					></div>
-					<span class="truncate">{selectedAccount.name}</span>
+					<span class="max-w-40 truncate">{selectedAccount.name}</span>
 					<ClearButton
 						onclick={(e) => {
 							e.preventDefault();
