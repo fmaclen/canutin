@@ -992,10 +992,10 @@ test('transactions can be filtered by account', async ({ page }) => {
 	await expect(page.getByText('Online Shopping')).toBeVisible();
 
 	// Account filter should show "All accounts" by default
-	await expect(page.getByLabel('Account')).toContainText('All accounts');
+	await expect(page.getByLabel('Account', { exact: true })).toContainText('All accounts');
 
 	// Open the account filter dropdown
-	await page.getByLabel('Account').click();
+	await page.getByLabel('Account', { exact: true }).click();
 
 	// Dropdown should show accounts grouped by balance type with colored indicators
 	await expect(page.getByText('Cash')).toBeVisible();
@@ -1013,19 +1013,19 @@ test('transactions can be filtered by account', async ({ page }) => {
 	await expect(page.getByText('Online Shopping')).not.toBeVisible();
 
 	// Filter trigger should show the selected account name
-	await expect(page.getByLabel('Account')).toContainText('Everyday Checking');
+	await expect(page.getByLabel('Account', { exact: true })).toContainText('Everyday Checking');
 
 	// URL should contain account parameter
 	await expect(page).toHaveURL(/account=/);
 
 	// Reload and verify filter persists
 	await page.reload();
-	await expect(page.getByLabel('Account')).toContainText('Everyday Checking');
+	await expect(page.getByLabel('Account', { exact: true })).toContainText('Everyday Checking');
 	await expect(page.getByText('Paycheck Direct Deposit')).toBeVisible();
 	await expect(page.getByText('Restaurant Dinner')).not.toBeVisible();
 
 	// Switch to credit card account
-	await page.getByLabel('Account').click();
+	await page.getByLabel('Account', { exact: true }).click();
 	await page.getByRole('option', { name: 'Rewards Credit Card' }).click();
 
 	// Only credit card transactions should be visible
@@ -1034,9 +1034,8 @@ test('transactions can be filtered by account', async ({ page }) => {
 	await expect(page.getByText('Paycheck Direct Deposit')).not.toBeVisible();
 	await expect(page.getByText('ATM Withdrawal')).not.toBeVisible();
 
-	// Clear the filter by selecting "All accounts"
-	await page.getByLabel('Account').click();
-	await page.getByRole('option', { name: 'All accounts' }).click();
+	// Clear the filter using the X button
+	await page.getByLabel('Clear account filter').click();
 
 	// All transactions should be visible again
 	await expect(page.getByText('Paycheck Direct Deposit')).toBeVisible();
@@ -1116,7 +1115,7 @@ test('account filter works with other filters combined', async ({ page }) => {
 	await goToPageViaSidebar(page, 'Transactions');
 
 	// Filter by savings account
-	await page.getByLabel('Account').click();
+	await page.getByLabel('Account', { exact: true }).click();
 	await page.getByRole('option', { name: 'High Yield Savings' }).click();
 
 	// Both savings transactions visible
@@ -1141,14 +1140,13 @@ test('account filter works with other filters combined', async ({ page }) => {
 
 	// Reload and verify both filters persist
 	await page.reload();
-	await expect(page.getByLabel('Account')).toContainText('High Yield Savings');
+	await expect(page.getByLabel('Account', { exact: true })).toContainText('High Yield Savings');
 	await expect(page.getByLabel('Type')).toContainText('Credits only');
 	await expect(page.getByText('Interest Payment')).toBeVisible();
 	await expect(page.getByText('Transfer to Checking')).not.toBeVisible();
 
 	// Clear account filter while keeping type filter
-	await page.getByLabel('Account').click();
-	await page.getByRole('option', { name: 'All accounts' }).click();
+	await page.getByLabel('Clear account filter').click();
 
 	// Both credit transactions should now be visible
 	await expect(page.getByText('Interest Payment')).toBeVisible();

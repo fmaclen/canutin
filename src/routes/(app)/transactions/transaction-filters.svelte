@@ -2,7 +2,6 @@
 	import { CalendarDate, type DateValue } from '@internationalized/date';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
 	import SearchIcon from '@lucide/svelte/icons/search';
-	import XIcon from '@lucide/svelte/icons/x';
 	import type { DateRange } from 'bits-ui';
 	import { addDays, format, subDays } from 'date-fns';
 
@@ -12,6 +11,7 @@
 		groupAccountsByBalanceGroup
 	} from '$lib/account-utils';
 	import { getAccountsContext } from '$lib/accounts.svelte';
+	import ClearButton from '$lib/components/clear-button.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
@@ -154,14 +154,9 @@
 			class="bg-background pr-9 pl-9"
 		/>
 		{#if txContext.search}
-			<button
-				type="button"
-				onclick={clearSearch}
-				aria-label={m.transactions_clear_search()}
-				class="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 cursor-pointer"
-			>
-				<XIcon class="size-4" />
-			</button>
+			<div class="absolute top-1/2 right-3 -translate-y-1/2">
+				<ClearButton onclick={clearSearch} aria-label={m.transactions_clear_search()} />
+			</div>
 		{/if}
 	</div>
 	<Popover.Root bind:open={periodPopoverOpen}>
@@ -231,13 +226,24 @@
 						].color}"
 					></div>
 					<span class="truncate">{selectedAccount.name}</span>
+					<ClearButton
+						onclick={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+							txContext.setAccountFilter(null);
+						}}
+						onpointerdown={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+						}}
+						aria-label={m.transactions_filter_account_clear()}
+					/>
 				</div>
 			{:else}
 				{m.transactions_filter_account_all()}
 			{/if}
 		</Select.Trigger>
 		<Select.Content>
-			<Select.Item value="">{m.transactions_filter_account_all()}</Select.Item>
 			{#each BALANCE_GROUP_ORDER as group (group)}
 				{@const accountsInGroup = accountsByGroup.get(group) ?? []}
 				{#if accountsInGroup.length > 0}
