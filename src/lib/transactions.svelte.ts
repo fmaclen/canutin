@@ -161,7 +161,11 @@ class TransactionsContext {
 
 		const accountParam = params.get('account');
 		if (accountParam) {
-			this.accountFilter = accountParam;
+			const accounts = this._accountsContext.accounts;
+			const isValid = accounts.length === 0 || accounts.some((a) => a.id === accountParam);
+			if (isValid) {
+				this.accountFilter = accountParam;
+			}
 		}
 
 		if (shouldRefresh) {
@@ -190,6 +194,19 @@ class TransactionsContext {
 			this._lastSyncedSearch = newUrl.search;
 			// eslint-disable-next-line svelte/no-navigation-without-resolve
 			replaceState(newUrl.href, {});
+		}
+	}
+
+	private syncFiltersToParams(params: SvelteURLSearchParams) {
+		if (this.kind === 'all') {
+			params.delete('amount');
+		} else {
+			params.set('amount', this.kind);
+		}
+		if (this.accountFilter) {
+			params.set('account', this.accountFilter);
+		} else {
+			params.delete('account');
 		}
 	}
 
@@ -423,10 +440,10 @@ class TransactionsContext {
 			const time = row.dateValue;
 			if (fromTime !== null && time < fromTime) return false;
 			if (toTime !== null && time >= toTime) return false;
+			if (this.accountFilter && row.accountId !== this.accountFilter) return false;
 			if (this.kind === 'credits') return row.value > 0;
 			if (this.kind === 'debits') return row.value < 0;
 			if (this.kind === 'excluded') return row.excluded;
-			if (this.accountFilter && row.accountId !== this.accountFilter) return false;
 			return true;
 		});
 
@@ -520,16 +537,7 @@ class TransactionsContext {
 		params.delete('periodTo');
 		params.delete('periodLabel');
 		params.set('period', option);
-		if (this.kind === 'all') {
-			params.delete('amount');
-		} else {
-			params.set('amount', this.kind);
-		}
-		if (this.accountFilter) {
-			params.set('account', this.accountFilter);
-		} else {
-			params.delete('account');
-		}
+		this.syncFiltersToParams(params);
 
 		this.updateUrl(params);
 		this.refreshTransactions();
@@ -540,16 +548,7 @@ class TransactionsContext {
 
 		const currentPage = get(page);
 		const params = new SvelteURLSearchParams(currentPage.url.searchParams);
-		if (option === 'all') {
-			params.delete('amount');
-		} else {
-			params.set('amount', option);
-		}
-		if (this.accountFilter) {
-			params.set('account', this.accountFilter);
-		} else {
-			params.delete('account');
-		}
+		this.syncFiltersToParams(params);
 
 		this.updateUrl(params);
 		this.refreshTransactions();
@@ -561,16 +560,7 @@ class TransactionsContext {
 
 		const currentPage = get(page);
 		const params = new SvelteURLSearchParams(currentPage.url.searchParams);
-		if (accountId) {
-			params.set('account', accountId);
-		} else {
-			params.delete('account');
-		}
-		if (this.kind === 'all') {
-			params.delete('amount');
-		} else {
-			params.set('amount', this.kind);
-		}
+		this.syncFiltersToParams(params);
 
 		this.updateUrl(params);
 		this.refreshTransactions();
