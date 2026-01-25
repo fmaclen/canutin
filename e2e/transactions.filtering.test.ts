@@ -1134,6 +1134,28 @@ test('account filter works with other filters combined', async ({ page }) => {
 	await expect(page.getByText('Dividend Income')).not.toBeVisible();
 	await expect(page.getByText('Stock Purchase')).not.toBeVisible();
 
+	// Test that realtime updates respect BOTH filters (account + kind).
+	// Seed two transactions: one that matches both filters, one that only matches kind.
+	await seedTransaction({
+		account: brokerageAccount.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Realtime Brokerage Dividend',
+		value: 75
+	});
+	await seedTransaction({
+		account: savingsAccount.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Realtime Savings Bonus',
+		value: 25
+	});
+
+	// Wait for the savings credit to appear (confirms realtime is working)
+	await expect(page.getByText('Realtime Savings Bonus')).toBeVisible();
+	// The brokerage credit should NOT appear (matches kind but wrong account)
+	await expect(page.getByText('Realtime Brokerage Dividend')).not.toBeVisible();
+
 	// URL should contain both filters
 	await expect(page).toHaveURL(/account=/);
 	await expect(page).toHaveURL(/amount=credits/);
