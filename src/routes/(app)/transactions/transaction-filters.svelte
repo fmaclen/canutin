@@ -2,16 +2,23 @@
 	import { CalendarDate, type DateValue } from '@internationalized/date';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
 	import SearchIcon from '@lucide/svelte/icons/search';
-	import XIcon from '@lucide/svelte/icons/x';
 	import type { DateRange } from 'bits-ui';
 	import { addDays, format, subDays } from 'date-fns';
 
+	import {
+		BALANCE_GROUP_ORDER,
+		getBalanceGroupMeta,
+		groupAccountsByBalanceGroup
+	} from '$lib/account-utils';
+	import { getAccountsContext } from '$lib/accounts.svelte';
+	import ClearButton from '$lib/components/clear-button.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
 	import { RangeCalendar } from '$lib/components/ui/range-calendar/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { m } from '$lib/paraglide/messages';
+	import { AccountsBalanceGroupOptions } from '$lib/pocketbase.schema';
 	import {
 		getTransactionsContext,
 		type KindFilter,
@@ -19,6 +26,15 @@
 	} from '$lib/transactions.svelte';
 
 	const txContext = getTransactionsContext();
+	const accountsContext = getAccountsContext();
+
+	const groupMeta = getBalanceGroupMeta();
+	let accountsByGroup = $derived(groupAccountsByBalanceGroup(accountsContext.accounts));
+	let selectedAccount = $derived(
+		txContext.accountFilter
+			? accountsContext.accounts.find((a) => a.id === txContext.accountFilter)
+			: null
+	);
 
 	let periodPopoverOpen = $state(false);
 
@@ -138,14 +154,9 @@
 			class="bg-background pr-9 pl-9"
 		/>
 		{#if txContext.search}
-			<button
-				type="button"
-				onclick={clearSearch}
-				aria-label={m.transactions_clear_search()}
-				class="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 cursor-pointer"
-			>
-				<XIcon class="size-4" />
-			</button>
+			<div class="absolute top-1/2 right-3 -translate-y-1/2">
+				<ClearButton onclick={clearSearch} aria-label={m.transactions_clear_search()} />
+			</div>
 		{/if}
 	</div>
 	<Popover.Root bind:open={periodPopoverOpen}>
@@ -195,6 +206,64 @@
 		<Select.Content>
 			{#each txContext.kindOptions as option (option)}
 				<Select.Item value={option}>{kindLabel(option)}</Select.Item>
+			{/each}
+		</Select.Content>
+	</Select.Root>
+	<Select.Root
+		type="single"
+		value={txContext.accountFilter ?? ''}
+		onValueChange={(v) => txContext.setAccountFilter(v || null)}
+	>
+		<Select.Trigger
+			aria-label={m.transactions_filter_account_label()}
+			class="bg-background w-full sm:w-auto sm:max-w-64 sm:min-w-48"
+		>
+			{#if selectedAccount}
+				<div class="flex w-full items-center gap-2">
+					<div
+						class="size-2 shrink-0 rounded-full {groupMeta[
+							selectedAccount.balanceGroup as AccountsBalanceGroupOptions
+						].color}"
+					></div>
+					<span class="max-w-40 truncate">{selectedAccount.name}</span>
+					<ClearButton
+						class="ml-auto"
+						onclick={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+							txContext.setAccountFilter(null);
+						}}
+						onpointerdown={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+						}}
+						onpointerup={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+						}}
+						aria-label={m.transactions_filter_account_clear()}
+					/>
+				</div>
+			{:else}
+				{m.transactions_filter_account_all()}
+			{/if}
+		</Select.Trigger>
+		<Select.Content>
+			{#each BALANCE_GROUP_ORDER as group (group)}
+				{@const accountsInGroup = accountsByGroup.get(group) ?? []}
+				{#if accountsInGroup.length > 0}
+					<Select.Group>
+						<Select.Label>
+							<div class="flex items-center gap-2">
+								<div class="size-2 rounded-full {groupMeta[group].color}"></div>
+								{groupMeta[group].label}
+							</div>
+						</Select.Label>
+						{#each accountsInGroup as account (account.id)}
+							<Select.Item value={account.id}>{account.name}</Select.Item>
+						{/each}
+					</Select.Group>
+				{/if}
 			{/each}
 		</Select.Content>
 	</Select.Root>

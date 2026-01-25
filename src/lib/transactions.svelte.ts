@@ -56,6 +56,7 @@ class TransactionsContext {
 	period: PeriodOption = $state('last-3-months');
 	kind: KindFilter = $state('all');
 	search: string = $state('');
+	accountFilter: string | null = $state(null);
 	page: number = $state(1);
 	isLoading: boolean = $state(true);
 	rawTransactions: TransactionsResponse<TransactionExpand>[] = $state([]);
@@ -113,6 +114,7 @@ class TransactionsContext {
 		this.period = 'last-3-months';
 		this.kind = 'all';
 		this.search = '';
+		this.accountFilter = null;
 
 		const sortParam = params.get('sort');
 		const dirParam = params.get('dir');
@@ -157,6 +159,15 @@ class TransactionsContext {
 			this.search = searchParam;
 		}
 
+		const accountParam = params.get('account');
+		if (accountParam) {
+			const accounts = this._accountsContext.accounts;
+			const isValid = accounts.length === 0 || accounts.some((a) => a.id === accountParam);
+			if (isValid) {
+				this.accountFilter = accountParam;
+			}
+		}
+
 		if (shouldRefresh) {
 			this.refreshTransactions();
 		}
@@ -183,6 +194,19 @@ class TransactionsContext {
 			this._lastSyncedSearch = newUrl.search;
 			// eslint-disable-next-line svelte/no-navigation-without-resolve
 			replaceState(newUrl.href, {});
+		}
+	}
+
+	private syncFiltersToParams(params: SvelteURLSearchParams) {
+		if (this.kind === 'all') {
+			params.delete('amount');
+		} else {
+			params.set('amount', this.kind);
+		}
+		if (this.accountFilter) {
+			params.set('account', this.accountFilter);
+		} else {
+			params.delete('account');
 		}
 	}
 
@@ -262,6 +286,10 @@ class TransactionsContext {
 			if (searchQuery) {
 				const escaped = searchQuery.replace(/'/g, "''");
 				filterParts.push(`description ~ '${escaped}'`);
+			}
+
+			if (this.accountFilter) {
+				filterParts.push(`account = '${this.accountFilter}'`);
 			}
 
 			const filter = filterParts.length > 0 ? filterParts.join(' && ') : undefined;
@@ -412,6 +440,7 @@ class TransactionsContext {
 			const time = row.dateValue;
 			if (fromTime !== null && time < fromTime) return false;
 			if (toTime !== null && time >= toTime) return false;
+			if (this.accountFilter && row.accountId !== this.accountFilter) return false;
 			if (this.kind === 'credits') return row.value > 0;
 			if (this.kind === 'debits') return row.value < 0;
 			if (this.kind === 'excluded') return row.excluded;
@@ -508,11 +537,7 @@ class TransactionsContext {
 		params.delete('periodTo');
 		params.delete('periodLabel');
 		params.set('period', option);
-		if (this.kind === 'all') {
-			params.delete('amount');
-		} else {
-			params.set('amount', this.kind);
-		}
+		this.syncFiltersToParams(params);
 
 		this.updateUrl(params);
 		this.refreshTransactions();
@@ -523,11 +548,19 @@ class TransactionsContext {
 
 		const currentPage = get(page);
 		const params = new SvelteURLSearchParams(currentPage.url.searchParams);
-		if (option === 'all') {
-			params.delete('amount');
-		} else {
-			params.set('amount', option);
-		}
+		this.syncFiltersToParams(params);
+
+		this.updateUrl(params);
+		this.refreshTransactions();
+	}
+
+	setAccountFilter(accountId: string | null) {
+		this.accountFilter = accountId;
+		this.page = 1;
+
+		const currentPage = get(page);
+		const params = new SvelteURLSearchParams(currentPage.url.searchParams);
+		this.syncFiltersToParams(params);
 
 		this.updateUrl(params);
 		this.refreshTransactions();

@@ -204,7 +204,7 @@ test.describe('transactions table sorting', () => {
 
 		const rows = page.locator('tbody tr');
 
-		const accountHeader = page.getByRole('button', { name: 'Account' });
+		const accountHeader = page.locator('thead').getByRole('button', { name: 'Account' });
 		await accountHeader.click();
 
 		await expect(page).toHaveURL(/sort=account/);
