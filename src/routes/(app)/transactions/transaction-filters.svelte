@@ -219,7 +219,7 @@
 			class="bg-background w-full sm:w-auto sm:max-w-64 sm:min-w-48"
 		>
 			{#if selectedAccount}
-				<div class="flex items-center gap-2">
+				<div class="flex w-full items-center gap-2">
 					<div
 						class="size-2 shrink-0 rounded-full {groupMeta[
 							selectedAccount.balanceGroup as AccountsBalanceGroupOptions
@@ -227,12 +227,17 @@
 					></div>
 					<span class="max-w-40 truncate">{selectedAccount.name}</span>
 					<ClearButton
+						class="ml-auto"
 						onclick={(e) => {
 							e.preventDefault();
 							e.stopPropagation();
 							txContext.setAccountFilter(null);
 						}}
 						onpointerdown={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+						}}
+						onpointerup={(e) => {
 							e.preventDefault();
 							e.stopPropagation();
 						}}
