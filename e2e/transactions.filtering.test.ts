@@ -1024,8 +1024,8 @@ test('transactions can be filtered by account', async ({ page }) => {
 	await expect(page.getByText('Paycheck Direct Deposit')).toBeVisible();
 	await expect(page.getByText('Restaurant Dinner')).not.toBeVisible();
 
-	// Switch to credit card account
-	await page.getByLabel('Account', { exact: true }).click();
+	// Switch to credit card account (click left side to avoid ClearButton on right)
+	await page.getByLabel('Account', { exact: true }).click({ position: { x: 10, y: 10 } });
 	await page.getByRole('option', { name: 'Rewards Credit Card' }).click();
 
 	// Only credit card transactions should be visible
