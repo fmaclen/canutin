@@ -1,14 +1,10 @@
 // PocketBase setup and server launcher
 
 import { spawn, spawnSync } from 'node:child_process';
-import fscore, { createWriteStream, existsSync } from 'node:fs';
-import fs from 'node:fs/promises';
-import https from 'node:https';
+import { createHash } from 'node:crypto';
+import fscore, { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-
-const POCKETBASE_VERSION = '0.35.0';
-const POCKETBASE_TAG = `v${POCKETBASE_VERSION}`; // GitHub release tag
 
 const projectRoot = process.cwd();
 const pbDir = path.join(projectRoot, 'pocketbase');
@@ -38,199 +34,89 @@ function getPlatform(): Platform {
 	}
 }
 
-function getArchForPocketBase(): string {
-	// Map Node.js architectures to PocketBase ones
-	const arch = process.arch;
-	switch (arch) {
-		case 'x64':
-			return 'amd64';
-		case 'arm64':
-			return 'arm64';
-		case 'arm':
-			// Default to armv7 for generic ARM (common on many SBCs)
-			return 'armv7';
-		case 'ia32':
-			return '386';
-		// Handle less common Linux server arches explicitly when possible
-		case 'ppc64':
-			return 'ppc64le';
-		case 's390x':
-			return 's390x';
-		case 'riscv64':
-			return 'riscv64';
-		default:
-			throw new Error(`Unsupported architecture: ${arch}`);
-	}
+function getBinaryName(): string {
+	return getPlatform() === 'windows' ? 'pocketbase-custom.exe' : 'pocketbase-custom';
 }
 
-function getAssetInfo() {
-	const platform = getPlatform();
-	const arch = getArchForPocketBase();
-
-	// Validate supported combos to avoid 404s
-	const supportedCombos = new Set([
-		'darwin_amd64',
-		'darwin_arm64',
-		'linux_amd64',
-		'linux_arm64',
-		'linux_armv7',
-		'linux_386',
-		'linux_ppc64le',
-		'linux_s390x',
-		'linux_riscv64',
-		'windows_amd64',
-		'windows_arm64',
-		'windows_386'
-	]);
-
-	const osPart = platform;
-	const combo = `${osPart}_${arch}`;
-	if (!supportedCombos.has(combo)) {
-		throw new Error(`Unsupported OS/arch combination for PocketBase: ${combo}`);
-	}
-
-	const filename = `pocketbase_${POCKETBASE_VERSION}_${combo}.zip`;
-	const url = `https://github.com/pocketbase/pocketbase/releases/download/${POCKETBASE_TAG}/${filename}`;
-	const binName = platform === 'windows' ? 'pocketbase.exe' : 'pocketbase';
-	return { url, filename, binName };
+function getBinaryPath(): string {
+	return path.join(pbDir, getBinaryName());
 }
 
-async function ensureDir(dir: string) {
-	await fs.mkdir(dir, { recursive: true });
-}
-
-async function download(url: string, destPath: string): Promise<void> {
-	await new Promise<void>((resolve, reject) => {
-		const file = createWriteStream(destPath);
-		const request = https.get(url, (response) => {
-			if (
-				response.statusCode &&
-				response.statusCode >= 300 &&
-				response.statusCode < 400 &&
-				response.headers.location
-			) {
-				// Follow redirect
-				return download(response.headers.location!, destPath).then(resolve, reject);
-			}
-			if (response.statusCode !== 200) {
-				file.close();
-				return reject(new Error(`Failed to download (status ${response.statusCode}): ${url}`));
-			}
-			response.pipe(file);
-			file.on('finish', () => file.close(() => resolve()));
-		});
-		request.on('error', (err) => {
-			file.close();
-			reject(err);
-		});
-	});
-}
-
-function unzip(zipPath: string, destDir: string): void {
-	const platform = getPlatform();
-	if (platform === 'windows') {
-		// Use PowerShell's Expand-Archive
-		const ps = spawnSync(
-			'powershell.exe',
-			[
-				'-NoLogo',
-				'-NoProfile',
-				'-Command',
-				`Expand-Archive -LiteralPath '${zipPath.replace(/'/g, "''")}' -DestinationPath '${destDir.replace(/'/g, "''")}' -Force`
-			],
-			{ stdio: 'inherit' }
-		);
-		if (ps.status !== 0) {
-			throw new Error(`Failed to unzip using PowerShell (exit ${ps.status}).`);
-		}
-	} else {
-		// Prefer unzip if available, fallback to tar if it supports zip (not guaranteed)
-		let res = spawnSync('unzip', ['-o', zipPath, '-d', destDir], { stdio: 'inherit' });
-		if (res.error || res.status !== 0) {
-			// Try tar as a fallback
-			res = spawnSync('tar', ['-xf', zipPath, '-C', destDir], { stdio: 'inherit' });
-			if (res.error || res.status !== 0) {
-				throw new Error(
-					'Failed to unzip. Please install "unzip" or ensure your tar supports zip archives.'
-				);
-			}
-		}
-	}
-}
-
-function getBinaryPath(binName: string): string {
-	return path.join(pbDir, binName);
-}
-
-function readVersionFromBinary(binPath: string): string | null {
+function goModHash(): string | null {
 	try {
-		// PocketBase exposes version via the global flag `--version`.
-		const out = spawnSync(binPath, ['--version'], { encoding: 'utf8' });
-		if (out.status === 0) {
-			const text = `${out.stdout || ''}${out.stderr || ''}`.trim();
-			// Accept forms like: "0.30.0", "v0.30.0", "PocketBase v0.30.0"
-			const match = text.match(/(\d+\.\d+\.\d+)/);
-			if (match) return match[1];
-			if (text) return text; // fallback to raw text
-		}
+		const goMod = path.join(pbDir, 'go.mod');
+		const mainGo = path.join(pbDir, 'main.go');
+		if (!existsSync(goMod) || !existsSync(mainGo)) return null;
+
+		const hash = createHash('sha256');
+		hash.update(readFileSync(goMod));
+		hash.update(readFileSync(mainGo));
+		return hash.digest('hex').slice(0, 16);
+	} catch {
+		return null;
+	}
+}
+
+function readBuildHash(): string | null {
+	try {
+		const hashFile = path.join(pbDir, '.build-hash');
+		if (!existsSync(hashFile)) return null;
+		return readFileSync(hashFile, 'utf8').trim();
+	} catch {
+		return null;
+	}
+}
+
+function writeBuildHash(hash: string): void {
+	try {
+		const hashFile = path.join(pbDir, '.build-hash');
+		writeFileSync(hashFile, hash);
 	} catch {
 		/* ignore */
 	}
-	return null;
+}
+
+function buildPocketBase(): void {
+	log('Building custom PocketBase binary...');
+	const res = spawnSync('go', ['build', '-o', getBinaryName()], {
+		cwd: pbDir,
+		stdio: 'inherit'
+	});
+	if (res.error) {
+		throw new Error(`Failed to run go build: ${res.error.message}`);
+	}
+	if (res.status !== 0) {
+		throw new Error(`go build failed with exit code ${res.status}`);
+	}
+	log('Build complete.');
 }
 
 async function ensurePocketBase(): Promise<string> {
-	const { url, filename, binName } = getAssetInfo();
-	const binPath = getBinaryPath(binName);
+	const binPath = getBinaryPath();
+	const currentHash = goModHash();
+	const savedHash = readBuildHash();
 
-	if (existsSync(binPath)) {
-		// Check version; if mismatch, re-download
-		const v = readVersionFromBinary(binPath);
-		if (v && (v === POCKETBASE_VERSION || v === POCKETBASE_TAG)) {
-			log(`Found PocketBase ${v} at ${path.relative(projectRoot, binPath)}`);
-			return binPath;
-		}
-		log(
-			`Existing PocketBase binary version ${v ?? 'unknown'} does not match ${POCKETBASE_VERSION}. Reinstalling...`
-		);
+	if (existsSync(binPath) && currentHash && currentHash === savedHash) {
+		log(`Found up-to-date PocketBase binary at ${path.relative(projectRoot, binPath)}`);
+		return binPath;
+	}
+
+	if (!existsSync(binPath)) {
+		log('PocketBase binary not found. Building...');
 	} else {
-		log('PocketBase binary not found. Installing...');
+		log('Source files changed. Rebuilding...');
 	}
 
-	await ensureDir(pbDir);
-	const zipPath = path.join(pbDir, filename);
+	buildPocketBase();
 
-	log(`Downloading ${url}`);
-	await download(url, zipPath);
-
-	log('Unzipping...');
-	unzip(zipPath, pbDir);
-
-	// Cleanup zip
-	try {
-		await fs.unlink(zipPath);
-	} catch {
-		/* ignore */
+	if (currentHash) {
+		writeBuildHash(currentHash);
 	}
 
-	// Ensure executable bit (non-Windows)
-	if (getPlatform() !== 'windows') {
-		try {
-			await fs.chmod(getBinaryPath(binName), 0o755);
-		} catch (e) {
-			// Ignore but warn
-			error(`Failed to set executable permissions: ${(e as Error).message}`);
-		}
+	if (!existsSync(binPath)) {
+		throw new Error('Build succeeded but binary not found.');
 	}
 
-	// Verify installed binary
-	const v2 = readVersionFromBinary(binPath);
-	if (!v2 || (v2 !== POCKETBASE_VERSION && v2 !== POCKETBASE_TAG)) {
-		throw new Error(
-			`Installed PocketBase version check failed. Expected ${POCKETBASE_VERSION}, got ${v2 ?? 'unknown'}.`
-		);
-	}
-	log(`Installed PocketBase ${v2}.`);
 	return binPath;
 }
 
@@ -263,11 +149,22 @@ async function startPocketBase(binPath: string): Promise<void> {
 	});
 }
 
+function runMigrations(binPath: string): void {
+	log('Running database migrations...');
+	const res = spawnSync(binPath, ['migrate', 'up'], {
+		cwd: pbDir,
+		encoding: 'utf8'
+	});
+	if (res.status !== 0) {
+		const out = `${res.stdout ?? ''}${res.stderr ?? ''}`.trim();
+		throw new Error(`Failed to run migrations. ${out ? 'Details: ' + out : ''}`);
+	}
+}
+
 async function upsertSuperuser(binPath: string): Promise<void> {
 	const email = process.env.PB_SUPERUSER_EMAIL || 'superadmin@example.com';
 	const password = process.env.PB_SUPERUSER_PASSWORD || '123qweasdzxc';
 
-	// Always upsert to guarantee existence and ensure known credentials in dev.
 	log('Ensuring superuser account exists (idempotent upsert)...');
 	const res = spawnSync(binPath, ['superuser', 'upsert', email, password], {
 		cwd: pbDir,
@@ -334,7 +231,6 @@ function watchMigrationsAndTypegen(): void {
 		}, 300);
 	};
 	try {
-		// Use non-recursive watch for portability; most changes are file writes/renames inside this dir.
 		fscore.watch(migrationsDir, { persistent: true }, () => {
 			debounce();
 		});
@@ -343,23 +239,25 @@ function watchMigrationsAndTypegen(): void {
 	}
 }
 
+const isDev = process.env.IS_DEV === 'true';
+
 (async () => {
 	try {
-		// Helpful environment note
 		log(`Host: ${os.platform()} ${os.arch()}`);
 		const binPath = await ensurePocketBase();
+		runMigrations(binPath);
 		await upsertSuperuser(binPath);
 		await startPocketBase(binPath);
 
-		// Kick off an initial type generation (retry until the HTTP server is ready)
-		try {
-			await generateTypesWithRetry();
-		} catch (e) {
-			error((e as Error).message);
-		}
+		if (isDev) {
+			try {
+				await generateTypesWithRetry();
+			} catch (e) {
+				error((e as Error).message);
+			}
 
-		// Watch migrations to keep types fresh during development
-		watchMigrationsAndTypegen();
+			watchMigrationsAndTypegen();
+		}
 	} catch (e) {
 		error((e as Error).message);
 		process.exit(1);

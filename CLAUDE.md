@@ -286,8 +286,16 @@ Always run: `bun run quality && bun run test`
 - Docker deployment with multi-stage Bun-based build
 - App runs on port 42069, PocketBase on port 42070 in production
 
+## Prerequisites
+
+- **Go 1.21+** - Required to build the custom PocketBase binary with Go hooks
+  - macOS: `brew install go`
+  - Linux: Use your package manager or download from https://go.dev/dl/
+  - The first time you run `bun run pb`, Go will compile PocketBase (~30 seconds)
+
 ## Notes
 
-- PocketBase v0.30.0 is automatically downloaded and managed by scripts
+- PocketBase uses custom Go hooks for automatic balance calculations (`pocketbase/main.go`)
+- The Go binary is built automatically by `scripts/pb-server.ts` when source files change
 - Frozen lockfile (`bun.lock`) ensures reproducible builds
 - All dependencies should be devDependencies (SvelteKit bundles everything at build time)
