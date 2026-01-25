@@ -16,6 +16,8 @@
 
 		const pathname = page.url.pathname;
 		const isAuth = pathname === '/auth' || pathname.startsWith('/auth/');
+		const isDemo = pathname === '/demo';
+		const isGuestRoute = isAuth || isDemo;
 		const isRoot = pathname === '/';
 
 		// Decide desired target based on auth state and current location
@@ -23,10 +25,10 @@
 		let target: Target = null;
 		if (auth.currentUser?.isValid) {
 			// If already authenticated, avoid staying on guest routes or root
-			if (isAuth || isRoot) target = '/big-picture';
+			if (isGuestRoute || isRoot) target = '/big-picture';
 		} else {
 			// If not authenticated, keep guest routes accessible; redirect others
-			if (!isAuth) target = '/auth';
+			if (!isGuestRoute) target = '/auth';
 		}
 
 		if (target && pathname !== target) {

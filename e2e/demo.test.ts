@@ -1,23 +1,16 @@
 import { expect, test } from '@playwright/test';
 
-test('paraglide demo switches language', async ({ page, context }) => {
-	await context.clearCookies();
-	await page.goto('/demo/paraglide');
+test('demo link is visible on login page and starts demo flow', async ({ page }) => {
+	await page.goto('/auth');
 
-	await expect(page.getByText('Plataforma de finanzas personales')).not.toBeVisible();
-	await expect(page.getByText('Personal finance platform')).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Try as guest' })).toBeVisible();
 
-	await Promise.all([
-		page.waitForLoadState('domcontentloaded'),
-		page.getByRole('button', { name: 'es' }).click()
-	]);
-	await expect(page.getByText('Personal finance platform')).not.toBeVisible();
-	await expect(page.getByText('Plataforma de finanzas personales')).toBeVisible();
+	await page.getByRole('link', { name: 'Try as guest' }).click();
 
-	await Promise.all([
-		page.waitForLoadState('domcontentloaded'),
-		page.getByRole('button', { name: 'en' }).click()
-	]);
-	await expect(page.getByText('Plataforma de finanzas personales')).not.toBeVisible();
-	await expect(page.getByText('Personal finance platform')).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Toggle Sidebar' })).toBeVisible();
+	await expect(page.getByRole('region', { name: 'Net worth' })).toBeVisible();
+
+	await page.goto('/demo');
+
+	await expect(page.getByRole('button', { name: 'Toggle Sidebar' })).toBeVisible();
 });

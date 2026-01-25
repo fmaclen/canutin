@@ -10,6 +10,7 @@
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import { getDemoContext } from '$lib/demo/demo.svelte';
 	import { m } from '$lib/paraglide/messages.js';
 
 	import DevAuthShortcuts from './dev-auth-shortcuts.svelte';
@@ -19,6 +20,7 @@
 	const id = $props.id();
 
 	const auth = getAuthContext();
+	const demo = getDemoContext();
 
 	let email = $state('');
 	let password = $state('');
@@ -88,6 +90,10 @@
 			{/if}
 
 			<Button type="submit" class="w-full" disabled={auth.isLoading}>{primaryText}</Button>
+
+			{#if demo.isEnabled && mode === 'login'}
+				<Button href="/demo" variant="outline" class="w-full">{m.demo_try_as_guest()}</Button>
+			{/if}
 
 			{#if dev}
 				<DevAuthShortcuts />

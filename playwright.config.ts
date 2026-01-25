@@ -22,7 +22,8 @@ export default defineConfig({
 			port: 42069,
 			env: {
 				...process.env,
-				PUBLIC_PLAYWRIGHT_TESTING: 'true'
+				PUBLIC_PLAYWRIGHT_TESTING: 'true',
+				PUBLIC_DEMO_ENABLED: 'true'
 			}
 		}
 	],
