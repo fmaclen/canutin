@@ -8,7 +8,7 @@ export interface AssetDefinition {
 	symbol?: string;
 }
 
-export const ASSET_SPY: AssetDefinition = {
+const ASSET_SPY: AssetDefinition = {
 	name: 'SPDR S&P 500 ETF Trust',
 	balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
 	balanceType: 'Security',
@@ -16,7 +16,7 @@ export const ASSET_SPY: AssetDefinition = {
 	symbol: 'SPY'
 };
 
-export const ASSET_GAMESTOP: AssetDefinition = {
+const ASSET_GAMESTOP: AssetDefinition = {
 	name: 'GameStop',
 	balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
 	balanceType: 'Security',
@@ -24,7 +24,7 @@ export const ASSET_GAMESTOP: AssetDefinition = {
 	symbol: 'GME'
 };
 
-export const ASSET_BITCOIN: AssetDefinition = {
+const ASSET_BITCOIN: AssetDefinition = {
 	name: 'Bitcoin',
 	balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
 	balanceType: 'Cryptocurrency',
@@ -32,7 +32,7 @@ export const ASSET_BITCOIN: AssetDefinition = {
 	symbol: 'BTC'
 };
 
-export const ASSET_ETHEREUM: AssetDefinition = {
+const ASSET_ETHEREUM: AssetDefinition = {
 	name: 'Ethereum',
 	balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
 	balanceType: 'Cryptocurrency',
@@ -40,14 +40,14 @@ export const ASSET_ETHEREUM: AssetDefinition = {
 	symbol: 'ETH'
 };
 
-export const ASSET_COLLECTIBLE: AssetDefinition = {
+const ASSET_COLLECTIBLE: AssetDefinition = {
 	name: 'Funko Pop Collection',
 	balanceGroup: AssetsBalanceGroupOptions.OTHER,
 	balanceType: 'Collectible',
 	type: AssetsTypeOptions.WHOLE
 };
 
-export const ASSET_VEHICLE: AssetDefinition = {
+const ASSET_VEHICLE: AssetDefinition = {
 	name: '1998 Fiat Multipla',
 	balanceGroup: AssetsBalanceGroupOptions.OTHER,
 	balanceType: 'Vehicle',

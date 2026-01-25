@@ -1,8 +1,12 @@
 package main
 
 import (
+	"context"
 	"log"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/pocketbase/pocketbase"
@@ -11,28 +15,45 @@ import (
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
 )
 
+// debounceMs is the trailing-edge debounce delay for balance recalculations.
+// After the last transaction mutation for an account, we wait this long before
+// recalculating to batch rapid sequential changes (e.g., bulk imports).
 const debounceMs = 250
 
+// tickerMs controls how often the worker checks for debounce expiration.
+// Lower values = more responsive but more CPU; 50ms is a good balance.
+const tickerMs = 50
+
 var (
-	balanceQueue = make(chan string, 1000)
-	pending      = make(map[string]time.Time)
-	pendingMu    sync.Mutex
+	// pending tracks accounts awaiting balance recalculation with their queue time.
+	// The map is protected by pendingMu.
+	pending   = make(map[string]time.Time)
+	pendingMu sync.Mutex
 )
 
 func main() {
 	app := pocketbase.New()
 
-	// Enable JS migrations and hooks
 	jsvm.MustRegister(app, jsvm.Config{
 		MigrationsDir: "pb_migrations",
 	})
 
-	// Register the migrate command
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{
 		Automigrate: true,
 	})
 
-	go balanceWorker(app)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigChan
+		log.Println("Shutting down balance worker...")
+		cancel()
+	}()
+
+	go balanceWorker(ctx, app)
 
 	app.OnRecordAfterCreateSuccess("transactions").BindFunc(func(e *core.RecordEvent) error {
 		accountID := e.Record.GetString("account")
@@ -69,26 +90,21 @@ func main() {
 }
 
 func enqueueBalance(accountID string) {
-	select {
-	case balanceQueue <- accountID:
-	default:
-		pendingMu.Lock()
+	pendingMu.Lock()
+	defer pendingMu.Unlock()
+	if _, exists := pending[accountID]; !exists {
 		pending[accountID] = time.Now()
-		pendingMu.Unlock()
 	}
 }
 
-func balanceWorker(app *pocketbase.PocketBase) {
-	ticker := time.NewTicker(50 * time.Millisecond)
+func balanceWorker(ctx context.Context, app *pocketbase.PocketBase) {
+	ticker := time.NewTicker(tickerMs * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case accountID := <-balanceQueue:
-			pendingMu.Lock()
-			pending[accountID] = time.Now()
-			pendingMu.Unlock()
-
+		case <-ctx.Done():
+			return
 		case <-ticker.C:
 			pendingMu.Lock()
 			now := time.Now()
@@ -106,6 +122,7 @@ func balanceWorker(app *pocketbase.PocketBase) {
 func calculateBalance(app *pocketbase.PocketBase, accountID string) {
 	account, err := app.FindRecordById("accounts", accountID)
 	if err != nil {
+		log.Printf("Failed to find account %s: %v", accountID, err)
 		return
 	}
 
@@ -123,6 +140,7 @@ func calculateBalance(app *pocketbase.PocketBase, accountID string) {
 		map[string]any{"aid": accountID},
 	)
 	if err != nil {
+		log.Printf("Failed to fetch transactions for account %s: %v", accountID, err)
 		return
 	}
 
@@ -137,6 +155,7 @@ func calculateBalance(app *pocketbase.PocketBase, accountID string) {
 
 	collection, err := app.FindCollectionByNameOrId("accountBalances")
 	if err != nil {
+		log.Printf("Failed to find accountBalances collection: %v", err)
 		return
 	}
 
