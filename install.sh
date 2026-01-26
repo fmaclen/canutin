@@ -2,7 +2,7 @@
 set -e
 
 REPO="fmaclen/canutin"
-BRANCH="next"
+BRANCH="${CANUTIN_BRANCH:-next}"
 INSTALL_DIR="${CANUTIN_DIR:-$HOME/.canutin}"
 COMPOSE_URL="https://raw.githubusercontent.com/$REPO/$BRANCH/docker-compose.prod.yml"
 BIN_DIR="$HOME/.local/bin"
