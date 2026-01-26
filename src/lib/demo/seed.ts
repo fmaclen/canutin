@@ -196,6 +196,10 @@ async function waitForAutoCalculatedBalances(
 ): Promise<void> {
 	const maxAttempts = 50;
 	const pollInterval = 100;
+	const stabilityThreshold = 5; // Number of consecutive polls with same count (~500ms of stability)
+
+	let lastCount = 0;
+	let stablePolls = 0;
 
 	for (let attempt = 0; attempt < maxAttempts; attempt++) {
 		const balances = await pb.collection('accountBalances').getFullList({
@@ -203,14 +207,29 @@ async function waitForAutoCalculatedBalances(
 			requestKey: null
 		});
 
-		if (balances.length >= accountIds.length) {
-			return;
+		// Need at least one balance per account
+		if (balances.length < accountIds.length) {
+			lastCount = balances.length;
+			stablePolls = 0;
+			await new Promise((resolve) => setTimeout(resolve, pollInterval));
+			continue;
+		}
+
+		// Check if balance count has stabilized (no new balances being created)
+		if (balances.length === lastCount) {
+			stablePolls++;
+			if (stablePolls >= stabilityThreshold) {
+				return;
+			}
+		} else {
+			lastCount = balances.length;
+			stablePolls = 1;
 		}
 
 		await new Promise((resolve) => setTimeout(resolve, pollInterval));
 	}
 
-	console.warn('[demo:seed] Timed out waiting for auto-calculated balances');
+	console.warn('[demo:seed] Timed out waiting for auto-calculated balances to stabilize');
 }
 
 export async function seedDemoData(pb: TypedPocketBase, userId: string): Promise<void> {
