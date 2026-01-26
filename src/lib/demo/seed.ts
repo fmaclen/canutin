@@ -189,7 +189,8 @@ const AUTO_CALCULATED_ACCOUNTS = [ACCOUNT_CHECKING, ACCOUNT_SAVINGS, ACCOUNT_CRE
 async function waitForAutoCalculatedBalances(pb: TypedPocketBase, accountIds: string[]) {
 	const maxAttempts = 50;
 	const pollInterval = 100;
-	const stabilityThreshold = 5; // Number of consecutive polls with same count (~500ms of stability)
+	// Go hooks create balance records with 250ms debounce; wait for count to stabilize
+	const stabilityThreshold = 5;
 
 	let lastCount = 0;
 	let stablePolls = 0;
