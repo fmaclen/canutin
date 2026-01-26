@@ -1,14 +1,17 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { getAuthContext } from '$lib/auth.svelte';
 	import CanutinIcon from '$lib/components/canutin-icon.svelte';
 	import { getDemoContext } from '$lib/demo/demo.svelte';
 
+	const auth = getAuthContext();
 	const demo = getDemoContext();
 
 	let started = $state(false);
 
 	$effect(() => {
+		if (auth.isLoading) return;
 		if (started) return;
 		started = true;
 		runDemo();
