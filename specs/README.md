@@ -9,17 +9,15 @@ Design documentation for CanutinX (SvelteKit + PocketBase).
 3. **Specs = WHAT** - Design intent and patterns, not implementation details
 4. **Code = truth** - When in doubt, check the actual source files referenced
 
-## Features
-
-| Spec                           | Purpose                               |
-| ------------------------------ | ------------------------------------- |
-| [demo-mode.md](./demo-mode.md) | Guest demo flow, seeding, determinism |
-
 ## Conventions
 
-| Spec                                                 | Purpose                              |
-| ---------------------------------------------------- | ------------------------------------ |
-| [conventions/realtime.md](./conventions/realtime.md) | PocketBase subscriptions, debouncing |
+| Spec                                                         | Purpose                              |
+| ------------------------------------------------------------ | ------------------------------------ |
+| [conventions/svelte5.md](./conventions/svelte5.md)           | Svelte 5 runes, events, snippets     |
+| [conventions/testing.md](./conventions/testing.md)           | Playwright E2E testing patterns      |
+| [conventions/code-quality.md](./conventions/code-quality.md) | TypeScript, formatting, commits      |
+| [conventions/code-review.md](./conventions/code-review.md)   | Code review checklist                |
+| [conventions/realtime.md](./conventions/realtime.md)         | PocketBase subscriptions, debouncing |
 
 ## Spec Template
 
