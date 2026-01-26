@@ -3,10 +3,12 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { getAuthContext } from '$lib/auth.svelte';
+	import { getDemoContext } from '$lib/demo/demo.svelte';
 
 	let { children } = $props();
 
 	const auth = getAuthContext();
+	const demo = getDemoContext();
 
 	$effect(() => {
 		// FIXME: Skip auth guard for specific demo route (temporary)
@@ -20,6 +22,18 @@
 		const isGuestRoute = isAuth || isDemo;
 		const isRoot = pathname === '/';
 
+		// Don't redirect away from /demo while demo is starting or seeding
+		if (isDemo && (demo.isStarting || demo.isSeeding)) {
+			console.log(
+				'[auth-guard] Demo in progress (isStarting:',
+				demo.isStarting,
+				'isSeeding:',
+				demo.isSeeding,
+				'), skipping redirect'
+			);
+			return;
+		}
+
 		// Decide desired target based on auth state and current location
 		type Target = '/auth' | '/big-picture' | null;
 		let target: Target = null;
@@ -32,6 +46,7 @@
 		}
 
 		if (target && pathname !== target) {
+			console.log('[auth-guard] Redirecting from', pathname, 'to', target);
 			goto(resolve(target), { replaceState: true });
 		}
 	});

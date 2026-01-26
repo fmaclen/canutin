@@ -37,13 +37,16 @@ class AccountsContext {
 	}
 
 	private async init() {
+		console.log('[accounts] init called');
 		try {
 			// Subscribe FIRST to avoid missing events during initial fetch
 			this.realtimeSubscribe();
 
+			console.log('[accounts] fetching accounts list...');
 			const list = await this._pb.authedClient
 				.collection('accounts')
 				.getFullList<AccountsResponse>();
+			console.log('[accounts] fetched', list.length, 'accounts');
 			this.accounts = list.map((a) => ({ ...a, balance: 0, balanceAsOf: '' }));
 			for (const a of this.accounts) {
 				const balanceData = await this.getLatestAccountBalance(a.id);
@@ -53,20 +56,25 @@ class AccountsContext {
 			}
 			this.lastBalanceEvent = Date.now();
 			this.isLoading = false;
+			console.log('[accounts] init complete, accounts:', this.accounts.length);
 		} catch (error) {
+			console.error('[accounts] init error:', error);
 			this._pb.handleConnectionError(error, 'accounts', 'init');
 			this.isLoading = false;
 		}
 	}
 
 	private realtimeSubscribe() {
+		console.log('[accounts] realtimeSubscribe called');
 		this._pb.authedClient
 			.collection('accounts')
 			.subscribe('*', this.onAccountEvent.bind(this))
+			.then(() => console.log('[accounts] subscribed to accounts'))
 			.catch((error) => this._pb.handleSubscriptionError(error, 'accounts', 'subscribe_accounts'));
 		this._pb.authedClient
 			.collection('accountBalances')
 			.subscribe('*', this.onAccountBalanceEvent.bind(this))
+			.then(() => console.log('[accounts] subscribed to accountBalances'))
 			.catch((error) => this._pb.handleSubscriptionError(error, 'accounts', 'subscribe_balances'));
 	}
 

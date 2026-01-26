@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import CanutinIcon from '$lib/components/canutin-icon.svelte';
 	import { getDemoContext } from '$lib/demo/demo.svelte';
 
 	const demo = getDemoContext();
@@ -27,3 +28,7 @@
 		}
 	}
 </script>
+
+<div class="flex h-screen w-full items-center justify-center">
+	<CanutinIcon class="size-12" fill="brand" />
+</div>
