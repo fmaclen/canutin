@@ -10,15 +10,15 @@ export interface TransactionDefinition {
 	isExcluded?: boolean;
 }
 
-function toISODate(date: Date): string {
+function toISODate(date: Date) {
 	return date.toISOString().split('T')[0];
 }
 
-function getMonthStart(monthsAgo: number, referenceDate: Date): Date {
+function getMonthStart(monthsAgo: number, referenceDate: Date) {
 	return startOfMonth(subMonths(referenceDate, monthsAgo));
 }
 
-export function generateCheckingTransactions(referenceDate: Date): TransactionDefinition[] {
+export function generateCheckingTransactions(referenceDate: Date) {
 	const transactions: TransactionDefinition[] = [];
 
 	for (let i = 0; i < MONTHS_IN_SET; i++) {
@@ -79,7 +79,7 @@ export function generateCheckingTransactions(referenceDate: Date): TransactionDe
 	return transactions;
 }
 
-export function generateSavingsTransactions(referenceDate: Date): TransactionDefinition[] {
+export function generateSavingsTransactions(referenceDate: Date) {
 	const transactions: TransactionDefinition[] = [];
 
 	for (let i = 0; i < MONTHS_IN_SET; i++) {
@@ -96,7 +96,7 @@ export function generateSavingsTransactions(referenceDate: Date): TransactionDef
 	return transactions;
 }
 
-export function generateCreditCardTransactions(referenceDate: Date): TransactionDefinition[] {
+export function generateCreditCardTransactions(referenceDate: Date) {
 	const transactions: TransactionDefinition[] = [];
 
 	for (let i = 0; i < MONTHS_IN_SET; i++) {

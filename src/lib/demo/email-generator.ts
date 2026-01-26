@@ -1,6 +1,6 @@
 import { adjectives, animals, uniqueNamesGenerator } from 'unique-names-generator';
 
-export function generateDemoEmail(): string {
+export function generateDemoEmail() {
 	const name = uniqueNamesGenerator({
 		dictionaries: [adjectives, animals],
 		separator: '-',

@@ -298,5 +298,9 @@
 	"cashflow_section_title": "Flujo de caja",
 	"cashflow_income_label": "Ingresos",
 	"cashflow_expenses_label": "Gastos",
-	"cashflow_surplus_label": "Excedente"
+	"cashflow_surplus_label": "Excedente",
+	"demo_try_as_guest": "Probar como invitado",
+	"demo_seeding_in_progress": "Configurando tu demo",
+	"demo_seeding_complete": "Tu demo está listo",
+	"demo_seeding_failed": "Error al configurar demo"
 }

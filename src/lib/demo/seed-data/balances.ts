@@ -12,15 +12,15 @@ export interface AssetBalanceDefinition {
 	marketValue: number;
 }
 
-function toISODate(date: Date): string {
+function toISODate(date: Date) {
 	return date.toISOString().split('T')[0];
 }
 
-function monthsAgo(months: number, referenceDate: Date): string {
+function monthsAgo(months: number, referenceDate: Date) {
 	return toISODate(subMonths(referenceDate, months));
 }
 
-export function generateAutoLoanBalances(referenceDate: Date): AccountBalanceDefinition[] {
+export function generateAutoLoanBalances(referenceDate: Date) {
 	return [
 		{ asOf: monthsAgo(0, referenceDate), value: -21250 },
 		{ asOf: monthsAgo(1, referenceDate), value: -23500 },
@@ -43,7 +43,7 @@ export function generateAutoLoanBalances(referenceDate: Date): AccountBalanceDef
 	];
 }
 
-export function generateRothIraBalances(referenceDate: Date): AccountBalanceDefinition[] {
+export function generateRothIraBalances(referenceDate: Date) {
 	return [
 		{ asOf: monthsAgo(0, referenceDate), value: 18535.78 },
 		{ asOf: monthsAgo(1, referenceDate), value: 18035.65 },
@@ -62,7 +62,7 @@ export function generateRothIraBalances(referenceDate: Date): AccountBalanceDefi
 	];
 }
 
-export function generate401kBalances(referenceDate: Date): AccountBalanceDefinition[] {
+export function generate401kBalances(referenceDate: Date) {
 	return [
 		{ asOf: monthsAgo(0, referenceDate), value: 4250.58 },
 		{ asOf: monthsAgo(1, referenceDate), value: 4000.25 },
@@ -81,14 +81,14 @@ export function generate401kBalances(referenceDate: Date): AccountBalanceDefinit
 	];
 }
 
-export function generateWalletBalances(referenceDate: Date): AccountBalanceDefinition[] {
+export function generateWalletBalances(referenceDate: Date) {
 	return [
 		{ asOf: monthsAgo(7, referenceDate), value: 1300 },
 		{ asOf: monthsAgo(18, referenceDate), value: 700 }
 	];
 }
 
-export function generateSpyBalances(referenceDate: Date): AssetBalanceDefinition[] {
+export function generateSpyBalances(referenceDate: Date) {
 	return [
 		{ asOf: monthsAgo(0, referenceDate), quantity: 50, bookValue: 580, marketValue: 29000 },
 		{ asOf: monthsAgo(1, referenceDate), quantity: 50, bookValue: 570, marketValue: 28500 },
@@ -100,7 +100,7 @@ export function generateSpyBalances(referenceDate: Date): AssetBalanceDefinition
 	];
 }
 
-export function generateGamestopBalances(referenceDate: Date): AssetBalanceDefinition[] {
+export function generateGamestopBalances(referenceDate: Date) {
 	return [
 		{ asOf: monthsAgo(0, referenceDate), quantity: 125, bookValue: 25, marketValue: 3125 },
 		{ asOf: monthsAgo(1, referenceDate), quantity: 125, bookValue: 100, marketValue: 12500 },
@@ -112,7 +112,7 @@ export function generateGamestopBalances(referenceDate: Date): AssetBalanceDefin
 	];
 }
 
-export function generateBitcoinBalances(referenceDate: Date): AssetBalanceDefinition[] {
+export function generateBitcoinBalances(referenceDate: Date) {
 	return [
 		{ asOf: monthsAgo(0, referenceDate), quantity: 1.5, bookValue: 46280, marketValue: 69420 },
 		{ asOf: monthsAgo(1, referenceDate), quantity: 1.4, bookValue: 43500, marketValue: 60900 },
@@ -122,7 +122,7 @@ export function generateBitcoinBalances(referenceDate: Date): AssetBalanceDefini
 	];
 }
 
-export function generateEthereumBalances(referenceDate: Date): AssetBalanceDefinition[] {
+export function generateEthereumBalances(referenceDate: Date) {
 	return [
 		{ asOf: monthsAgo(0, referenceDate), quantity: 5, bookValue: 3500, marketValue: 17500 },
 		{ asOf: monthsAgo(3, referenceDate), quantity: 3, bookValue: 2750, marketValue: 8250 },
@@ -132,14 +132,14 @@ export function generateEthereumBalances(referenceDate: Date): AssetBalanceDefin
 	];
 }
 
-export function generateCollectibleBalances(referenceDate: Date): AssetBalanceDefinition[] {
+export function generateCollectibleBalances(referenceDate: Date) {
 	return [
 		{ asOf: monthsAgo(6, referenceDate), marketValue: 14500 },
 		{ asOf: monthsAgo(18, referenceDate), marketValue: 9500 }
 	];
 }
 
-export function generateVehicleBalances(referenceDate: Date): AssetBalanceDefinition[] {
+export function generateVehicleBalances(referenceDate: Date) {
 	return [
 		{ asOf: monthsAgo(4, referenceDate), marketValue: 38500 },
 		{ asOf: monthsAgo(8, referenceDate), marketValue: 40250 },

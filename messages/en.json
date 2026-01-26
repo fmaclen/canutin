@@ -298,5 +298,9 @@
 	"cashflow_section_title": "Cashflow",
 	"cashflow_income_label": "Income",
 	"cashflow_expenses_label": "Expenses",
-	"cashflow_surplus_label": "Surplus"
+	"cashflow_surplus_label": "Surplus",
+	"demo_try_as_guest": "Try as guest",
+	"demo_seeding_in_progress": "Setting up your demo",
+	"demo_seeding_complete": "Your demo is ready",
+	"demo_seeding_failed": "Failed to set up demo"
 }
