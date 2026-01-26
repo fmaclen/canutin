@@ -13,13 +13,14 @@ SvelteKit + PocketBase personal finance application using Bun.
 
 Load specs relevant to your task:
 
-| Task                      | Spec                                                   |
-| ------------------------- | ------------------------------------------------------ |
-| Writing Svelte components | [svelte5.md](./specs/conventions/svelte5.md)           |
-| Writing tests             | [testing.md](./specs/conventions/testing.md)           |
-| Code style & commits      | [code-quality.md](./specs/conventions/code-quality.md) |
-| Reviewing code            | [code-review.md](./specs/conventions/code-review.md)   |
-| PocketBase realtime       | [realtime.md](./specs/conventions/realtime.md)         |
+| Task                      | Spec                                                       |
+| ------------------------- | ---------------------------------------------------------- |
+| Writing Svelte components | [svelte5.md](./specs/conventions/svelte5.md)               |
+| Writing tests             | [testing.md](./specs/conventions/testing.md)               |
+| Code style & commits      | [code-quality.md](./specs/conventions/code-quality.md)     |
+| Reviewing code            | [code-review.md](./specs/conventions/code-review.md)       |
+| PocketBase realtime       | [realtime.md](./specs/conventions/realtime.md)             |
+| Calling PocketBase API    | [pocketbase-api.md](./specs/conventions/pocketbase-api.md) |
 
 ## Architecture
 

@@ -11,13 +11,14 @@ Design documentation for CanutinX (SvelteKit + PocketBase).
 
 ## Conventions
 
-| Spec                                                         | Purpose                              |
-| ------------------------------------------------------------ | ------------------------------------ |
-| [conventions/svelte5.md](./conventions/svelte5.md)           | Svelte 5 runes, events, snippets     |
-| [conventions/testing.md](./conventions/testing.md)           | Playwright E2E testing patterns      |
-| [conventions/code-quality.md](./conventions/code-quality.md) | TypeScript, formatting, commits      |
-| [conventions/code-review.md](./conventions/code-review.md)   | Code review checklist                |
-| [conventions/realtime.md](./conventions/realtime.md)         | PocketBase subscriptions, debouncing |
+| Spec                                                             | Purpose                              |
+| ---------------------------------------------------------------- | ------------------------------------ |
+| [conventions/svelte5.md](./conventions/svelte5.md)               | Svelte 5 runes, events, snippets     |
+| [conventions/testing.md](./conventions/testing.md)               | Playwright E2E testing patterns      |
+| [conventions/code-quality.md](./conventions/code-quality.md)     | TypeScript, formatting, commits      |
+| [conventions/code-review.md](./conventions/code-review.md)       | Code review checklist                |
+| [conventions/realtime.md](./conventions/realtime.md)             | PocketBase subscriptions, debouncing |
+| [conventions/pocketbase-api.md](./conventions/pocketbase-api.md) | API access, schema, Go hooks         |
 
 ## Spec Template
 
