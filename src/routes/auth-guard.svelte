@@ -24,13 +24,6 @@
 
 		// Don't redirect away from /demo while demo is starting or seeding
 		if (isDemo && (demo.isStarting || demo.isSeeding)) {
-			console.log(
-				'[auth-guard] Demo in progress (isStarting:',
-				demo.isStarting,
-				'isSeeding:',
-				demo.isSeeding,
-				'), skipping redirect'
-			);
 			return;
 		}
 
@@ -46,7 +39,6 @@
 		}
 
 		if (target && pathname !== target) {
-			console.log('[auth-guard] Redirecting from', pathname, 'to', target);
 			goto(resolve(target), { replaceState: true });
 		}
 	});

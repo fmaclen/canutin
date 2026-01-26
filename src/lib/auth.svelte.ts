@@ -46,25 +46,21 @@ export class AuthContext {
 
 	private subscribeToCurrentUser() {
 		const userId = this._pb.authStore.record?.id;
-		console.log('[auth] subscribeToCurrentUser called, userId:', userId);
 		if (!userId) return;
 
 		this._pb
 			.collection('users')
 			.subscribe(userId, this.onCurrentUserEvent.bind(this))
-			.then(() => console.log('[auth] subscribeToCurrentUser SUCCESS'))
 			.catch((error) => console.error('[auth:subscribe]', error));
 	}
 
 	private unsubscribeFromCurrentUser() {
 		const userId = this._pb.authStore.record?.id;
-		console.log('[auth] unsubscribeFromCurrentUser called, userId:', userId);
 		if (!userId) return;
 
 		this._pb
 			.collection('users')
 			.unsubscribe(userId)
-			.then(() => console.log('[auth] unsubscribeFromCurrentUser SUCCESS'))
 			.catch((error) => console.error('[auth:unsubscribe]', error));
 	}
 
@@ -88,23 +84,14 @@ export class AuthContext {
 	}
 
 	async login(email: string, password: string) {
-		console.log('[auth] login called for:', email);
 		this.error = null;
 		this.isLoading = true;
 		try {
-			console.log('[auth] calling authWithPassword...');
 			await this._pb.collection('users').authWithPassword(email, password);
-			console.log(
-				'[auth] authWithPassword complete, authStore.isValid:',
-				this._pb.authStore.isValid
-			);
 			this.currentUser = this._pb.authStore;
-			console.log('[auth] calling subscribeToCurrentUser (fire-and-forget)...');
 			this.subscribeToCurrentUser();
-			console.log('[auth] login returning success');
 			return { success: true } as const;
 		} catch (e: unknown) {
-			console.error('[auth] login failed:', e);
 			this.error = this.getErrorMessage(e, m.auth_login_failed());
 			return { success: false, error: this.error } as const;
 		} finally {
@@ -128,16 +115,12 @@ export class AuthContext {
 	}
 
 	async logout() {
-		console.log('[auth] logout called');
 		this.error = null;
 		try {
 			this.unsubscribeFromCurrentUser();
-			console.log('[auth] clearing authStore...');
 			this._pb.authStore.clear();
-			console.log('[auth] authStore cleared');
 		} finally {
 			this.currentUser = null;
-			console.log('[auth] logout complete');
 		}
 	}
 }

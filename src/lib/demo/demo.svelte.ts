@@ -42,27 +42,22 @@ export class DemoContext {
 	}
 
 	async startDemo(): Promise<{ success: boolean }> {
-		console.log('[demo] startDemo called');
 		if (!this.isEnabled) {
 			console.error('[demo] Demo mode is not enabled');
 			return { success: false };
 		}
 
 		if (this.isStarting || this.isSeeding) {
-			console.log('[demo] Already starting/seeding, returning early');
 			return { success: true };
 		}
 
 		this.isStarting = true;
-		console.log('[demo] isStarting set to true');
 
 		try {
 			let userId = this._auth.currentUser?.record?.id;
-			console.log('[demo] Current userId:', userId);
 
 			if (!userId) {
 				const email = generateDemoEmail();
-				console.log('[demo] Creating new user with email:', email);
 				await this._pb.collection('users').create({
 					email,
 					password: DEMO_PASSWORD,
@@ -76,9 +71,7 @@ export class DemoContext {
 					return { success: false };
 				}
 
-				console.log('[demo] Login successful, waiting 500ms for auth to stabilize...');
 				await new Promise((resolve) => setTimeout(resolve, 500));
-				console.log('[demo] 500ms delay complete, proceeding to seed');
 
 				userId = this._auth.currentUser?.record?.id;
 			}
@@ -89,19 +82,11 @@ export class DemoContext {
 				return { success: false };
 			}
 
-			if (this.isAlreadySeeded(userId)) {
-				console.log('[demo] Already seeded for userId:', userId);
+			if (this.isAlreadySeeded(userId) || this.isSeeding) {
 				return { success: true };
 			}
 
-			if (this.isSeeding) {
-				console.log('[demo] isSeeding is true, returning early');
-				return { success: true };
-			}
-
-			console.log('[demo] Starting seed for userId:', userId);
 			await this.seed(userId);
-			console.log('[demo] Seed complete');
 			return { success: true };
 		} catch (error) {
 			console.error('[demo] Failed to start demo:', error);
@@ -109,7 +94,6 @@ export class DemoContext {
 			return { success: false };
 		} finally {
 			this.isStarting = false;
-			console.log('[demo] isStarting set to false');
 		}
 	}
 
