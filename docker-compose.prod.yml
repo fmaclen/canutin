@@ -14,7 +14,7 @@ services:
     ports:
       - '42069:42069'
     environment:
-      PUBLIC_PB_URL: 'https://pb.next.canutin.com'
+      PUBLIC_PB_URL: 'https://pb-next.canutin.com'
       PUBLIC_DEMO_ENABLED: 'true'
       ORIGIN: 'https://next.canutin.com'
     depends_on:
