@@ -16,13 +16,14 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 
 COPY . .
+ENV DOCKER_BUILD=true
 RUN bun run build
 
 FROM oven/bun:1-slim
 
 WORKDIR /app
 
-COPY --from=builder /app/.svelte-kit/output ./build
+COPY --from=builder /app/build ./build
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/pocketbase/pb_migrations ./pocketbase/pb_migrations
 COPY --from=go-builder /pocketbase/pocketbase-custom ./pocketbase/pocketbase-custom
@@ -30,9 +31,8 @@ COPY --from=go-builder /pocketbase/pocketbase-custom ./pocketbase/pocketbase-cus
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=42069
-ENV ORIGIN=http://localhost:42069
 
 EXPOSE 42069
 EXPOSE 42070
 
-CMD ["bun", "run", "build/server/index.js"]
+CMD ["bun", "run", "build/index.js"]

@@ -1,0 +1,25 @@
+services:
+  pocketbase:
+    image: ghcr.io/fmaclen/canutin:next
+    command: ['./pocketbase/pocketbase-custom', 'serve', '--http', '0.0.0.0:42070']
+    ports:
+      - '42070:42070'
+    volumes:
+      - pocketbase-data:/app/pocketbase/pb_data
+    restart: unless-stopped
+
+  sveltekit:
+    image: ghcr.io/fmaclen/canutin:next
+    command: ['bun', 'run', 'build/index.js']
+    ports:
+      - '42069:42069'
+    environment:
+      PUBLIC_PB_URL: 'https://pb.next.canutin.com'
+      PUBLIC_DEMO_ENABLED: 'true'
+      ORIGIN: 'https://next.canutin.com'
+    depends_on:
+      - pocketbase
+    restart: unless-stopped
+
+volumes:
+  pocketbase-data:
