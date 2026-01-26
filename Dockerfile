@@ -1,3 +1,13 @@
+FROM golang:1.23-alpine AS go-builder
+
+WORKDIR /pocketbase
+
+COPY pocketbase/go.mod pocketbase/go.sum ./
+RUN go mod download
+
+COPY pocketbase/main.go ./
+RUN CGO_ENABLED=0 go build -o pocketbase-custom .
+
 FROM oven/bun:1 AS builder
 
 WORKDIR /app
@@ -14,7 +24,8 @@ WORKDIR /app
 
 COPY --from=builder /app/.svelte-kit/output ./build
 COPY --from=builder /app/package.json ./
-COPY --from=builder /app/pocketbase ./pocketbase
+COPY --from=builder /app/pocketbase/pb_migrations ./pocketbase/pb_migrations
+COPY --from=go-builder /pocketbase/pocketbase-custom ./pocketbase/pocketbase-custom
 
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0

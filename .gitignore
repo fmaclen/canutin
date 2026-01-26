@@ -12,6 +12,8 @@ pocketbase/pb_data
 pocketbase/CHANGELOG.md
 pocketbase/LICENSE.md
 pocketbase/pocketbase
+pocketbase/pocketbase-custom
+pocketbase/.build-hash
 
 # OS
 .DS_Store
