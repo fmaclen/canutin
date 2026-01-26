@@ -31,6 +31,14 @@ Review against [code-quality.md](./code-quality.md). For **every** new or modifi
 - No silent failures or unhandled promise rejections
 - Cleanup on unmount/logout (timers, subscriptions, state flags)
 
+### Performance
+
+- **Query efficiency** - Avoid N+1 queries; batch where possible
+- **Unnecessary re-fetches** - Don't fetch data already available in context/state
+- **Expensive computations** - Memoize or debounce where appropriate
+- **Large dataset handling** - Pagination, virtualization, or lazy loading for lists
+- Use PocketBase Logs API to inspect query performance when in doubt (see [pocketbase-api.md](./pocketbase-api.md))
+
 ### Framework Patterns
 
 Review against [svelte5.md](./svelte5.md) and [realtime.md](./realtime.md):
