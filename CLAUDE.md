@@ -295,7 +295,7 @@ Always run: `bun run quality && bun run test`
 
 ## Notes
 
-- PocketBase uses custom Go hooks for automatic balance calculations (`pocketbase/main.go`)
-- The Go binary is built automatically by `scripts/pb-server.ts` when source files change
+- PocketBase v0.35.0 is automatically built from source and managed by scripts (custom Go hooks in `pocketbase/main.go`)
+- Version is pinned in `pocketbase/go.mod` - update periodically to stay current with PocketBase releases
 - Frozen lockfile (`bun.lock`) ensures reproducible builds
 - All dependencies should be devDependencies (SvelteKit bundles everything at build time)
