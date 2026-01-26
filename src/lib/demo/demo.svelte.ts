@@ -41,7 +41,7 @@ export class DemoContext {
 		localStorage.setItem(this.getStorageKey(userId), 'true');
 	}
 
-	async startDemo(): Promise<{ success: boolean }> {
+	async startDemo() {
 		if (!this.isEnabled) {
 			console.error('[demo] Demo mode is not enabled');
 			return { success: false };
@@ -71,6 +71,7 @@ export class DemoContext {
 					return { success: false };
 				}
 
+				// Allow auth state to settle before seeding
 				await new Promise((resolve) => setTimeout(resolve, 500));
 
 				userId = this._auth.currentUser?.record?.id;

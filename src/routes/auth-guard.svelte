@@ -11,7 +11,7 @@
 	const demo = getDemoContext();
 
 	$effect(() => {
-		// FIXME: Skip auth guard for specific demo route (temporary)
+		// TODO(#309): Remove once language switcher UI is added
 		if (page.url.pathname.startsWith('/demo/paraglide')) return;
 
 		if (auth.isLoading) return;

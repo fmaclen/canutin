@@ -37,11 +37,7 @@ type IdMap = Record<string, string>;
 
 const BATCH_SIZE = 10;
 
-async function runInBatches<T, R>(
-	items: T[],
-	fn: (item: T) => Promise<R>,
-	batchSize = BATCH_SIZE
-): Promise<R[]> {
+async function runInBatches<T, R>(items: T[], fn: (item: T) => Promise<R>, batchSize = BATCH_SIZE) {
 	const results: R[] = [];
 	for (let i = 0; i < items.length; i += batchSize) {
 		const batch = items.slice(i, i + batchSize);
@@ -76,7 +72,7 @@ const ALL_LABELS = [
 	'Fees'
 ];
 
-async function createBalanceTypes(pb: TypedPocketBase, owner: string): Promise<IdMap> {
+async function createBalanceTypes(pb: TypedPocketBase, owner: string) {
 	const balanceTypeNames = [
 		...new Set([...ALL_ACCOUNTS.map((a) => a.balanceType), ...ALL_ASSETS.map((a) => a.balanceType)])
 	];
@@ -89,7 +85,7 @@ async function createBalanceTypes(pb: TypedPocketBase, owner: string): Promise<I
 	return cache;
 }
 
-async function createLabels(pb: TypedPocketBase, owner: string): Promise<IdMap> {
+async function createLabels(pb: TypedPocketBase, owner: string) {
 	const cache: IdMap = {};
 	for (const name of ALL_LABELS) {
 		const created = await pb.collection('transactionLabels').create({ name, owner });
@@ -103,7 +99,7 @@ async function createAccount(
 	account: AccountDefinition,
 	owner: string,
 	balanceTypeCache: IdMap
-): Promise<string> {
+) {
 	const created = await pb.collection('accounts').create({
 		name: account.name,
 		balanceGroup: account.balanceGroup,
@@ -121,7 +117,7 @@ async function createAsset(
 	asset: AssetDefinition,
 	owner: string,
 	balanceTypeCache: IdMap
-): Promise<string> {
+) {
 	const created = await pb.collection('assets').create({
 		name: asset.name,
 		balanceGroup: asset.balanceGroup,
@@ -140,7 +136,7 @@ async function createTransactions(
 	accountId: string,
 	owner: string,
 	labelCache: IdMap
-): Promise<void> {
+) {
 	await runInBatches(transactions, (tx) =>
 		pb.collection('transactions').create({
 			account: accountId,
@@ -159,7 +155,7 @@ async function createAccountBalances(
 	balances: AccountBalanceDefinition[],
 	accountId: string,
 	owner: string
-): Promise<void> {
+) {
 	await runInBatches(balances, (balance) =>
 		pb.collection('accountBalances').create({
 			account: accountId,
@@ -175,7 +171,7 @@ async function createAssetBalances(
 	balances: AssetBalanceDefinition[],
 	assetId: string,
 	owner: string
-): Promise<void> {
+) {
 	await runInBatches(balances, (balance) =>
 		pb.collection('assetBalances').create({
 			asset: assetId,
@@ -190,10 +186,7 @@ async function createAssetBalances(
 
 const AUTO_CALCULATED_ACCOUNTS = [ACCOUNT_CHECKING, ACCOUNT_SAVINGS, ACCOUNT_CREDIT_CARD];
 
-async function waitForAutoCalculatedBalances(
-	pb: TypedPocketBase,
-	accountIds: string[]
-): Promise<void> {
+async function waitForAutoCalculatedBalances(pb: TypedPocketBase, accountIds: string[]) {
 	const maxAttempts = 50;
 	const pollInterval = 100;
 	const stabilityThreshold = 5; // Number of consecutive polls with same count (~500ms of stability)
@@ -232,7 +225,7 @@ async function waitForAutoCalculatedBalances(
 	console.warn('[demo:seed] Timed out waiting for auto-calculated balances to stabilize');
 }
 
-export async function seedDemoData(pb: TypedPocketBase, userId: string): Promise<void> {
+export async function seedDemoData(pb: TypedPocketBase, userId: string) {
 	// Disable auto-cancellation for bulk operations
 	pb.autoCancellation(false);
 
