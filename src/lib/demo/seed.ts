@@ -37,10 +37,10 @@ type IdMap = Record<string, string>;
 
 const BATCH_SIZE = 10;
 
-async function runInBatches<T, R>(items: T[], fn: (item: T) => Promise<R>, batchSize = BATCH_SIZE) {
+async function runInBatches<T, R>(items: T[], fn: (item: T) => Promise<R>) {
 	const results: R[] = [];
-	for (let i = 0; i < items.length; i += batchSize) {
-		const batch = items.slice(i, i + batchSize);
+	for (let i = 0; i < items.length; i += BATCH_SIZE) {
+		const batch = items.slice(i, i + BATCH_SIZE);
 		const batchResults = await Promise.all(batch.map(fn));
 		results.push(...batchResults);
 	}

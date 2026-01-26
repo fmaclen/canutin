@@ -21,6 +21,7 @@ bun run check     # svelte-check only
 - **Never use `@ts-ignore`** - Fix the underlying issue
 - **Never disable linter rules** - Fix the code instead
   - Exception: `svelte/no-navigation-without-resolve` for dynamic URLs (see [svelte5.md](./svelte5.md#navigation))
+- **Avoid default parameter values** - Only use when strictly necessary; prefer explicit arguments at call sites
 
 ### Type Narrowing
 
