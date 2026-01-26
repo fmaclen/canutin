@@ -64,6 +64,7 @@ export class DemoContext {
 				const loginResult = await this._auth.login(email, DEMO_PASSWORD);
 				if (!loginResult.success) {
 					console.error('[demo] Failed to login after user creation');
+					toast.error(m.demo_seeding_failed());
 					return { success: false };
 				}
 
@@ -72,36 +73,38 @@ export class DemoContext {
 
 			if (!userId) {
 				console.error('[demo] No user ID after authentication');
+				toast.error(m.demo_seeding_failed());
 				return { success: false };
 			}
 
-			if (this.isAlreadySeeded(userId)) {
+			if (this.isAlreadySeeded(userId) || this.isSeeding) {
 				return { success: true };
 			}
 
-			this.seedInBackground(userId);
+			await this.seed(userId);
 			return { success: true };
 		} catch (error) {
 			console.error('[demo] Failed to start demo:', error);
+			toast.error(m.demo_seeding_failed());
 			return { success: false };
 		}
 	}
 
-	private seedInBackground(userId: string) {
+	private async seed(userId: string) {
 		this.isSeeding = true;
-		this.markAsSeeded(userId);
 		toast.loading(m.demo_seeding_in_progress(), { id: TOAST_ID, duration: Infinity });
 
-		seedDemoData(this._pb, userId)
-			.then(() => {
-				this.isSeeding = false;
-				toast.success(m.demo_seeding_complete(), { id: TOAST_ID });
-			})
-			.catch((error) => {
-				console.error('[demo:seed]', error);
-				this.isSeeding = false;
-				toast.error(m.demo_seeding_failed(), { id: TOAST_ID });
-			});
+		try {
+			await seedDemoData(this._pb, userId);
+			this.markAsSeeded(userId);
+			toast.success(m.demo_seeding_complete(), { id: TOAST_ID });
+		} catch (error) {
+			console.error('[demo:seed]', error);
+			toast.error(m.demo_seeding_failed(), { id: TOAST_ID });
+			throw error;
+		} finally {
+			this.isSeeding = false;
+		}
 	}
 }
 

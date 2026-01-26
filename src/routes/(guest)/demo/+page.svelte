@@ -5,18 +5,25 @@
 
 	const demo = getDemoContext();
 
+	let started = $state(false);
+
 	$effect(() => {
+		if (started) return;
+		started = true;
+		runDemo();
+	});
+
+	async function runDemo() {
 		if (!demo.isEnabled) {
 			goto(resolve('/auth'), { replaceState: true });
 			return;
 		}
 
-		demo.startDemo().then((result) => {
-			if (result.success) {
-				goto(resolve('/'), { replaceState: true });
-			} else {
-				goto(resolve('/auth'), { replaceState: true });
-			}
-		});
-	});
+		const result = await demo.startDemo();
+		if (result.success) {
+			goto(resolve('/'), { replaceState: true });
+		} else {
+			goto(resolve('/auth'), { replaceState: true });
+		}
+	}
 </script>

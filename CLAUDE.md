@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 CanutinX is a personal finance management application built with SvelteKit 2 and PocketBase. It uses Svelte 5 with runes for reactivity, Bun as the runtime, and Playwright for end-to-end testing.
 
+## Specifications
+
+Feature specs and conventions are documented in `specs/`. Read [specs/README.md](./specs/README.md) for the index.
+
 ## Essential Commands
 
 ### Development

@@ -1,23 +1,17 @@
 import { expect, test } from '@playwright/test';
-import PocketBase from 'pocketbase';
 
-import { seedDemoData } from '../src/lib/demo/seed';
-import type { TypedPocketBase } from '../src/lib/pocketbase.schema';
-import { DEFAULT_PASSWORD, seedUser } from './pocketbase.helpers';
+test('/demo route seeds data and displays net worth', async ({ page }) => {
+	await page.goto('/auth');
 
-const PB_URL = 'http://127.0.0.1:42070';
+	await expect(page.getByRole('link', { name: 'Try as guest' })).toBeVisible();
+	await page.getByRole('link', { name: 'Try as guest' }).click();
 
-test('seedDemoData populates expected net worth', async ({ page }) => {
-	const user = await seedUser('seed-test');
-	const pb = new PocketBase(PB_URL) as TypedPocketBase;
-	await pb.collection('users').authWithPassword(user.email, DEFAULT_PASSWORD);
+	await expect(page.getByRole('link', { name: 'Try as guest' })).not.toBeVisible();
 
-	await seedDemoData(pb, user.id);
-
-	await page.goto('/');
-	await page.getByLabel('Email').fill(user.email);
-	await page.getByLabel('Password', { exact: true }).fill(DEFAULT_PASSWORD);
-	await page.getByRole('button', { name: 'Login' }).click();
-
+	// Verify seeding completed with deterministic net worth
 	await expect(page.getByRole('region', { name: 'Net worth' })).toContainText('$184,719');
+	await expect(page.getByRole('region', { name: 'Cash' })).toBeVisible();
+	await expect(page.getByRole('region', { name: 'Investments' })).toBeVisible();
+	await expect(page.getByRole('region', { name: 'Debt' })).toBeVisible();
+	await expect(page.getByRole('region', { name: 'Other assets' })).toBeVisible();
 });

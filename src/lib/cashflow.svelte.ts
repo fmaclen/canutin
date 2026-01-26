@@ -21,6 +21,8 @@ export type CashflowPeriod = {
 	periodLabel: string;
 };
 
+const DEBOUNCE_MS = 200;
+
 class CashflowContext {
 	avg3m: CashflowAverages = $state({ income: 0, expenses: 0, surplus: 0 });
 	avg6m: CashflowAverages = $state({ income: 0, expenses: 0, surplus: 0 });
@@ -30,6 +32,7 @@ class CashflowContext {
 	periods: CashflowPeriod[] = $state([]);
 
 	private _pb: PocketBaseContext;
+	private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
@@ -53,14 +56,21 @@ class CashflowContext {
 			.catch((error) => this._pb.handleSubscriptionError(error, 'cashflow', 'subscribe'));
 	}
 
-	private async onTransactionEvent(e: RecordSubscription<TransactionsResponse>) {
-		if (e.action) {
+	private onTransactionEvent(e: RecordSubscription<TransactionsResponse>) {
+		if (!e.action) return;
+
+		if (this._debounceTimer) {
+			clearTimeout(this._debounceTimer);
+		}
+
+		this._debounceTimer = setTimeout(async () => {
+			this._debounceTimer = null;
 			try {
 				await this.recomputeAll();
 			} catch (error) {
 				console.error('[cashflow:recompute_on_event]', error);
 			}
-		}
+		}, DEBOUNCE_MS);
 	}
 
 	private async recomputeAll() {
@@ -78,7 +88,8 @@ class CashflowContext {
 		const txns = await this._pb.authedClient
 			.collection('transactions')
 			.getFullList<TransactionsResponse>({
-				filter: `date >= '${toPocketBaseDateString(earliest)}'`
+				filter: `date >= '${toPocketBaseDateString(earliest)}'`,
+				requestKey: null // Disable auto-cancellation to prevent glitches during bulk operations
 			});
 
 		const compute = (from: Date) => {
@@ -164,6 +175,9 @@ class CashflowContext {
 	}
 
 	dispose() {
+		if (this._debounceTimer) {
+			clearTimeout(this._debounceTimer);
+		}
 		this._pb.authedClient.collection('transactions').unsubscribe();
 	}
 }

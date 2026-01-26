@@ -35,6 +35,22 @@ import {
 
 type IdMap = Record<string, string>;
 
+const BATCH_SIZE = 10;
+
+async function runInBatches<T, R>(
+	items: T[],
+	fn: (item: T) => Promise<R>,
+	batchSize = BATCH_SIZE
+): Promise<R[]> {
+	const results: R[] = [];
+	for (let i = 0; i < items.length; i += batchSize) {
+		const batch = items.slice(i, i + batchSize);
+		const batchResults = await Promise.all(batch.map(fn));
+		results.push(...batchResults);
+	}
+	return results;
+}
+
 const ALL_LABELS = [
 	'Rent',
 	'Payroll & benefits',
@@ -125,7 +141,7 @@ async function createTransactions(
 	owner: string,
 	labelCache: IdMap
 ): Promise<void> {
-	const createPromises = transactions.map((tx) =>
+	await runInBatches(transactions, (tx) =>
 		pb.collection('transactions').create({
 			account: accountId,
 			owner,
@@ -136,8 +152,6 @@ async function createTransactions(
 			excluded: tx.isExcluded ? new Date().toISOString() : undefined
 		})
 	);
-
-	await Promise.all(createPromises);
 }
 
 async function createAccountBalances(
@@ -146,7 +160,7 @@ async function createAccountBalances(
 	accountId: string,
 	owner: string
 ): Promise<void> {
-	const createPromises = balances.map((balance) =>
+	await runInBatches(balances, (balance) =>
 		pb.collection('accountBalances').create({
 			account: accountId,
 			owner,
@@ -154,8 +168,6 @@ async function createAccountBalances(
 			value: balance.value
 		})
 	);
-
-	await Promise.all(createPromises);
 }
 
 async function createAssetBalances(
@@ -164,7 +176,7 @@ async function createAssetBalances(
 	assetId: string,
 	owner: string
 ): Promise<void> {
-	const createPromises = balances.map((balance) =>
+	await runInBatches(balances, (balance) =>
 		pb.collection('assetBalances').create({
 			asset: assetId,
 			owner,
@@ -174,12 +186,31 @@ async function createAssetBalances(
 			marketValue: balance.marketValue
 		})
 	);
-
-	await Promise.all(createPromises);
 }
 
-function sleep(ms: number): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, ms));
+const AUTO_CALCULATED_ACCOUNTS = [ACCOUNT_CHECKING, ACCOUNT_SAVINGS, ACCOUNT_CREDIT_CARD];
+
+async function waitForAutoCalculatedBalances(
+	pb: TypedPocketBase,
+	accountIds: string[]
+): Promise<void> {
+	const maxAttempts = 50;
+	const pollInterval = 100;
+
+	for (let attempt = 0; attempt < maxAttempts; attempt++) {
+		const balances = await pb.collection('accountBalances').getFullList({
+			filter: accountIds.map((id) => `account = '${id}'`).join(' || '),
+			requestKey: null
+		});
+
+		if (balances.length >= accountIds.length) {
+			return;
+		}
+
+		await new Promise((resolve) => setTimeout(resolve, pollInterval));
+	}
+
+	console.warn('[demo:seed] Timed out waiting for auto-calculated balances');
 }
 
 export async function seedDemoData(pb: TypedPocketBase, userId: string): Promise<void> {
@@ -205,85 +236,94 @@ export async function seedDemoData(pb: TypedPocketBase, userId: string): Promise
 		assetIds[asset.name] = await createAsset(pb, asset, userId, balanceTypeCache);
 	}
 
-	// Create transactions for auto-calculated accounts (parallel)
-	await Promise.all([
-		createTransactions(
-			pb,
-			generateCheckingTransactions(referenceDate),
-			accountIds[ACCOUNT_CHECKING.name],
-			userId,
-			labelCache
-		),
-		createTransactions(
-			pb,
-			generateSavingsTransactions(referenceDate),
-			accountIds[ACCOUNT_SAVINGS.name],
-			userId,
-			labelCache
-		),
-		createTransactions(
-			pb,
-			generateCreditCardTransactions(referenceDate),
-			accountIds[ACCOUNT_CREDIT_CARD.name],
-			userId,
-			labelCache
-		)
-	]);
+	// Create transactions for auto-calculated accounts (sequentially to reduce load)
+	await createTransactions(
+		pb,
+		generateCheckingTransactions(referenceDate),
+		accountIds[ACCOUNT_CHECKING.name],
+		userId,
+		labelCache
+	);
+	await createTransactions(
+		pb,
+		generateSavingsTransactions(referenceDate),
+		accountIds[ACCOUNT_SAVINGS.name],
+		userId,
+		labelCache
+	);
+	await createTransactions(
+		pb,
+		generateCreditCardTransactions(referenceDate),
+		accountIds[ACCOUNT_CREDIT_CARD.name],
+		userId,
+		labelCache
+	);
 
-	// Create account balances for manual accounts (parallel)
-	await Promise.all([
-		createAccountBalances(
-			pb,
-			generateAutoLoanBalances(referenceDate),
-			accountIds[ACCOUNT_AUTO_LOAN.name],
-			userId
-		),
-		createAccountBalances(
-			pb,
-			generateRothIraBalances(referenceDate),
-			accountIds[ACCOUNT_ROTH_IRA.name],
-			userId
-		),
-		createAccountBalances(
-			pb,
-			generate401kBalances(referenceDate),
-			accountIds[ACCOUNT_401K.name],
-			userId
-		),
-		createAccountBalances(
-			pb,
-			generateWalletBalances(referenceDate),
-			accountIds[ACCOUNT_WALLET.name],
-			userId
-		)
-	]);
+	// Create account balances for manual accounts (sequentially)
+	await createAccountBalances(
+		pb,
+		generateAutoLoanBalances(referenceDate),
+		accountIds[ACCOUNT_AUTO_LOAN.name],
+		userId
+	);
+	await createAccountBalances(
+		pb,
+		generateRothIraBalances(referenceDate),
+		accountIds[ACCOUNT_ROTH_IRA.name],
+		userId
+	);
+	await createAccountBalances(
+		pb,
+		generate401kBalances(referenceDate),
+		accountIds[ACCOUNT_401K.name],
+		userId
+	);
+	await createAccountBalances(
+		pb,
+		generateWalletBalances(referenceDate),
+		accountIds[ACCOUNT_WALLET.name],
+		userId
+	);
 
-	// Create asset balances (parallel)
-	await Promise.all([
-		createAssetBalances(
-			pb,
-			generateSpyBalances(referenceDate),
-			assetIds['SPDR S&P 500 ETF Trust'],
-			userId
-		),
-		createAssetBalances(pb, generateGamestopBalances(referenceDate), assetIds['GameStop'], userId),
-		createAssetBalances(pb, generateBitcoinBalances(referenceDate), assetIds['Bitcoin'], userId),
-		createAssetBalances(pb, generateEthereumBalances(referenceDate), assetIds['Ethereum'], userId),
-		createAssetBalances(
-			pb,
-			generateCollectibleBalances(referenceDate),
-			assetIds['Funko Pop Collection'],
-			userId
-		),
-		createAssetBalances(
-			pb,
-			generateVehicleBalances(referenceDate),
-			assetIds['1998 Fiat Multipla'],
-			userId
-		)
-	]);
+	// Create asset balances (sequentially)
+	await createAssetBalances(
+		pb,
+		generateSpyBalances(referenceDate),
+		assetIds['SPDR S&P 500 ETF Trust'],
+		userId
+	);
+	await createAssetBalances(
+		pb,
+		generateGamestopBalances(referenceDate),
+		assetIds['GameStop'],
+		userId
+	);
+	await createAssetBalances(
+		pb,
+		generateBitcoinBalances(referenceDate),
+		assetIds['Bitcoin'],
+		userId
+	);
+	await createAssetBalances(
+		pb,
+		generateEthereumBalances(referenceDate),
+		assetIds['Ethereum'],
+		userId
+	);
+	await createAssetBalances(
+		pb,
+		generateCollectibleBalances(referenceDate),
+		assetIds['Funko Pop Collection'],
+		userId
+	);
+	await createAssetBalances(
+		pb,
+		generateVehicleBalances(referenceDate),
+		assetIds['1998 Fiat Multipla'],
+		userId
+	);
 
-	// Wait for PocketBase Go hooks to complete debounced balance calculations.
-	// The hooks use a 250ms trailing-edge debounce, so we wait 500ms to be safe.
-	await sleep(500);
+	// Wait for Go hooks to finish calculating balances for auto-calculated accounts
+	const autoCalculatedAccountIds = AUTO_CALCULATED_ACCOUNTS.map((a) => accountIds[a.name]);
+	await waitForAutoCalculatedBalances(pb, autoCalculatedAccountIds);
 }
