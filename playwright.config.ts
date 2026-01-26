@@ -13,7 +13,7 @@ export default defineConfig({
 	globalSetup: 'e2e/global.setup.ts',
 	webServer: [
 		{
-			command: 'bun scripts/pb-server.ts',
+			command: 'bun run pb',
 			port: 42070,
 			reuseExistingServer: true
 		},
