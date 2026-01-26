@@ -201,12 +201,13 @@ test('user can edit transaction details', async ({ page }) => {
 	await expect(page.getByLabel('Account')).toHaveText('Eastgate Savings');
 	await expect(page.getByLabel('Labels')).toHaveValue('Business Travel, Conference');
 
-	await page.getByLabel('Excluded from totals').check();
+	// TODO: Flaky on mobile - checkbox.check() doesn't change state intermittently
+	await page.getByLabel('Excluded from totals').click();
 	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(page.getByText('Transaction updated').first()).toBeVisible();
 	await expect(page.getByLabel('Excluded from totals')).toBeChecked();
 
-	await page.getByLabel('Excluded from totals').uncheck();
+	await page.getByLabel('Excluded from totals').click();
 	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(page.getByText('Transaction updated').first()).toBeVisible();
 	await expect(page.getByLabel('Excluded from totals')).not.toBeChecked();
