@@ -7,6 +7,8 @@ import { env } from '$env/dynamic/public';
 import { m } from './paraglide/messages';
 import type { TypedPocketBase } from './pocketbase.schema';
 
+export type SetupStatus = 'checking' | 'ready' | 'needs-setup' | 'unreachable';
+
 enum ToastId {
 	CONNECTION_ERROR = 'connection-error',
 	SUBSCRIPTION_ERROR = 'subscription-error',
@@ -15,9 +17,29 @@ enum ToastId {
 
 export class PocketBaseContext {
 	authedClient: TypedPocketBase;
+	setupStatus: SetupStatus = $state('checking');
 
 	constructor() {
 		this.authedClient = new PocketBase(env.PUBLIC_PB_URL || 'http://127.0.0.1:42070');
+	}
+
+	get backendUrl(): string {
+		return env.PUBLIC_PB_URL || 'http://127.0.0.1:42070';
+	}
+
+	async checkSetup(): Promise<SetupStatus> {
+		try {
+			const response = await fetch(`${this.backendUrl}/api/setup-status`);
+			if (!response.ok) {
+				this.setupStatus = 'unreachable';
+			} else {
+				const data = await response.json();
+				this.setupStatus = data.ready ? 'ready' : 'needs-setup';
+			}
+		} catch {
+			this.setupStatus = 'unreachable';
+		}
+		return this.setupStatus;
 	}
 
 	async findOrCreateLabel(name: string, ownerId: string) {

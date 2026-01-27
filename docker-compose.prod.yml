@@ -1,7 +1,8 @@
 services:
   pocketbase:
     image: ghcr.io/fmaclen/canutin:next
-    command: ['./pocketbase/pocketbase-custom', 'serve', '--http', '0.0.0.0:42070']
+    working_dir: /app/pocketbase
+    command: ['./pocketbase-custom', 'serve', '--http', '0.0.0.0:42070']
     ports:
       - '42070:42070'
     volumes:
