@@ -19,7 +19,7 @@ COPY . .
 ENV DOCKER_BUILD=true
 RUN bun run build
 
-FROM oven/bun:1-slim
+FROM node:22-slim
 
 LABEL org.opencontainers.image.source=https://github.com/fmaclen/canutin
 LABEL org.opencontainers.image.description="Personal finance app"
@@ -39,4 +39,4 @@ ENV PORT=42069
 EXPOSE 42069
 EXPOSE 42070
 
-CMD ["bun", "run", "build/index.js"]
+CMD ["node", "build/index.js"]

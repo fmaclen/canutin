@@ -11,7 +11,7 @@ services:
 
   sveltekit:
     image: ghcr.io/fmaclen/canutin:next
-    command: ['bun', 'run', 'build/index.js']
+    command: ['node', 'build/index.js']
     ports:
       - '42069:42069'
     environment:
