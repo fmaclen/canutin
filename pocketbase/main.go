@@ -55,6 +55,24 @@ func main() {
 
 	go balanceWorker(ctx, app)
 
+	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
+		e.Router.GET("/api/setup-status", func(re *core.RequestEvent) error {
+			superusers, err := e.App.FindAllRecords("_superusers")
+			if err != nil {
+				return re.JSON(200, map[string]bool{"ready": false})
+			}
+			// Check if any superuser has a real email (not the installer placeholder)
+			for _, su := range superusers {
+				email := su.Email()
+				if email != "" && email != "__pbinstaller@example.com" {
+					return re.JSON(200, map[string]bool{"ready": true})
+				}
+			}
+			return re.JSON(200, map[string]bool{"ready": false})
+		})
+		return e.Next()
+	})
+
 	app.OnRecordAfterCreateSuccess("transactions").BindFunc(func(e *core.RecordEvent) error {
 		accountID := e.Record.GetString("account")
 		if accountID != "" {

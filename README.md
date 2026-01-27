@@ -2,17 +2,54 @@
 
 This is the next prerelease branch for Canutin v2.
 
-## Install (Docker)
+## Self-hosting (Docker)
 
-Clone the repository and use Docker Compose:
+Create a `docker-compose.yml` file:
+
+```yaml
+services:
+  pocketbase:
+    image: ghcr.io/fmaclen/canutin:next
+    working_dir: /app/pocketbase
+    command: ['./pocketbase-custom', 'serve', '--http', '0.0.0.0:42070']
+    ports:
+      - '42070:42070'
+    volumes:
+      - canutin-data:/app/pocketbase/pb_data
+    restart: unless-stopped
+
+  sveltekit:
+    image: ghcr.io/fmaclen/canutin:next
+    command: ['bun', 'run', 'build/index.js']
+    ports:
+      - '42069:42069'
+    environment:
+      PUBLIC_PB_URL: 'http://localhost:42070'
+    depends_on:
+      - pocketbase
+    restart: unless-stopped
+
+volumes:
+  canutin-data:
+```
+
+Then run:
 
 ```bash
-git clone https://github.com/fmaclen/canutin.git
-cd canutin
 docker compose up -d
 ```
 
-This will build the Docker image locally and start Canutin at `http://localhost:42069`.
+Open [http://localhost:42069](http://localhost:42069) to access Canutin.
+
+### Initial setup
+
+On first run, PocketBase needs a superuser to be configured. Get the setup link from the logs:
+
+```bash
+docker compose logs pocketbase | grep "pbinstal"
+```
+
+Open the URL in your browser to create your superuser account. Once complete, refresh Canutin to start using the app.
 
 ## Development
 

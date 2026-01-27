@@ -302,5 +302,11 @@
 	"demo_try_as_guest": "Probar como invitado",
 	"demo_seeding_in_progress": "Configurando tu demo",
 	"demo_seeding_complete": "Tu demo está listo",
-	"demo_seeding_failed": "Error al configurar demo"
+	"demo_seeding_failed": "Error al configurar demo",
+
+	"setup_title": "Configuración requerida",
+	"setup_description": "Revisa los registros del servidor para obtener el enlace de configuración",
+	"setup_unreachable_title": "Sin conexión",
+	"setup_unreachable_description": "No se pudo conectar al servidor de base de datos",
+	"setup_unreachable_server": "Servidor"
 }
