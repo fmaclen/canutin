@@ -21,6 +21,10 @@ RUN bun run build
 
 FROM oven/bun:1-slim
 
+LABEL org.opencontainers.image.source=https://github.com/fmaclen/canutin
+LABEL org.opencontainers.image.description="Personal finance app"
+LABEL org.opencontainers.image.licenses=AGPL-3.0
+
 WORKDIR /app
 
 COPY --from=builder /app/build ./build
