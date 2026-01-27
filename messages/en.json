@@ -302,5 +302,11 @@
 	"demo_try_as_guest": "Try as guest",
 	"demo_seeding_in_progress": "Setting up your demo",
 	"demo_seeding_complete": "Your demo is ready",
-	"demo_seeding_failed": "Failed to set up demo"
+	"demo_seeding_failed": "Failed to set up demo",
+
+	"setup_title": "Setup required",
+	"setup_description": "Check your server logs for the setup link",
+	"setup_unreachable_title": "Can't connect",
+	"setup_unreachable_description": "Unable to reach the database server",
+	"setup_unreachable_server": "Server"
 }
