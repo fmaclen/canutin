@@ -8,6 +8,9 @@
 	import { getAssetsContext } from '$lib/assets.svelte';
 	import { getAuthContext } from '$lib/auth.svelte';
 	import { getBalanceTypesContext } from '$lib/balance-types.svelte';
+	import CheckboxLabel from '$lib/components/checkbox-label.svelte';
+	import Fieldset from '$lib/components/fieldset.svelte';
+	import FormFieldRow from '$lib/components/form-field-row.svelte';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
@@ -16,6 +19,7 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import * as Select from '$lib/components/ui/select/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
@@ -306,6 +310,10 @@
 			toast.error('Failed to remove share');
 		}
 	}
+
+	function perspectiveLabel(perspective: AssetSharesPerspectiveOptions) {
+		return perspective === AssetSharesPerspectiveOptions.INVERSE ? 'Inverse' : 'Normal';
+	}
 </script>
 
 <header class="bg-background flex h-16 shrink-0 items-center gap-2 border-b">
@@ -373,70 +381,108 @@
 		{#if isLoading || !asset}
 			<Skeleton class="h-40" />
 		{:else if canWrite}
-			<div class="bg-muted border-border rounded border p-4">
+			<div class="bg-muted border-border overflow-hidden rounded border">
 				<form
-					class="grid gap-3 md:grid-cols-[1fr_160px_auto]"
+					class="space-y-0"
 					onsubmit={(e) => {
 						e.preventDefault();
 						handleCreateShare();
 					}}
 				>
-					<div class="space-y-2">
-						<Label for="share-email">Recipient email</Label>
-						<Input id="share-email" bind:value={shareRecipientEmail} type="email" required />
-					</div>
-					<div class="space-y-2">
-						<Label for="share-perspective">Perspective</Label>
-						<select
-							id="share-perspective"
-							class="bg-background border-border h-9 w-full rounded border px-3 text-sm"
-							bind:value={sharePerspective}
-						>
-							<option value={AssetSharesPerspectiveOptions.NORMAL}>Normal</option>
-							<option value={AssetSharesPerspectiveOptions.INVERSE}>Inverse</option>
-						</select>
-					</div>
-					<div class="flex items-end">
-						<Button type="submit">Share</Button>
-					</div>
-				</form>
-
-				{#if grantedShares.length > 0}
-					<div class="mt-4 space-y-2">
-						{#each grantedShares as share (share.id)}
-							<div
-								class="bg-background border-border flex items-center justify-between rounded border px-3 py-2 text-sm"
+					<Fieldset isFirst={true}>
+						<FormFieldRow>
+							<Label for="share-email" class="justify-start pr-0 md:justify-end"
+								>Recipient email</Label
 							>
-								<div>
-									<div>{share.recipientEmail}</div>
-									<div class="text-muted-foreground">
-										{share.perspective === 'INVERSE' ? 'Inverse' : 'Normal'} •
-										{share.includeInNetWorth
-											? ' included in net worth'
-											: ' excluded from net worth'}
-									</div>
-								</div>
-								<Button variant="outline" onclick={() => handleRevokeShare(share.id)}>Remove</Button
-								>
+							<Input id="share-email" bind:value={shareRecipientEmail} type="email" required />
+						</FormFieldRow>
+
+						<FormFieldRow>
+							<Label for="share-perspective" class="justify-start pr-0 md:justify-end"
+								>Perspective</Label
+							>
+							<Select.Root type="single" bind:value={sharePerspective}>
+								<Select.Trigger id="share-perspective" class="bg-background w-full">
+									{perspectiveLabel(sharePerspective)}
+								</Select.Trigger>
+								<Select.Content>
+									<Select.Item value={AssetSharesPerspectiveOptions.NORMAL}>Normal</Select.Item>
+									<Select.Item value={AssetSharesPerspectiveOptions.INVERSE}>Inverse</Select.Item>
+								</Select.Content>
+							</Select.Root>
+						</FormFieldRow>
+					</Fieldset>
+
+					<Fieldset>
+						<FormFieldRow itemsAlignment="items-start">
+							<Label class="justify-start pr-0 md:justify-end md:pt-2.5">Current shares</Label>
+							<div class="space-y-2">
+								{#if grantedShares.length === 0}
+									<p class="text-muted-foreground text-sm">No shares yet</p>
+								{:else}
+									{#each grantedShares as share (share.id)}
+										<div
+											class="bg-background border-border flex items-start justify-between gap-3 rounded border px-3 py-2.5"
+										>
+											<div class="min-w-0 text-sm">
+												<p class="truncate">{share.recipientEmail}</p>
+												<p class="text-muted-foreground">
+													{perspectiveLabel(share.perspective)} perspective
+													{share.includeInNetWorth
+														? ' · included in net worth'
+														: ' · excluded from net worth'}
+												</p>
+											</div>
+											<Button
+												type="button"
+												variant="outline"
+												onclick={() => handleRevokeShare(share.id)}>Remove</Button
+											>
+										</div>
+									{/each}
+								{/if}
 							</div>
-						{/each}
-					</div>
-				{/if}
+						</FormFieldRow>
+					</Fieldset>
+
+					<footer class="border-border bg-border border-t p-2">
+						<div class="flex justify-end">
+							<Button type="submit">Share</Button>
+						</div>
+					</footer>
+				</form>
 			</div>
 		{:else}
-			<div class="bg-muted border-border rounded border p-4">
+			<div class="bg-muted border-border overflow-hidden rounded border">
 				<form
-					class="space-y-3"
+					class="space-y-0"
 					onsubmit={(e) => {
 						e.preventDefault();
 						handleUpdateRecipientPreference();
 					}}
 				>
-					<label class="flex items-center gap-2 text-sm" for="include-in-net-worth">
-						<input id="include-in-net-worth" type="checkbox" bind:checked={includeInNetWorth} />
-						<span>Include in my net worth</span>
-					</label>
-					<Button type="submit">Save preferences</Button>
+					<Fieldset isFirst={true}>
+						<FormFieldRow>
+							<Label class="justify-start pr-0 md:justify-end">Perspective</Label>
+							<p class="text-sm">{perspectiveLabel(asset.perspective)}</p>
+						</FormFieldRow>
+
+						<FormFieldRow itemsAlignment="items-start">
+							<Label class="justify-start pr-0 md:justify-end md:pt-2.5">Preferences</Label>
+							<CheckboxLabel
+								id="include-in-net-worth"
+								bind:checked={includeInNetWorth}
+								label="Include in my net worth"
+								class="bg-background"
+							/>
+						</FormFieldRow>
+					</Fieldset>
+
+					<footer class="border-border bg-border border-t p-2">
+						<div class="flex justify-end">
+							<Button type="submit">Save preferences</Button>
+						</div>
+					</footer>
 				</form>
 			</div>
 		{/if}
