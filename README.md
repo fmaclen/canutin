@@ -61,20 +61,20 @@ bun install && bunx playwright install && bun run test
 
 ## Commands
 
-| Command                                     | Description                                    |
-| ------------------------------------------- | ---------------------------------------------- |
-| `bun run dev`                               | Start Vite dev server                          |
-| `bun run build`                             | Production build via Vite/SvelteKit            |
-| `bun run preview`                           | Preview the built app                          |
-| `bun run check`                             | Type-check with svelte-check                   |
-| `bun run check:watch`                       | Type-check in watch mode                       |
-| `bun run lint`                              | Prettier check + ESLint                        |
-| `bun run format`                            | Auto-format with Prettier                      |
-| `bun run quality`                           | Format, lint, and type-check                   |
-| `bun run test`                              | Run Playwright e2e tests                       |
-| `bun run pb`                                | Ensure and start PocketBase locally (dev)      |
+| Command                                                                                                                                                                                | Description                                                 |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `bun run dev`                                                                                                                                                                          | Start Vite dev server                                       |
+| `bun run build`                                                                                                                                                                        | Production build via Vite/SvelteKit                         |
+| `bun run preview`                                                                                                                                                                      | Preview the built app                                       |
+| `bun run check`                                                                                                                                                                        | Type-check with svelte-check                                |
+| `bun run check:watch`                                                                                                                                                                  | Type-check in watch mode                                    |
+| `bun run lint`                                                                                                                                                                         | Prettier check + ESLint                                     |
+| `bun run format`                                                                                                                                                                       | Auto-format with Prettier                                   |
+| `bun run quality`                                                                                                                                                                      | Format, lint, and type-check                                |
+| `bun run test`                                                                                                                                                                         | Run Playwright e2e tests                                    |
+| `bun run pb`                                                                                                                                                                           | Ensure and start PocketBase locally (dev)                   |
 | `bun run pb:import temp/Canutin.demo.vault --email user@example.com --password secret --pb-url http://127.0.0.1:42070 --superuser-email admin@example.com --superuser-password secret` | Import Canutin v1 vault into PocketBase for a specific user |
-| `bun run pb:reset`                          | Reset (delete) the PocketBase dev database     |
+| `bun run pb:reset`                                                                                                                                                                     | Reset (delete) the PocketBase dev database                  |
 
 If the target user already exists, `--password` is optional and the import will reuse that user.
 The import command requires explicit `--pb-url`, `--superuser-email`, and `--superuser-password` options.

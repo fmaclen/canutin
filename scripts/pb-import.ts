@@ -180,7 +180,9 @@ function parseArgs(args: string[]): ImportOptions | null {
 }
 
 function printUsage() {
-	log('Usage: bun pb:import <vault-path> --email <user-email> --pb-url <url> --superuser-email <email> --superuser-password <password> [--password <password>] [--name <display-name>]');
+	log(
+		'Usage: bun pb:import <vault-path> --email <user-email> --pb-url <url> --superuser-email <email> --superuser-password <password> [--password <password>] [--name <display-name>]'
+	);
 	log('If the user does not exist yet, --password is required and the user will be created.');
 }
 
@@ -227,7 +229,9 @@ async function main() {
 	// Ensure target user exists, then import records owned by that user.
 	let ownerId: string | null = null;
 	try {
-		const existing = await pb.collection('users').getFirstListItem(`email = ${JSON.stringify(email)}`);
+		const existing = await pb
+			.collection('users')
+			.getFirstListItem(`email = ${JSON.stringify(email)}`);
 		ownerId = existing.id;
 		log(`Found target user: ${email} (${ownerId})`);
 	} catch {
@@ -254,15 +258,13 @@ async function main() {
 		const key = name.trim();
 		if (balanceTypeIdByName.has(key)) return balanceTypeIdByName.get(key) as string;
 		try {
-			const existing = await pb.collection('balanceTypes').getFirstListItem(
-				`name = ${JSON.stringify(key)} && owner = ${JSON.stringify(ownerId)}`
-			);
+			const existing = await pb
+				.collection('balanceTypes')
+				.getFirstListItem(`name = ${JSON.stringify(key)} && owner = ${JSON.stringify(ownerId)}`);
 			balanceTypeIdByName.set(key, existing.id);
 			return existing.id;
 		} catch {
-			const created = await pb
-				.collection('balanceTypes')
-				.create({ name: key, owner: ownerId });
+			const created = await pb.collection('balanceTypes').create({ name: key, owner: ownerId });
 			balanceTypeIdByName.set(key, created.id);
 			return created.id;
 		}
@@ -272,9 +274,9 @@ async function main() {
 		const key = name.trim();
 		if (txLabelIdByName.has(key)) return txLabelIdByName.get(key) as string;
 		try {
-			const existing = await pb.collection('transactionLabels').getFirstListItem(
-				`name = ${JSON.stringify(key)} && owner = ${JSON.stringify(ownerId)}`
-			);
+			const existing = await pb
+				.collection('transactionLabels')
+				.getFirstListItem(`name = ${JSON.stringify(key)} && owner = ${JSON.stringify(ownerId)}`);
 			txLabelIdByName.set(key, existing.id);
 			return existing.id;
 		} catch {
