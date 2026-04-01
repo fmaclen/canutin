@@ -58,6 +58,29 @@ export class PocketBaseContext {
 		return label.id;
 	}
 
+	async postJson<T>(path: string, body: Record<string, unknown>) {
+		const token = this.authedClient.authStore.token;
+		const response = await fetch(`${this.backendUrl}${path}`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: token
+			},
+			body: JSON.stringify(body)
+		});
+
+		const data = (await response.json().catch(() => null)) as T | { message?: string } | null;
+		if (!response.ok) {
+			const message =
+				data && typeof data === 'object' && 'message' in data && typeof data.message === 'string'
+					? data.message
+					: `Request failed with status ${response.status}`;
+			throw new Error(message);
+		}
+
+		return data as T;
+	}
+
 	private captureError(error: unknown, context: string, operation: string) {
 		console.error(`[${context}:${operation}]`, error);
 	}

@@ -84,16 +84,16 @@
 		for (const a of accountsContext.accounts) {
 			if (a.closed) continue;
 			const group = a.balanceGroup as BalanceGroup;
-			if (!a.excluded) groups[group].total += a.balance ?? 0;
+			if (!a.participantExcluded) groups[group].total += a.balance ?? 0;
 			const balanceType = upsert(group, a.balanceType, accountsContext.getTypeName(a.balanceType));
-			if (!a.excluded) balanceType.total += a.balance ?? 0;
+			if (!a.participantExcluded) balanceType.total += a.balance ?? 0;
 			balanceType.items = [
 				...balanceType.items,
 				{
 					id: a.id,
 					name: a.name,
 					balance: a.balance ?? 0,
-					excluded: Boolean(a.excluded),
+					excluded: a.participantExcluded,
 					type: 'account'
 				}
 			];
@@ -102,16 +102,16 @@
 		for (const a of assetsContext.assets) {
 			if (a.sold) continue;
 			const group = a.balanceGroup as BalanceGroup;
-			if (!a.excluded) groups[group].total += a.marketValue ?? 0;
+			if (!a.participantExcluded) groups[group].total += a.marketValue ?? 0;
 			const balanceType = upsert(group, a.balanceType, assetsContext.getTypeName(a.balanceType));
-			if (!a.excluded) balanceType.total += a.marketValue ?? 0;
+			if (!a.participantExcluded) balanceType.total += a.marketValue ?? 0;
 			balanceType.items = [
 				...balanceType.items,
 				{
 					id: a.id,
 					name: a.name,
 					balance: a.marketValue ?? 0,
-					excluded: Boolean(a.excluded),
+					excluded: a.participantExcluded,
 					type: 'asset'
 				}
 			];

@@ -274,11 +274,7 @@ class TransactionsContext {
 				filterParts.push(`date < '${toPocketBaseDateString(to)}'`);
 			}
 
-			if (this.kind === 'credits') {
-				filterParts.push('value > 0');
-			} else if (this.kind === 'debits') {
-				filterParts.push('value < 0');
-			} else if (this.kind === 'excluded') {
+			if (this.kind === 'excluded') {
 				filterParts.push('excluded != ""');
 			}
 
@@ -399,13 +395,20 @@ class TransactionsContext {
 			const dateIso = txn.date;
 			const date = new Date(dateIso);
 			const expandedAccount = txn.expand?.account;
-			const accountName = expandedAccount?.name ?? this.accountNameById.get(txn.account) ?? '';
+			const contextAccount = this._accountsContext.getAccount(txn.account);
+			const accountName =
+				contextAccount?.name ??
+				expandedAccount?.name ??
+				this.accountNameById.get(txn.account) ??
+				'';
 			const expandedLabels = txn.expand?.labels ?? [];
 			const dateValue = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 			const labelNames = expandedLabels
 				.map((label) => label.name)
 				.filter((name): name is string => Boolean(name))
 				.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+			const rawValue = txn.value ?? 0;
+			const value = contextAccount?.perspective === 'INVERSE' ? -rawValue : rawValue;
 			return {
 				id: txn.id,
 				date,
@@ -415,7 +418,7 @@ class TransactionsContext {
 				labels: labelNames,
 				accountName,
 				accountId: txn.account ?? null,
-				value: txn.value ?? 0,
+				value,
 				excluded: Boolean(txn.excluded)
 			};
 		});

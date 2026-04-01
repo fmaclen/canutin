@@ -16,6 +16,7 @@
 		AssetsResponse
 	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+	import { projectSignedValue } from '$lib/sharing';
 
 	import ChartNetWorth from './growth.svelte';
 	import Performance from './performance.svelte';
@@ -47,17 +48,33 @@
 
 			const activeAccounts = new Map(
 				(accountsCtx?.accounts ?? [])
-					.filter((a) => !a.excluded && !a.closed)
+					.filter((a) => !a.participantExcluded && !a.closed)
 					.map((a) => [a.id, a] as const)
 			);
 			const activeAssets = new Map(
 				(assetsCtx?.assets ?? [])
-					.filter((a) => !a.excluded && !a.sold)
+					.filter((a) => !a.participantExcluded && !a.sold)
 					.map((a) => [a.id, a] as const)
 			);
 
-			const accountBalances = accountBalancesAll.filter((b) => activeAccounts.has(b.account));
-			const assetBalances = assetBalancesAll.filter((b) => activeAssets.has(b.asset));
+			const accountBalances = accountBalancesAll
+				.filter((b) => activeAccounts.has(b.account))
+				.map((balance) => {
+					const account = activeAccounts.get(balance.account)!;
+					return {
+						...balance,
+						value: projectSignedValue(balance.value, account.perspective)
+					};
+				});
+			const assetBalances = assetBalancesAll
+				.filter((b) => activeAssets.has(b.asset))
+				.map((balance) => {
+					const asset = activeAssets.get(balance.asset)!;
+					return {
+						...balance,
+						marketValue: projectSignedValue(balance.marketValue, asset.perspective)
+					};
+				});
 
 			rawAccounts = Array.from(activeAccounts.values());
 			rawAssets = Array.from(activeAssets.values());

@@ -53,7 +53,7 @@
 		typeName: string;
 		balanceGroup: BalanceGroup;
 		autoCalculated: boolean;
-		excluded: boolean;
+		participantExcluded: boolean;
 		closed: boolean;
 	};
 
@@ -119,7 +119,7 @@
 			typeName: accountsContext.getTypeName(account.balanceType),
 			balanceGroup: account.balanceGroup as BalanceGroup,
 			autoCalculated: Boolean(account.autoCalculated),
-			excluded: Boolean(account.excluded),
+			participantExcluded: account.participantExcluded,
 			closed: Boolean(account.closed)
 		}));
 
@@ -147,7 +147,7 @@
 		for (const option of filters) {
 			const rows = rowsByFilter.get(option.key) ?? [];
 			const total = rows.reduce(
-				(sum, row) => sum + (option.key === 'open' && row.excluded ? 0 : row.balance),
+				(sum, row) => sum + (option.key === 'open' && row.participantExcluded ? 0 : row.balance),
 				0
 			);
 			totals.set(option.key, total);
@@ -183,7 +183,7 @@
 	const isLoaded = $derived(accountsContext.lastBalanceEvent !== 0);
 
 	function balanceSentiment(row: AccountRow) {
-		if (row.closed || row.excluded) return 'neutral';
+		if (row.closed || row.participantExcluded) return 'neutral';
 		if (row.balance === 0) return 'neutral';
 		return row.balance > 0 ? 'positive' : 'negative';
 	}
@@ -209,7 +209,7 @@
 	function statusBadges(row: AccountRow) {
 		const statuses: StatusBadge[] = [];
 		if (row.autoCalculated) statuses.push({ id: 'auto', ...statusMeta.auto });
-		if (row.excluded) statuses.push({ id: 'excluded', ...statusMeta.excluded });
+		if (row.participantExcluded) statuses.push({ id: 'excluded', ...statusMeta.excluded });
 		if (row.closed) statuses.push({ id: 'closed', ...statusMeta.closed });
 		return statuses;
 	}
@@ -310,7 +310,7 @@
 									</Table.Header>
 									<Table.Body>
 										{#each rowsForOption as row (row.id)}
-											<Table.Row class={row.excluded || row.closed ? 'bg-muted/30' : ''}>
+											<Table.Row class={row.participantExcluded || row.closed ? 'bg-muted/30' : ''}>
 												<Table.Cell>
 													<Link
 														href={`/accounts/${row.id}`}
@@ -370,7 +370,7 @@
 													{/if}
 												</Table.Cell>
 												<Table.Cell class="text-right tabular-nums">
-													{#if row.excluded || row.closed}
+													{#if row.participantExcluded || row.closed}
 														<Tooltip.Root>
 															<Tooltip.Trigger
 																class="border-border inline-block border-b border-dashed hover:border-current"

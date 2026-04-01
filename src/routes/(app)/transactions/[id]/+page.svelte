@@ -38,11 +38,13 @@
 	const transactionId = $derived(page.params.id);
 	const ownerId = $derived(auth.currentUser?.record?.id);
 	const openAccounts = $derived(accountsContext.accounts.filter((a) => !a.closed));
+	const editableAccounts = $derived(openAccounts.filter((a) => a.canWrite));
 
 	const groupMeta = getBalanceGroupMeta();
-	const accountsByGroup = $derived(groupAccountsByBalanceGroup(openAccounts));
+	const accountsByGroup = $derived(groupAccountsByBalanceGroup(editableAccounts));
 
 	const selectedAccount = $derived(openAccounts.find((a) => a.id === formData.accountId));
+	const canWrite = $derived(Boolean(selectedAccount?.canWrite));
 
 	let transaction = $state<TransactionsResponse | null>(null);
 	let isLoading = $state(true);
@@ -69,7 +71,6 @@
 			const result = await pb.authedClient
 				.collection('transactions')
 				.getOne<TransactionsResponse>(transactionId, {
-					filter: `owner='${ownerId}'`,
 					expand: 'labels'
 				});
 			transaction = result;
@@ -102,7 +103,7 @@
 	async function handleSubmit() {
 		const currentTransactionId = transactionId;
 		const currentOwnerId = ownerId;
-		if (!currentTransactionId || !currentOwnerId || !formData.accountId) return;
+		if (!currentTransactionId || !currentOwnerId || !formData.accountId || !canWrite) return;
 
 		try {
 			const labelIds: string[] = [];
@@ -142,7 +143,7 @@
 
 	async function handleDelete() {
 		const currentTransactionId = transactionId;
-		if (!currentTransactionId) return;
+		if (!currentTransactionId || !canWrite) return;
 
 		try {
 			await pb.authedClient.collection('transactions').delete(currentTransactionId);
@@ -193,6 +194,11 @@
 					}}
 					class="space-y-0"
 				>
+					{#if !canWrite}
+						<div class="border-border bg-background border-b px-4 py-3 text-sm">
+							This shared transaction is read-only
+						</div>
+					{/if}
 					<Fieldset isFirst={true}>
 						<FormFieldRow>
 							<Label for="description" class="justify-start pr-0 md:justify-end"
@@ -285,50 +291,54 @@
 						</FormFieldRow>
 					</Fieldset>
 
-					<footer class="border-border bg-border border-t p-2">
-						<div class="flex justify-end">
-							<Button type="submit">{m.transactions_button_save()}</Button>
-						</div>
-					</footer>
+					{#if canWrite}
+						<footer class="border-border bg-border border-t p-2">
+							<div class="flex justify-end">
+								<Button type="submit">{m.transactions_button_save()}</Button>
+							</div>
+						</footer>
+					{/if}
 				</form>
 			</div>
 		{/if}
 	</Section>
 
-	<Section>
-		<SectionTitle title={m.danger_zone_title()} />
-		{#if isLoading || !transaction}
-			<Skeleton class="h-24" />
-		{:else}
-			<div
-				class="bg-muted border-border overflow-hidden rounded border md:grayscale md:hover:grayscale-0"
-			>
-				<div class="flex items-center justify-between p-4">
-					<div>
-						<p class="text-sm">{m.transactions_delete_description()}</p>
-						<p class="text-destructive text-sm">{m.transactions_delete_subtext()}</p>
+	{#if canWrite || isLoading}
+		<Section>
+			<SectionTitle title={m.danger_zone_title()} />
+			{#if isLoading || !transaction}
+				<Skeleton class="h-24" />
+			{:else}
+				<div
+					class="bg-muted border-border overflow-hidden rounded border md:grayscale md:hover:grayscale-0"
+				>
+					<div class="flex items-center justify-between p-4">
+						<div>
+							<p class="text-sm">{m.transactions_delete_description()}</p>
+							<p class="text-destructive text-sm">{m.transactions_delete_subtext()}</p>
+						</div>
+						<AlertDialog.Root>
+							<AlertDialog.Trigger>
+								<Button variant="destructive">{m.transactions_delete_button()}</Button>
+							</AlertDialog.Trigger>
+							<AlertDialog.Content>
+								<AlertDialog.Header>
+									<AlertDialog.Title>{m.transactions_delete_confirm_title()}</AlertDialog.Title>
+									<AlertDialog.Description>
+										{m.transactions_delete_confirm_description()}
+									</AlertDialog.Description>
+								</AlertDialog.Header>
+								<AlertDialog.Footer>
+									<AlertDialog.Cancel>{m.transactions_delete_confirm_cancel()}</AlertDialog.Cancel>
+									<AlertDialog.Action onclick={handleDelete}
+										>{m.transactions_delete_confirm_continue()}</AlertDialog.Action
+									>
+								</AlertDialog.Footer>
+							</AlertDialog.Content>
+						</AlertDialog.Root>
 					</div>
-					<AlertDialog.Root>
-						<AlertDialog.Trigger>
-							<Button variant="destructive">{m.transactions_delete_button()}</Button>
-						</AlertDialog.Trigger>
-						<AlertDialog.Content>
-							<AlertDialog.Header>
-								<AlertDialog.Title>{m.transactions_delete_confirm_title()}</AlertDialog.Title>
-								<AlertDialog.Description>
-									{m.transactions_delete_confirm_description()}
-								</AlertDialog.Description>
-							</AlertDialog.Header>
-							<AlertDialog.Footer>
-								<AlertDialog.Cancel>{m.transactions_delete_confirm_cancel()}</AlertDialog.Cancel>
-								<AlertDialog.Action onclick={handleDelete}
-									>{m.transactions_delete_confirm_continue()}</AlertDialog.Action
-								>
-							</AlertDialog.Footer>
-						</AlertDialog.Content>
-					</AlertDialog.Root>
 				</div>
-			</div>
-		{/if}
-	</Section>
+			{/if}
+		</Section>
+	{/if}
 </Page>

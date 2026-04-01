@@ -14,11 +14,17 @@
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import { Input } from '$lib/components/ui/input/index.js';
+	import { Label } from '$lib/components/ui/label/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { m } from '$lib/paraglide/messages';
-	import { AssetsBalanceGroupOptions, AssetsTypeOptions } from '$lib/pocketbase.schema';
+	import {
+		AssetsBalanceGroupOptions,
+		AssetSharesPerspectiveOptions,
+		AssetsTypeOptions
+	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 
 	import BalanceForm from './balance-form.svelte';
@@ -34,6 +40,9 @@
 
 	const asset = $derived(assetId ? assetsContext.getAsset(assetId) : null);
 	const isLoading = $derived(assetsContext.isLoading);
+	const canWrite = $derived(Boolean(asset?.canWrite));
+	const incomingShare = $derived(asset ? assetsContext.getIncomingShare(asset.id) : null);
+	const grantedShares = $derived(asset ? assetsContext.getGrantedShares(asset.id) : []);
 
 	let formData = $state({
 		name: '',
@@ -56,6 +65,11 @@
 		justSaved: false,
 		initialized: false
 	});
+	let shareRecipientEmail = $state('');
+	let sharePerspective = $state<AssetSharesPerspectiveOptions>(
+		AssetSharesPerspectiveOptions.NORMAL
+	);
+	let includeInNetWorth = $derived(incomingShare?.includeInNetWorth ?? true);
 
 	const isWhole = $derived(formData.type === AssetsTypeOptions.WHOLE);
 	const isShares = $derived(formData.type === AssetsTypeOptions.SHARES);
@@ -256,6 +270,42 @@
 			toast.error(m.assets_delete_failed());
 		}
 	}
+
+	async function handleCreateShare() {
+		if (!asset || !canWrite) return;
+
+		try {
+			await assetsContext.createShare(asset.id, shareRecipientEmail, sharePerspective);
+			shareRecipientEmail = '';
+			sharePerspective = AssetSharesPerspectiveOptions.NORMAL;
+			toast.success('Share created');
+		} catch (error) {
+			console.error('Failed to create share:', error);
+			toast.error(error instanceof Error ? error.message : 'Failed to create share');
+		}
+	}
+
+	async function handleUpdateRecipientPreference() {
+		if (!incomingShare) return;
+
+		try {
+			await assetsContext.updateShareIncludeInNetWorth(incomingShare.id, includeInNetWorth);
+			toast.success('Preferences updated');
+		} catch (error) {
+			console.error('Failed to update share preferences:', error);
+			toast.error('Failed to update preferences');
+		}
+	}
+
+	async function handleRevokeShare(shareId: string) {
+		try {
+			await assetsContext.revokeShare(shareId);
+			toast.success('Share removed');
+		} catch (error) {
+			console.error('Failed to revoke share:', error);
+			toast.error('Failed to remove share');
+		}
+	}
 </script>
 
 <header class="bg-background flex h-16 shrink-0 items-center gap-2 border-b">
@@ -285,8 +335,15 @@
 		<SectionTitle title={m.assets_section_balance()} />
 		{#if isLoading || !asset}
 			<Skeleton class="h-48" />
-		{:else}
+		{:else if canWrite}
 			<BalanceForm {formData} {isWhole} {isShares} onSubmit={handleUpdateBalance} />
+		{:else}
+			<div class="bg-muted border-border rounded border p-4">
+				<p class="text-muted-foreground text-sm">This shared asset is read-only</p>
+				<p class="mt-3 text-2xl font-semibold">
+					{formData.marketValue || formData.bookValue || '$0'}
+				</p>
+			</div>
 		{/if}
 	</Section>
 
@@ -294,49 +351,137 @@
 		<SectionTitle title={m.assets_section_details()} />
 		{#if isLoading || !asset}
 			<Skeleton class="h-96" />
-		{:else}
+		{:else if canWrite}
 			<DetailsForm {formData} {isWhole} {isShares} onSubmit={handleUpdateDetails} />
+		{:else}
+			<div class="bg-muted border-border rounded border p-4 text-sm">
+				<div><strong>Name:</strong> {asset.name}</div>
+				<div class="mt-2">
+					<strong>Category:</strong>
+					{assetsContext.getTypeName(asset.balanceType)}
+				</div>
+				<div class="mt-2"><strong>Balance group:</strong> {asset.balanceGroup}</div>
+				{#if asset.symbol}
+					<div class="mt-2"><strong>Symbol:</strong> {asset.symbol}</div>
+				{/if}
+			</div>
 		{/if}
 	</Section>
 
 	<Section>
-		<SectionTitle title={m.danger_zone_title()} />
+		<SectionTitle title="Sharing" />
 		{#if isLoading || !asset}
-			<Skeleton class="h-24" />
-		{:else}
-			<div
-				class="bg-muted border-border overflow-hidden rounded border md:grayscale md:hover:grayscale-0"
-			>
-				<div class="flex items-center justify-between p-4">
-					<div>
-						<p class="text-sm">
-							{m.assets_delete_description()}
-						</p>
-						<p class="text-destructive text-sm">
-							{m.assets_delete_subtext()}
-						</p>
+			<Skeleton class="h-40" />
+		{:else if canWrite}
+			<div class="bg-muted border-border rounded border p-4">
+				<form
+					class="grid gap-3 md:grid-cols-[1fr_160px_auto]"
+					onsubmit={(e) => {
+						e.preventDefault();
+						handleCreateShare();
+					}}
+				>
+					<div class="space-y-2">
+						<Label for="share-email">Recipient email</Label>
+						<Input id="share-email" bind:value={shareRecipientEmail} type="email" required />
 					</div>
-					<AlertDialog.Root>
-						<AlertDialog.Trigger>
-							<Button variant="destructive">{m.assets_delete_button()}</Button>
-						</AlertDialog.Trigger>
-						<AlertDialog.Content>
-							<AlertDialog.Header>
-								<AlertDialog.Title>{m.assets_delete_confirm_title()}</AlertDialog.Title>
-								<AlertDialog.Description>
-									{m.assets_delete_confirm_description()}
-								</AlertDialog.Description>
-							</AlertDialog.Header>
-							<AlertDialog.Footer>
-								<AlertDialog.Cancel>{m.assets_delete_confirm_cancel()}</AlertDialog.Cancel>
-								<AlertDialog.Action onclick={handleDelete}>
-									{m.assets_delete_confirm_continue()}
-								</AlertDialog.Action>
-							</AlertDialog.Footer>
-						</AlertDialog.Content>
-					</AlertDialog.Root>
-				</div>
+					<div class="space-y-2">
+						<Label for="share-perspective">Perspective</Label>
+						<select
+							id="share-perspective"
+							class="bg-background border-border h-9 w-full rounded border px-3 text-sm"
+							bind:value={sharePerspective}
+						>
+							<option value={AssetSharesPerspectiveOptions.NORMAL}>Normal</option>
+							<option value={AssetSharesPerspectiveOptions.INVERSE}>Inverse</option>
+						</select>
+					</div>
+					<div class="flex items-end">
+						<Button type="submit">Share</Button>
+					</div>
+				</form>
+
+				{#if grantedShares.length > 0}
+					<div class="mt-4 space-y-2">
+						{#each grantedShares as share (share.id)}
+							<div
+								class="bg-background border-border flex items-center justify-between rounded border px-3 py-2 text-sm"
+							>
+								<div>
+									<div>{share.recipientEmail}</div>
+									<div class="text-muted-foreground">
+										{share.perspective === 'INVERSE' ? 'Inverse' : 'Normal'} •
+										{share.includeInNetWorth
+											? ' included in net worth'
+											: ' excluded from net worth'}
+									</div>
+								</div>
+								<Button variant="outline" onclick={() => handleRevokeShare(share.id)}>Remove</Button
+								>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
+		{:else}
+			<div class="bg-muted border-border rounded border p-4">
+				<form
+					class="space-y-3"
+					onsubmit={(e) => {
+						e.preventDefault();
+						handleUpdateRecipientPreference();
+					}}
+				>
+					<label class="flex items-center gap-2 text-sm" for="include-in-net-worth">
+						<input id="include-in-net-worth" type="checkbox" bind:checked={includeInNetWorth} />
+						<span>Include in my net worth</span>
+					</label>
+					<Button type="submit">Save preferences</Button>
+				</form>
 			</div>
 		{/if}
 	</Section>
+
+	{#if canWrite || isLoading}
+		<Section>
+			<SectionTitle title={m.danger_zone_title()} />
+			{#if isLoading || !asset}
+				<Skeleton class="h-24" />
+			{:else}
+				<div
+					class="bg-muted border-border overflow-hidden rounded border md:grayscale md:hover:grayscale-0"
+				>
+					<div class="flex items-center justify-between p-4">
+						<div>
+							<p class="text-sm">
+								{m.assets_delete_description()}
+							</p>
+							<p class="text-destructive text-sm">
+								{m.assets_delete_subtext()}
+							</p>
+						</div>
+						<AlertDialog.Root>
+							<AlertDialog.Trigger>
+								<Button variant="destructive">{m.assets_delete_button()}</Button>
+							</AlertDialog.Trigger>
+							<AlertDialog.Content>
+								<AlertDialog.Header>
+									<AlertDialog.Title>{m.assets_delete_confirm_title()}</AlertDialog.Title>
+									<AlertDialog.Description>
+										{m.assets_delete_confirm_description()}
+									</AlertDialog.Description>
+								</AlertDialog.Header>
+								<AlertDialog.Footer>
+									<AlertDialog.Cancel>{m.assets_delete_confirm_cancel()}</AlertDialog.Cancel>
+									<AlertDialog.Action onclick={handleDelete}>
+										{m.assets_delete_confirm_continue()}
+									</AlertDialog.Action>
+								</AlertDialog.Footer>
+							</AlertDialog.Content>
+						</AlertDialog.Root>
+					</div>
+				</div>
+			{/if}
+		</Section>
+	{/if}
 </Page>

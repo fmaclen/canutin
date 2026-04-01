@@ -17,6 +17,17 @@ export async function signIn(page: Page, email: string) {
 	await expect(page.getByRole('button', { name: 'Toggle Sidebar' })).toBeVisible();
 }
 
+export async function signOut(page: Page, userLabel: string) {
+	const userButton = page.getByRole('button', { name: userLabel });
+	if (!(await userButton.isVisible())) {
+		await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
+		await expect(userButton).toBeVisible();
+	}
+	await userButton.click();
+	await page.getByRole('menuitem', { name: 'Log out' }).click();
+	await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
+}
+
 export async function goToPageViaSidebar(page: Page, label: string) {
 	const sidebar = page.getByLabel('Sidebar');
 	const link = sidebar.getByRole('link', { name: label });
