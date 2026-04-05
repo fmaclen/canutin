@@ -59,11 +59,11 @@ function importPayload(sessionLabel: string) {
 	};
 }
 
-test('bulk import creates records and displays in settings', async ({ page, baseURL }) => {
+test('bulk import creates records and displays in settings', async ({ page }) => {
 	const user = await seedUser('nathan');
 	const token = await authenticateUser(user.email);
 
-	const response = await fetch(`${baseURL}/api/import`, {
+	const response = await fetch(`${PB_URL}/api/canutin/import`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
@@ -89,12 +89,12 @@ test('bulk import creates records and displays in settings', async ({ page, base
 	await expect(page.getByText('Completed')).toBeVisible();
 });
 
-test('duplicate import skips existing records', async ({ page, baseURL }) => {
+test('duplicate import skips existing records', async ({ page }) => {
 	const user = await seedUser('olivia');
 	const token = await authenticateUser(user.email);
 	const payload = importPayload('olivia-scraper-run-1');
 
-	const first = await fetch(`${baseURL}/api/import`, {
+	const first = await fetch(`${PB_URL}/api/canutin/import`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
@@ -109,7 +109,7 @@ test('duplicate import skips existing records', async ({ page, baseURL }) => {
 	expect(firstResult.accountBalances.created).toBe(2);
 
 	payload.sessionLabel = 'olivia-scraper-run-2';
-	const second = await fetch(`${baseURL}/api/import`, {
+	const second = await fetch(`${PB_URL}/api/canutin/import`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
@@ -134,7 +134,7 @@ test('duplicate import skips existing records', async ({ page, baseURL }) => {
 	await expect(page.getByText('olivia-scraper-run-2')).toBeVisible();
 });
 
-test('externalId dedup takes precedence over field-based dedup', async ({ baseURL }) => {
+test('externalId dedup takes precedence over field-based dedup', async () => {
 	const user = await seedUser('patricia');
 	const token = await authenticateUser(user.email);
 
@@ -158,7 +158,7 @@ test('externalId dedup takes precedence over field-based dedup', async ({ baseUR
 		]
 	};
 
-	const first = await fetch(`${baseURL}/api/import`, {
+	const first = await fetch(`${PB_URL}/api/canutin/import`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
@@ -181,7 +181,7 @@ test('externalId dedup takes precedence over field-based dedup', async ({ baseUR
 		]
 	};
 
-	const second = await fetch(`${baseURL}/api/import`, {
+	const second = await fetch(`${PB_URL}/api/canutin/import`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
@@ -192,7 +192,7 @@ test('externalId dedup takes precedence over field-based dedup', async ({ baseUR
 	expect((await second.json()).transactions.skipped).toBe(1);
 });
 
-test('description normalization handles whitespace and casing', async ({ baseURL }) => {
+test('description normalization handles whitespace and casing', async () => {
 	const user = await seedUser('quinn');
 	const token = await authenticateUser(user.email);
 
@@ -215,7 +215,7 @@ test('description normalization handles whitespace and casing', async ({ baseURL
 		]
 	};
 
-	await fetch(`${baseURL}/api/import`, {
+	await fetch(`${PB_URL}/api/canutin/import`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
@@ -236,7 +236,7 @@ test('description normalization handles whitespace and casing', async ({ baseURL
 		]
 	};
 
-	const second = await fetch(`${baseURL}/api/import`, {
+	const second = await fetch(`${PB_URL}/api/canutin/import`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
@@ -250,11 +250,11 @@ test('description normalization handles whitespace and casing', async ({ baseURL
 	expect(result.transactions.created).toBe(0);
 });
 
-test('reverting an import deletes its records and updates status', async ({ page, baseURL }) => {
+test('reverting an import deletes its records and updates status', async ({ page }) => {
 	const user = await seedUser('samuel');
 	const token = await authenticateUser(user.email);
 
-	const response = await fetch(`${baseURL}/api/import`, {
+	const response = await fetch(`${PB_URL}/api/canutin/import`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
@@ -295,8 +295,8 @@ test('reverting an import deletes its records and updates status', async ({ page
 	expect(accounts.length).toBe(0);
 });
 
-test('import rejects requests without auth', async ({ baseURL }) => {
-	const response = await fetch(`${baseURL}/api/import`, {
+test('import rejects requests without auth', async () => {
+	const response = await fetch(`${PB_URL}/api/canutin/import`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify(importPayload('no-auth-test'))
@@ -305,11 +305,11 @@ test('import rejects requests without auth', async ({ baseURL }) => {
 	expect(response.status).toBe(401);
 });
 
-test('import rejects empty payload', async ({ baseURL }) => {
+test('import rejects empty payload', async () => {
 	const user = await seedUser('rachel');
 	const token = await authenticateUser(user.email);
 
-	const response = await fetch(`${baseURL}/api/import`, {
+	const response = await fetch(`${PB_URL}/api/canutin/import`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',

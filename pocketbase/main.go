@@ -36,6 +36,7 @@ func main() {
 
 	jsvm.MustRegister(app, jsvm.Config{
 		MigrationsDir: "pb_migrations",
+		HooksDir:      "pb_hooks",
 	})
 
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{

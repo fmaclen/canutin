@@ -100,20 +100,10 @@
 	async function handleRevert(sessionId: string) {
 		revertingSessionId = sessionId;
 		try {
-			const token = pb.authedClient.authStore.token;
-			const response = await fetch('/api/import/revert', {
+			await pb.authedClient.send('/api/canutin/import/revert', {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${token}`
-				},
-				body: JSON.stringify({ sessionId })
+				body: { sessionId }
 			});
-
-			if (!response.ok) {
-				const body = await response.json();
-				throw new Error(body.error || 'Revert failed');
-			}
 
 			toast.success(m.settings_imports_revert_success());
 		} catch (error) {
