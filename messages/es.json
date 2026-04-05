@@ -308,5 +308,23 @@
 	"setup_description": "Revisa los registros del servidor para obtener el enlace de configuración",
 	"setup_unreachable_title": "Sin conexión",
 	"setup_unreachable_description": "No se pudo conectar al servidor de base de datos",
-	"setup_unreachable_server": "Servidor"
+	"setup_unreachable_server": "Servidor",
+
+	"settings_page_title": "Configuración",
+	"settings_imports_section_title": "Importaciones",
+	"settings_imports_empty": "No hay importaciones todavía",
+	"settings_imports_table_header_label": "Etiqueta",
+	"settings_imports_table_header_status": "Estado",
+	"settings_imports_table_header_created": "Fecha",
+	"settings_imports_table_header_skipped": "Omitidos",
+	"settings_imports_table_header_records": "Registros",
+	"settings_imports_status_completed": "Completada",
+	"settings_imports_status_rolled_back": "Revertida",
+	"settings_imports_revert_button": "Revertir",
+	"settings_imports_revert_confirm_title": "Revertir importación",
+	"settings_imports_revert_confirm_description": "Esto eliminará permanentemente todos los registros creados por esta importación. Esta acción no se puede deshacer.",
+	"settings_imports_revert_confirm_cancel": "Cancelar",
+	"settings_imports_revert_confirm_continue": "Revertir",
+	"settings_imports_revert_success": "Importación revertida exitosamente",
+	"settings_imports_revert_failed": "Error al revertir la importación"
 }

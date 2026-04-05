@@ -72,7 +72,8 @@
 		"quality": "bun run format && bun run eslint . && bun run check",
 		"pb": "IS_DEV=true bun scripts/pb-server.ts",
 		"pb:import": "bun scripts/pb-import.ts",
-		"pb:reset": "bun scripts/pb-reset.ts"
+		"pb:reset": "bun scripts/pb-reset.ts",
+		"pb:rollback": "bun scripts/pb-rollback-import.ts"
 	},
 	"type": "module"
 }

@@ -3,6 +3,7 @@
 	import { setAssetsContext } from '$lib/assets.svelte';
 	import { setBalanceTypesContext } from '$lib/balance-types.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import { setImportSessionsContext } from '$lib/import-sessions.svelte';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 
 	import AppSidebar from './app-sidebar.svelte';
@@ -13,6 +14,7 @@
 	const balanceTypesContext = setBalanceTypesContext(pb);
 	setAccountsContext(pb, balanceTypesContext);
 	setAssetsContext(pb, balanceTypesContext);
+	setImportSessionsContext(pb);
 </script>
 
 <Sidebar.Provider>
