@@ -52,6 +52,16 @@ function importPayload(sessionLabel: string) {
 
 const IMPORT_PATH = '/api/canutin/import';
 
+test('settings page shows empty state when no imports exist', async ({ page }) => {
+	const user = await seedUser('wendy');
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Settings');
+
+	await expect(page.getByText('No imports yet')).toBeVisible();
+});
+
 test('bulk import creates records and displays in settings', async ({ page }) => {
 	const user = await seedUser('nathan');
 
