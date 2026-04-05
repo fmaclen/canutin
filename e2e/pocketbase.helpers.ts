@@ -23,6 +23,25 @@ async function getAdminPB(): Promise<TypedPocketBase> {
 	return pb;
 }
 
+export async function authenticateAsUser(email: string) {
+	const pb = new PocketBase(PB_URL) as TypedPocketBase;
+	await pb.collection('users').authWithPassword(email, DEFAULT_PASSWORD);
+	return pb;
+}
+
+export async function pbSend(path: string, body: Record<string, unknown>, email?: string) {
+	const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+	if (email) {
+		const pb = await authenticateAsUser(email);
+		headers['Authorization'] = `Bearer ${pb.authStore.token}`;
+	}
+	return fetch(`${PB_URL}${path}`, {
+		method: 'POST',
+		headers,
+		body: JSON.stringify(body)
+	});
+}
+
 export async function resetDatabase() {
 	const pbAdmin = await getAdminPB();
 	try {

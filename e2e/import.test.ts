@@ -1,16 +1,7 @@
 import { expect, test } from '@playwright/test';
-import PocketBase from 'pocketbase';
 
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
-import { DEFAULT_PASSWORD, seedUser } from './pocketbase.helpers';
-
-const PB_URL = 'http://127.0.0.1:42070';
-
-async function authenticateUser(email: string) {
-	const pb = new PocketBase(PB_URL);
-	await pb.collection('users').authWithPassword(email, DEFAULT_PASSWORD);
-	return pb.authStore.token;
-}
+import { authenticateAsUser, pbSend, seedUser } from './pocketbase.helpers';
 
 function importPayload(sessionLabel: string) {
 	return {
@@ -59,18 +50,16 @@ function importPayload(sessionLabel: string) {
 	};
 }
 
+const IMPORT_PATH = '/api/canutin/import';
+
 test('bulk import creates records and displays in settings', async ({ page }) => {
 	const user = await seedUser('nathan');
-	const token = await authenticateUser(user.email);
 
-	const response = await fetch(`${PB_URL}/api/canutin/import`, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			Authorization: `Bearer ${token}`
-		},
-		body: JSON.stringify(importPayload('nathan-scraper-2025-06-15'))
-	});
+	const response = await pbSend(
+		IMPORT_PATH,
+		importPayload('nathan-scraper-2025-06-15'),
+		user.email
+	);
 	const result = await response.json();
 
 	expect(response.status).toBe(200);
@@ -91,33 +80,16 @@ test('bulk import creates records and displays in settings', async ({ page }) =>
 
 test('duplicate import skips existing records', async ({ page }) => {
 	const user = await seedUser('olivia');
-	const token = await authenticateUser(user.email);
 	const payload = importPayload('olivia-scraper-run-1');
 
-	const first = await fetch(`${PB_URL}/api/canutin/import`, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			Authorization: `Bearer ${token}`
-		},
-		body: JSON.stringify(payload)
-	});
-	const firstResult = await first.json();
+	const firstResult = await (await pbSend(IMPORT_PATH, payload, user.email)).json();
 
 	expect(firstResult.accounts.created).toBe(2);
 	expect(firstResult.transactions.created).toBe(3);
 	expect(firstResult.accountBalances.created).toBe(2);
 
 	payload.sessionLabel = 'olivia-scraper-run-2';
-	const second = await fetch(`${PB_URL}/api/canutin/import`, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			Authorization: `Bearer ${token}`
-		},
-		body: JSON.stringify(payload)
-	});
-	const secondResult = await second.json();
+	const secondResult = await (await pbSend(IMPORT_PATH, payload, user.email)).json();
 
 	expect(secondResult.accounts.created).toBe(0);
 	expect(secondResult.accounts.existing).toBe(2);
@@ -136,17 +108,10 @@ test('duplicate import skips existing records', async ({ page }) => {
 
 test('externalId dedup takes precedence over field-based dedup', async () => {
 	const user = await seedUser('patricia');
-	const token = await authenticateUser(user.email);
 
 	const payload1 = {
 		sessionLabel: 'patricia-run-1',
-		accounts: [
-			{
-				name: 'Patricia Checking',
-				balanceGroup: 'CASH',
-				balanceType: 'Checking'
-			}
-		],
+		accounts: [{ name: 'Patricia Checking', balanceGroup: 'CASH', balanceType: 'Checking' }],
 		transactions: [
 			{
 				accountName: 'Patricia Checking',
@@ -158,15 +123,8 @@ test('externalId dedup takes precedence over field-based dedup', async () => {
 		]
 	};
 
-	const first = await fetch(`${PB_URL}/api/canutin/import`, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			Authorization: `Bearer ${token}`
-		},
-		body: JSON.stringify(payload1)
-	});
-	expect((await first.json()).transactions.created).toBe(1);
+	const firstResult = await (await pbSend(IMPORT_PATH, payload1, user.email)).json();
+	expect(firstResult.transactions.created).toBe(1);
 
 	const payload2 = {
 		sessionLabel: 'patricia-run-2',
@@ -181,30 +139,16 @@ test('externalId dedup takes precedence over field-based dedup', async () => {
 		]
 	};
 
-	const second = await fetch(`${PB_URL}/api/canutin/import`, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			Authorization: `Bearer ${token}`
-		},
-		body: JSON.stringify(payload2)
-	});
-	expect((await second.json()).transactions.skipped).toBe(1);
+	const secondResult = await (await pbSend(IMPORT_PATH, payload2, user.email)).json();
+	expect(secondResult.transactions.skipped).toBe(1);
 });
 
 test('description normalization handles whitespace and casing', async () => {
 	const user = await seedUser('quinn');
-	const token = await authenticateUser(user.email);
 
 	const payload1 = {
 		sessionLabel: 'quinn-run-1',
-		accounts: [
-			{
-				name: 'Quinn Savings',
-				balanceGroup: 'CASH',
-				balanceType: 'Savings'
-			}
-		],
+		accounts: [{ name: 'Quinn Savings', balanceGroup: 'CASH', balanceType: 'Savings' }],
 		transactions: [
 			{
 				accountName: 'Quinn Savings',
@@ -215,14 +159,7 @@ test('description normalization handles whitespace and casing', async () => {
 		]
 	};
 
-	await fetch(`${PB_URL}/api/canutin/import`, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			Authorization: `Bearer ${token}`
-		},
-		body: JSON.stringify(payload1)
-	});
+	await pbSend(IMPORT_PATH, payload1, user.email);
 
 	const payload2 = {
 		sessionLabel: 'quinn-run-2',
@@ -236,33 +173,17 @@ test('description normalization handles whitespace and casing', async () => {
 		]
 	};
 
-	const second = await fetch(`${PB_URL}/api/canutin/import`, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			Authorization: `Bearer ${token}`
-		},
-		body: JSON.stringify(payload2)
-	});
-	const result = await second.json();
-
+	const result = await (await pbSend(IMPORT_PATH, payload2, user.email)).json();
 	expect(result.transactions.skipped).toBe(1);
 	expect(result.transactions.created).toBe(0);
 });
 
 test('reverting an import deletes its records and updates status', async ({ page }) => {
 	const user = await seedUser('samuel');
-	const token = await authenticateUser(user.email);
 
-	const response = await fetch(`${PB_URL}/api/canutin/import`, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			Authorization: `Bearer ${token}`
-		},
-		body: JSON.stringify(importPayload('samuel-scraper-to-revert'))
-	});
-	const result = await response.json();
+	const result = await (
+		await pbSend(IMPORT_PATH, importPayload('samuel-scraper-to-revert'), user.email)
+	).json();
 
 	expect(result.transactions.created).toBe(3);
 	expect(result.accounts.created).toBe(2);
@@ -282,8 +203,7 @@ test('reverting an import deletes its records and updates status', async ({ page
 
 	await expect(page.getByText('Rolled back')).toBeVisible();
 
-	const pb = new PocketBase(PB_URL);
-	await pb.collection('users').authWithPassword(user.email, DEFAULT_PASSWORD);
+	const pb = await authenticateAsUser(user.email);
 	const transactions = await pb.collection('transactions').getFullList({
 		filter: `owner = "${user.id}"`
 	});
@@ -296,27 +216,12 @@ test('reverting an import deletes its records and updates status', async ({ page
 });
 
 test('import rejects requests without auth', async () => {
-	const response = await fetch(`${PB_URL}/api/canutin/import`, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(importPayload('no-auth-test'))
-	});
-
+	const response = await pbSend(IMPORT_PATH, importPayload('no-auth-test'));
 	expect(response.status).toBe(401);
 });
 
 test('import rejects empty payload', async () => {
 	const user = await seedUser('rachel');
-	const token = await authenticateUser(user.email);
-
-	const response = await fetch(`${PB_URL}/api/canutin/import`, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			Authorization: `Bearer ${token}`
-		},
-		body: JSON.stringify({ sessionLabel: 'empty-import' })
-	});
-
+	const response = await pbSend(IMPORT_PATH, { sessionLabel: 'empty-import' }, user.email);
 	expect(response.status).toBe(400);
 });
