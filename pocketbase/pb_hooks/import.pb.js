@@ -5,8 +5,12 @@ routerAdd("POST", "/api/canutin/import", function (e) {
 		return (desc || "").trim().replace(/\s+/g, " ").toLowerCase();
 	}
 
+	function datePart(isoDate) {
+		return isoDate.split("T")[0].split(" ")[0];
+	}
+
 	function pbDateRange(isoDate) {
-		var start = isoDate.split("T")[0] + " 00:00:00.000Z";
+		var start = datePart(isoDate) + " 00:00:00.000Z";
 		var dateObj = new Date(isoDate);
 		dateObj.setUTCDate(dateObj.getUTCDate() + 1);
 		var end = dateObj.toISOString().split("T")[0] + " 00:00:00.000Z";

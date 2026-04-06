@@ -180,6 +180,31 @@ test('externalId dedup takes precedence over field-based dedup', async () => {
 	expect(secondResult.transactions.skipped).toBe(1);
 });
 
+test('dedup works with space-separated date format from scrapers', async () => {
+	const user = await seedUser('paula');
+
+	const payload = {
+		sessionLabel: 'paula-run-1',
+		accounts: [{ name: 'Paula Checking', balanceGroup: 'CASH', balanceType: 'Checking' }],
+		transactions: [
+			{
+				accountName: 'Paula Checking',
+				date: '2025-08-25 00:00:00.000Z',
+				description: 'GROCERY STORE',
+				value: -85.5
+			}
+		]
+	};
+
+	const first = await (await pbSend(IMPORT_PATH, payload, user.email)).json();
+	expect(first.transactions.created).toBe(1);
+
+	payload.sessionLabel = 'paula-run-2';
+	const second = await (await pbSend(IMPORT_PATH, payload, user.email)).json();
+	expect(second.transactions.created).toBe(0);
+	expect(second.transactions.skipped).toBe(1);
+});
+
 test('description normalization handles whitespace and casing', async () => {
 	const user = await seedUser('quinn');
 
