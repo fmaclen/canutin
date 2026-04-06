@@ -5,30 +5,13 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
-	"time"
 
 	"github.com/pocketbase/pocketbase"
+	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/plugins/jsvm"
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
-)
-
-// debounceMs is the trailing-edge debounce delay for balance recalculations.
-// After the last transaction mutation for an account, we wait this long before
-// recalculating to batch rapid sequential changes (e.g., bulk imports).
-const debounceMs = 250
-
-// tickerMs controls how often the worker checks for debounce expiration.
-// Lower values = more responsive but more CPU; 50ms is a good balance.
-const tickerMs = 50
-
-var (
-	// pending tracks accounts awaiting balance recalculation with their queue time.
-	// The map is protected by pendingMu.
-	pending   = make(map[string]time.Time)
-	pendingMu sync.Mutex
 )
 
 func main() {
@@ -36,7 +19,6 @@ func main() {
 
 	jsvm.MustRegister(app, jsvm.Config{
 		MigrationsDir: "pb_migrations",
-		HooksDir:      "pb_hooks",
 	})
 
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{
@@ -62,7 +44,6 @@ func main() {
 			if err != nil {
 				return re.JSON(200, map[string]bool{"ready": false})
 			}
-			// Check if any superuser has a real email (not the installer placeholder)
 			for _, su := range superusers {
 				email := su.Email()
 				if email != "" && email != "__pbinstaller@example.com" {
@@ -71,118 +52,45 @@ func main() {
 			}
 			return re.JSON(200, map[string]bool{"ready": false})
 		})
+
+		e.Router.POST("/api/canutin/import", func(re *core.RequestEvent) error {
+			return handleImport(e.App, re)
+		}).Bind(apis.RequireAuth())
+
+		e.Router.POST("/api/canutin/import/revert", func(re *core.RequestEvent) error {
+			return handleRevert(e.App, re)
+		}).Bind(apis.RequireAuth())
+
 		return e.Next()
 	})
 
 	app.OnRecordAfterCreateSuccess("transactions").BindFunc(func(e *core.RecordEvent) error {
-		accountID := e.Record.GetString("account")
-		if accountID != "" {
-			enqueueBalance(accountID)
+		if aid := e.Record.GetString("account"); aid != "" {
+			enqueueBalance(aid)
 		}
 		return e.Next()
 	})
 
 	app.OnRecordAfterUpdateSuccess("transactions").BindFunc(func(e *core.RecordEvent) error {
-		oldAccountID := e.Record.Original().GetString("account")
-		newAccountID := e.Record.GetString("account")
-
-		if oldAccountID != "" && oldAccountID != newAccountID {
-			enqueueBalance(oldAccountID)
+		oldAID := e.Record.Original().GetString("account")
+		newAID := e.Record.GetString("account")
+		if oldAID != "" && oldAID != newAID {
+			enqueueBalance(oldAID)
 		}
-		if newAccountID != "" {
-			enqueueBalance(newAccountID)
+		if newAID != "" {
+			enqueueBalance(newAID)
 		}
 		return e.Next()
 	})
 
 	app.OnRecordAfterDeleteSuccess("transactions").BindFunc(func(e *core.RecordEvent) error {
-		accountID := e.Record.GetString("account")
-		if accountID != "" {
-			enqueueBalance(accountID)
+		if aid := e.Record.GetString("account"); aid != "" {
+			enqueueBalance(aid)
 		}
 		return e.Next()
 	})
 
 	if err := app.Start(); err != nil {
 		log.Fatal(err)
-	}
-}
-
-func enqueueBalance(accountID string) {
-	pendingMu.Lock()
-	defer pendingMu.Unlock()
-	pending[accountID] = time.Now()
-}
-
-func balanceWorker(ctx context.Context, app *pocketbase.PocketBase) {
-	ticker := time.NewTicker(tickerMs * time.Millisecond)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			pendingMu.Lock()
-			now := time.Now()
-			for accountID, queuedAt := range pending {
-				if now.Sub(queuedAt) >= debounceMs*time.Millisecond {
-					delete(pending, accountID)
-					go calculateBalance(app, accountID)
-				}
-			}
-			pendingMu.Unlock()
-		}
-	}
-}
-
-func calculateBalance(app *pocketbase.PocketBase, accountID string) {
-	account, err := app.FindRecordById("accounts", accountID)
-	if err != nil {
-		log.Printf("Failed to find account %s: %v", accountID, err)
-		return
-	}
-
-	autoCalculated := account.GetDateTime("autoCalculated")
-	if autoCalculated.IsZero() {
-		return
-	}
-
-	transactions, err := app.FindRecordsByFilter(
-		"transactions",
-		"account = {:aid}",
-		"",
-		0,
-		0,
-		map[string]any{"aid": accountID},
-	)
-	if err != nil {
-		log.Printf("Failed to fetch transactions for account %s: %v", accountID, err)
-		return
-	}
-
-	var sum float64
-	for _, tx := range transactions {
-		excluded := tx.GetDateTime("excluded")
-		if !excluded.IsZero() {
-			continue
-		}
-		sum += tx.GetFloat("value")
-	}
-
-	collection, err := app.FindCollectionByNameOrId("accountBalances")
-	if err != nil {
-		log.Printf("Failed to find accountBalances collection: %v", err)
-		return
-	}
-
-	balance := core.NewRecord(collection)
-	balance.Set("account", accountID)
-	balance.Set("value", sum)
-	balance.Set("asOf", time.Now().UTC())
-	balance.Set("owner", account.GetString("owner"))
-
-	if err := app.Save(balance); err != nil {
-		log.Printf("Failed to save balance for account %s: %v", accountID, err)
 	}
 }
