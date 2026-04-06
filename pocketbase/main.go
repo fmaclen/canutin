@@ -36,6 +36,7 @@ func main() {
 
 	jsvm.MustRegister(app, jsvm.Config{
 		MigrationsDir: "pb_migrations",
+		HooksDir:      "pb_hooks",
 	})
 
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{
@@ -110,9 +111,7 @@ func main() {
 func enqueueBalance(accountID string) {
 	pendingMu.Lock()
 	defer pendingMu.Unlock()
-	if _, exists := pending[accountID]; !exists {
-		pending[accountID] = time.Now()
-	}
+	pending[accountID] = time.Now()
 }
 
 func balanceWorker(ctx context.Context, app *pocketbase.PocketBase) {

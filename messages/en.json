@@ -308,5 +308,23 @@
 	"setup_description": "Check your server logs for the setup link",
 	"setup_unreachable_title": "Can't connect",
 	"setup_unreachable_description": "Unable to reach the database server",
-	"setup_unreachable_server": "Server"
+	"setup_unreachable_server": "Server",
+
+	"settings_page_title": "Settings",
+	"settings_imports_section_title": "Imports",
+	"settings_imports_empty": "No imports yet",
+	"settings_imports_table_header_label": "Label",
+	"settings_imports_table_header_status": "Status",
+	"settings_imports_table_header_created": "Created",
+	"settings_imports_table_header_skipped": "Skipped",
+	"settings_imports_table_header_records": "Records",
+	"settings_imports_status_completed": "Completed",
+	"settings_imports_status_rolled_back": "Rolled back",
+	"settings_imports_revert_button": "Revert",
+	"settings_imports_revert_confirm_title": "Revert import",
+	"settings_imports_revert_confirm_description": "This will permanently delete all records created by this import. This action cannot be undone.",
+	"settings_imports_revert_confirm_cancel": "Cancel",
+	"settings_imports_revert_confirm_continue": "Revert",
+	"settings_imports_revert_success": "Import reverted successfully",
+	"settings_imports_revert_failed": "Failed to revert import"
 }
