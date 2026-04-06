@@ -5,7 +5,7 @@ WORKDIR /pocketbase
 COPY pocketbase/go.mod pocketbase/go.sum ./
 RUN go mod download
 
-COPY pocketbase/main.go ./
+COPY pocketbase/*.go ./
 RUN CGO_ENABLED=0 go build -o pocketbase-custom .
 
 FROM oven/bun:1 AS builder
