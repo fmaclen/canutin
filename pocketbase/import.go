@@ -68,8 +68,8 @@ type importTransaction struct {
 
 type importCounts struct {
 	Created  int `json:"created"`
-	Existing int `json:"existing,omitempty"`
-	Skipped  int `json:"skipped,omitempty"`
+	Existing int `json:"existing"`
+	Skipped  int `json:"skipped"`
 }
 
 type importResult struct {
