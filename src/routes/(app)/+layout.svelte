@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
+
 	import { setAccountsContext } from '$lib/accounts.svelte';
 	import { setAssetsContext } from '$lib/assets.svelte';
 	import { setBalanceTypesContext } from '$lib/balance-types.svelte';
@@ -12,9 +14,16 @@
 
 	const pb = getPocketBaseContext();
 	const balanceTypesContext = setBalanceTypesContext(pb);
-	setAccountsContext(pb, balanceTypesContext);
-	setAssetsContext(pb, balanceTypesContext);
-	setImportSessionsContext(pb);
+	const accountsContext = setAccountsContext(pb, balanceTypesContext);
+	const assetsContext = setAssetsContext(pb, balanceTypesContext);
+	const importSessionsContext = setImportSessionsContext(pb);
+
+	onDestroy(() => {
+		balanceTypesContext.dispose();
+		accountsContext.dispose();
+		assetsContext.dispose();
+		importSessionsContext.dispose();
+	});
 </script>
 
 <Sidebar.Provider>

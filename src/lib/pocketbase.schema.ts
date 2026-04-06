@@ -12,10 +12,8 @@ export enum Collections {
 	Otps = "_otps",
 	Superusers = "_superusers",
 	AccountBalances = "accountBalances",
-	AccountShares = "accountShares",
 	Accounts = "accounts",
 	AssetBalances = "assetBalances",
-	AssetShares = "assetShares",
 	Assets = "assets",
 	BalanceTypes = "balanceTypes",
 	ImportSessions = "importSessions",
@@ -111,25 +109,6 @@ export type AccountBalancesRecord = {
 	value?: number
 }
 
-export enum AccountSharesAccessRoleOptions {
-	"VIEWER" = "VIEWER",
-}
-
-export enum AccountSharesPerspectiveOptions {
-	"NORMAL" = "NORMAL",
-	"INVERSE" = "INVERSE",
-}
-export type AccountSharesRecord = {
-	accessRole: AccountSharesAccessRoleOptions
-	account: RecordIdString
-	grantedBy: RecordIdString
-	id: string
-	includeInNetWorth?: boolean
-	perspective: AccountSharesPerspectiveOptions
-	recipient: RecordIdString
-	recipientEmail: string
-}
-
 export enum AccountsBalanceGroupOptions {
 	"CASH" = "CASH",
 	"DEBT" = "DEBT",
@@ -164,25 +143,6 @@ export type AssetBalancesRecord = {
 	owner: RecordIdString
 	quantity?: number
 	updated?: IsoDateString
-}
-
-export enum AssetSharesAccessRoleOptions {
-	"VIEWER" = "VIEWER",
-}
-
-export enum AssetSharesPerspectiveOptions {
-	"NORMAL" = "NORMAL",
-	"INVERSE" = "INVERSE",
-}
-export type AssetSharesRecord = {
-	accessRole: AssetSharesAccessRoleOptions
-	asset: RecordIdString
-	grantedBy: RecordIdString
-	id: string
-	includeInNetWorth?: boolean
-	perspective: AssetSharesPerspectiveOptions
-	recipient: RecordIdString
-	recipientEmail: string
 }
 
 export enum AssetsBalanceGroupOptions {
@@ -277,10 +237,8 @@ export type MfasResponse<Texpand = unknown> = Required<MfasRecord> & BaseSystemF
 export type OtpsResponse<Texpand = unknown> = Required<OtpsRecord> & BaseSystemFields<Texpand>
 export type SuperusersResponse<Texpand = unknown> = Required<SuperusersRecord> & AuthSystemFields<Texpand>
 export type AccountBalancesResponse<Texpand = unknown> = Required<AccountBalancesRecord> & BaseSystemFields<Texpand>
-export type AccountSharesResponse<Texpand = unknown> = Required<AccountSharesRecord> & BaseSystemFields<Texpand>
 export type AccountsResponse<Texpand = unknown> = Required<AccountsRecord> & BaseSystemFields<Texpand>
 export type AssetBalancesResponse<Texpand = unknown> = Required<AssetBalancesRecord> & BaseSystemFields<Texpand>
-export type AssetSharesResponse<Texpand = unknown> = Required<AssetSharesRecord> & BaseSystemFields<Texpand>
 export type AssetsResponse<Texpand = unknown> = Required<AssetsRecord> & BaseSystemFields<Texpand>
 export type BalanceTypesResponse<Texpand = unknown> = Required<BalanceTypesRecord> & BaseSystemFields<Texpand>
 export type ImportSessionsResponse<Texpand = unknown> = Required<ImportSessionsRecord> & BaseSystemFields<Texpand>
@@ -297,10 +255,8 @@ export type CollectionRecords = {
 	_otps: OtpsRecord
 	_superusers: SuperusersRecord
 	accountBalances: AccountBalancesRecord
-	accountShares: AccountSharesRecord
 	accounts: AccountsRecord
 	assetBalances: AssetBalancesRecord
-	assetShares: AssetSharesRecord
 	assets: AssetsRecord
 	balanceTypes: BalanceTypesRecord
 	importSessions: ImportSessionsRecord
@@ -316,10 +272,8 @@ export type CollectionResponses = {
 	_otps: OtpsResponse
 	_superusers: SuperusersResponse
 	accountBalances: AccountBalancesResponse
-	accountShares: AccountSharesResponse
 	accounts: AccountsResponse
 	assetBalances: AssetBalancesResponse
-	assetShares: AssetSharesResponse
 	assets: AssetsResponse
 	balanceTypes: BalanceTypesResponse
 	importSessions: ImportSessionsResponse
@@ -338,10 +292,8 @@ export type TypedPocketBase = PocketBase & {
 	collection(idOrName: '_otps'): RecordService<OtpsResponse>
 	collection(idOrName: '_superusers'): RecordService<SuperusersResponse>
 	collection(idOrName: 'accountBalances'): RecordService<AccountBalancesResponse>
-	collection(idOrName: 'accountShares'): RecordService<AccountSharesResponse>
 	collection(idOrName: 'accounts'): RecordService<AccountsResponse>
 	collection(idOrName: 'assetBalances'): RecordService<AssetBalancesResponse>
-	collection(idOrName: 'assetShares'): RecordService<AssetSharesResponse>
 	collection(idOrName: 'assets'): RecordService<AssetsResponse>
 	collection(idOrName: 'balanceTypes'): RecordService<BalanceTypesResponse>
 	collection(idOrName: 'importSessions'): RecordService<ImportSessionsResponse>

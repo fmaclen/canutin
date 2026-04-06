@@ -23,6 +23,23 @@ function importPayload(sessionLabel: string) {
 				balance: { value: -450, asOf: '2025-06-15T00:00:00.000Z' }
 			}
 		],
+		assets: [
+			{
+				name: 'SPDR S&P 500',
+				symbol: 'SPY',
+				balanceGroup: 'INVESTMENT',
+				balanceType: 'ETF',
+				type: 'SHARES',
+				balance: {
+					quantity: 10,
+					marketPrice: 550,
+					bookPrice: 450,
+					marketValue: 5500,
+					bookValue: 4500,
+					asOf: '2025-06-15T00:00:00.000Z'
+				}
+			}
+		],
 		transactions: [
 			{
 				accountName: 'Nathan Checking',
@@ -79,6 +96,10 @@ test('bulk import creates records and displays in settings', async ({ page }) =>
 	expect(result.transactions.skipped).toBe(0);
 	expect(result.accountBalances.created).toBe(2);
 	expect(result.accountBalances.skipped).toBe(0);
+	expect(result.assets.created).toBe(1);
+	expect(result.assets.existing).toBe(0);
+	expect(result.assetBalances.created).toBe(1);
+	expect(result.assetBalances.skipped).toBe(0);
 
 	await page.goto('/');
 	await signIn(page, user.email);
@@ -97,6 +118,8 @@ test('duplicate import skips existing records', async ({ page }) => {
 	expect(firstResult.accounts.created).toBe(2);
 	expect(firstResult.transactions.created).toBe(3);
 	expect(firstResult.accountBalances.created).toBe(2);
+	expect(firstResult.assets.created).toBe(1);
+	expect(firstResult.assetBalances.created).toBe(1);
 
 	payload.sessionLabel = 'olivia-scraper-run-2';
 	const secondResult = await (await pbSend(IMPORT_PATH, payload, user.email)).json();
@@ -107,6 +130,10 @@ test('duplicate import skips existing records', async ({ page }) => {
 	expect(secondResult.transactions.skipped).toBe(3);
 	expect(secondResult.accountBalances.created).toBe(0);
 	expect(secondResult.accountBalances.skipped).toBe(2);
+	expect(secondResult.assets.created).toBe(0);
+	expect(secondResult.assets.existing).toBe(1);
+	expect(secondResult.assetBalances.created).toBe(0);
+	expect(secondResult.assetBalances.skipped).toBe(1);
 
 	await page.goto('/');
 	await signIn(page, user.email);
