@@ -180,6 +180,7 @@ export type BalanceTypesRecord = {
 }
 
 export enum ImportSessionsStatusOptions {
+	"pending" = "pending",
 	"completed" = "completed",
 	"rolled_back" = "rolled_back",
 }

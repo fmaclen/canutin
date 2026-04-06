@@ -111,9 +111,7 @@ func main() {
 func enqueueBalance(accountID string) {
 	pendingMu.Lock()
 	defer pendingMu.Unlock()
-	if _, exists := pending[accountID]; !exists {
-		pending[accountID] = time.Now()
-	}
+	pending[accountID] = time.Now()
 }
 
 func balanceWorker(ctx context.Context, app *pocketbase.PocketBase) {

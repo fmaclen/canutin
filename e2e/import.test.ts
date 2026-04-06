@@ -252,6 +252,100 @@ test('reverting an import deletes its records and updates status', async ({ page
 	expect(accounts.length).toBe(0);
 });
 
+test('revert rejects injection-like session IDs', async () => {
+	const user = await seedUser('tanya');
+	const REVERT_PATH = '/api/canutin/import/revert';
+
+	const injectionPayloads = [
+		'" || owner != "',
+		'"; DROP TABLE transactions; --',
+		'aaaaaaaaaaaaaaa" || 1=1 || "'
+	];
+
+	for (const malicious of injectionPayloads) {
+		const response = await pbSend(REVERT_PATH, { sessionId: malicious }, user.email);
+		expect(response.status).not.toBe(200);
+	}
+});
+
+test('revert non-existent session returns 404', async () => {
+	const user = await seedUser('ursula');
+	const response = await pbSend(
+		'/api/canutin/import/revert',
+		{ sessionId: 'nonexistent00000' },
+		user.email
+	);
+	expect(response.status).toBe(404);
+});
+
+test('same-name accounts at different institutions resolve correctly', async () => {
+	const user = await seedUser('victor');
+
+	const payload = {
+		sessionLabel: 'victor-multi-institution',
+		accounts: [
+			{
+				name: 'Savings',
+				institution: 'Bank A',
+				balanceGroup: 'CASH',
+				balanceType: 'Savings'
+			},
+			{
+				name: 'Savings',
+				institution: 'Bank B',
+				balanceGroup: 'CASH',
+				balanceType: 'Savings'
+			}
+		],
+		transactions: [
+			{
+				accountName: 'Savings',
+				date: '2025-09-01T00:00:00.000Z',
+				description: 'Deposit at Bank A',
+				value: 100,
+				externalId: 'bankA-001'
+			}
+		]
+	};
+
+	const result = await (await pbSend(IMPORT_PATH, payload, user.email)).json();
+	expect(result.accounts.created).toBe(2);
+	expect(result.transactions.created).toBe(1);
+});
+
+test('revert cleans up orphaned labels and balance types', async () => {
+	const user = await seedUser('wanda');
+
+	const result = await (
+		await pbSend(IMPORT_PATH, importPayload('wanda-to-revert'), user.email)
+	).json();
+	expect(result.transactions.created).toBe(3);
+
+	const pb = await authenticateAsUser(user.email);
+
+	const labelsBefore = await pb.collection('transactionLabels').getFullList({
+		filter: `owner = "${user.id}"`
+	});
+	expect(labelsBefore.length).toBeGreaterThan(0);
+
+	const balanceTypesBefore = await pb.collection('balanceTypes').getFullList({
+		filter: `owner = "${user.id}"`
+	});
+	expect(balanceTypesBefore.length).toBeGreaterThan(0);
+
+	await pbSend('/api/canutin/import/revert', { sessionId: result.sessionId }, user.email);
+
+	const labelsAfter = await pb.collection('transactionLabels').getFullList({
+		filter: `owner = "${user.id}"`
+	});
+	expect(labelsAfter.length).toBe(0);
+
+	const balanceTypesAfter = await pb.collection('balanceTypes').getFullList({
+		filter: `owner = "${user.id}"`
+	});
+	expect(balanceTypesAfter.length).toBe(0);
+});
+
 test('import rejects requests without auth', async () => {
 	const response = await pbSend(IMPORT_PATH, importPayload('no-auth-test'));
 	expect(response.status).toBe(401);

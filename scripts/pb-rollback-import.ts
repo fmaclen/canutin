@@ -51,6 +51,12 @@ async function main() {
 		process.exit(1);
 	}
 
+	if (!/^[a-z0-9]{15}$/.test(sessionId)) {
+		error(`Invalid session ID format: "${sessionId}"`);
+		error('  session-id must be a 15-character alphanumeric PocketBase record ID');
+		process.exit(1);
+	}
+
 	const pb = new PocketBase(PB_BASE_URL);
 	pb.autoCancellation(false);
 

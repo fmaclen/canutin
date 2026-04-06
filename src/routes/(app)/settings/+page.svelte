@@ -17,6 +17,7 @@
 	import * as Table from '$lib/components/ui/table/index';
 	import { getImportSessionsContext } from '$lib/import-sessions.svelte';
 	import { m } from '$lib/paraglide/messages';
+	import type { ImportSessionsResponse } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import {
 		createSortComparator,
@@ -29,14 +30,10 @@
 	const importSessionsContext = getImportSessionsContext();
 	const pb = getPocketBaseContext();
 
-	type SessionRow = {
-		id: string;
-		label: string;
-		status: string;
-		recordsCreated: number;
-		recordsSkipped: number;
-		created: string;
-	};
+	type SessionRow = Pick<
+		ImportSessionsResponse,
+		'id' | 'label' | 'status' | 'recordsCreated' | 'recordsSkipped' | 'created'
+	>;
 
 	type SessionSortColumn = 'label' | 'recordsCreated' | 'recordsSkipped' | 'created';
 	const validSortColumns: SessionSortColumn[] = [

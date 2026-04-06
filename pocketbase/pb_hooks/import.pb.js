@@ -27,6 +27,13 @@ routerAdd("POST", "/api/canutin/import", function (e) {
 		}
 	}
 
+	function cachedFindOrCreate(cache, cacheKey, collectionName, filter, params, data) {
+		if (cache[cacheKey]) return cache[cacheKey];
+		var res = findOrCreate(collectionName, filter, params, data);
+		cache[cacheKey] = res.record.id;
+		return res.record.id;
+	}
+
 	var info = e.requestInfo();
 	var auth = info.auth;
 	var body = info.body;
@@ -52,7 +59,7 @@ routerAdd("POST", "/api/canutin/import", function (e) {
 	session.set("owner", ownerId);
 	session.set("recordsCreated", 0);
 	session.set("recordsSkipped", 0);
-	session.set("status", "completed");
+	session.set("status", "pending");
 	$app.save(session);
 	result.sessionId = session.id;
 
@@ -65,13 +72,14 @@ routerAdd("POST", "/api/canutin/import", function (e) {
 			var account = body.accounts[i];
 			var institution = account.institution || "";
 
-			var btResult = findOrCreate(
+			var btCacheKey = account.balanceType + "::" + ownerId;
+			var balanceTypeId = cachedFindOrCreate(
+				balanceTypeCache, btCacheKey,
 				"balanceTypes",
 				"name = {:name} && owner = {:owner}",
 				{ name: account.balanceType, owner: ownerId },
 				{ name: account.balanceType, owner: ownerId }
 			);
-			var balanceTypeId = btResult.record.id;
 
 			var acctFilter = institution
 				? "name = {:name} && institution = {:inst} && balanceGroup = {:bg} && owner = {:owner}"
@@ -93,7 +101,8 @@ routerAdd("POST", "/api/canutin/import", function (e) {
 				importSession: session.id
 			});
 
-			accountNameIndex[account.name] = acctResult.record.id;
+			var acctKey = account.name + "|" + institution + "|" + account.balanceGroup;
+			accountNameIndex[acctKey] = acctResult.record.id;
 
 			if (acctResult.created) {
 				result.accounts.created++;
@@ -135,7 +144,9 @@ routerAdd("POST", "/api/canutin/import", function (e) {
 			var asset = body.assets[j];
 			var symbol = asset.symbol || "";
 
-			var abtResult = findOrCreate(
+			var abtCacheKey = asset.balanceType + "::" + ownerId;
+			var aBalanceTypeId = cachedFindOrCreate(
+				balanceTypeCache, abtCacheKey,
 				"balanceTypes",
 				"name = {:name} && owner = {:owner}",
 				{ name: asset.balanceType, owner: ownerId },
@@ -154,7 +165,7 @@ routerAdd("POST", "/api/canutin/import", function (e) {
 				name: asset.name,
 				symbol: symbol,
 				balanceGroup: asset.balanceGroup,
-				balanceType: abtResult.record.id,
+				balanceType: aBalanceTypeId,
 				type: asset.type,
 				sold: asset.sold ? anow : "",
 				excluded: asset.excluded ? anow : "",
@@ -206,7 +217,15 @@ routerAdd("POST", "/api/canutin/import", function (e) {
 		for (var k = 0; k < body.transactions.length; k++) {
 			var tx = body.transactions[k];
 
-			var accountId = accountNameIndex[tx.accountName];
+			var accountId = null;
+			var keys = Object.keys(accountNameIndex);
+			for (var n = 0; n < keys.length; n++) {
+				if (keys[n].indexOf(tx.accountName + "|") === 0) {
+					accountId = accountNameIndex[keys[n]];
+					break;
+				}
+			}
+
 			if (!accountId) {
 				try {
 					var found = $app.findFirstRecordByFilter(
@@ -215,7 +234,7 @@ routerAdd("POST", "/api/canutin/import", function (e) {
 						{ name: tx.accountName, owner: ownerId }
 					);
 					accountId = found.id;
-					accountNameIndex[tx.accountName] = accountId;
+					accountNameIndex[tx.accountName + "||"] = accountId;
 				} catch (err) {
 					result.transactions.skipped++;
 					continue;
@@ -241,7 +260,7 @@ routerAdd("POST", "/api/canutin/import", function (e) {
 						"transactions",
 						"account = {:account} && date >= {:start} && date < {:end} && value = {:value} && owner = {:owner}",
 						"",
-						50,
+						0,
 						0,
 						{ account: accountId, start: txRange.start, end: txRange.end, value: txValue, owner: ownerId }
 					);
@@ -262,13 +281,15 @@ routerAdd("POST", "/api/canutin/import", function (e) {
 			var labelIds = [];
 			if (tx.labels) {
 				for (var l = 0; l < tx.labels.length; l++) {
-					var lblResult = findOrCreate(
+					var lblCacheKey = tx.labels[l] + "::" + ownerId;
+					var lblId = cachedFindOrCreate(
+						labelCache, lblCacheKey,
 						"transactionLabels",
 						"name = {:name} && owner = {:owner}",
 						{ name: tx.labels[l], owner: ownerId },
 						{ name: tx.labels[l], owner: ownerId }
 					);
-					labelIds.push(lblResult.record.id);
+					labelIds.push(lblId);
 				}
 			}
 
@@ -296,6 +317,7 @@ routerAdd("POST", "/api/canutin/import", function (e) {
 		result.accounts.existing + result.assets.existing + result.transactions.skipped +
 		result.accountBalances.skipped + result.assetBalances.skipped;
 
+	session.set("status", "completed");
 	session.set("recordsCreated", totalCreated);
 	session.set("recordsSkipped", totalSkipped);
 	$app.save(session);
@@ -318,28 +340,79 @@ routerAdd("POST", "/api/canutin/import/revert", function (e) {
 
 	var totalDeleted = 0;
 
-	for (var i = 0; i < COLLECTIONS.length; i++) {
-		while (true) {
-			var records;
-			try {
-				records = $app.findRecordsByFilter(
-					COLLECTIONS[i],
-					"importSession = {:sid} && owner = {:owner}",
-					"", 100, 0,
-					{ sid: body.sessionId, owner: auth.id }
-				);
-			} catch (err) { break; }
-			if (!records || records.length === 0) break;
-			for (var j = 0; j < records.length; j++) {
-				$app.delete(records[j]);
-				totalDeleted++;
+	$app.runInTransaction(function (txApp) {
+		for (var i = 0; i < COLLECTIONS.length; i++) {
+			while (true) {
+				var records;
+				try {
+					records = txApp.findRecordsByFilter(
+						COLLECTIONS[i],
+						"importSession = {:sid} && owner = {:owner}",
+						"", 100, 0,
+						{ sid: body.sessionId, owner: auth.id }
+					);
+				} catch (err) { break; }
+				if (!records || records.length === 0) break;
+				for (var j = 0; j < records.length; j++) {
+					txApp.delete(records[j]);
+					totalDeleted++;
+				}
 			}
 		}
-	}
 
-	session.set("status", "rolled_back");
-	session.set("recordsCreated", 0);
-	$app.save(session);
+		var allLabels;
+		try {
+			allLabels = txApp.findRecordsByFilter(
+				"transactionLabels",
+				"owner = {:owner}", "", 0, 0,
+				{ owner: auth.id }
+			);
+		} catch (err) { allLabels = []; }
+
+		for (var li = 0; li < allLabels.length; li++) {
+			try {
+				txApp.findFirstRecordByFilter(
+					"transactions",
+					"labels ~ {:labelId} && owner = {:owner}",
+					{ labelId: allLabels[li].id, owner: auth.id }
+				);
+			} catch (err) {
+				txApp.delete(allLabels[li]);
+			}
+		}
+
+		var allBalanceTypes;
+		try {
+			allBalanceTypes = txApp.findRecordsByFilter(
+				"balanceTypes",
+				"owner = {:owner}", "", 0, 0,
+				{ owner: auth.id }
+			);
+		} catch (err) { allBalanceTypes = []; }
+
+		for (var bi = 0; bi < allBalanceTypes.length; bi++) {
+			var btId = allBalanceTypes[bi].id;
+			var inUse = false;
+			try {
+				txApp.findFirstRecordByFilter("accounts", "balanceType = {:btId} && owner = {:owner}", { btId: btId, owner: auth.id });
+				inUse = true;
+			} catch (err) { /* not found */ }
+			if (!inUse) {
+				try {
+					txApp.findFirstRecordByFilter("assets", "balanceType = {:btId} && owner = {:owner}", { btId: btId, owner: auth.id });
+					inUse = true;
+				} catch (err) { /* not found */ }
+			}
+			if (!inUse) {
+				txApp.delete(allBalanceTypes[bi]);
+			}
+		}
+
+		session.set("status", "rolled_back");
+		session.set("recordsCreated", 0);
+		session.set("recordsSkipped", 0);
+		txApp.save(session);
+	});
 
 	return e.json(200, { sessionId: body.sessionId, deleted: totalDeleted });
 }, $apis.requireAuth());
