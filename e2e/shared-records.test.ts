@@ -8,6 +8,7 @@ import {
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
 import {
 	getUserPB,
+	pbSend,
 	seedAccount,
 	seedAccountBalance,
 	seedAccountShare,
@@ -144,4 +145,174 @@ test('shared inverse asset mirrors value fields while allowing recipient-only ne
 
 	await goToPageViaSidebar(page, 'Assets');
 	await expect(page.getByRole('row', { name: /Intercompany receivable/ })).toBeVisible();
+});
+
+test('owner creates account share via UI and recipient sees it with NORMAL perspective', async ({
+	page
+}) => {
+	const owner = await seedUser('alice');
+	const recipient = await seedUser('bob');
+
+	const jointAccount = await seedAccount({
+		name: 'Joint savings',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: owner.id,
+		balanceType: 'Savings'
+	});
+
+	await seedAccountBalance({
+		account: jointAccount.id,
+		owner: owner.id,
+		asOf: new Date().toISOString(),
+		value: 5000
+	});
+
+	await page.goto('/');
+	await signIn(page, owner.email);
+
+	await page.goto(`/accounts/${jointAccount.id}`);
+	await page.getByLabel('Recipient email').fill(recipient.email);
+	// Perspective defaults to NORMAL; no need to change it
+	await page.getByRole('button', { name: 'Share', exact: true }).click();
+
+	await expect(page.getByText('Share created')).toBeVisible();
+	await expect(page.getByText(recipient.email)).toBeVisible();
+	await expect(page.getByText(/Normal perspective/)).toBeVisible();
+
+	// Switch to recipient without touching the sign-out UI. PocketBase's auth
+	// store is in localStorage, so cookies alone aren't enough.
+	await page.evaluate(() => {
+		localStorage.clear();
+		sessionStorage.clear();
+	});
+	await page.context().clearCookies();
+	await page.goto('/');
+	await signIn(page, recipient.email);
+
+	const netWorth = page.getByRole('region', { name: 'Net worth' });
+	await expect(netWorth).toContainText('$5,000');
+
+	await goToPageViaSidebar(page, 'Accounts');
+	await expect(page.getByRole('row', { name: /Joint savings/ })).toContainText('$5,000.00');
+});
+
+test('account share API rejects self-share, unknown recipient, duplicates, and missing fields', async () => {
+	const owner = await seedUser('carol');
+	const recipient = await seedUser('dave');
+
+	const account = await seedAccount({
+		name: 'API test account',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: owner.id,
+		balanceType: 'Checking'
+	});
+
+	// Missing recipient email
+	let response = await pbSend(
+		'/api/shares/accounts',
+		{ accountId: account.id, perspective: 'NORMAL' },
+		owner.email
+	);
+	expect(response.status).toBe(400);
+
+	// Missing account id
+	response = await pbSend(
+		'/api/shares/accounts',
+		{ recipientEmail: recipient.email, perspective: 'NORMAL' },
+		owner.email
+	);
+	expect(response.status).toBe(400);
+
+	// Invalid perspective
+	response = await pbSend(
+		'/api/shares/accounts',
+		{ accountId: account.id, recipientEmail: recipient.email, perspective: 'SIDEWAYS' },
+		owner.email
+	);
+	expect(response.status).toBe(400);
+
+	// Self-share
+	response = await pbSend(
+		'/api/shares/accounts',
+		{ accountId: account.id, recipientEmail: owner.email, perspective: 'NORMAL' },
+		owner.email
+	);
+	expect(response.status).toBe(400);
+
+	// Unknown recipient
+	response = await pbSend(
+		'/api/shares/accounts',
+		{
+			accountId: account.id,
+			recipientEmail: 'nobody.nope@example.com',
+			perspective: 'NORMAL'
+		},
+		owner.email
+	);
+	expect(response.status).toBe(404);
+
+	// Unauthenticated
+	response = await pbSend('/api/shares/accounts', {
+		accountId: account.id,
+		recipientEmail: recipient.email,
+		perspective: 'NORMAL'
+	});
+	expect(response.status).toBe(401);
+
+	// Valid share succeeds
+	response = await pbSend(
+		'/api/shares/accounts',
+		{ accountId: account.id, recipientEmail: recipient.email, perspective: 'NORMAL' },
+		owner.email
+	);
+	expect(response.status).toBe(200);
+
+	// Duplicate share rejected
+	response = await pbSend(
+		'/api/shares/accounts',
+		{ accountId: account.id, recipientEmail: recipient.email, perspective: 'NORMAL' },
+		owner.email
+	);
+	expect(response.status).toBe(400);
+});
+
+test('asset share API rejects self-share and unknown recipient', async () => {
+	const owner = await seedUser('erin');
+	const recipient = await seedUser('frank');
+
+	const asset = await seedAsset({
+		name: 'API test asset',
+		balanceGroup: AssetsBalanceGroupOptions.OTHER,
+		owner: owner.id,
+		balanceType: 'Collectible',
+		type: AssetsTypeOptions.WHOLE
+	});
+
+	// Self-share
+	let response = await pbSend(
+		'/api/shares/assets',
+		{ assetId: asset.id, recipientEmail: owner.email, perspective: 'NORMAL' },
+		owner.email
+	);
+	expect(response.status).toBe(400);
+
+	// Unknown recipient
+	response = await pbSend(
+		'/api/shares/assets',
+		{
+			assetId: asset.id,
+			recipientEmail: 'ghost@example.com',
+			perspective: 'NORMAL'
+		},
+		owner.email
+	);
+	expect(response.status).toBe(404);
+
+	// Valid share succeeds
+	response = await pbSend(
+		'/api/shares/assets',
+		{ assetId: asset.id, recipientEmail: recipient.email, perspective: 'NORMAL' },
+		owner.email
+	);
+	expect(response.status).toBe(200);
 });
