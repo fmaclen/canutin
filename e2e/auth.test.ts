@@ -43,17 +43,13 @@ test('user can sign up, login and logout', async ({ page }) => {
 	await page.getByLabel('Password').fill(DEFAULT_PASSWORD);
 	await page.getByRole('button', { name: 'Login' }).click();
 	await expect(page.getByRole('button', { name: 'Toggle Sidebar' })).toBeVisible();
-	await expect(page.getByRole('menuitem', { name: 'Log out' })).not.toBeVisible();
-
 	// Logout
-	const userButton = page.getByRole('button', { name: 'bob' });
-	if (!(await userButton.isVisible())) {
-		// On mobile the sidebar is collapsed; open it first
+	const logoutButton = page.getByRole('button', { name: 'Log out' });
+	if (!(await logoutButton.isVisible())) {
 		await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
-		await expect(userButton).toBeVisible();
+		await expect(logoutButton).toBeVisible();
 	}
-	await userButton.click();
-	await page.getByRole('menuitem', { name: 'Log out' }).click();
+	await logoutButton.click();
 	await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Create account' })).not.toBeVisible();
 	await expect(page.getByRole('link', { name: 'Toggle Sidebar' })).not.toBeVisible();

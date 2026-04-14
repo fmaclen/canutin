@@ -2,7 +2,7 @@
 
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import fscore, { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import fscore, { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -45,12 +45,18 @@ function getBinaryPath(): string {
 function goModHash(): string | null {
 	try {
 		const goMod = path.join(pbDir, 'go.mod');
-		const mainGo = path.join(pbDir, 'main.go');
-		if (!existsSync(goMod) || !existsSync(mainGo)) return null;
+		if (!existsSync(goMod)) return null;
 
 		const hash = createHash('sha256');
 		hash.update(readFileSync(goMod));
-		hash.update(readFileSync(mainGo));
+
+		const entries = readdirSync(pbDir);
+		for (const entry of entries.sort()) {
+			if (entry.endsWith('.go')) {
+				hash.update(readFileSync(path.join(pbDir, entry)));
+			}
+		}
+
 		return hash.digest('hex').slice(0, 16);
 	} catch {
 		return null;

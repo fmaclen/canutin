@@ -18,6 +18,7 @@ export enum Collections {
 	AssetShares = "assetShares",
 	Assets = "assets",
 	BalanceTypes = "balanceTypes",
+	ImportSessions = "importSessions",
 	TransactionLabels = "transactionLabels",
 	Transactions = "transactions",
 	Users = "users",
@@ -104,6 +105,7 @@ export type AccountBalancesRecord = {
 	asOf: IsoDateString
 	created?: IsoDateString
 	id: string
+	importSession?: RecordIdString
 	owner: RecordIdString
 	updated?: IsoDateString
 	value?: number
@@ -142,6 +144,7 @@ export type AccountsRecord = {
 	created?: IsoDateString
 	excluded?: IsoDateString
 	id: string
+	importSession?: RecordIdString
 	institution?: string
 	name: string
 	owner: RecordIdString
@@ -155,6 +158,7 @@ export type AssetBalancesRecord = {
 	bookValue?: number
 	created?: IsoDateString
 	id: string
+	importSession?: RecordIdString
 	marketPrice?: number
 	marketValue?: number
 	owner: RecordIdString
@@ -198,6 +202,7 @@ export type AssetsRecord = {
 	created?: IsoDateString
 	excluded?: IsoDateString
 	id: string
+	importSession?: RecordIdString
 	name: string
 	owner: RecordIdString
 	sold?: IsoDateString
@@ -211,6 +216,22 @@ export type BalanceTypesRecord = {
 	id: string
 	name: string
 	owner: RecordIdString
+	updated?: IsoDateString
+}
+
+export enum ImportSessionsStatusOptions {
+	"pending" = "pending",
+	"completed" = "completed",
+	"rolled_back" = "rolled_back",
+}
+export type ImportSessionsRecord = {
+	created?: IsoDateString
+	id: string
+	label: string
+	owner: RecordIdString
+	recordsCreated?: number
+	recordsSkipped?: number
+	status: ImportSessionsStatusOptions
 	updated?: IsoDateString
 }
 
@@ -228,7 +249,9 @@ export type TransactionsRecord = {
 	date: IsoDateString
 	description?: string
 	excluded?: IsoDateString
+	externalId?: string
 	id: string
+	importSession?: RecordIdString
 	labels?: RecordIdString[]
 	owner: RecordIdString
 	updated?: IsoDateString
@@ -261,6 +284,7 @@ export type AssetBalancesResponse<Texpand = unknown> = Required<AssetBalancesRec
 export type AssetSharesResponse<Texpand = unknown> = Required<AssetSharesRecord> & BaseSystemFields<Texpand>
 export type AssetsResponse<Texpand = unknown> = Required<AssetsRecord> & BaseSystemFields<Texpand>
 export type BalanceTypesResponse<Texpand = unknown> = Required<BalanceTypesRecord> & BaseSystemFields<Texpand>
+export type ImportSessionsResponse<Texpand = unknown> = Required<ImportSessionsRecord> & BaseSystemFields<Texpand>
 export type TransactionLabelsResponse<Texpand = unknown> = Required<TransactionLabelsRecord> & BaseSystemFields<Texpand>
 export type TransactionsResponse<Texpand = unknown> = Required<TransactionsRecord> & BaseSystemFields<Texpand>
 export type UsersResponse<Texpand = unknown> = Required<UsersRecord> & AuthSystemFields<Texpand>
@@ -280,6 +304,7 @@ export type CollectionRecords = {
 	assetShares: AssetSharesRecord
 	assets: AssetsRecord
 	balanceTypes: BalanceTypesRecord
+	importSessions: ImportSessionsRecord
 	transactionLabels: TransactionLabelsRecord
 	transactions: TransactionsRecord
 	users: UsersRecord
@@ -298,6 +323,7 @@ export type CollectionResponses = {
 	assetShares: AssetSharesResponse
 	assets: AssetsResponse
 	balanceTypes: BalanceTypesResponse
+	importSessions: ImportSessionsResponse
 	transactionLabels: TransactionLabelsResponse
 	transactions: TransactionsResponse
 	users: UsersResponse
@@ -319,6 +345,7 @@ export type TypedPocketBase = PocketBase & {
 	collection(idOrName: 'assetShares'): RecordService<AssetSharesResponse>
 	collection(idOrName: 'assets'): RecordService<AssetsResponse>
 	collection(idOrName: 'balanceTypes'): RecordService<BalanceTypesResponse>
+	collection(idOrName: 'importSessions'): RecordService<ImportSessionsResponse>
 	collection(idOrName: 'transactionLabels'): RecordService<TransactionLabelsResponse>
 	collection(idOrName: 'transactions'): RecordService<TransactionsResponse>
 	collection(idOrName: 'users'): RecordService<UsersResponse>

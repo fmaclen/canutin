@@ -29,6 +29,19 @@ export async function getUserPB(email: string): Promise<TypedPocketBase> {
 	return pb;
 }
 
+export async function pbSend(path: string, body: Record<string, unknown>, email?: string) {
+	const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+	if (email) {
+		const pb = await getUserPB(email);
+		headers['Authorization'] = `Bearer ${pb.authStore.token}`;
+	}
+	return fetch(`${PB_URL}${path}`, {
+		method: 'POST',
+		headers,
+		body: JSON.stringify(body)
+	});
+}
+
 export async function resetDatabase() {
 	const pbAdmin = await getAdminPB();
 	try {
