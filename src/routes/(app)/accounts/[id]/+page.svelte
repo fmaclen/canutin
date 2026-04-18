@@ -9,6 +9,7 @@
 	import { getAuthContext } from '$lib/auth.svelte';
 	import { getBalanceTypesContext } from '$lib/balance-types.svelte';
 	import CheckboxLabel from '$lib/components/checkbox-label.svelte';
+	import Currency from '$lib/components/currency.svelte';
 	import Fieldset from '$lib/components/fieldset.svelte';
 	import FormFieldRow from '$lib/components/form-field-row.svelte';
 	import Page from '$lib/components/page.svelte';
@@ -302,7 +303,9 @@
 		{:else}
 			<div class="bg-muted border-border rounded border p-4">
 				<p class="text-muted-foreground text-sm">This shared account is read-only</p>
-				<p class="mt-3 text-2xl font-semibold">{formData.value}</p>
+				<p class="mt-3 text-2xl font-semibold">
+					<Currency value={account.balance} decimalScale={2} />
+				</p>
 			</div>
 		{/if}
 	</Section>

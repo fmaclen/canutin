@@ -141,19 +141,19 @@ func validateShareUpdateRequest(e *core.RecordRequestEvent) error {
 		return e.ForbiddenError("Authentication required", nil)
 	}
 
+	info, err := e.RequestInfo()
+	if err != nil {
+		return e.BadRequestError("Invalid request body", err)
+	}
+
 	grantedBy := e.Record.GetString("grantedBy")
 	if e.Auth.Id == grantedBy {
-		return nil
+		return e.ForbiddenError("Sharers must revoke and recreate shares to change them", nil)
 	}
 
 	recipient := e.Record.GetString("recipient")
 	if e.Auth.Id != recipient {
 		return e.ForbiddenError("You cannot update this share", nil)
-	}
-
-	info, err := e.RequestInfo()
-	if err != nil {
-		return e.BadRequestError("Invalid request body", err)
 	}
 
 	for key := range info.Body {

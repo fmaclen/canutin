@@ -43,9 +43,6 @@
 	const groupMeta = getBalanceGroupMeta();
 	const accountsByGroup = $derived(groupAccountsByBalanceGroup(editableAccounts));
 
-	const selectedAccount = $derived(openAccounts.find((a) => a.id === formData.accountId));
-	const canWrite = $derived(Boolean(selectedAccount?.canWrite));
-
 	let transaction = $state<TransactionsResponse | null>(null);
 	let isLoading = $state(true);
 
@@ -57,6 +54,11 @@
 		labelsInput: '',
 		excluded: false
 	});
+
+	const selectedAccount = $derived(openAccounts.find((a) => a.id === formData.accountId));
+	const canWrite = $derived(
+		Boolean(transaction?.owner && ownerId && transaction.owner === ownerId)
+	);
 
 	$effect(() => {
 		if (transactionId && ownerId) {
@@ -204,28 +206,40 @@
 							<Label for="description" class="justify-start pr-0 md:justify-end"
 								>{m.transactions_label_description()}</Label
 							>
-							<Input id="description" bind:value={formData.description} />
+							<Input id="description" bind:value={formData.description} disabled={!canWrite} />
 						</FormFieldRow>
 
 						<FormFieldRow>
 							<Label for="amount" class="justify-start pr-0 md:justify-end"
 								>{m.transactions_label_amount()}</Label
 							>
-							<CurrencyField id="amount" name="amount" bind:value={formData.amount} required />
+							<CurrencyField
+								id="amount"
+								name="amount"
+								bind:value={formData.amount}
+								required
+								disabled={!canWrite}
+							/>
 						</FormFieldRow>
 
 						<FormFieldRow>
 							<Label for="date" class="justify-start pr-0 md:justify-end"
 								>{m.transactions_label_date()}</Label
 							>
-							<Input id="date" type="date" bind:value={formData.date} required />
+							<Input
+								id="date"
+								type="date"
+								bind:value={formData.date}
+								required
+								disabled={!canWrite}
+							/>
 						</FormFieldRow>
 
 						<FormFieldRow>
 							<Label for="account" class="justify-start pr-0 md:justify-end"
 								>{m.transactions_label_account()}</Label
 							>
-							<Select.Root type="single" bind:value={formData.accountId}>
+							<Select.Root type="single" bind:value={formData.accountId} disabled={!canWrite}>
 								<Select.Trigger id="account" class="bg-background w-full pl-3">
 									{#if selectedAccount}
 										<div class="flex items-center gap-2">
@@ -273,6 +287,7 @@
 							<Input
 								id="labels"
 								bind:value={formData.labelsInput}
+								disabled={!canWrite}
 								placeholder={m.transactions_labels_placeholder()}
 							/>
 						</FormFieldRow>
@@ -286,6 +301,7 @@
 							<CheckboxLabel
 								id="excluded"
 								bind:checked={formData.excluded}
+								disabled={!canWrite}
 								label={m.transactions_label_excluded_from_totals()}
 							/>
 						</FormFieldRow>

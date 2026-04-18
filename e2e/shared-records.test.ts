@@ -196,6 +196,180 @@ test('owner creates account share via UI and recipient sees it with NORMAL persp
 	await expect(page.getByRole('row', { name: /Joint savings/ })).toContainText('$5,000.00');
 });
 
+test('sharer cannot mutate an existing account share after creation', async () => {
+	const owner = await seedUser('georgia');
+	const recipient = await seedUser('harold');
+
+	const account = await seedAccount({
+		name: 'Immutable account share',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: owner.id,
+		balanceType: 'Checking'
+	});
+
+	const share = await seedAccountShare({
+		account: account.id,
+		recipient: recipient.id,
+		recipientEmail: recipient.email,
+		grantedBy: owner.id,
+		accessRole: 'VIEWER',
+		perspective: 'NORMAL',
+		includeInNetWorth: true
+	});
+
+	const ownerPB = await getUserPB(owner.email);
+	await expect(
+		ownerPB.collection('accountShares').update(share.id, { perspective: 'INVERSE' })
+	).rejects.toThrow();
+});
+
+test('sharer cannot mutate an existing asset share after creation', async () => {
+	const owner = await seedUser('isla');
+	const recipient = await seedUser('jordan');
+
+	const asset = await seedAsset({
+		name: 'Immutable asset share',
+		balanceGroup: AssetsBalanceGroupOptions.OTHER,
+		owner: owner.id,
+		balanceType: 'Collectible',
+		type: AssetsTypeOptions.WHOLE
+	});
+
+	const share = await seedAssetShare({
+		asset: asset.id,
+		recipient: recipient.id,
+		recipientEmail: recipient.email,
+		grantedBy: owner.id,
+		accessRole: 'VIEWER',
+		perspective: 'NORMAL',
+		includeInNetWorth: true
+	});
+
+	const ownerPB = await getUserPB(owner.email);
+	await expect(
+		ownerPB.collection('assetShares').update(share.id, { perspective: 'INVERSE' })
+	).rejects.toThrow();
+});
+
+test('shared transaction detail page stays read-only for recipients', async ({ page }) => {
+	const owner = await seedUser('kendra');
+	const recipient = await seedUser('leo');
+
+	const account = await seedAccount({
+		name: 'Shared checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: owner.id,
+		balanceType: 'Checking'
+	});
+	const personalAccount = await seedAccount({
+		name: 'Recipient checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: recipient.id,
+		balanceType: 'Checking'
+	});
+	const transaction = await seedTransaction({
+		account: account.id,
+		owner: owner.id,
+		date: new Date().toISOString(),
+		description: 'Shared transfer',
+		value: 125
+	});
+
+	await seedAccountShare({
+		account: account.id,
+		recipient: recipient.id,
+		recipientEmail: recipient.email,
+		grantedBy: owner.id,
+		accessRole: 'VIEWER',
+		perspective: 'NORMAL',
+		includeInNetWorth: true
+	});
+	await seedAccountBalance({
+		account: personalAccount.id,
+		owner: recipient.id,
+		asOf: new Date().toISOString(),
+		value: 250
+	});
+
+	await page.goto('/');
+	await signIn(page, recipient.email);
+
+	await page.goto(`/transactions/${transaction.id}`);
+	await expect(page.getByText('This shared transaction is read-only')).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Save' })).toHaveCount(0);
+	await expect(page.getByRole('button', { name: 'Delete' })).toHaveCount(0);
+	await expect(page.getByLabel('Description')).toBeDisabled();
+	await expect(page.getByLabel('Amount')).toBeDisabled();
+	await expect(page.getByLabel('Date')).toBeDisabled();
+	await expect(page.getByLabel('Labels')).toBeDisabled();
+	await expect(page.getByLabel('Account')).toBeDisabled();
+	await expect(page.getByLabel('Excluded from totals')).toBeDisabled();
+	await expect(page.getByRole('button', { name: 'Recipient checking' })).toHaveCount(0);
+	await expect(page.getByRole('button', { name: 'Shared checking' })).toBeVisible();
+});
+
+test('shared account and asset detail views keep currency formatting for recipients', async ({
+	page
+}) => {
+	const owner = await seedUser('maya');
+	const recipient = await seedUser('nolan');
+
+	const account = await seedAccount({
+		name: 'Formatted liability',
+		balanceGroup: AccountsBalanceGroupOptions.DEBT,
+		owner: owner.id,
+		balanceType: 'Payable'
+	});
+	const asset = await seedAsset({
+		name: 'Formatted receivable',
+		balanceGroup: AssetsBalanceGroupOptions.OTHER,
+		owner: owner.id,
+		balanceType: 'Receivable',
+		type: AssetsTypeOptions.WHOLE
+	});
+
+	await seedAccountBalance({
+		account: account.id,
+		owner: owner.id,
+		asOf: new Date().toISOString(),
+		value: -1200
+	});
+	await seedAssetBalance({
+		asset: asset.id,
+		owner: owner.id,
+		asOf: new Date().toISOString(),
+		bookValue: 9000,
+		marketValue: 12000
+	});
+	await seedAccountShare({
+		account: account.id,
+		recipient: recipient.id,
+		recipientEmail: recipient.email,
+		grantedBy: owner.id,
+		accessRole: 'VIEWER',
+		perspective: 'INVERSE',
+		includeInNetWorth: true
+	});
+	await seedAssetShare({
+		asset: asset.id,
+		recipient: recipient.id,
+		recipientEmail: recipient.email,
+		grantedBy: owner.id,
+		accessRole: 'VIEWER',
+		perspective: 'INVERSE',
+		includeInNetWorth: true
+	});
+
+	await page.goto('/');
+	await signIn(page, recipient.email);
+
+	await page.goto(`/accounts/${account.id}`);
+	await expect(page.getByText('$1,200.00')).toBeVisible();
+
+	await page.goto(`/assets/${asset.id}`);
+	await expect(page.getByText('-$12,000.00')).toBeVisible();
+});
+
 test('account share API rejects self-share, unknown recipient, duplicates, and missing fields', async () => {
 	const owner = await seedUser('carol');
 	const recipient = await seedUser('dave');
