@@ -3,8 +3,6 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 
-const vitePort = Number(process.env.VITE_PORT ?? 5173);
-
 export default defineConfig({
 	plugins: [
 		tailwindcss(),
@@ -15,9 +13,9 @@ export default defineConfig({
 		})
 	],
 	server: {
-		port: vitePort
+		port: Number(process.env.VITE_PORT ?? 5173)
 	},
 	preview: {
-		port: Number(process.env.VITE_PREVIEW_PORT ?? vitePort)
+		port: Number(process.env.VITE_PREVIEW_PORT ?? process.env.VITE_PORT ?? 42069)
 	}
 });
