@@ -2,7 +2,9 @@ import { defineConfig, devices } from '@playwright/test';
 
 const isCI = process.env.CI === 'true';
 
-const BASE_URL = 'http://localhost:42069';
+const PB_PORT = Number(process.env.PB_PORT ?? 42070);
+const VITE_PORT = Number(process.env.VITE_PREVIEW_PORT ?? process.env.VITE_PORT ?? 42069);
+const BASE_URL = `http://localhost:${VITE_PORT}`;
 
 export enum Projects {
 	DESKTOP_CHROMIUM = 'desktop',
@@ -14,12 +16,12 @@ export default defineConfig({
 	webServer: [
 		{
 			command: 'bun run pb',
-			port: 42070,
+			port: PB_PORT,
 			reuseExistingServer: true
 		},
 		{
 			command: 'bun run build && bun run preview',
-			port: 42069,
+			port: VITE_PORT,
 			env: {
 				...process.env,
 				PUBLIC_PLAYWRIGHT_TESTING: 'true',

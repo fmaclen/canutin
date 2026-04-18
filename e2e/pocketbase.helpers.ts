@@ -14,7 +14,7 @@ import type {
 
 export const DEFAULT_PASSWORD = '123qweasdzxc';
 
-const PB_URL = 'http://127.0.0.1:42070';
+const PB_URL = process.env.PUBLIC_PB_URL ?? 'http://127.0.0.1:42070';
 const SUPERADMIN_EMAIL = 'superadmin@example.com';
 
 async function getAdminPB(): Promise<TypedPocketBase> {

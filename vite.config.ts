@@ -3,6 +3,8 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 
+const vitePort = Number(process.env.VITE_PORT ?? 5173);
+
 export default defineConfig({
 	plugins: [
 		tailwindcss(),
@@ -12,7 +14,10 @@ export default defineConfig({
 			outdir: './src/lib/paraglide'
 		})
 	],
+	server: {
+		port: vitePort
+	},
 	preview: {
-		port: 42069
+		port: Number(process.env.VITE_PREVIEW_PORT ?? vitePort)
 	}
 });
