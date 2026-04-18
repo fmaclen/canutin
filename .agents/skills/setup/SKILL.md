@@ -120,10 +120,10 @@ Teardown kills any processes on the worktree's ports and removes the git worktre
 
 ## Key Files
 
-| File              | Purpose                                                        |
-| ----------------- | -------------------------------------------------------------- |
-| `.worktree.json`  | Worktree number, port assignments, branch                      |
-| `.env`            | `VITE_PORT`, `PB_PORT`, `PUBLIC_PB_URL` for this worktree only |
+| File             | Purpose                                                        |
+| ---------------- | -------------------------------------------------------------- |
+| `.worktree.json` | Worktree number, port assignments, branch                      |
+| `.env`           | `VITE_PORT`, `PB_PORT`, `PUBLIC_PB_URL` for this worktree only |
 
 ## Agent Behavior
 

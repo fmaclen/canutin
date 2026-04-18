@@ -11,13 +11,13 @@ Skills for agents working on canutin — from worktree setup to backend migratio
 
 Intent aliases improve retrieval without duplicating canonical rules:
 
-| Alias         | Canonical      |
-| ------------- | -------------- |
-| `tests`       | `testing`      |
-| `review`      | `code-review`  |
-| `pr`          | `deliver`      |
-| `worktree`    | `setup`        |
-| `orchestrate` | `pm`           |
+| Alias           | Canonical     |
+| --------------- | ------------- |
+| `tests`         | `testing`     |
+| `review`        | `code-review` |
+| `pr`            | `deliver`     |
+| `worktree`      | `setup`       |
+| `orchestrate`   | `pm`          |
 | `working-notes` | `scratchpads` |
 
 ## Phases
@@ -30,37 +30,37 @@ Intent aliases improve retrieval without duplicating canonical rules:
 
 ## Conventions
 
-| Skill                                        | Purpose                                         |
-| -------------------------------------------- | ----------------------------------------------- |
-| [svelte5](./svelte5/SKILL.md)                | Svelte 5 runes, events, snippets, navigation    |
-| [code-quality](./code-quality/SKILL.md)      | TypeScript, Prettier, conventional commits      |
-| [code-review](./code-review/SKILL.md)        | Review checklist, every-function rules          |
-| [testing](./testing/SKILL.md)                | Playwright E2E, seeding helpers, selectors      |
-| [realtime](./realtime/SKILL.md)              | PocketBase subscriptions, debouncing            |
-| [pocketbase](./pocketbase/SKILL.md)          | Backend schema, Go hooks, admin API             |
-| [error-handling](./error-handling/SKILL.md)  | Toasts, tagged logs, Go hook logging            |
-| [auth-system](./auth-system/SKILL.md)        | PocketBase users auth, route guard              |
-| [frontend-design](./frontend-design/SKILL.md)| Creative design guidance                        |
+| Skill                                         | Purpose                                      |
+| --------------------------------------------- | -------------------------------------------- |
+| [svelte5](./svelte5/SKILL.md)                 | Svelte 5 runes, events, snippets, navigation |
+| [code-quality](./code-quality/SKILL.md)       | TypeScript, Prettier, conventional commits   |
+| [code-review](./code-review/SKILL.md)         | Review checklist, every-function rules       |
+| [testing](./testing/SKILL.md)                 | Playwright E2E, seeding helpers, selectors   |
+| [realtime](./realtime/SKILL.md)               | PocketBase subscriptions, debouncing         |
+| [pocketbase](./pocketbase/SKILL.md)           | Backend schema, Go hooks, admin API          |
+| [error-handling](./error-handling/SKILL.md)   | Toasts, tagged logs, Go hook logging         |
+| [auth-system](./auth-system/SKILL.md)         | PocketBase users auth, route guard           |
+| [frontend-design](./frontend-design/SKILL.md) | Creative design guidance                     |
 
 ## Workflow
 
-| Skill                                                  | Purpose                                      |
-| ------------------------------------------------------ | -------------------------------------------- |
-| [setup](./setup/SKILL.md)                              | Worktree creation, env, port allocation      |
-| [verify](./verify/SKILL.md)                            | Local quality + Playwright verification      |
-| [deliver](./deliver/SKILL.md)                          | PR creation, commit format, handoff          |
-| [pm](./pm/SKILL.md)                                    | Reviewer-orchestrator workflow               |
-| [issue-writing](./issue-writing/SKILL.md)              | GitHub issue titles and problem-first bodies |
-| [failure-discipline](./failure-discipline/SKILL.md)    | Error diagnosis and push discipline          |
-| [deployment](./deployment/SKILL.md)                    | Docker build + semantic-release              |
-| [scratchpads](./scratchpads/SKILL.md)                  | Working documents directory and naming       |
+| Skill                                               | Purpose                                      |
+| --------------------------------------------------- | -------------------------------------------- |
+| [setup](./setup/SKILL.md)                           | Worktree creation, env, port allocation      |
+| [verify](./verify/SKILL.md)                         | Local quality + Playwright verification      |
+| [deliver](./deliver/SKILL.md)                       | PR creation, commit format, handoff          |
+| [pm](./pm/SKILL.md)                                 | Reviewer-orchestrator workflow               |
+| [issue-writing](./issue-writing/SKILL.md)           | GitHub issue titles and problem-first bodies |
+| [failure-discipline](./failure-discipline/SKILL.md) | Error diagnosis and push discipline          |
+| [deployment](./deployment/SKILL.md)                 | Docker build + semantic-release              |
+| [scratchpads](./scratchpads/SKILL.md)               | Working documents directory and naming       |
 
 ## PocketBase Task Skills
 
-| Skill                                  | Purpose                                        |
-| -------------------------------------- | ---------------------------------------------- |
-| [pb-migrate](./pb-migrate/SKILL.md)    | Schema changes via admin API (auto JS migrations) |
-| [pb-import](./pb-import/SKILL.md)      | Bulk import and revert via custom API routes   |
+| Skill                               | Purpose                                           |
+| ----------------------------------- | ------------------------------------------------- |
+| [pb-migrate](./pb-migrate/SKILL.md) | Schema changes via admin API (auto JS migrations) |
+| [pb-import](./pb-import/SKILL.md)   | Bulk import and revert via custom API routes      |
 
 ## Key Principles
 

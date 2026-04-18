@@ -11,13 +11,13 @@ Canutin ships as a Docker image that bundles the SvelteKit Node server and the c
 
 ## Files
 
-| File                       | Purpose                                  |
-| -------------------------- | ---------------------------------------- |
-| `Dockerfile`               | Multi-stage build: Go (PB) + Node (SK)   |
-| `docker-compose.yml`       | Local / dev compose file                 |
-| `docker-compose.prod.yml`  | Production compose file                  |
-| `.releaserc.json`          | semantic-release config                  |
-| `.github/workflows/`       | CI workflows (tests, release, image)     |
+| File                      | Purpose                                |
+| ------------------------- | -------------------------------------- |
+| `Dockerfile`              | Multi-stage build: Go (PB) + Node (SK) |
+| `docker-compose.yml`      | Local / dev compose file               |
+| `docker-compose.prod.yml` | Production compose file                |
+| `.releaserc.json`         | semantic-release config                |
+| `.github/workflows/`      | CI workflows (tests, release, image)   |
 
 ## Build
 

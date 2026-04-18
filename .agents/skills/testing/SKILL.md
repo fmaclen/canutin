@@ -33,10 +33,10 @@ bun run test --project=mobile             # Mobile only
 
 Defined in `playwright.config.ts`:
 
-| Project   | Scope             | Viewport           |
-| --------- | ----------------- | ------------------ |
-| `desktop` | `e2e/*.test.ts`   | Desktop Chrome     |
-| `mobile`  | `e2e/*.test.ts`   | iPhone 13 (WebKit) |
+| Project   | Scope           | Viewport           |
+| --------- | --------------- | ------------------ |
+| `desktop` | `e2e/*.test.ts` | Desktop Chrome     |
+| `mobile`  | `e2e/*.test.ts` | iPhone 13 (WebKit) |
 
 ## Test Isolation
 

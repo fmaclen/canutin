@@ -11,13 +11,13 @@ Canutin uses PocketBase's built-in `users` auth collection. The frontend auth st
 
 ## Key Files
 
-| File                              | Purpose                                    |
-| --------------------------------- | ------------------------------------------ |
+| File                              | Purpose                                   |
+| --------------------------------- | ----------------------------------------- |
 | `src/lib/auth.svelte.ts`          | Auth context store (login, logout, state) |
-| `src/lib/pocketbase.svelte.ts`    | PocketBase client wrapper                  |
-| `src/routes/(guest)/auth/`        | Login and signup pages                     |
-| `src/routes/(app)/+layout.svelte` | Protected route guard                      |
-| `src/routes/(guest)/+layout.ts`   | Guest route layout                         |
+| `src/lib/pocketbase.svelte.ts`    | PocketBase client wrapper                 |
+| `src/routes/(guest)/auth/`        | Login and signup pages                    |
+| `src/routes/(app)/+layout.svelte` | Protected route guard                     |
+| `src/routes/(guest)/+layout.ts`   | Guest route layout                        |
 
 ## Collections
 
