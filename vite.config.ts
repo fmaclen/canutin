@@ -12,7 +12,10 @@ export default defineConfig({
 			outdir: './src/lib/paraglide'
 		})
 	],
+	server: {
+		port: Number(process.env.VITE_PORT ?? 5173)
+	},
 	preview: {
-		port: 42069
+		port: Number(process.env.VITE_PREVIEW_PORT ?? process.env.VITE_PORT ?? 42069)
 	}
 });

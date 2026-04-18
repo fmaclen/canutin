@@ -1,3 +1,8 @@
+---
+name: svelte5
+description: Svelte 5 runes, event handling, snippets, navigation - never use Svelte 4 patterns
+---
+
 # Svelte 5 Conventions
 
 ## Overview
@@ -49,8 +54,8 @@ Always use `resolve()` with `goto()` for static paths:
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 
-goto(resolve('/threads')); // Correct
-goto('/threads'); // Wrong - won't work with base paths
+goto(resolve('/accounts')); // Correct
+goto('/accounts'); // Wrong - won't work with base paths
 ```
 
 For dynamic URLs, disable the lint rule with explanation:
@@ -72,8 +77,10 @@ goto(storedUrl);
 ## Reference
 
 - shadcn components: `src/lib/components/ui/` (all use Svelte 5 patterns)
+- Context stores: `src/lib/*.svelte.ts`
 - [Svelte 5 Migration Guide](https://svelte.dev/docs/svelte/v5-migration-guide)
 
 ## See Also
 
-- [code-quality.md](./code-quality.md) - TypeScript and formatting
+- [code-quality.md](../code-quality/SKILL.md) - TypeScript rules, formatting, sentence case
+- [realtime.md](../realtime/SKILL.md) - PocketBase subscription patterns in context stores
