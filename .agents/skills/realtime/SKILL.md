@@ -1,8 +1,13 @@
+---
+name: realtime
+description: PocketBase realtime subscriptions, debouncing, subscription lifecycle in context stores
+---
+
 # Realtime Conventions
 
 ## Overview
 
-PocketBase realtime subscriptions for live data updates. Contexts subscribe to collection changes and update UI state accordingly.
+PocketBase realtime subscriptions for live data updates. Context stores in `src/lib/*.svelte.ts` subscribe to collection changes and update UI state accordingly.
 
 ## Patterns
 
@@ -38,17 +43,18 @@ Reference: `pocketbase/main.go`
 
 ## Subscription Lifecycle
 
-1. Subscribe in `init()` before initial data fetch
-2. Handle events with debounced callback
-3. Unsubscribe in `dispose()`
+1. Subscribe in `init()` **before** the initial data fetch (avoids missing events during the fetch window)
+2. Handle events with a debounced callback
+3. Unsubscribe in `dispose()` using the specific collection + filter — never `realtime.unsubscribe()`
 
 ## Anti-patterns
 
 - **No debouncing** - Causes UI flicker and excessive API calls during bulk operations
 - **Forgetting `requestKey: null`** - Causes data to disappear mid-operation
-- **Unsubscribing all** - `realtime.unsubscribe()` kills ALL subscriptions; use collection-specific unsubscribe
+- **`realtime.unsubscribe()`** - Kills ALL subscriptions; use collection-specific unsubscribe
 
 ## See Also
 
-- [demo-mode.md](../demo-mode.md) - Demo seeding triggers many realtime events
+- [pocketbase.md](../pocketbase/SKILL.md) - Backend, Go hooks, API
+- [svelte5.md](../svelte5/SKILL.md) - Runes and reactivity
 - PocketBase JS SDK docs: Realtime subscriptions

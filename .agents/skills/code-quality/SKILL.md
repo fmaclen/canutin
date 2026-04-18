@@ -1,3 +1,8 @@
+---
+name: code-quality
+description: TypeScript strict mode, Prettier, conventional commits, code style, git workflow
+---
+
 # Code Quality Conventions
 
 ## Overview
@@ -20,7 +25,7 @@ bun run check     # svelte-check only
 - **Never use explicit return types** - Let TypeScript infer (exception: class getters with complex inline types)
 - **Never use `@ts-ignore`** - Fix the underlying issue
 - **Never disable linter rules** - Fix the code instead
-  - Exception: `svelte/no-navigation-without-resolve` for dynamic URLs (see [svelte5.md](./svelte5.md#navigation))
+  - Exception: `svelte/no-navigation-without-resolve` for dynamic URLs (see [svelte5.md](../svelte5/SKILL.md#navigation))
 - **Avoid default parameter values** - Only use when strictly necessary; prefer explicit arguments at call sites
 
 ### Type Narrowing
@@ -65,20 +70,34 @@ Format: `type: description`
 | `test`     | Adding/updating tests        |
 | `chore`    | Maintenance tasks            |
 
+Examples:
+
+- `feat: add account sharing`
+- `fix: resolve balance calculation race condition`
+- `refactor: extract transaction dedup logic`
+
 ## Code Style
 
-- **No unnecessary comments** - Code should be self-documenting
-- **Only comment complex business logic** or non-obvious algorithms
+- **Keep code self-documenting** - Prefer clear names and structure over narration
+- **No unnecessary comments** - Only comment complex business logic or non-obvious algorithms
+- **Use line-comment prefixes for intentional comments** - `// NOTE:`, `// HACK:`, `// TODO:`, or `// FIXME:` for durable comments
+  - `NOTE:` for important context, rules, or constraints that are easy to miss
+  - `HACK:` for deliberate workarounds or temporary compromises
+  - `TODO:` for planned follow-up work that is still intentionally deferred
+  - `FIXME:` for known broken or risky behavior
+- **Remove or update stale comments** - If the code changes, keep the comment accurate or delete it
 - **Extract when used 2-3+ times** - Avoid premature abstraction
 - **Inline single-use logic** - Don't extract functions used only once
 - **Remove unused code** - Delete dead imports, variables, functions
 - **Sentence case for UI labels** - Except acronyms/proper names
 - **No trailing periods in UI text** - Labels, buttons, headings
-- **Use project dependencies** - Don't manually implement what libraries provide
+- **No ellipsis in UI text** - Never use `...` or `…` for loading. Use a spinner or `toast.loading()` instead
+- **Use project dependencies** - Don't manually implement what libraries provide (e.g., `date-fns` for time math)
 
 ## Dependencies
 
-- Always install as `devDependencies` (SvelteKit bundles everything)
+- All packages go in `devDependencies` (SvelteKit bundles everything at build time)
+- Use `bun add -d` (not `bun add`) when adding packages
 - Use `bun install` (not npm)
 
 ## Git Workflow
@@ -95,5 +114,6 @@ Format: `type: description`
 
 ## See Also
 
-- [testing.md](./testing.md) - Test conventions
-- [svelte5.md](./svelte5.md) - Svelte 5 patterns
+- [issue-writing.md](../issue-writing/SKILL.md) - GitHub issue authoring guidance
+- [testing.md](../testing/SKILL.md) - Test conventions
+- [svelte5.md](../svelte5/SKILL.md) - Svelte 5 patterns
