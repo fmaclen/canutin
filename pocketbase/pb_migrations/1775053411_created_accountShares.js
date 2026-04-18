@@ -116,7 +116,7 @@ migrate((app) => {
     "name": "accountShares",
     "system": false,
     "type": "base",
-    "updateRule": "grantedBy = @request.auth.id || recipient = @request.auth.id",
+    "updateRule": "recipient = @request.auth.id",
     "viewRule": "grantedBy = @request.auth.id || recipient = @request.auth.id"
   });
 

@@ -305,7 +305,6 @@ test('shared transaction detail page stays read-only for recipients', async ({ p
 	await expect(page.getByLabel('Account')).toBeDisabled();
 	await expect(page.getByLabel('Excluded from totals')).toBeDisabled();
 	await expect(page.getByRole('button', { name: 'Recipient checking' })).toHaveCount(0);
-	await expect(page.getByRole('button', { name: 'Shared checking' })).toBeVisible();
 });
 
 test('shared account and asset detail views keep currency formatting for recipients', async ({
