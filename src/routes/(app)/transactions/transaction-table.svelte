@@ -2,6 +2,7 @@
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
 	import Link from '$lib/components/link.svelte';
+	import RecordLink from '$lib/components/record-link.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import * as Pagination from '$lib/components/ui/pagination/index';
@@ -146,9 +147,13 @@
 						</Table.Cell>
 						<Table.Cell>
 							{#if row.accountName && row.accountId}
-								<Link href="/accounts/{row.accountId}" class="text-foreground/80 text-sm">
-									{row.accountName}
-								</Link>
+								<RecordLink
+									type="account"
+									id={row.accountId}
+									name={row.accountName}
+									isShared={row.accountIsShared}
+									class="text-foreground/80 text-sm"
+								/>
 							{:else if row.accountName}
 								<span class="text-foreground/80 text-sm">{row.accountName}</span>
 							{:else}

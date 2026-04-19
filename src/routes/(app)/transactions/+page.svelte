@@ -51,7 +51,7 @@
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 	</div>
-	<nav class="px-2">
+	<nav class="px-4">
 		<Link href="/transactions/add" class="text-sm">{m.transactions_add_link()}</Link>
 	</nav>
 </header>

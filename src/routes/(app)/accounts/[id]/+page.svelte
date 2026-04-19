@@ -1,4 +1,5 @@
 <script lang="ts">
+	import UsersIcon from '@lucide/svelte/icons/users';
 	import { error } from '@sveltejs/kit';
 	import { toast } from 'svelte-sonner';
 
@@ -11,6 +12,7 @@
 	import CheckboxLabel from '$lib/components/checkbox-label.svelte';
 	import Fieldset from '$lib/components/fieldset.svelte';
 	import FormFieldRow from '$lib/components/form-field-row.svelte';
+	import Link from '$lib/components/link.svelte';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
@@ -282,7 +284,7 @@
 	}
 </script>
 
-<header class="bg-background flex h-16 shrink-0 items-center gap-2 border-b">
+<header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b">
 	<div class="flex items-center gap-2 px-4">
 		<Sidebar.Trigger class="-ml-1" />
 		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
@@ -302,6 +304,11 @@
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 	</div>
+	<nav class="px-4">
+		{#if account}
+			<Link href={`/transactions?account=${account.id}`} class="text-sm">Transactions</Link>
+		{/if}
+	</nav>
 </header>
 
 <Page pageTitle={m.accounts_edit_page_title()}>
@@ -310,7 +317,10 @@
 			<div class="bg-muted border-border overflow-hidden rounded border">
 				<div class="flex items-center justify-between p-4">
 					<div>
-						<p class="text-sm">This shared account is read-only</p>
+						<p class="flex items-center gap-2 text-sm">
+							<UsersIcon class="text-muted-foreground size-3.5" aria-hidden="true" />
+							This shared account is read-only
+						</p>
 						<p class="text-muted-foreground text-sm">
 							Stop following this account and remove it from your views
 						</p>
@@ -396,7 +406,7 @@
 							<Label class="justify-start pr-0 md:justify-end md:pt-2.5">Shares</Label>
 							<div class="space-y-2">
 								{#if grantedShares.length === 0}
-									<p class="text-muted-foreground text-sm">No shares yet</p>
+									<Input disabled placeholder="No shares yet" />
 								{:else}
 									{#each grantedShares as share (share.id)}
 										<div

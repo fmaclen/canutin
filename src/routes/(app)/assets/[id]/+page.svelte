@@ -1,4 +1,5 @@
 <script lang="ts">
+	import UsersIcon from '@lucide/svelte/icons/users';
 	import { error } from '@sveltejs/kit';
 	import { toast } from 'svelte-sonner';
 
@@ -356,7 +357,10 @@
 			<div class="bg-muted border-border overflow-hidden rounded border">
 				<div class="flex items-center justify-between p-4">
 					<div>
-						<p class="text-sm">This shared asset is read-only</p>
+						<p class="flex items-center gap-2 text-sm">
+							<UsersIcon class="text-muted-foreground size-3.5" aria-hidden="true" />
+							This shared asset is read-only
+						</p>
 						<p class="text-muted-foreground text-sm">
 							Stop following this asset and remove it from your views
 						</p>
@@ -453,7 +457,7 @@
 							<Label class="justify-start pr-0 md:justify-end md:pt-2.5">Shares</Label>
 							<div class="space-y-2">
 								{#if grantedShares.length === 0}
-									<p class="text-muted-foreground text-sm">No shares yet</p>
+									<Input disabled placeholder="No shares yet" />
 								{:else}
 									{#each grantedShares as share (share.id)}
 										<div

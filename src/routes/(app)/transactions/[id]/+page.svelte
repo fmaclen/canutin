@@ -1,4 +1,5 @@
 <script lang="ts">
+	import UsersIcon from '@lucide/svelte/icons/users';
 	import { toast } from 'svelte-sonner';
 
 	import { goto } from '$app/navigation';
@@ -16,6 +17,7 @@
 	import Fieldset from '$lib/components/fieldset.svelte';
 	import FormFieldRow from '$lib/components/form-field-row.svelte';
 	import Page from '$lib/components/page.svelte';
+	import RecordLink from '$lib/components/record-link.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
@@ -158,7 +160,7 @@
 	}
 </script>
 
-<header class="bg-background flex h-16 shrink-0 items-center gap-2 border-b">
+<header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b">
 	<div class="flex items-center gap-2 px-4">
 		<Sidebar.Trigger class="-ml-1" />
 		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
@@ -180,9 +182,37 @@
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 	</div>
+	<nav class="px-4">
+		{#if selectedAccount}
+			<RecordLink
+				type="account"
+				id={selectedAccount.id}
+				name={selectedAccount.name}
+				isShared={selectedAccount.isShared}
+				class="text-sm"
+			/>
+		{/if}
+	</nav>
 </header>
 
 <Page pageTitle={m.transactions_edit_page_title()}>
+	{#if !isLoading && transaction && !canWrite}
+		<Section>
+			<div class="bg-muted border-border overflow-hidden rounded border">
+				<div class="flex items-center justify-between p-4">
+					<div>
+						<p class="flex items-center gap-2 text-sm">
+							<UsersIcon class="text-muted-foreground size-3.5" aria-hidden="true" />
+							This shared transaction is read-only
+						</p>
+						<p class="text-muted-foreground text-sm">
+							Owned by the account's sharer and cannot be edited
+						</p>
+					</div>
+				</div>
+			</div>
+		</Section>
+	{/if}
 	<Section>
 		<SectionTitle title={m.transactions_section_details()} />
 		{#if isLoading || !transaction}
@@ -196,11 +226,6 @@
 					}}
 					class="space-y-0"
 				>
-					{#if !canWrite}
-						<div class="border-border bg-background border-b px-4 py-3 text-sm">
-							This shared transaction is read-only
-						</div>
-					{/if}
 					<Fieldset isFirst={true}>
 						<FormFieldRow>
 							<Label for="description" class="justify-start pr-0 md:justify-end"
