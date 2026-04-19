@@ -16,11 +16,30 @@
 		};
 		isWhole: boolean;
 		isShares: boolean;
+		balanceAsOf?: string;
 		onSubmit: () => void;
 		disabled?: boolean;
 	}
 
-	let { formData, isWhole, isShares, onSubmit, disabled = false }: Props = $props();
+	let {
+		formData,
+		isWhole,
+		isShares,
+		balanceAsOf = '',
+		onSubmit,
+		disabled = false
+	}: Props = $props();
+
+	const formattedAsOf = $derived.by(() => {
+		if (!balanceAsOf) return '';
+		const parsed = new Date(balanceAsOf);
+		if (Number.isNaN(parsed.getTime())) return '';
+		return parsed.toLocaleDateString(undefined, {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric'
+		});
+	});
 </script>
 
 <div class="bg-muted border-border overflow-hidden rounded border">
@@ -34,9 +53,16 @@
 		<Fieldset isFirst={true}>
 			{#if isWhole}
 				<FormFieldRow>
-					<Label for="market-value" class="justify-start pr-0 md:justify-end"
-						>{m.assets_label_market_value()}</Label
-					>
+					<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+						<Label for="market-value" class="justify-start pr-0 md:justify-end"
+							>{m.assets_label_market_value()}</Label
+						>
+						{#if formattedAsOf}
+							<span class="text-muted-foreground text-sm" data-testid="balance-as-of"
+								>{m.assets_text_balance_as_of({ date: formattedAsOf })}</span
+							>
+						{/if}
+					</div>
 					<CurrencyField
 						id="market-value"
 						name="market-value"
@@ -61,9 +87,16 @@
 				</FormFieldRow>
 			{:else if isShares}
 				<FormFieldRow>
-					<Label for="quantity" class="justify-start pr-0 md:justify-end"
-						>{m.assets_label_quantity()}</Label
-					>
+					<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+						<Label for="quantity" class="justify-start pr-0 md:justify-end"
+							>{m.assets_label_quantity()}</Label
+						>
+						{#if formattedAsOf}
+							<span class="text-muted-foreground text-sm" data-testid="balance-as-of"
+								>{m.assets_text_balance_as_of({ date: formattedAsOf })}</span
+							>
+						{/if}
+					</div>
 					<CurrencyField id="quantity" name="quantity" bind:value={formData.quantity} {disabled} />
 				</FormFieldRow>
 

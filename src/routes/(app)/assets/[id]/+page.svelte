@@ -409,6 +409,7 @@
 				{formData}
 				{isWhole}
 				{isShares}
+				balanceAsOf={asset?.balanceAsOf ?? ''}
 				onSubmit={handleUpdateBalance}
 				disabled={!canWrite}
 			/>

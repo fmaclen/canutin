@@ -366,7 +366,12 @@
 		{#if isLoading || !account}
 			<Skeleton class="h-48" />
 		{:else}
-			<BalanceForm {formData} onSubmit={handleUpdateBalance} disabled={!canWrite} />
+			<BalanceForm
+				{formData}
+				balanceAsOf={account?.balanceAsOf ?? ''}
+				onSubmit={handleUpdateBalance}
+				disabled={!canWrite}
+			/>
 		{/if}
 	</Section>
 

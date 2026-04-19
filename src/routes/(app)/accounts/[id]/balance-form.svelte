@@ -10,11 +10,23 @@
 		formData: {
 			value: string;
 		};
+		balanceAsOf?: string;
 		onSubmit: () => void;
 		disabled?: boolean;
 	}
 
-	let { formData, onSubmit, disabled = false }: Props = $props();
+	let { formData, balanceAsOf = '', onSubmit, disabled = false }: Props = $props();
+
+	const formattedAsOf = $derived.by(() => {
+		if (!balanceAsOf) return '';
+		const parsed = new Date(balanceAsOf);
+		if (Number.isNaN(parsed.getTime())) return '';
+		return parsed.toLocaleDateString(undefined, {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric'
+		});
+	});
 </script>
 
 <div class="bg-muted border-border overflow-hidden rounded border">
@@ -27,9 +39,16 @@
 	>
 		<Fieldset isFirst={true}>
 			<FormFieldRow>
-				<Label for="value" class="justify-start pr-0 md:justify-end"
-					>{m.accounts_label_balance()}</Label
-				>
+				<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+					<Label for="value" class="justify-start pr-0 md:justify-end"
+						>{m.accounts_label_balance()}</Label
+					>
+					{#if formattedAsOf}
+						<span class="text-muted-foreground text-sm" data-testid="balance-as-of"
+							>{m.accounts_text_balance_as_of({ date: formattedAsOf })}</span
+						>
+					{/if}
+				</div>
 				<CurrencyField id="value" name="value" bind:value={formData.value} {disabled} />
 			</FormFieldRow>
 		</Fieldset>
