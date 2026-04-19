@@ -28,10 +28,17 @@
 	for={id}
 	class={cn(
 		'flex h-9 shrink-0 items-center gap-2 rounded border px-2.5 py-1 font-normal',
-		disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
+		disabled ? 'bg-border/33 cursor-not-allowed' : 'cursor-pointer',
 		className
 	)}
 >
-	<Checkbox {id} bind:checked {disabled} {indeterminate} {onCheckedChange} class="bg-background" />
+	<Checkbox
+		{id}
+		bind:checked
+		{disabled}
+		{indeterminate}
+		{onCheckedChange}
+		class={disabled ? 'bg-transparent' : 'bg-background'}
+	/>
 	<span class="text-sm">{label}</span>
 </Label>
