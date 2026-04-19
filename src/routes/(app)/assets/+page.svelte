@@ -9,8 +9,8 @@
 	import Link from '$lib/components/link.svelte';
 	import Number from '$lib/components/number.svelte';
 	import Page from '$lib/components/page.svelte';
-	import SectionTitle from '$lib/components/section-title.svelte';
 	import RecordLink from '$lib/components/record-link.svelte';
+	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';

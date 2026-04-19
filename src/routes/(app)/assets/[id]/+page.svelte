@@ -31,6 +31,7 @@
 		AssetsTypeOptions
 	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+	import { sanitizeFromParam } from '$lib/utils';
 
 	import BalanceForm from './balance-form.svelte';
 	import DetailsForm from './details-form.svelte';
@@ -218,6 +219,12 @@
 			syncState.lastSyncedData = { ...formData };
 
 			toast.success(m.assets_add_success());
+
+			const from = sanitizeFromParam(page.url.searchParams.get('from'));
+			if (from) {
+				// eslint-disable-next-line svelte/no-navigation-without-resolve -- sanitized dynamic ?from= redirect
+				await goto(from);
+			}
 		} catch (error) {
 			console.error('Failed to update balance:', error);
 			toast.error(m.assets_add_failed());
@@ -255,6 +262,12 @@
 			syncState.lastSyncedData = { ...formData };
 
 			toast.success(m.assets_edit_success());
+
+			const from = sanitizeFromParam(page.url.searchParams.get('from'));
+			if (from) {
+				// eslint-disable-next-line svelte/no-navigation-without-resolve -- sanitized dynamic ?from= redirect
+				await goto(from);
+			}
 		} catch (error) {
 			console.error('Failed to update asset:', error);
 			toast.error(m.assets_edit_failed());

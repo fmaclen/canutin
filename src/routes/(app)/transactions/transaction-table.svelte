@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
 	import Link from '$lib/components/link.svelte';
@@ -10,6 +11,12 @@
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import { getTransactionsContext, type TransactionSortColumn } from '$lib/transactions.svelte';
+
+	const fromQuery = $derived.by(() => {
+		const currentUrl = page.url;
+		if (!currentUrl) return '';
+		return `?from=${encodeURIComponent(currentUrl.pathname + currentUrl.search)}`;
+	});
 
 	const txContext = getTransactionsContext();
 
@@ -125,11 +132,16 @@
 						</Table.Cell>
 						<Table.Cell>
 							{#if row.description}
-								<Link href="/transactions/{row.id}" class="text-foreground/90 text-sm font-medium">
+								<Link
+									href="/transactions/{row.id}{fromQuery}"
+									class="text-foreground/90 text-sm font-medium"
+								>
 									{row.description}
 								</Link>
 							{:else}
-								<Link href="/transactions/{row.id}" class="text-muted-foreground text-sm">~</Link>
+								<Link href="/transactions/{row.id}{fromQuery}" class="text-muted-foreground text-sm"
+									>~</Link
+								>
 							{/if}
 						</Table.Cell>
 						<Table.Cell>

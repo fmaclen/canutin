@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import Link from '$lib/components/link.svelte';
 	import SharedIndicator from '$lib/components/shared-indicator.svelte';
 
@@ -20,7 +21,13 @@
 		wrapperClass = ''
 	}: Props = $props();
 
-	const href = $derived(type === 'account' ? `/accounts/${id}` : `/assets/${id}`);
+	const basePath = $derived(type === 'account' ? `/accounts/${id}` : `/assets/${id}`);
+	const href = $derived.by(() => {
+		const currentUrl = page.url;
+		if (!currentUrl) return basePath;
+		const from = currentUrl.pathname + currentUrl.search;
+		return `${basePath}?from=${encodeURIComponent(from)}`;
+	});
 	const sharedLabel = $derived(type === 'account' ? 'Shared account' : 'Shared asset');
 </script>
 

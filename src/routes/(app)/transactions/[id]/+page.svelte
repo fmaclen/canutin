@@ -32,6 +32,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import { AccountsBalanceGroupOptions, type TransactionsResponse } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+	import { sanitizeFromParam } from '$lib/utils';
 
 	const pb = getPocketBaseContext();
 	const auth = getAuthContext();
@@ -139,6 +140,12 @@
 
 			transaction = { ...transaction!, description: formData.description.trim() };
 			toast.success(m.transactions_edit_success());
+
+			const from = sanitizeFromParam(page.url.searchParams.get('from'));
+			if (from) {
+				// eslint-disable-next-line svelte/no-navigation-without-resolve -- sanitized dynamic ?from= redirect
+				await goto(from);
+			}
 		} catch (error) {
 			console.error('Failed to update transaction:', error);
 			toast.error(m.transactions_edit_failed());
