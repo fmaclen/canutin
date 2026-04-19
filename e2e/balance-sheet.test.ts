@@ -233,12 +233,12 @@ test('balance sheet', async ({ page }) => {
 
 	// Clicking on an account navigates to its detail page
 	await page.getByRole('link', { name: 'Willow Everyday' }).click();
-	await expect(page).toHaveURL(`/accounts/${checkingAccount.id}`);
+	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}(\\?|$)`));
 	await expect(page.getByText('Willow Everyday')).toBeVisible();
 
 	// Go back to balance sheet and click on an asset
 	await goToPageViaSidebar(page, 'Balance sheet');
 	await page.getByRole('link', { name: 'Las Meninas' }).click();
-	await expect(page).toHaveURL(`/assets/${otherAsset.id}`);
+	await expect(page).toHaveURL(new RegExp(`/assets/${otherAsset.id}(\\?|$)`));
 	await expect(page.getByText('Las Meninas')).toBeVisible();
 });

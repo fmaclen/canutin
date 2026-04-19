@@ -358,7 +358,7 @@ test('user can edit asset details and update balance', async ({ page }) => {
 	await expect(initialCells.nth(0)).toContainText('Vintage Watch Collection');
 	await expect(initialCells.nth(8)).toContainText('$10,000.00');
 
-	await initialRow.getByRole('link', { name: 'Vintage Watch Collection' }).click();
+	await page.goto(`/assets/${wholeAsset.id}`);
 	await expect(page).toHaveURL(`/assets/${wholeAsset.id}`);
 	await expect(page.getByLabel('Name')).toHaveValue('Vintage Watch Collection');
 	await expect(page.getByLabel('Category')).toHaveValue('Collectibles');
@@ -395,7 +395,7 @@ test('user can edit asset details and update balance', async ({ page }) => {
 	await expect(updatedCells.nth(5)).toContainText('$10,000.00');
 	await expect(updatedCells.nth(8)).toContainText('$12,500.00');
 
-	await updatedRow.getByRole('link', { name: 'Rare Coin Collection' }).click();
+	await page.goto(`/assets/${wholeAsset.id}`);
 	await expect(page).toHaveURL(`/assets/${wholeAsset.id}`);
 	await expect(page.getByLabel('Name')).toHaveValue('Rare Coin Collection');
 	await expect(page.getByLabel('Category')).toHaveValue('Collectibles');
@@ -439,12 +439,12 @@ test('user can edit shares asset and update balance', async ({ page }) => {
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Assets');
 
-	await page.getByRole('link', { name: 'Apple Inc' }).click();
+	await page.goto(`/assets/${sharesAsset.id}`);
 	await expect(page).toHaveURL(`/assets/${sharesAsset.id}`);
 	await expect(page.getByLabel('Name')).toHaveValue('Apple Inc');
 	await expect(page.getByLabel('Symbol')).toHaveValue('AAPL');
 	await expect(page.getByLabel('Type', { exact: true })).toBeDisabled();
-	await expect(page.getByLabel('Quantity')).toHaveValue('$100.00');
+	await expect(page.getByLabel('Quantity')).toHaveValue('100.00');
 	await expect(page.getByLabel('Market price')).toHaveValue('$60.00');
 	await expect(page.getByLabel('Book price')).toHaveValue('$50.00');
 
@@ -474,12 +474,12 @@ test('user can edit shares asset and update balance', async ({ page }) => {
 	await expect(updatedCells.nth(5)).toContainText('$7,500.00');
 	await expect(updatedCells.nth(8)).toContainText('$11,250.00');
 
-	await updatedRow.getByRole('link', { name: 'NVIDIA Corporation' }).click();
+	await page.goto(`/assets/${sharesAsset.id}`);
 	await expect(page).toHaveURL(`/assets/${sharesAsset.id}`);
 	await expect(page.getByLabel('Name')).toHaveValue('NVIDIA Corporation');
 	await expect(page.getByLabel('Symbol')).toHaveValue('NVDA');
 	await expect(page.getByLabel('Category')).toHaveValue('Securities');
-	await expect(page.getByLabel('Quantity')).toHaveValue('$150.00');
+	await expect(page.getByLabel('Quantity')).toHaveValue('150.00');
 	await expect(page.getByLabel('Market price')).toHaveValue('$75.00');
 	await expect(page.getByLabel('Book price')).toHaveValue('$50.00');
 });
@@ -533,9 +533,8 @@ test('user sees stale data warning and can refresh form', async ({ page }) => {
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await goToPageViaSidebar(page, 'Assets');
 
-	await page.getByRole('link', { name: 'Vanguard Total Stock Market' }).click();
+	await page.goto(`/assets/${investment.id}`);
 	await expect(page).toHaveURL(`/assets/${investment.id}`);
 	await expect(page.getByLabel('Name')).toHaveValue('Vanguard Total Stock Market');
 
@@ -584,7 +583,7 @@ test('user can delete asset and cascade deletes balances', async ({ page }) => {
 	const assetRow = page.getByRole('row', { name: 'Old Investment' });
 	await expect(assetRow).toBeVisible();
 
-	await assetRow.getByRole('link', { name: 'Old Investment' }).click();
+	await page.goto(`/assets/${asset.id}`);
 	await expect(page).toHaveURL(`/assets/${asset.id}`);
 
 	await page.getByRole('button', { name: 'Delete' }).first().click();

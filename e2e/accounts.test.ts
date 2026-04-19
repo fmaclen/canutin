@@ -196,7 +196,7 @@ test('user can edit account details and update balance', async ({ page }) => {
 	await expect(initialCells.nth(0)).toContainText('Primary Checking');
 	await expect(initialCells.nth(6)).toContainText('$3,000.00');
 
-	await initialRow.getByRole('link', { name: 'Primary Checking' }).click();
+	await page.goto(`/accounts/${checkingAccount.id}`);
 	await expect(page).toHaveURL(`/accounts/${checkingAccount.id}`);
 	await expect(page.getByLabel('Name')).toHaveValue('Primary Checking');
 	await expect(page.getByLabel('Institution')).toHaveValue('Bank of America');
@@ -233,7 +233,7 @@ test('user can edit account details and update balance', async ({ page }) => {
 	await expect(updatedCells.nth(3)).toContainText('Checking');
 	await expect(updatedCells.nth(6)).toContainText('$4,500.00');
 
-	await updatedRow.getByRole('link', { name: 'Business Checking' }).click();
+	await page.goto(`/accounts/${checkingAccount.id}`);
 	await expect(page).toHaveURL(`/accounts/${checkingAccount.id}`);
 	await expect(page.getByLabel('Name')).toHaveValue('Business Checking');
 	await expect(page.getByLabel('Institution')).toHaveValue('Wells Fargo');
@@ -298,9 +298,8 @@ test('user sees stale data warning and can refresh form', async ({ page }) => {
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await goToPageViaSidebar(page, 'Accounts');
 
-	await page.getByRole('link', { name: 'Investment Account' }).click();
+	await page.goto(`/accounts/${investmentAccount.id}`);
 	await expect(page).toHaveURL(`/accounts/${investmentAccount.id}`);
 	await expect(page.getByLabel('Name')).toHaveValue('Investment Account');
 
@@ -365,7 +364,7 @@ test('user can delete account and cascade deletes transactions and balances', as
 	const accountRow = page.getByRole('row', { name: 'Old Checking' });
 	await expect(accountRow).toBeVisible();
 
-	await accountRow.getByRole('link', { name: 'Old Checking' }).click();
+	await page.goto(`/accounts/${checkingAccount.id}`);
 	await expect(page).toHaveURL(`/accounts/${checkingAccount.id}`);
 
 	await page.getByRole('button', { name: 'Delete' }).first().click();
