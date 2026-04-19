@@ -76,10 +76,10 @@ test('shared inverse account mirrors balances and transactions while allowing re
 	await expect(transactionRow.getByText('$200.00')).toBeVisible();
 
 	await page.goto(`/accounts/${payableAccount.id}`);
-	await expect(page.getByLabel('Include in my net worth')).toBeChecked();
+	await expect(page.getByLabel('Include in net worth')).toBeChecked();
 
-	await page.getByLabel('Include in my net worth').uncheck();
-	await page.getByRole('button', { name: 'Save preferences' }).click();
+	await page.getByLabel('Include in net worth').uncheck();
+	await page.getByRole('button', { name: 'Save', exact: true }).click();
 	await expect(page.getByText('Preferences updated')).toBeVisible();
 
 	await page.goto('/');
@@ -134,10 +134,10 @@ test('shared inverse asset mirrors value fields while allowing recipient-only ne
 	await expect(assetCells.nth(8)).toContainText('-$12,000.00');
 
 	await page.goto(`/assets/${receivableAsset.id}`);
-	await expect(page.getByLabel('Include in my net worth')).toBeChecked();
+	await expect(page.getByLabel('Include in net worth')).toBeChecked();
 
-	await page.getByLabel('Include in my net worth').uncheck();
-	await page.getByRole('button', { name: 'Save preferences' }).click();
+	await page.getByLabel('Include in net worth').uncheck();
+	await page.getByRole('button', { name: 'Save', exact: true }).click();
 	await expect(page.getByText('Preferences updated')).toBeVisible();
 
 	await page.goto('/');
@@ -171,7 +171,7 @@ test('owner creates account share via UI and recipient sees it with NORMAL persp
 	await signIn(page, owner.email);
 
 	await page.goto(`/accounts/${jointAccount.id}`);
-	await page.getByLabel('Recipient email').fill(recipient.email);
+	await page.getByLabel('Email').fill(recipient.email);
 	// Perspective defaults to NORMAL; no need to change it
 	await page.getByRole('button', { name: 'Share', exact: true }).click();
 
@@ -363,10 +363,10 @@ test('shared account and asset detail views keep currency formatting for recipie
 	await signIn(page, recipient.email);
 
 	await page.goto(`/accounts/${account.id}`);
-	await expect(page.getByText('$1,200.00')).toBeVisible();
+	await expect(page.getByLabel('Balance', { exact: true })).toHaveValue('$1,200.00');
 
 	await page.goto(`/assets/${asset.id}`);
-	await expect(page.getByText('-$12,000.00')).toBeVisible();
+	await expect(page.getByLabel('Market value', { exact: true })).toHaveValue('-$12,000.00');
 });
 
 test('account share API rejects self-share, unknown recipient, duplicates, and missing fields', async () => {
@@ -447,6 +447,248 @@ test('account share API rejects self-share, unknown recipient, duplicates, and m
 		owner.email
 	);
 	expect(response.status).toBe(400);
+});
+
+test('recipient can leave a shared account via UI', async ({ page }) => {
+	const owner = await seedUser('olivia');
+	const recipient = await seedUser('peter');
+
+	const account = await seedAccount({
+		name: 'Leavable savings',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: owner.id,
+		balanceType: 'Savings'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: owner.id,
+		asOf: new Date().toISOString(),
+		value: 5000
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: owner.id,
+		date: new Date().toISOString(),
+		description: 'Leavable bill',
+		value: -45
+	});
+	await seedAccountShare({
+		account: account.id,
+		recipient: recipient.id,
+		recipientEmail: recipient.email,
+		grantedBy: owner.id,
+		accessRole: 'VIEWER',
+		perspective: 'NORMAL',
+		includeInNetWorth: true
+	});
+
+	await page.goto('/');
+	await signIn(page, recipient.email);
+
+	await goToPageViaSidebar(page, 'Accounts');
+	await expect(page.getByRole('row', { name: /Leavable savings/ })).toBeVisible();
+
+	await page.goto(`/accounts/${account.id}`);
+	await page.getByRole('button', { name: 'Leave' }).first().click();
+	await page.getByRole('button', { name: 'Continue' }).click();
+
+	await expect(page).toHaveURL(/\/accounts$/);
+	await expect(page.getByRole('row', { name: /Leavable savings/ })).toHaveCount(0);
+
+	await goToPageViaSidebar(page, 'Transactions');
+	await expect(page.getByRole('row', { name: /Leavable bill/ })).toHaveCount(0);
+});
+
+test('recipient can leave a shared asset via UI', async ({ page }) => {
+	const owner = await seedUser('quincy');
+	const recipient = await seedUser('rita');
+
+	const asset = await seedAsset({
+		name: 'Leavable brokerage',
+		balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
+		owner: owner.id,
+		balanceType: 'Brokerage',
+		type: AssetsTypeOptions.WHOLE
+	});
+	await seedAssetBalance({
+		asset: asset.id,
+		owner: owner.id,
+		asOf: new Date().toISOString(),
+		bookValue: 9000,
+		marketValue: 12000
+	});
+	await seedAssetShare({
+		asset: asset.id,
+		recipient: recipient.id,
+		recipientEmail: recipient.email,
+		grantedBy: owner.id,
+		accessRole: 'VIEWER',
+		perspective: 'NORMAL',
+		includeInNetWorth: true
+	});
+
+	await page.goto('/');
+	await signIn(page, recipient.email);
+
+	await goToPageViaSidebar(page, 'Assets');
+	await expect(page.getByRole('row', { name: /Leavable brokerage/ })).toBeVisible();
+
+	await page.goto(`/assets/${asset.id}`);
+	await page.getByRole('button', { name: 'Leave' }).first().click();
+	await page.getByRole('button', { name: 'Continue' }).click();
+
+	await expect(page).toHaveURL(/\/assets$/);
+	await expect(page.getByRole('row', { name: /Leavable brokerage/ })).toHaveCount(0);
+});
+
+test('recipient can delete their own account share via API', async () => {
+	const owner = await seedUser('sam');
+	const recipient = await seedUser('tina');
+
+	const account = await seedAccount({
+		name: 'Recipient-delete account',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: owner.id,
+		balanceType: 'Checking'
+	});
+	const share = await seedAccountShare({
+		account: account.id,
+		recipient: recipient.id,
+		recipientEmail: recipient.email,
+		grantedBy: owner.id,
+		accessRole: 'VIEWER',
+		perspective: 'NORMAL',
+		includeInNetWorth: true
+	});
+
+	const recipientPB = await getUserPB(recipient.email);
+	await recipientPB.collection('accountShares').delete(share.id);
+
+	await expect(recipientPB.collection('accountShares').getOne(share.id)).rejects.toThrow();
+});
+
+test('recipient can delete their own asset share via API', async () => {
+	const owner = await seedUser('ulysses');
+	const recipient = await seedUser('vera');
+
+	const asset = await seedAsset({
+		name: 'Recipient-delete asset',
+		balanceGroup: AssetsBalanceGroupOptions.OTHER,
+		owner: owner.id,
+		balanceType: 'Collectible',
+		type: AssetsTypeOptions.WHOLE
+	});
+	const share = await seedAssetShare({
+		asset: asset.id,
+		recipient: recipient.id,
+		recipientEmail: recipient.email,
+		grantedBy: owner.id,
+		accessRole: 'VIEWER',
+		perspective: 'NORMAL',
+		includeInNetWorth: true
+	});
+
+	const recipientPB = await getUserPB(recipient.email);
+	await recipientPB.collection('assetShares').delete(share.id);
+
+	await expect(recipientPB.collection('assetShares').getOne(share.id)).rejects.toThrow();
+});
+
+test('owner can still revoke a share after delete rule change', async () => {
+	const owner = await seedUser('walt');
+	const recipient = await seedUser('xena');
+
+	const account = await seedAccount({
+		name: 'Owner-revoke account',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: owner.id,
+		balanceType: 'Checking'
+	});
+	const share = await seedAccountShare({
+		account: account.id,
+		recipient: recipient.id,
+		recipientEmail: recipient.email,
+		grantedBy: owner.id,
+		accessRole: 'VIEWER',
+		perspective: 'NORMAL',
+		includeInNetWorth: true
+	});
+
+	const ownerPB = await getUserPB(owner.email);
+	await ownerPB.collection('accountShares').delete(share.id);
+
+	await expect(ownerPB.collection('accountShares').getOne(share.id)).rejects.toThrow();
+});
+
+test("a third user cannot delete someone else's share", async () => {
+	const owner = await seedUser('yuri');
+	const recipient = await seedUser('zoe');
+	const outsider = await seedUser('aaron');
+
+	const account = await seedAccount({
+		name: 'Guarded share',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: owner.id,
+		balanceType: 'Checking'
+	});
+	const share = await seedAccountShare({
+		account: account.id,
+		recipient: recipient.id,
+		recipientEmail: recipient.email,
+		grantedBy: owner.id,
+		accessRole: 'VIEWER',
+		perspective: 'NORMAL',
+		includeInNetWorth: true
+	});
+
+	const outsiderPB = await getUserPB(outsider.email);
+	await expect(outsiderPB.collection('accountShares').delete(share.id)).rejects.toThrow();
+});
+
+test('leaving a share leaves owner data intact', async () => {
+	const owner = await seedUser('brenda');
+	const recipient = await seedUser('colin');
+
+	const account = await seedAccount({
+		name: 'Owner-retained account',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: owner.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: owner.id,
+		asOf: new Date().toISOString(),
+		value: 7500
+	});
+	const transaction = await seedTransaction({
+		account: account.id,
+		owner: owner.id,
+		date: new Date().toISOString(),
+		description: 'Owner-retained transfer',
+		value: 100
+	});
+	const share = await seedAccountShare({
+		account: account.id,
+		recipient: recipient.id,
+		recipientEmail: recipient.email,
+		grantedBy: owner.id,
+		accessRole: 'VIEWER',
+		perspective: 'NORMAL',
+		includeInNetWorth: true
+	});
+
+	const recipientPB = await getUserPB(recipient.email);
+	await recipientPB.collection('accountShares').delete(share.id);
+
+	const ownerPB = await getUserPB(owner.email);
+	const ownerAccount = await ownerPB.collection('accounts').getOne(account.id);
+	expect(ownerAccount.name).toBe('Owner-retained account');
+
+	const ownerTransaction = await ownerPB.collection('transactions').getOne(transaction.id);
+	expect(ownerTransaction.description).toBe('Owner-retained transfer');
+
+	await expect(recipientPB.collection('accounts').getOne(account.id)).rejects.toThrow();
 });
 
 test('asset share API rejects self-share and unknown recipient', async () => {

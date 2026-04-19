@@ -19,9 +19,10 @@
 			closed: boolean;
 		};
 		onSubmit: () => void;
+		disabled?: boolean;
 	}
 
-	let { formData, onSubmit }: Props = $props();
+	let { formData, onSubmit, disabled = false }: Props = $props();
 </script>
 
 <div class="bg-muted border-border overflow-hidden rounded border">
@@ -36,7 +37,7 @@
 			<FormFieldRow>
 				<Label for="name" class="justify-start pr-0 md:justify-end">{m.accounts_label_name()}</Label
 				>
-				<Input id="name" bind:value={formData.name} required />
+				<Input id="name" bind:value={formData.name} required {disabled} />
 			</FormFieldRow>
 
 			<FormFieldRow>
@@ -46,7 +47,7 @@
 					>
 					<span class="text-muted-foreground text-sm">{m.accounts_text_optional()}</span>
 				</div>
-				<Input id="institution" bind:value={formData.institution} />
+				<Input id="institution" bind:value={formData.institution} {disabled} />
 			</FormFieldRow>
 
 			<FormFieldRow>
@@ -59,6 +60,7 @@
 					bind:value={formData.accountTypeName}
 					placeholder={m.accounts_category_placeholder()}
 					required
+					{disabled}
 				/>
 			</FormFieldRow>
 
@@ -66,7 +68,7 @@
 				<Label for="balance-group" class="justify-start pr-0 md:justify-end"
 					>{m.accounts_label_balance_group()}</Label
 				>
-				<Select.Root type="single" bind:value={formData.balanceGroup}>
+				<Select.Root type="single" bind:value={formData.balanceGroup} {disabled}>
 					<Select.Trigger id="balance-group" class="bg-background w-full">
 						{#if formData.balanceGroup}
 							<div class="flex items-center gap-2">
@@ -134,26 +136,33 @@
 				<div class="space-y-2">
 					<Label
 						for="excluded"
-						class="flex h-9 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
+						class="flex h-9 items-center gap-2 rounded border px-3 py-1 font-normal"
 					>
-						<Checkbox id="excluded" bind:checked={formData.excluded} class="bg-background" />
+						<Checkbox
+							id="excluded"
+							bind:checked={formData.excluded}
+							class="bg-background"
+							{disabled}
+						/>
 						<span>{m.accounts_label_exclude_from_net_worth()}</span>
 					</Label>
 					<Label
 						for="closed"
-						class="flex h-9 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
+						class="flex h-9 items-center gap-2 rounded border px-3 py-1 font-normal"
 					>
-						<Checkbox id="closed" bind:checked={formData.closed} class="bg-background" />
+						<Checkbox id="closed" bind:checked={formData.closed} class="bg-background" {disabled} />
 						<span>{m.accounts_label_closed()}</span>
 					</Label>
 				</div>
 			</FormFieldRow>
 		</Fieldset>
 
-		<footer class="border-border bg-border border-t p-2">
-			<div class="flex justify-end">
-				<Button type="submit">{m.accounts_button_save()}</Button>
-			</div>
-		</footer>
+		{#if !disabled}
+			<footer class="border-border bg-border border-t p-2">
+				<div class="flex justify-end">
+					<Button type="submit">{m.accounts_button_save()}</Button>
+				</div>
+			</footer>
+		{/if}
 	</form>
 </div>

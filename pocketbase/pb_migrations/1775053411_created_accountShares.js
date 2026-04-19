@@ -2,7 +2,7 @@
 migrate((app) => {
   const collection = new Collection({
     "createRule": "grantedBy = @request.auth.id && account.owner = @request.auth.id && recipient != @request.auth.id",
-    "deleteRule": "grantedBy = @request.auth.id",
+    "deleteRule": "grantedBy = @request.auth.id || recipient = @request.auth.id",
     "fields": [
       {
         "autogeneratePattern": "[a-z0-9]{15}",

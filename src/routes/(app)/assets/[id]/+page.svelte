@@ -9,7 +9,6 @@
 	import { getAuthContext } from '$lib/auth.svelte';
 	import { getBalanceTypesContext } from '$lib/balance-types.svelte';
 	import CheckboxLabel from '$lib/components/checkbox-label.svelte';
-	import Currency from '$lib/components/currency.svelte';
 	import Fieldset from '$lib/components/fieldset.svelte';
 	import FormFieldRow from '$lib/components/form-field-row.svelte';
 	import Page from '$lib/components/page.svelte';
@@ -312,6 +311,18 @@
 		}
 	}
 
+	async function handleLeaveShare() {
+		if (!incomingShare) return;
+		try {
+			await assetsContext.revokeShare(incomingShare.id);
+			toast.success('You left the shared asset');
+			goto(resolve('/assets'));
+		} catch (error) {
+			console.error('Failed to leave share:', error);
+			toast.error('Failed to leave share');
+		}
+	}
+
 	function perspectiveLabel(perspective: AssetSharesPerspectiveOptions) {
 		return perspective === AssetSharesPerspectiveOptions.INVERSE ? 'Inverse' : 'Normal';
 	}
@@ -340,19 +351,50 @@
 </header>
 
 <Page pageTitle={m.assets_edit_page_title()}>
+	{#if !isLoading && asset && !canWrite}
+		<Section>
+			<div class="bg-muted border-border overflow-hidden rounded border">
+				<div class="flex items-center justify-between p-4">
+					<div>
+						<p class="text-sm">This shared asset is read-only</p>
+						<p class="text-muted-foreground text-sm">
+							Stop following this asset and remove it from your views
+						</p>
+					</div>
+					<AlertDialog.Root>
+						<AlertDialog.Trigger>
+							<Button variant="outline">Leave</Button>
+						</AlertDialog.Trigger>
+						<AlertDialog.Content>
+							<AlertDialog.Header>
+								<AlertDialog.Title>Are you absolutely sure?</AlertDialog.Title>
+								<AlertDialog.Description>
+									You will no longer see this asset. The owner can share it with you again later.
+								</AlertDialog.Description>
+							</AlertDialog.Header>
+							<AlertDialog.Footer>
+								<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+								<AlertDialog.Action onclick={handleLeaveShare}>Continue</AlertDialog.Action>
+							</AlertDialog.Footer>
+						</AlertDialog.Content>
+					</AlertDialog.Root>
+				</div>
+			</div>
+		</Section>
+	{/if}
+
 	<Section>
 		<SectionTitle title={m.assets_section_balance()} />
 		{#if isLoading || !asset}
 			<Skeleton class="h-48" />
-		{:else if canWrite}
-			<BalanceForm {formData} {isWhole} {isShares} onSubmit={handleUpdateBalance} />
 		{:else}
-			<div class="bg-muted border-border rounded border p-4">
-				<p class="text-muted-foreground text-sm">This shared asset is read-only</p>
-				<p class="mt-3 text-2xl font-semibold">
-					<Currency value={asset.marketValue || asset.bookValue || 0} decimalScale={2} />
-				</p>
-			</div>
+			<BalanceForm
+				{formData}
+				{isWhole}
+				{isShares}
+				onSubmit={handleUpdateBalance}
+				disabled={!canWrite}
+			/>
 		{/if}
 	</Section>
 
@@ -360,20 +402,14 @@
 		<SectionTitle title={m.assets_section_details()} />
 		{#if isLoading || !asset}
 			<Skeleton class="h-96" />
-		{:else if canWrite}
-			<DetailsForm {formData} {isWhole} {isShares} onSubmit={handleUpdateDetails} />
 		{:else}
-			<div class="bg-muted border-border rounded border p-4 text-sm">
-				<div><strong>Name:</strong> {asset.name}</div>
-				<div class="mt-2">
-					<strong>Category:</strong>
-					{assetsContext.getTypeName(asset.balanceType)}
-				</div>
-				<div class="mt-2"><strong>Balance group:</strong> {asset.balanceGroup}</div>
-				{#if asset.symbol}
-					<div class="mt-2"><strong>Symbol:</strong> {asset.symbol}</div>
-				{/if}
-			</div>
+			<DetailsForm
+				{formData}
+				{isWhole}
+				{isShares}
+				onSubmit={handleUpdateDetails}
+				disabled={!canWrite}
+			/>
 		{/if}
 	</Section>
 
@@ -392,9 +428,7 @@
 				>
 					<Fieldset isFirst={true}>
 						<FormFieldRow>
-							<Label for="share-email" class="justify-start pr-0 md:justify-end"
-								>Recipient email</Label
-							>
+							<Label for="share-email" class="justify-start pr-0 md:justify-end">Email</Label>
 							<Input id="share-email" bind:value={shareRecipientEmail} type="email" required />
 						</FormFieldRow>
 
@@ -416,7 +450,7 @@
 
 					<Fieldset>
 						<FormFieldRow itemsAlignment="items-start">
-							<Label class="justify-start pr-0 md:justify-end md:pt-2.5">Current shares</Label>
+							<Label class="justify-start pr-0 md:justify-end md:pt-2.5">Shares</Label>
 							<div class="space-y-2">
 								{#if grantedShares.length === 0}
 									<p class="text-muted-foreground text-sm">No shares yet</p>
@@ -464,16 +498,16 @@
 				>
 					<Fieldset isFirst={true}>
 						<FormFieldRow>
-							<Label class="justify-start pr-0 md:justify-end">Perspective</Label>
-							<p class="text-sm">{perspectiveLabel(asset.perspective)}</p>
+							<Label for="perspective" class="justify-start pr-0 md:justify-end">Perspective</Label>
+							<Input id="perspective" value={perspectiveLabel(asset.perspective)} disabled />
 						</FormFieldRow>
 
 						<FormFieldRow itemsAlignment="items-start">
-							<Label class="justify-start pr-0 md:justify-end md:pt-2.5">Preferences</Label>
+							<Label class="justify-start pr-0 md:justify-end md:pt-2.5">Marked as</Label>
 							<CheckboxLabel
 								id="include-in-net-worth"
 								bind:checked={includeInNetWorth}
-								label="Include in my net worth"
+								label="Include in net worth"
 								class="bg-background"
 							/>
 						</FormFieldRow>
@@ -481,7 +515,7 @@
 
 					<footer class="border-border bg-border border-t p-2">
 						<div class="flex justify-end">
-							<Button type="submit">Save preferences</Button>
+							<Button type="submit">Save</Button>
 						</div>
 					</footer>
 				</form>
