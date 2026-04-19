@@ -197,7 +197,7 @@ test('user can edit account details and update balance', async ({ page }) => {
 	await expect(initialCells.nth(6)).toContainText('$3,000.00');
 
 	await initialRow.getByRole('link', { name: 'Primary Checking' }).click();
-	await expect(page).toHaveURL(`/accounts/${checkingAccount.id}`);
+	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}(\\?|$)`));
 	await expect(page.getByLabel('Name')).toHaveValue('Primary Checking');
 	await expect(page.getByLabel('Institution')).toHaveValue('Bank of America');
 	await expect(page.getByLabel('Category')).toHaveValue('Checking');
@@ -214,41 +214,51 @@ test('user can edit account details and update balance', async ({ page }) => {
 			'This account has been updated elsewhere and your changes may be based on outdated data'
 		)
 	).not.toBeVisible();
-	await expect(page.getByLabel('breadcrumb').getByText('Business Checking')).toBeVisible();
-
-	await page.getByLabel('Balance', { exact: true }).fill('4500');
-	await page.getByRole('button', { name: 'Update' }).click();
-	await expect(page.getByText('Account added successfully')).toBeVisible();
-
-	await page.getByLabel('breadcrumb').getByRole('link', { name: 'Accounts' }).click();
 	await expect(page).toHaveURL('/accounts');
 	await expect(page.getByRole('row', { name: 'Primary Checking' })).not.toBeVisible();
 
-	const updatedRow = page.getByRole('row', { name: 'Business Checking' });
-	await expect(updatedRow).toBeVisible();
+	const renamedRow = page.getByRole('row', { name: 'Business Checking' });
+	await expect(renamedRow).toBeVisible();
 
-	const updatedCells = updatedRow.locator('td');
-	await expect(updatedCells.nth(0)).toContainText('Business Checking');
-	await expect(updatedCells.nth(1)).toContainText('Wells Fargo');
-	await expect(updatedCells.nth(3)).toContainText('Checking');
-	await expect(updatedCells.nth(6)).toContainText('$4,500.00');
+	const renamedCells = renamedRow.locator('td');
+	await expect(renamedCells.nth(0)).toContainText('Business Checking');
+	await expect(renamedCells.nth(1)).toContainText('Wells Fargo');
+	await expect(renamedCells.nth(3)).toContainText('Checking');
+	await expect(renamedCells.nth(6)).toContainText('$3,000.00');
 
-	await updatedRow.getByRole('link', { name: 'Business Checking' }).click();
-	await expect(page).toHaveURL(`/accounts/${checkingAccount.id}`);
+	await renamedRow.getByRole('link', { name: 'Business Checking' }).click();
+	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}(\\?|$)`));
 	await expect(page.getByLabel('Name')).toHaveValue('Business Checking');
 	await expect(page.getByLabel('Institution')).toHaveValue('Wells Fargo');
 	await expect(page.getByLabel('Category')).toHaveValue('Checking');
 	await expect(page.getByLabel('Balance group')).toHaveText('Cash');
 	await expect(page.getByLabel('Exclude from net worth')).not.toBeChecked();
 
+	await page.getByLabel('Balance', { exact: true }).fill('4500');
+	await page.getByRole('button', { name: 'Update' }).click();
+	await expect(page.getByText('Account added successfully')).toBeVisible();
+	await expect(page).toHaveURL('/accounts');
+	await expect(
+		page.getByRole('row', { name: 'Business Checking' }).locator('td').nth(6)
+	).toContainText('$4,500.00');
+
+	await page.getByRole('row', { name: 'Business Checking' }).getByRole('link').click();
+	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}(\\?|$)`));
 	await page.getByLabel('Exclude from net worth').check();
 	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(page.getByText('Account updated successfully').first()).toBeVisible();
-	await expect(page.getByLabel('Exclude from net worth')).toBeChecked();
+	await expect(page).toHaveURL('/accounts');
 
+	await page.getByRole('row', { name: 'Business Checking' }).getByRole('link').click();
+	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}(\\?|$)`));
+	await expect(page.getByLabel('Exclude from net worth')).toBeChecked();
 	await page.getByLabel('Exclude from net worth').uncheck();
 	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(page.getByText('Account updated successfully').first()).toBeVisible();
+	await expect(page).toHaveURL('/accounts');
+
+	await page.getByRole('row', { name: 'Business Checking' }).getByRole('link').click();
+	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}(\\?|$)`));
 	await expect(page.getByLabel('Exclude from net worth')).not.toBeChecked();
 });
 
@@ -301,7 +311,7 @@ test('user sees stale data warning and can refresh form', async ({ page }) => {
 	await goToPageViaSidebar(page, 'Accounts');
 
 	await page.getByRole('link', { name: 'Investment Account' }).click();
-	await expect(page).toHaveURL(`/accounts/${investmentAccount.id}`);
+	await expect(page).toHaveURL(new RegExp(`/accounts/${investmentAccount.id}(\\?|$)`));
 	await expect(page.getByLabel('Name')).toHaveValue('Investment Account');
 
 	await page.getByLabel('Name').fill('My Investment Account');
@@ -366,7 +376,7 @@ test('user can delete account and cascade deletes transactions and balances', as
 	await expect(accountRow).toBeVisible();
 
 	await accountRow.getByRole('link', { name: 'Old Checking' }).click();
-	await expect(page).toHaveURL(`/accounts/${checkingAccount.id}`);
+	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}(\\?|$)`));
 
 	await page.getByRole('button', { name: 'Delete' }).first().click();
 	const dialog = page.getByRole('alertdialog');
