@@ -125,7 +125,7 @@
 				<Label id="type-label" for="type" class="justify-start pr-0 md:justify-end"
 					>{m.assets_label_type()}</Label
 				>
-				<Select.Root type="single" bind:value={formData.type} {disabled}>
+				<Select.Root type="single" bind:value={formData.type} disabled>
 					<Select.Trigger
 						id="type"
 						name="type"
