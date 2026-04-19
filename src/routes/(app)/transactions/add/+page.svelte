@@ -33,7 +33,7 @@
 	const accountsContext = getAccountsContext();
 
 	const ownerId = $derived(auth.currentUser?.record?.id);
-	const openAccounts = $derived(accountsContext.accounts.filter((a) => !a.closed));
+	const openAccounts = $derived(accountsContext.accounts.filter((a) => !a.closed && a.canWrite));
 
 	const groupMeta = getBalanceGroupMeta();
 	const accountsByGroup = $derived(groupAccountsByBalanceGroup(openAccounts));

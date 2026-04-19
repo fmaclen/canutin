@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
-import { authenticateAsUser, pbSend, seedUser } from './pocketbase.helpers';
+import { getUserPB, pbSend, seedUser } from './pocketbase.helpers';
 
 function importPayload(sessionLabel: string) {
 	return {
@@ -265,7 +265,7 @@ test('reverting an import deletes its records and updates status', async ({ page
 
 	await expect(page.getByText('Rolled back')).toBeVisible();
 
-	const pb = await authenticateAsUser(user.email);
+	const pb = await getUserPB(user.email);
 	const transactions = await pb.collection('transactions').getFullList({
 		filter: `owner = "${user.id}"`
 	});
@@ -346,7 +346,7 @@ test('revert cleans up orphaned labels and balance types', async () => {
 	).json();
 	expect(result.transactions.created).toBe(3);
 
-	const pb = await authenticateAsUser(user.email);
+	const pb = await getUserPB(user.email);
 
 	const labelsBefore = await pb.collection('transactionLabels').getFullList({
 		filter: `owner = "${user.id}"`

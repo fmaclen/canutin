@@ -3,15 +3,6 @@ import path from 'node:path';
 import { Database } from 'bun:sqlite';
 import PocketBase from 'pocketbase';
 
-const PB_HOST = '127.0.0.1';
-const PB_PORT = 42070;
-const PB_SUPERUSER_EMAIL = 'superadmin@example.com';
-const PB_SUPERUSER_PASSWORD = '123qweasdzxc';
-// Temporary import user; records will be owned by this user
-const IMPORT_EMAIL = 'import@example.com';
-const IMPORT_PASSWORD = '123qweasdzxc';
-const PB_BASE_URL = `http://${PB_HOST}:${PB_PORT}`;
-
 function log(msg: string) {
 	console.log(`[pb:import] ${msg}`);
 }
@@ -86,13 +77,132 @@ function normalizeDateOr(primary: unknown, fallback?: unknown): string | undefin
 	return toISODate(primary) ?? toISODate(fallback ?? '') ?? undefined;
 }
 
+type ImportOptions = {
+	vaultPath: string;
+	email: string | null;
+	password: string | null;
+	name: string | null;
+	pbBaseUrl: string | null;
+	superuserEmail: string | null;
+	superuserPassword: string | null;
+};
+
+function parseArgs(args: string[]): ImportOptions | null {
+	const positional: string[] = [];
+	let email: string | null = null;
+	let password: string | null = null;
+	let name: string | null = null;
+	let pbBaseUrl: string | null = null;
+	let superuserEmail: string | null = null;
+	let superuserPassword: string | null = null;
+
+	for (let i = 0; i < args.length; i += 1) {
+		const arg = args[i];
+
+		if (arg === '--help' || arg === '-h') {
+			return null;
+		}
+
+		if (arg === '--email') {
+			email = args[i + 1] ?? null;
+			i += 1;
+			continue;
+		}
+
+		if (arg === '--password') {
+			password = args[i + 1] ?? null;
+			i += 1;
+			continue;
+		}
+
+		if (arg === '--name') {
+			name = args[i + 1] ?? null;
+			i += 1;
+			continue;
+		}
+
+		if (arg === '--pb-url') {
+			pbBaseUrl = args[i + 1] ?? pbBaseUrl;
+			i += 1;
+			continue;
+		}
+
+		if (arg === '--superuser-email') {
+			superuserEmail = args[i + 1] ?? superuserEmail;
+			i += 1;
+			continue;
+		}
+
+		if (arg === '--superuser-password') {
+			superuserPassword = args[i + 1] ?? superuserPassword;
+			i += 1;
+			continue;
+		}
+
+		if (arg.startsWith('--')) {
+			throw new Error(`Unknown option: ${arg}`);
+		}
+
+		positional.push(arg);
+	}
+
+	if (positional.length < 1) {
+		throw new Error(
+			'Missing required path to .vault file. Example: bun pb:import temp/Canutin.demo.vault --email calypso@example.com --password hunter2'
+		);
+	}
+
+	if (!email?.trim()) {
+		throw new Error('Missing required --email option');
+	}
+
+	if (!pbBaseUrl?.trim()) {
+		throw new Error('Missing required --pb-url option');
+	}
+
+	if (!superuserEmail?.trim()) {
+		throw new Error('Missing required --superuser-email option');
+	}
+
+	if (!superuserPassword?.trim()) {
+		throw new Error('Missing required --superuser-password option');
+	}
+
+	return {
+		vaultPath: path.resolve(positional[0]),
+		email: email.trim(),
+		password: password?.trim() ? password.trim() : null,
+		name: name?.trim() ? name.trim() : null,
+		pbBaseUrl: pbBaseUrl.trim(),
+		superuserEmail: superuserEmail.trim(),
+		superuserPassword: superuserPassword.trim()
+	};
+}
+
+function printUsage() {
+	log(
+		'Usage: bun pb:import <vault-path> --email <user-email> --pb-url <url> --superuser-email <email> --superuser-password <password> [--password <password>] [--name <display-name>]'
+	);
+	log('If the user does not exist yet, --password is required and the user will be created.');
+}
+
 async function main() {
-	const args = process.argv.slice(2);
-	if (args.length < 1) {
-		error('Missing required path to .vault file. Example: bun pb:import temp/Canutin.demo.vault');
+	let options: ImportOptions | null;
+	try {
+		options = parseArgs(process.argv.slice(2));
+	} catch (err) {
+		error(err instanceof Error ? err.message : 'Failed to parse arguments');
+		printUsage();
 		process.exit(1);
 	}
-	const vaultPath = path.resolve(args[0]);
+
+	if (!options) {
+		printUsage();
+		process.exit(0);
+	}
+
+	const { vaultPath, email, password, name, pbBaseUrl, superuserEmail, superuserPassword } =
+		options;
 
 	try {
 		await fs.access(vaultPath);
@@ -105,44 +215,40 @@ async function main() {
 	const db = new Database(vaultPath, { readonly: true });
 
 	// Prepare PocketBase client
-	const pb = new PocketBase(PB_BASE_URL);
+	const pb = new PocketBase(pbBaseUrl);
 
-	log(`Authenticating as superuser at ${PB_BASE_URL} ...`);
+	log(`Authenticating as superuser at ${pbBaseUrl} ...`);
 	try {
 		// With PB >=0.23 superusers are a system auth collection
-		await pb.collection('_superusers').authWithPassword(PB_SUPERUSER_EMAIL, PB_SUPERUSER_PASSWORD);
+		await pb.collection('_superusers').authWithPassword(superuserEmail, superuserPassword);
 	} catch (e) {
 		error(`Failed to authenticate: ${(e as Error).message}`);
 		process.exit(1);
 	}
 
-	// Ensure/import user exists, then authenticate as that user to own imported data
-	let importUserId: string | null = null;
+	// Ensure target user exists, then import records owned by that user.
+	let ownerId: string | null = null;
 	try {
 		const existing = await pb
 			.collection('users')
-			.getFirstListItem(`email = ${JSON.stringify(IMPORT_EMAIL)}`);
-		importUserId = existing.id;
-		log(`Found import user: ${IMPORT_EMAIL} (${importUserId})`);
+			.getFirstListItem(`email = ${JSON.stringify(email)}`);
+		ownerId = existing.id;
+		log(`Found target user: ${email} (${ownerId})`);
 	} catch {
-		log(`Creating import user: ${IMPORT_EMAIL}`);
+		if (!password) {
+			error(`Target user ${email} does not exist and no --password was provided`);
+			process.exit(1);
+		}
+
+		log(`Creating target user: ${email}`);
 		const created = await pb.collection('users').create({
-			email: IMPORT_EMAIL,
-			password: IMPORT_PASSWORD,
-			passwordConfirm: IMPORT_PASSWORD
+			email,
+			name: name ?? undefined,
+			password,
+			passwordConfirm: password
 		});
-		importUserId = created.id;
+		ownerId = created.id;
 	}
-
-	// Clear superuser auth before authenticating as import user
-	pb.authStore.clear();
-
-	// Authenticate as import user so create/update rules using @request.auth.id pass
-	await pb.collection('users').authWithPassword(IMPORT_EMAIL, IMPORT_PASSWORD);
-	if (!pb.authStore.model) {
-		throw new Error('Failed to authenticate as import user');
-	}
-	log(`Authenticated as import user (${pb.authStore.model.id})`);
 
 	// Helpers: upsert by name and cache ids (per-user scope)
 	const balanceTypeIdByName = new Map<string, string>();
@@ -154,13 +260,11 @@ async function main() {
 		try {
 			const existing = await pb
 				.collection('balanceTypes')
-				.getFirstListItem(`name = ${JSON.stringify(key)}`);
+				.getFirstListItem(`name = ${JSON.stringify(key)} && owner = ${JSON.stringify(ownerId)}`);
 			balanceTypeIdByName.set(key, existing.id);
 			return existing.id;
 		} catch {
-			const created = await pb
-				.collection('balanceTypes')
-				.create({ name: key, owner: importUserId });
+			const created = await pb.collection('balanceTypes').create({ name: key, owner: ownerId });
 			balanceTypeIdByName.set(key, created.id);
 			return created.id;
 		}
@@ -172,13 +276,13 @@ async function main() {
 		try {
 			const existing = await pb
 				.collection('transactionLabels')
-				.getFirstListItem(`name = ${JSON.stringify(key)}`);
+				.getFirstListItem(`name = ${JSON.stringify(key)} && owner = ${JSON.stringify(ownerId)}`);
 			txLabelIdByName.set(key, existing.id);
 			return existing.id;
 		} catch {
 			const created = await pb
 				.collection('transactionLabels')
-				.create({ name: key, owner: importUserId });
+				.create({ name: key, owner: ownerId });
 			txLabelIdByName.set(key, created.id);
 			return created.id;
 		}
@@ -317,7 +421,7 @@ async function main() {
 			autoCalculated: autoDate,
 			// Legacy flag maps to datetime; prefer creation, fallback update, then now
 			excluded: excludedDate,
-			owner: importUserId
+			owner: ownerId
 		};
 
 		// BalanceType in PB is used to indicate computation mode such as "Auto-calculated".
@@ -355,7 +459,7 @@ async function main() {
 				? (normalizeDateOr(a.updatedAt, a.createdAt) ?? toISODate(new Date().toISOString()))
 				: undefined,
 			excluded: a.isExcludedFromNetWorth ? toISODate(a.updatedAt) : undefined,
-			owner: importUserId
+			owner: ownerId
 		};
 		if (typeName) data.balanceType = await upsertBalanceType(typeName);
 
@@ -376,7 +480,7 @@ async function main() {
 			account: pbAccountId,
 			value: s.value,
 			asOf: toISODate(s.createdAt),
-			owner: importUserId
+			owner: ownerId
 		};
 		try {
 			await pb.collection('accountBalances').create(balData);
@@ -395,7 +499,7 @@ async function main() {
 			quantity: s.quantity || undefined,
 			bookValue: s.cost || undefined,
 			asOf: toISODate(s.createdAt),
-			owner: importUserId
+			owner: ownerId
 		};
 		try {
 			await pb.collection('assetBalances').create(balData);
@@ -432,7 +536,7 @@ async function main() {
 			value: t.value,
 			excluded: exDate,
 			labels,
-			owner: importUserId
+			owner: ownerId
 		};
 		try {
 			await pb.collection('transactions').create(data);

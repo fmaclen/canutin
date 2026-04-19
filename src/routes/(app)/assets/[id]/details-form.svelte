@@ -22,9 +22,10 @@
 		isWhole: boolean;
 		isShares: boolean;
 		onSubmit: () => void;
+		disabled?: boolean;
 	}
 
-	let { formData, isWhole, isShares, onSubmit }: Props = $props();
+	let { formData, isWhole, isShares, onSubmit, disabled = false }: Props = $props();
 </script>
 
 <div class="bg-muted border-border overflow-hidden rounded border">
@@ -38,7 +39,7 @@
 		<Fieldset isFirst={true}>
 			<FormFieldRow>
 				<Label for="name" class="justify-start pr-0 md:justify-end">{m.assets_label_name()}</Label>
-				<Input id="name" bind:value={formData.name} required />
+				<Input id="name" bind:value={formData.name} required {disabled} />
 			</FormFieldRow>
 
 			<FormFieldRow>
@@ -51,6 +52,7 @@
 					bind:value={formData.assetTypeName}
 					placeholder={m.assets_category_placeholder()}
 					required
+					{disabled}
 				/>
 			</FormFieldRow>
 
@@ -58,7 +60,7 @@
 				<Label for="balance-group" class="justify-start pr-0 md:justify-end"
 					>{m.assets_label_balance_group()}</Label
 				>
-				<Select.Root type="single" bind:value={formData.balanceGroup}>
+				<Select.Root type="single" bind:value={formData.balanceGroup} {disabled}>
 					<Select.Trigger id="balance-group" class="bg-background w-full">
 						{#if formData.balanceGroup}
 							<div class="flex items-center gap-2">
@@ -123,13 +125,12 @@
 				<Label id="type-label" for="type" class="justify-start pr-0 md:justify-end"
 					>{m.assets_label_type()}</Label
 				>
-				<Select.Root type="single" bind:value={formData.type}>
+				<Select.Root type="single" bind:value={formData.type} disabled>
 					<Select.Trigger
 						id="type"
 						name="type"
 						aria-labelledby="type-label"
 						class="bg-background w-full"
-						disabled={true}
 					>
 						{#if isWhole}
 							{m.assets_type_whole_label()}
@@ -156,7 +157,7 @@
 						>
 						<span class="text-muted-foreground text-sm">{m.assets_text_optional()}</span>
 					</div>
-					<Input id="symbol" bind:value={formData.symbol} />
+					<Input id="symbol" bind:value={formData.symbol} {disabled} />
 				</FormFieldRow>
 			{/if}
 		</Fieldset>
@@ -169,26 +170,33 @@
 				<div class="space-y-2">
 					<Label
 						for="excluded"
-						class="flex h-9 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
+						class="flex h-9 items-center gap-2 rounded border px-3 py-1 font-normal"
 					>
-						<Checkbox id="excluded" bind:checked={formData.excluded} class="bg-background" />
+						<Checkbox
+							id="excluded"
+							bind:checked={formData.excluded}
+							class="bg-background"
+							{disabled}
+						/>
 						<span>{m.assets_label_exclude_from_net_worth()}</span>
 					</Label>
 					<Label
 						for="sold"
-						class="flex h-9 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
+						class="flex h-9 items-center gap-2 rounded border px-3 py-1 font-normal"
 					>
-						<Checkbox id="sold" bind:checked={formData.sold} class="bg-background" />
+						<Checkbox id="sold" bind:checked={formData.sold} class="bg-background" {disabled} />
 						<span>{m.assets_label_sold()}</span>
 					</Label>
 				</div>
 			</FormFieldRow>
 		</Fieldset>
 
-		<footer class="border-border bg-border border-t p-2">
-			<div class="flex justify-end">
-				<Button type="submit">{m.assets_button_save()}</Button>
-			</div>
-		</footer>
+		{#if !disabled}
+			<footer class="border-border bg-border border-t p-2">
+				<div class="flex justify-end">
+					<Button type="submit">{m.assets_button_save()}</Button>
+				</div>
+			</footer>
+		{/if}
 	</form>
 </div>

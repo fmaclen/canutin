@@ -23,7 +23,7 @@ async function getAdminPB(): Promise<TypedPocketBase> {
 	return pb;
 }
 
-export async function authenticateAsUser(email: string) {
+export async function getUserPB(email: string): Promise<TypedPocketBase> {
 	const pb = new PocketBase(PB_URL) as TypedPocketBase;
 	await pb.collection('users').authWithPassword(email, DEFAULT_PASSWORD);
 	return pb;
@@ -32,7 +32,7 @@ export async function authenticateAsUser(email: string) {
 export async function pbSend(path: string, body: Record<string, unknown>, email?: string) {
 	const headers: Record<string, string> = { 'Content-Type': 'application/json' };
 	if (email) {
-		const pb = await authenticateAsUser(email);
+		const pb = await getUserPB(email);
 		headers['Authorization'] = `Bearer ${pb.authStore.token}`;
 	}
 	return fetch(`${PB_URL}${path}`, {
@@ -180,6 +180,35 @@ export async function seedTransaction(transactionInput: {
 }) {
 	const pb = await getAdminPB();
 	return await pb.collection('transactions').create(transactionInput);
+}
+
+type SharePerspective = 'NORMAL' | 'INVERSE';
+type ShareAccessRole = 'VIEWER';
+
+export async function seedAccountShare(shareInput: {
+	account: string;
+	recipient: string;
+	recipientEmail: string;
+	grantedBy: string;
+	accessRole: ShareAccessRole;
+	perspective: SharePerspective;
+	includeInNetWorth: boolean;
+}) {
+	const pb = await getAdminPB();
+	return await pb.collection('accountShares').create(shareInput);
+}
+
+export async function seedAssetShare(shareInput: {
+	asset: string;
+	recipient: string;
+	recipientEmail: string;
+	grantedBy: string;
+	accessRole: ShareAccessRole;
+	perspective: SharePerspective;
+	includeInNetWorth: boolean;
+}) {
+	const pb = await getAdminPB();
+	return await pb.collection('assetShares').create(shareInput);
 }
 
 export async function recordExists(collection: string, id: string): Promise<boolean> {

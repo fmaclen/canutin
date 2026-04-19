@@ -22,7 +22,9 @@ func main() {
 	})
 
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{
-		Automigrate: true,
+		Automigrate:  true,
+		TemplateLang: migratecmd.TemplateLangJS,
+		Dir:          "pb_migrations",
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -61,6 +63,20 @@ func main() {
 			return handleRevert(e.App, re)
 		}).Bind(apis.RequireAuth())
 
+		e.Router.POST("/api/shares/accounts", createAccountShareHandler(e.App)).Bind(
+			apis.RequireAuth("users"),
+		)
+		e.Router.POST("/api/shares/assets", createAssetShareHandler(e.App)).Bind(
+			apis.RequireAuth("users"),
+		)
+
+		return e.Next()
+	})
+
+	app.OnRecordUpdateRequest("accountShares", "assetShares").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := validateShareUpdateRequest(e); err != nil {
+			return err
+		}
 		return e.Next()
 	})
 

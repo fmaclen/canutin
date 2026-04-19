@@ -52,7 +52,7 @@
 		marketValue: number;
 		typeName: string;
 		balanceGroup: BalanceGroup;
-		excluded: boolean;
+		participantExcluded: boolean;
 		sold: boolean;
 		gain: number;
 		gainPercent: number;
@@ -125,7 +125,7 @@
 			marketValue: asset.marketValue ?? 0,
 			typeName: assetsContext.getTypeName(asset.balanceType),
 			balanceGroup: asset.balanceGroup as BalanceGroup,
-			excluded: Boolean(asset.excluded),
+			participantExcluded: asset.participantExcluded,
 			sold: Boolean(asset.sold),
 			gain: asset.gain ?? 0,
 			gainPercent: asset.gainPercent ?? 0
@@ -157,7 +157,8 @@
 		for (const option of filters) {
 			const rows = rowsByFilter.get(option.key) ?? [];
 			const total = rows.reduce(
-				(sum, row) => sum + (option.key === 'owned' && row.excluded ? 0 : row.marketValue),
+				(sum, row) =>
+					sum + (option.key === 'owned' && row.participantExcluded ? 0 : row.marketValue),
 				0
 			);
 			totals.set(option.key, total);
@@ -168,7 +169,7 @@
 	const isLoaded = $derived(assetsContext.lastBalanceEvent !== 0);
 
 	function balanceSentiment(row: AssetRow) {
-		if (row.sold || row.excluded) return 'neutral';
+		if (row.sold || row.participantExcluded) return 'neutral';
 		if (row.marketValue === 0) return 'neutral';
 		if (row.balanceGroup === 'DEBT') return 'negative';
 		return 'positive';
@@ -190,7 +191,7 @@
 
 	function statusBadges(row: AssetRow) {
 		const statuses: StatusBadge[] = [];
-		if (row.excluded) statuses.push({ id: 'excluded', ...statusMeta.excluded });
+		if (row.participantExcluded) statuses.push({ id: 'excluded', ...statusMeta.excluded });
 		if (row.sold) statuses.push({ id: 'sold', ...statusMeta.sold });
 		return statuses;
 	}
@@ -309,7 +310,7 @@
 									</Table.Header>
 									<Table.Body>
 										{#each rowsForOption as row (row.id)}
-											<Table.Row class={row.excluded || row.sold ? 'bg-muted/30' : ''}>
+											<Table.Row class={row.participantExcluded || row.sold ? 'bg-muted/30' : ''}>
 												<Table.Cell>
 													<Link
 														href={`/assets/${row.id}`}
@@ -384,7 +385,7 @@
 													/>
 												</Table.Cell>
 												<Table.Cell class="text-right tabular-nums">
-													{#if row.excluded || row.sold}
+													{#if row.participantExcluded || row.sold}
 														<Tooltip.Root>
 															<Tooltip.Trigger
 																class="border-border inline-block border-b border-dashed hover:border-current"

@@ -8,17 +8,26 @@
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAuthContext } from '$lib/auth.svelte';
 	import { getBalanceTypesContext } from '$lib/balance-types.svelte';
+	import CheckboxLabel from '$lib/components/checkbox-label.svelte';
+	import Fieldset from '$lib/components/fieldset.svelte';
+	import FormFieldRow from '$lib/components/form-field-row.svelte';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import { Input } from '$lib/components/ui/input/index.js';
+	import { Label } from '$lib/components/ui/label/index.js';
+	import * as Select from '$lib/components/ui/select/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { m } from '$lib/paraglide/messages';
-	import { AccountsBalanceGroupOptions } from '$lib/pocketbase.schema';
+	import {
+		AccountsBalanceGroupOptions,
+		AccountSharesPerspectiveOptions
+	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 
 	import BalanceForm from './balance-form.svelte';
@@ -34,6 +43,9 @@
 
 	const account = $derived(accountId ? accountsContext.getAccount(accountId) : null);
 	const isLoading = $derived(accountsContext.isLoading);
+	const canWrite = $derived(Boolean(account?.canWrite));
+	const incomingShare = $derived(account ? accountsContext.getIncomingShare(account.id) : null);
+	const grantedShares = $derived(account ? accountsContext.getGrantedShares(account.id) : []);
 
 	let formData = $state({
 		name: '',
@@ -51,6 +63,11 @@
 		justSaved: false,
 		initialized: false
 	});
+	let shareRecipientEmail = $state('');
+	let sharePerspective = $state<AccountSharesPerspectiveOptions>(
+		AccountSharesPerspectiveOptions.NORMAL
+	);
+	let includeInNetWorth = $derived(incomingShare?.includeInNetWorth ?? true);
 
 	function isDirty(): boolean {
 		if (!syncState.lastSyncedData) return false;
@@ -86,16 +103,7 @@
 		await balanceTypesContext.ensureLoaded(accountData.balanceType);
 		newFormData.accountTypeName = balanceTypesContext.getName(accountData.balanceType);
 
-		// Get latest balance
-		try {
-			const res = await pb.authedClient.collection('accountBalances').getList(1, 1, {
-				filter: `account='${accountData.id}'`,
-				sort: '-asOf,-created,-id'
-			});
-			newFormData.value = res.items[0]?.value?.toString() ?? '';
-		} catch (error) {
-			console.error('Failed to load balance:', error);
-		}
+		newFormData.value = accountData.balance.toString();
 
 		formData = newFormData;
 		syncState.lastSyncedData = { ...newFormData };
@@ -220,6 +228,58 @@
 			toast.error(m.accounts_delete_failed());
 		}
 	}
+
+	async function handleCreateShare() {
+		if (!account || !canWrite) return;
+
+		try {
+			await accountsContext.createShare(account.id, shareRecipientEmail, sharePerspective);
+			shareRecipientEmail = '';
+			sharePerspective = AccountSharesPerspectiveOptions.NORMAL;
+			toast.success('Share created');
+		} catch (error) {
+			console.error('Failed to create share:', error);
+			toast.error(error instanceof Error ? error.message : 'Failed to create share');
+		}
+	}
+
+	async function handleUpdateRecipientPreference() {
+		if (!incomingShare) return;
+
+		try {
+			await accountsContext.updateShareIncludeInNetWorth(incomingShare.id, includeInNetWorth);
+			toast.success('Preferences updated');
+		} catch (error) {
+			console.error('Failed to update share preferences:', error);
+			toast.error('Failed to update preferences');
+		}
+	}
+
+	async function handleRevokeShare(shareId: string) {
+		try {
+			await accountsContext.revokeShare(shareId);
+			toast.success('Share removed');
+		} catch (error) {
+			console.error('Failed to revoke share:', error);
+			toast.error('Failed to remove share');
+		}
+	}
+
+	async function handleLeaveShare() {
+		if (!incomingShare) return;
+		try {
+			await accountsContext.revokeShare(incomingShare.id);
+			toast.success('You left the shared account');
+			goto(resolve('/accounts'));
+		} catch (error) {
+			console.error('Failed to leave share:', error);
+			toast.error('Failed to leave share');
+		}
+	}
+
+	function perspectiveLabel(perspective: AccountSharesPerspectiveOptions) {
+		return perspective === AccountSharesPerspectiveOptions.INVERSE ? 'Inverse' : 'Normal';
+	}
 </script>
 
 <header class="bg-background flex h-16 shrink-0 items-center gap-2 border-b">
@@ -245,12 +305,45 @@
 </header>
 
 <Page pageTitle={m.accounts_edit_page_title()}>
+	{#if !isLoading && account && !canWrite}
+		<Section>
+			<div class="bg-muted border-border overflow-hidden rounded border">
+				<div class="flex items-center justify-between p-4">
+					<div>
+						<p class="text-sm">This shared account is read-only</p>
+						<p class="text-muted-foreground text-sm">
+							Stop following this account and remove it from your views
+						</p>
+					</div>
+					<AlertDialog.Root>
+						<AlertDialog.Trigger>
+							<Button variant="outline">Leave</Button>
+						</AlertDialog.Trigger>
+						<AlertDialog.Content>
+							<AlertDialog.Header>
+								<AlertDialog.Title>Are you absolutely sure?</AlertDialog.Title>
+								<AlertDialog.Description>
+									You will no longer see this account or its transactions. The owner can share it
+									with you again later.
+								</AlertDialog.Description>
+							</AlertDialog.Header>
+							<AlertDialog.Footer>
+								<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+								<AlertDialog.Action onclick={handleLeaveShare}>Continue</AlertDialog.Action>
+							</AlertDialog.Footer>
+						</AlertDialog.Content>
+					</AlertDialog.Root>
+				</div>
+			</div>
+		</Section>
+	{/if}
+
 	<Section>
 		<SectionTitle title={m.accounts_section_balance()} />
 		{#if isLoading || !account}
 			<Skeleton class="h-48" />
 		{:else}
-			<BalanceForm {formData} onSubmit={handleUpdateBalance} />
+			<BalanceForm {formData} onSubmit={handleUpdateBalance} disabled={!canWrite} />
 		{/if}
 	</Section>
 
@@ -259,48 +352,160 @@
 		{#if isLoading || !account}
 			<Skeleton class="h-96" />
 		{:else}
-			<DetailsForm {formData} onSubmit={handleUpdateDetails} />
+			<DetailsForm {formData} onSubmit={handleUpdateDetails} disabled={!canWrite} />
 		{/if}
 	</Section>
 
 	<Section>
-		<SectionTitle title={m.danger_zone_title()} />
+		<SectionTitle title="Sharing" />
 		{#if isLoading || !account}
-			<Skeleton class="h-24" />
+			<Skeleton class="h-40" />
+		{:else if canWrite}
+			<div class="bg-muted border-border overflow-hidden rounded border">
+				<form
+					class="space-y-0"
+					onsubmit={(e) => {
+						e.preventDefault();
+						handleCreateShare();
+					}}
+				>
+					<Fieldset isFirst={true}>
+						<FormFieldRow>
+							<Label for="share-email" class="justify-start pr-0 md:justify-end">Email</Label>
+							<Input id="share-email" bind:value={shareRecipientEmail} type="email" required />
+						</FormFieldRow>
+
+						<FormFieldRow>
+							<Label for="share-perspective" class="justify-start pr-0 md:justify-end"
+								>Perspective</Label
+							>
+							<Select.Root type="single" bind:value={sharePerspective}>
+								<Select.Trigger id="share-perspective" class="bg-background w-full">
+									{perspectiveLabel(sharePerspective)}
+								</Select.Trigger>
+								<Select.Content>
+									<Select.Item value={AccountSharesPerspectiveOptions.NORMAL}>Normal</Select.Item>
+									<Select.Item value={AccountSharesPerspectiveOptions.INVERSE}>Inverse</Select.Item>
+								</Select.Content>
+							</Select.Root>
+						</FormFieldRow>
+					</Fieldset>
+
+					<Fieldset>
+						<FormFieldRow itemsAlignment="items-start">
+							<Label class="justify-start pr-0 md:justify-end md:pt-2.5">Shares</Label>
+							<div class="space-y-2">
+								{#if grantedShares.length === 0}
+									<p class="text-muted-foreground text-sm">No shares yet</p>
+								{:else}
+									{#each grantedShares as share (share.id)}
+										<div
+											class="bg-background border-border flex items-start justify-between gap-3 rounded border px-3 py-2.5"
+										>
+											<div class="min-w-0 text-sm">
+												<p class="truncate">{share.recipientEmail}</p>
+												<p class="text-muted-foreground">
+													{perspectiveLabel(share.perspective)} perspective
+													{share.includeInNetWorth
+														? ' · included in net worth'
+														: ' · excluded from net worth'}
+												</p>
+											</div>
+											<Button
+												type="button"
+												variant="outline"
+												onclick={() => handleRevokeShare(share.id)}>Remove</Button
+											>
+										</div>
+									{/each}
+								{/if}
+							</div>
+						</FormFieldRow>
+					</Fieldset>
+
+					<footer class="border-border bg-border border-t p-2">
+						<div class="flex justify-end">
+							<Button type="submit">Share</Button>
+						</div>
+					</footer>
+				</form>
+			</div>
 		{:else}
-			<div
-				class="bg-muted border-border overflow-hidden rounded border md:grayscale md:hover:grayscale-0"
-			>
-				<div class="flex items-center justify-between p-4">
-					<div>
-						<p class="text-sm">
-							{m.accounts_delete_description()}
-						</p>
-						<p class="text-destructive text-sm">
-							{m.accounts_delete_subtext()}
-						</p>
-					</div>
-					<AlertDialog.Root>
-						<AlertDialog.Trigger>
-							<Button variant="destructive">{m.accounts_delete_button()}</Button>
-						</AlertDialog.Trigger>
-						<AlertDialog.Content>
-							<AlertDialog.Header>
-								<AlertDialog.Title>{m.accounts_delete_confirm_title()}</AlertDialog.Title>
-								<AlertDialog.Description>
-									{m.accounts_delete_confirm_description()}
-								</AlertDialog.Description>
-							</AlertDialog.Header>
-							<AlertDialog.Footer>
-								<AlertDialog.Cancel>{m.accounts_delete_confirm_cancel()}</AlertDialog.Cancel>
-								<AlertDialog.Action onclick={handleDelete}>
-									{m.accounts_delete_confirm_continue()}
-								</AlertDialog.Action>
-							</AlertDialog.Footer>
-						</AlertDialog.Content>
-					</AlertDialog.Root>
-				</div>
+			<div class="bg-muted border-border overflow-hidden rounded border">
+				<form
+					class="space-y-0"
+					onsubmit={(e) => {
+						e.preventDefault();
+						handleUpdateRecipientPreference();
+					}}
+				>
+					<Fieldset isFirst={true}>
+						<FormFieldRow>
+							<Label for="perspective" class="justify-start pr-0 md:justify-end">Perspective</Label>
+							<Input id="perspective" value={perspectiveLabel(account.perspective)} disabled />
+						</FormFieldRow>
+
+						<FormFieldRow itemsAlignment="items-start">
+							<Label class="justify-start pr-0 md:justify-end md:pt-2.5">Marked as</Label>
+							<CheckboxLabel
+								id="include-in-net-worth"
+								bind:checked={includeInNetWorth}
+								label="Include in net worth"
+								class="bg-background"
+							/>
+						</FormFieldRow>
+					</Fieldset>
+
+					<footer class="border-border bg-border border-t p-2">
+						<div class="flex justify-end">
+							<Button type="submit">Save</Button>
+						</div>
+					</footer>
+				</form>
 			</div>
 		{/if}
 	</Section>
+
+	{#if canWrite || isLoading}
+		<Section>
+			<SectionTitle title={m.danger_zone_title()} />
+			{#if isLoading || !account}
+				<Skeleton class="h-24" />
+			{:else}
+				<div
+					class="bg-muted border-border overflow-hidden rounded border md:grayscale md:hover:grayscale-0"
+				>
+					<div class="flex items-center justify-between p-4">
+						<div>
+							<p class="text-sm">
+								{m.accounts_delete_description()}
+							</p>
+							<p class="text-destructive text-sm">
+								{m.accounts_delete_subtext()}
+							</p>
+						</div>
+						<AlertDialog.Root>
+							<AlertDialog.Trigger>
+								<Button variant="destructive">{m.accounts_delete_button()}</Button>
+							</AlertDialog.Trigger>
+							<AlertDialog.Content>
+								<AlertDialog.Header>
+									<AlertDialog.Title>{m.accounts_delete_confirm_title()}</AlertDialog.Title>
+									<AlertDialog.Description>
+										{m.accounts_delete_confirm_description()}
+									</AlertDialog.Description>
+								</AlertDialog.Header>
+								<AlertDialog.Footer>
+									<AlertDialog.Cancel>{m.accounts_delete_confirm_cancel()}</AlertDialog.Cancel>
+									<AlertDialog.Action onclick={handleDelete}>
+										{m.accounts_delete_confirm_continue()}
+									</AlertDialog.Action>
+								</AlertDialog.Footer>
+							</AlertDialog.Content>
+						</AlertDialog.Root>
+					</div>
+				</div>
+			{/if}
+		</Section>
+	{/if}
 </Page>
