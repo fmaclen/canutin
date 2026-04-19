@@ -48,6 +48,7 @@ export type TransactionRow = {
 	labels: string[];
 	accountName: string;
 	accountId: string | null;
+	accountIsShared: boolean;
 	value: number;
 	excluded: boolean;
 };
@@ -418,6 +419,7 @@ class TransactionsContext {
 				labels: labelNames,
 				accountName,
 				accountId: txn.account ?? null,
+				accountIsShared: Boolean(contextAccount?.isShared),
 				value,
 				excluded: Boolean(txn.excluded)
 			};

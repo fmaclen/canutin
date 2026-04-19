@@ -1,6 +1,6 @@
 import { UTCDate } from '@date-fns/utc';
 import { expect, test } from '@playwright/test';
-import { setHours, subDays, subYears } from 'date-fns';
+import { setHours, subDays } from 'date-fns';
 
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
 import { formatDateForInput, goToPageViaSidebar, signIn } from './playwright.helpers';
@@ -163,7 +163,7 @@ test('user can edit transaction details', async ({ page }) => {
 	await expect(paperclipRow.getByText('Office Supplies')).toBeVisible();
 
 	await page.getByRole('link', { name: 'Paperclip Office Supply Co' }).click();
-	await expect(page).toHaveURL(`/transactions/${transaction.id}`);
+	await expect(page).toHaveURL(new RegExp(`/transactions/${transaction.id}(\\?|$)`));
 	await expect(page.getByLabel('Description')).toHaveValue('Paperclip Office Supply Co');
 	await expect(page.getByLabel('Amount')).toHaveValue('-$150.00');
 	await expect(page.getByLabel('Date')).toHaveValue(formatDateForInput(initialDate));
@@ -178,12 +178,7 @@ test('user can edit transaction details', async ({ page }) => {
 	await page.getByLabel('Labels').fill('Business Travel, Conference');
 	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(page.getByText('Transaction updated')).toBeVisible();
-	await expect(
-		page.getByLabel('breadcrumb').getByText('Skyward Airlines Conference Trip')
-	).toBeVisible();
-
-	await page.getByLabel('breadcrumb').getByRole('link', { name: 'Transactions' }).click();
-	await expect(page.url()).toContain('/transactions');
+	await expect(page).toHaveURL('/transactions');
 	await expect(page.getByText('Paperclip Office Supply Co')).not.toBeVisible();
 
 	const skywardRow = page.getByRole('row', { name: /Skyward Airlines Conference Trip/ });
@@ -194,7 +189,7 @@ test('user can edit transaction details', async ({ page }) => {
 	await expect(skywardRow.getByText('Conference', { exact: true })).toBeVisible();
 
 	await page.getByRole('link', { name: 'Skyward Airlines Conference Trip' }).click();
-	await expect(page).toHaveURL(`/transactions/${transaction.id}`);
+	await expect(page).toHaveURL(new RegExp(`/transactions/${transaction.id}(\\?|$)`));
 	await expect(page.getByLabel('Description')).toHaveValue('Skyward Airlines Conference Trip');
 	await expect(page.getByLabel('Amount')).toHaveValue('-$450.00');
 	await expect(page.getByLabel('Date')).toHaveValue(updatedDateStr);
@@ -205,11 +200,19 @@ test('user can edit transaction details', async ({ page }) => {
 	await page.getByLabel('Excluded from totals').click();
 	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(page.getByText('Transaction updated').first()).toBeVisible();
+	await expect(page).toHaveURL('/transactions');
+
+	await page.getByRole('link', { name: 'Skyward Airlines Conference Trip' }).click();
+	await expect(page).toHaveURL(new RegExp(`/transactions/${transaction.id}(\\?|$)`));
 	await expect(page.getByLabel('Excluded from totals')).toBeChecked();
 
 	await page.getByLabel('Excluded from totals').click();
 	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(page.getByText('Transaction updated').first()).toBeVisible();
+	await expect(page).toHaveURL('/transactions');
+
+	await page.getByRole('link', { name: 'Skyward Airlines Conference Trip' }).click();
+	await expect(page).toHaveURL(new RegExp(`/transactions/${transaction.id}(\\?|$)`));
 	await expect(page.getByLabel('Excluded from totals')).not.toBeChecked();
 });
 
@@ -288,7 +291,7 @@ test('user can delete transaction', async ({ page }) => {
 	await expect(page.getByText('StreamFlix Annual Subscription')).toBeVisible();
 
 	await page.getByRole('link', { name: 'StreamFlix Annual Subscription' }).click();
-	await expect(page).toHaveURL(`/transactions/${transaction.id}`);
+	await expect(page).toHaveURL(new RegExp(`/transactions/${transaction.id}(\\?|$)`));
 
 	await page.getByRole('button', { name: 'Delete' }).first().click();
 	const dialog = page.getByRole('alertdialog');
@@ -303,6 +306,13 @@ test('user can delete transaction', async ({ page }) => {
 
 test('transactions list updates in real-time when new transaction is added', async ({ page }) => {
 	const user = await seedUser('frank');
+	const currentYear = new UTCDate().getUTCFullYear();
+	const seededTransactionRow = page.getByRole('row', { name: /Fresh Groceries Market/ });
+	const seededTransactionDate = new UTCDate(currentYear - 1, 5, 15, 12, 0, 0, 0);
+	const isLastYearTransactionsResponse = (url: string) =>
+		url.includes('/api/collections/transactions/records') &&
+		url.includes(`${currentYear - 1}-01-01`) &&
+		url.includes(`${currentYear}-01-01`);
 
 	const checkingAccount = await seedAccount({
 		name: 'Realtime Checking',
@@ -323,23 +333,35 @@ test('transactions list updates in real-time when new transaction is added', asy
 	await goToPageViaSidebar(page, 'Transactions');
 
 	await page.getByLabel('Period').click();
-	await page.getByRole('button', { name: 'Last year' }).click();
+	await Promise.all([
+		page.waitForResponse(
+			(response) =>
+				response.request().method() === 'GET' && isLastYearTransactionsResponse(response.url())
+		),
+		page.getByRole('button', { name: 'Last year' }).click()
+	]);
 	await expect(page.getByLabel('Period')).toContainText('Last year');
 
 	await page.getByLabel('Type').click();
-	await page.getByRole('option', { name: 'Debits only' }).click();
+	await Promise.all([
+		page.waitForResponse(
+			(response) =>
+				response.request().method() === 'GET' && isLastYearTransactionsResponse(response.url())
+		),
+		page.getByRole('option', { name: 'Debits only' }).click()
+	]);
 	await expect(page.getByLabel('Type')).toContainText('Debits only');
-	await expect(page.getByText('Fresh Groceries Market')).toHaveCount(0);
+	await expect(seededTransactionRow).toHaveCount(0);
 
 	await seedTransaction({
 		account: checkingAccount.id,
 		owner: user.id,
-		date: subYears(new UTCDate(), 1).toISOString(),
+		date: seededTransactionDate.toISOString(),
 		description: 'Fresh Groceries Market',
 		value: -125
 	});
 
-	await expect(page.getByText('Fresh Groceries Market')).toHaveCount(1);
+	await expect.poll(async () => seededTransactionRow.count(), { timeout: 10_000 }).toBe(1);
 });
 
 test('reuses existing labels instead of creating duplicates', async ({ page }) => {
@@ -414,6 +436,7 @@ test('reuses existing labels instead of creating duplicates', async ({ page }) =
 	await page.getByLabel('Labels').fill('Groceries, Dining');
 	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(page.getByText('Transaction updated')).toBeVisible();
+	await expect(page).toHaveURL('/transactions');
 
 	const groceriesAfterEdit = await getTransactionLabelsByName(user.id, 'Groceries');
 	const diningAfterEdit = await getTransactionLabelsByName(user.id, 'Dining');
@@ -423,8 +446,6 @@ test('reuses existing labels instead of creating duplicates', async ({ page }) =
 	expect(diningAfterEdit[0].id).toBe(diningLabel.id);
 
 	// Batch edit with existing label
-	await page.getByLabel('breadcrumb').getByRole('link', { name: 'Transactions' }).click();
-
 	const deliRow = page.getByRole('row', { name: 'Downtown Deli' });
 	const marketRow = page.getByRole('row', { name: 'Corner Market' });
 	await deliRow.getByRole('checkbox').check();

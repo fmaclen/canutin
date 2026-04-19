@@ -9,11 +9,25 @@
 		value: string;
 		required?: boolean;
 		disabled?: boolean;
+		isCurrency?: boolean;
 	}
 
-	let { id, name, value = $bindable(), required = false, disabled = false }: Props = $props();
+	let {
+		id,
+		name,
+		value = $bindable(),
+		required = false,
+		disabled = false,
+		isCurrency = true
+	}: Props = $props();
 
-	const placeholder = formatValue({ value: '0', intlConfig, decimalScale: 2 });
+	const fieldIntlConfig = $derived(
+		isCurrency ? intlConfig : { locale: intlConfig.locale, style: 'decimal' as const }
+	);
+
+	const placeholder = $derived(
+		formatValue({ value: '0', intlConfig: fieldIntlConfig, decimalScale: 2 })
+	);
 
 	const baseClass =
 		'border-input bg-background ring-offset-background selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground dark:bg-input/30 flex h-9 w-full min-w-0 rounded border px-2 py-1 shadow-xs transition-[color,box-shadow] outline-none disabled:cursor-not-allowed disabled:bg-border/33 disabled:shadow-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] font-mono';
@@ -32,8 +46,8 @@
 	bind:value
 	{required}
 	{disabled}
-	{intlConfig}
+	intlConfig={fieldIntlConfig}
 	{placeholder}
 	decimalScale={2}
-	class="{baseClass} {getValueColor(value)}"
+	class="{baseClass} {isCurrency ? getValueColor(value) : ''}"
 />

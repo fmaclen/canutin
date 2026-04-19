@@ -282,7 +282,12 @@
 							<Label for="quantity" class="justify-start pr-0 md:justify-end"
 								>{m.assets_label_quantity()}</Label
 							>
-							<CurrencyField id="quantity" name="quantity" bind:value={quantity} />
+							<CurrencyField
+								id="quantity"
+								name="quantity"
+								bind:value={quantity}
+								isCurrency={false}
+							/>
 						</FormFieldRow>
 
 						<FormFieldRow>

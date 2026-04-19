@@ -1,4 +1,5 @@
 <script lang="ts">
+	import UsersIcon from '@lucide/svelte/icons/users';
 	import { error } from '@sveltejs/kit';
 	import { toast } from 'svelte-sonner';
 
@@ -30,6 +31,7 @@
 		AssetsTypeOptions
 	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+	import { sanitizeFromParam } from '$lib/utils';
 
 	import BalanceForm from './balance-form.svelte';
 	import DetailsForm from './details-form.svelte';
@@ -217,6 +219,12 @@
 			syncState.lastSyncedData = { ...formData };
 
 			toast.success(m.assets_add_success());
+
+			const from = sanitizeFromParam(page.url.searchParams.get('from'));
+			if (from) {
+				// eslint-disable-next-line svelte/no-navigation-without-resolve -- sanitized dynamic ?from= redirect
+				await goto(from);
+			}
 		} catch (error) {
 			console.error('Failed to update balance:', error);
 			toast.error(m.assets_add_failed());
@@ -254,6 +262,12 @@
 			syncState.lastSyncedData = { ...formData };
 
 			toast.success(m.assets_edit_success());
+
+			const from = sanitizeFromParam(page.url.searchParams.get('from'));
+			if (from) {
+				// eslint-disable-next-line svelte/no-navigation-without-resolve -- sanitized dynamic ?from= redirect
+				await goto(from);
+			}
 		} catch (error) {
 			console.error('Failed to update asset:', error);
 			toast.error(m.assets_edit_failed());
@@ -356,7 +370,10 @@
 			<div class="bg-muted border-border overflow-hidden rounded border">
 				<div class="flex items-center justify-between p-4">
 					<div>
-						<p class="text-sm">This shared asset is read-only</p>
+						<p class="flex items-center gap-2 text-sm">
+							<UsersIcon class="text-muted-foreground size-3.5" aria-hidden="true" />
+							This shared asset is read-only
+						</p>
 						<p class="text-muted-foreground text-sm">
 							Stop following this asset and remove it from your views
 						</p>
@@ -392,6 +409,7 @@
 				{formData}
 				{isWhole}
 				{isShares}
+				balanceAsOf={asset?.balanceAsOf ?? ''}
 				onSubmit={handleUpdateBalance}
 				disabled={!canWrite}
 			/>
@@ -453,7 +471,7 @@
 							<Label class="justify-start pr-0 md:justify-end md:pt-2.5">Shares</Label>
 							<div class="space-y-2">
 								{#if grantedShares.length === 0}
-									<p class="text-muted-foreground text-sm">No shares yet</p>
+									<Input disabled placeholder="No shares yet" />
 								{:else}
 									{#each grantedShares as share (share.id)}
 										<div

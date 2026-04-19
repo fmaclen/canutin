@@ -359,7 +359,7 @@ test('user can edit asset details and update balance', async ({ page }) => {
 	await expect(initialCells.nth(8)).toContainText('$10,000.00');
 
 	await initialRow.getByRole('link', { name: 'Vintage Watch Collection' }).click();
-	await expect(page).toHaveURL(`/assets/${wholeAsset.id}`);
+	await expect(page).toHaveURL(new RegExp(`/assets/${wholeAsset.id}(\\?|$)`));
 	await expect(page.getByLabel('Name')).toHaveValue('Vintage Watch Collection');
 	await expect(page.getByLabel('Category')).toHaveValue('Collectibles');
 	await expect(page.getByLabel('Type', { exact: true })).toBeDisabled();
@@ -375,41 +375,52 @@ test('user can edit asset details and update balance', async ({ page }) => {
 			'This asset has been updated elsewhere and your changes may be based on outdated data'
 		)
 	).not.toBeVisible();
-	await expect(page.getByLabel('breadcrumb').getByText('Rare Coin Collection')).toBeVisible();
-
-	await page.getByLabel('Market value').fill('12500');
-	await page.getByLabel('Book value').fill('10000');
-	await page.getByRole('button', { name: 'Update' }).click();
-	await expect(page.getByText('Asset added successfully')).toBeVisible();
-
-	await page.getByLabel('breadcrumb').getByRole('link', { name: 'Assets' }).click();
 	await expect(page).toHaveURL('/assets');
 	await expect(page.getByRole('row', { name: 'Vintage Watch Collection' })).not.toBeVisible();
 
-	const updatedRow = page.getByRole('row', { name: 'Rare Coin Collection' });
-	await expect(updatedRow).toBeVisible();
+	const renamedRow = page.getByRole('row', { name: 'Rare Coin Collection' });
+	await expect(renamedRow).toBeVisible();
 
-	const updatedCells = updatedRow.locator('td');
-	await expect(updatedCells.nth(0)).toContainText('Rare Coin Collection');
-	await expect(updatedCells.nth(3)).toContainText('Collectibles');
-	await expect(updatedCells.nth(5)).toContainText('$10,000.00');
-	await expect(updatedCells.nth(8)).toContainText('$12,500.00');
+	const renamedCells = renamedRow.locator('td');
+	await expect(renamedCells.nth(0)).toContainText('Rare Coin Collection');
+	await expect(renamedCells.nth(3)).toContainText('Collectibles');
 
-	await updatedRow.getByRole('link', { name: 'Rare Coin Collection' }).click();
-	await expect(page).toHaveURL(`/assets/${wholeAsset.id}`);
+	await renamedRow.getByRole('link', { name: 'Rare Coin Collection' }).click();
+	await expect(page).toHaveURL(new RegExp(`/assets/${wholeAsset.id}(\\?|$)`));
 	await expect(page.getByLabel('Name')).toHaveValue('Rare Coin Collection');
 	await expect(page.getByLabel('Category')).toHaveValue('Collectibles');
 	await expect(page.getByLabel('Balance group')).toHaveText('Investments');
 	await expect(page.getByLabel('Exclude from net worth')).not.toBeChecked();
 
+	await page.getByLabel('Market value').fill('12500');
+	await page.getByLabel('Book value').fill('10000');
+	await page.getByRole('button', { name: 'Update' }).click();
+	await expect(page.getByText('Asset added successfully')).toBeVisible();
+	await expect(page).toHaveURL('/assets');
+
+	const updatedRow = page.getByRole('row', { name: 'Rare Coin Collection' });
+	await expect(updatedRow).toBeVisible();
+	const updatedCells = updatedRow.locator('td');
+	await expect(updatedCells.nth(5)).toContainText('$10,000.00');
+	await expect(updatedCells.nth(8)).toContainText('$12,500.00');
+
+	await updatedRow.getByRole('link', { name: 'Rare Coin Collection' }).click();
+	await expect(page).toHaveURL(new RegExp(`/assets/${wholeAsset.id}(\\?|$)`));
 	await page.getByLabel('Exclude from net worth').check();
 	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(page.getByText('Asset updated successfully').first()).toBeVisible();
-	await expect(page.getByLabel('Exclude from net worth')).toBeChecked();
+	await expect(page).toHaveURL('/assets');
 
+	await page.getByRole('row', { name: 'Rare Coin Collection' }).getByRole('link').click();
+	await expect(page).toHaveURL(new RegExp(`/assets/${wholeAsset.id}(\\?|$)`));
+	await expect(page.getByLabel('Exclude from net worth')).toBeChecked();
 	await page.getByLabel('Exclude from net worth').uncheck();
 	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(page.getByText('Asset updated successfully').first()).toBeVisible();
+	await expect(page).toHaveURL('/assets');
+
+	await page.getByRole('row', { name: 'Rare Coin Collection' }).getByRole('link').click();
+	await expect(page).toHaveURL(new RegExp(`/assets/${wholeAsset.id}(\\?|$)`));
 	await expect(page.getByLabel('Exclude from net worth')).not.toBeChecked();
 });
 
@@ -440,11 +451,11 @@ test('user can edit shares asset and update balance', async ({ page }) => {
 	await goToPageViaSidebar(page, 'Assets');
 
 	await page.getByRole('link', { name: 'Apple Inc' }).click();
-	await expect(page).toHaveURL(`/assets/${sharesAsset.id}`);
+	await expect(page).toHaveURL(new RegExp(`/assets/${sharesAsset.id}(\\?|$)`));
 	await expect(page.getByLabel('Name')).toHaveValue('Apple Inc');
 	await expect(page.getByLabel('Symbol')).toHaveValue('AAPL');
 	await expect(page.getByLabel('Type', { exact: true })).toBeDisabled();
-	await expect(page.getByLabel('Quantity')).toHaveValue('$100.00');
+	await expect(page.getByLabel('Quantity')).toHaveValue('100.00');
 	await expect(page.getByLabel('Market price')).toHaveValue('$60.00');
 	await expect(page.getByLabel('Book price')).toHaveValue('$50.00');
 
@@ -453,16 +464,20 @@ test('user can edit shares asset and update balance', async ({ page }) => {
 	await page.getByLabel('Category').fill('Securities');
 	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(page.getByText('Asset updated successfully')).toBeVisible();
+	await expect(page).toHaveURL('/assets');
+	await expect(page.getByRole('row', { name: 'Apple Inc' })).not.toBeVisible();
 
+	const renamedRow = page.getByRole('row', { name: 'NVIDIA Corporation' });
+	await expect(renamedRow).toBeVisible();
+
+	await renamedRow.getByRole('link', { name: 'NVIDIA Corporation' }).click();
+	await expect(page).toHaveURL(new RegExp(`/assets/${sharesAsset.id}(\\?|$)`));
 	await page.getByLabel('Quantity').fill('150');
 	await page.getByLabel('Market price').fill('75');
 	await page.getByLabel('Book price').fill('50');
 	await page.getByRole('button', { name: 'Update' }).click();
 	await expect(page.getByText('Asset added successfully')).toBeVisible();
-
-	await page.getByLabel('breadcrumb').getByRole('link', { name: 'Assets' }).click();
 	await expect(page).toHaveURL('/assets');
-	await expect(page.getByRole('row', { name: 'Apple Inc' })).not.toBeVisible();
 
 	const updatedRow = page.getByRole('row', { name: 'NVIDIA Corporation' });
 	await expect(updatedRow).toBeVisible();
@@ -475,11 +490,11 @@ test('user can edit shares asset and update balance', async ({ page }) => {
 	await expect(updatedCells.nth(8)).toContainText('$11,250.00');
 
 	await updatedRow.getByRole('link', { name: 'NVIDIA Corporation' }).click();
-	await expect(page).toHaveURL(`/assets/${sharesAsset.id}`);
+	await expect(page).toHaveURL(new RegExp(`/assets/${sharesAsset.id}(\\?|$)`));
 	await expect(page.getByLabel('Name')).toHaveValue('NVIDIA Corporation');
 	await expect(page.getByLabel('Symbol')).toHaveValue('NVDA');
 	await expect(page.getByLabel('Category')).toHaveValue('Securities');
-	await expect(page.getByLabel('Quantity')).toHaveValue('$150.00');
+	await expect(page.getByLabel('Quantity')).toHaveValue('150.00');
 	await expect(page.getByLabel('Market price')).toHaveValue('$75.00');
 	await expect(page.getByLabel('Book price')).toHaveValue('$50.00');
 });
@@ -536,7 +551,7 @@ test('user sees stale data warning and can refresh form', async ({ page }) => {
 	await goToPageViaSidebar(page, 'Assets');
 
 	await page.getByRole('link', { name: 'Vanguard Total Stock Market' }).click();
-	await expect(page).toHaveURL(`/assets/${investment.id}`);
+	await expect(page).toHaveURL(new RegExp(`/assets/${investment.id}(\\?|$)`));
 	await expect(page.getByLabel('Name')).toHaveValue('Vanguard Total Stock Market');
 
 	await page.getByLabel('Name').fill('My Investment Fund');
@@ -585,7 +600,7 @@ test('user can delete asset and cascade deletes balances', async ({ page }) => {
 	await expect(assetRow).toBeVisible();
 
 	await assetRow.getByRole('link', { name: 'Old Investment' }).click();
-	await expect(page).toHaveURL(`/assets/${asset.id}`);
+	await expect(page).toHaveURL(new RegExp(`/assets/${asset.id}(\\?|$)`));
 
 	await page.getByRole('button', { name: 'Delete' }).first().click();
 	const dialog = page.getByRole('alertdialog');

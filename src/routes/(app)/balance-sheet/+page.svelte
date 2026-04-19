@@ -3,8 +3,8 @@
 	import { getAssetsContext } from '$lib/assets.svelte';
 	import Currency from '$lib/components/currency.svelte';
 	import KeyValue from '$lib/components/key-value.svelte';
-	import Link from '$lib/components/link.svelte';
 	import Page from '$lib/components/page.svelte';
+	import RecordLink from '$lib/components/record-link.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
@@ -54,6 +54,7 @@
 						balance: number;
 						excluded: boolean;
 						type: 'account' | 'asset';
+						isShared: boolean;
 					}>;
 				}>;
 			}
@@ -94,7 +95,8 @@
 					name: a.name,
 					balance: a.balance ?? 0,
 					excluded: a.participantExcluded,
-					type: 'account'
+					type: 'account',
+					isShared: a.isShared
 				}
 			];
 		}
@@ -112,7 +114,8 @@
 					name: a.name,
 					balance: a.marketValue ?? 0,
 					excluded: a.participantExcluded,
-					type: 'asset'
+					type: 'asset',
+					isShared: a.isShared
 				}
 			];
 		}
@@ -169,13 +172,14 @@
 									<li
 										class="odd:bg-sidebar flex items-center justify-between gap-2 border-b border-dashed px-4 py-3 text-balance last:border-b-0"
 									>
-										<Link
-											href={item.type === 'account' ? `/accounts/${item.id}` : `/assets/${item.id}`}
+										<RecordLink
+											type={item.type}
+											id={item.id}
+											name={item.name}
+											isShared={item.isShared}
 											class={'text-sm ' +
 												(item.excluded ? 'text-muted-foreground' : 'text-foreground/90')}
-										>
-											{item.name}
-										</Link>
+										/>
 										<span
 											class={'font-mono tabular-nums ' +
 												(item.excluded ? 'text-muted-foreground' : '')}

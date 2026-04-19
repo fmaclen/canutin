@@ -5,6 +5,25 @@ export function cn(...inputs: ClassValue[]) {
 	return twMerge(clsx(inputs));
 }
 
+// Validates a `?from=` redirect target. Returns the value only if it is a
+// same-origin relative path (starts with a single `/`, not `//` or `/\`, and
+// contains no protocol scheme before the first slash). Returns null otherwise.
+export function sanitizeFromParam(value: string | null): string | null {
+	if (!value) return null;
+	if (typeof value !== 'string') return null;
+	if (value.length === 0) return null;
+	if (value[0] !== '/') return null;
+	// Reject protocol-relative URLs (`//example.com`, `/\example.com`)
+	if (value.length >= 2 && (value[1] === '/' || value[1] === '\\')) return null;
+	// Defense-in-depth: reject anything containing a colon before the first slash.
+	// Since we already require `/` at index 0 this can never trigger, but keeps the
+	// intent explicit if the leading-slash check is ever relaxed.
+	const firstSlash = value.indexOf('/');
+	const firstColon = value.indexOf(':');
+	if (firstColon !== -1 && firstColon < firstSlash) return null;
+	return value;
+}
+
 // PocketBase stores dates with space separator (e.g. "2025-01-01 00:00:00.000Z")
 // but JavaScript's toISOString() uses 'T' (e.g. "2025-01-01T00:00:00.000Z").
 // This causes filter comparison failures due to lexicographic ordering.

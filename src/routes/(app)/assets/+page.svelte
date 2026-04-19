@@ -9,6 +9,7 @@
 	import Link from '$lib/components/link.svelte';
 	import Number from '$lib/components/number.svelte';
 	import Page from '$lib/components/page.svelte';
+	import RecordLink from '$lib/components/record-link.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
@@ -56,6 +57,7 @@
 		sold: boolean;
 		gain: number;
 		gainPercent: number;
+		isShared: boolean;
 	};
 
 	const filters: Array<{
@@ -128,7 +130,8 @@
 			participantExcluded: asset.participantExcluded,
 			sold: Boolean(asset.sold),
 			gain: asset.gain ?? 0,
-			gainPercent: asset.gainPercent ?? 0
+			gainPercent: asset.gainPercent ?? 0,
+			isShared: asset.isShared
 		}));
 
 		const comparator = createSortComparator<AssetRow, AssetSortColumn>(sortState, {
@@ -209,7 +212,7 @@
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 	</div>
-	<nav class="px-2">
+	<nav class="px-4">
 		<Link href="/assets/add" class="text-sm">Add asset</Link>
 	</nav>
 </header>
@@ -312,12 +315,13 @@
 										{#each rowsForOption as row (row.id)}
 											<Table.Row class={row.participantExcluded || row.sold ? 'bg-muted/30' : ''}>
 												<Table.Cell>
-													<Link
-														href={`/assets/${row.id}`}
+													<RecordLink
+														type="asset"
+														id={row.id}
+														name={row.name}
+														isShared={row.isShared}
 														class="text-foreground/90 text-sm font-medium"
-													>
-														{row.name}
-													</Link>
+													/>
 												</Table.Cell>
 												<Table.Cell class="text-foreground/80 text-sm tracking-wide uppercase">
 													{#if row.symbol}

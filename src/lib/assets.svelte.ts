@@ -42,6 +42,7 @@ export type AssetWithBalance = AssetsResponse &
 		perspective: AssetSharesPerspectiveOptions;
 		participantExcluded: boolean;
 		incomingShareId: string | null;
+		isShared: boolean;
 	};
 
 class AssetsContext {
@@ -271,6 +272,8 @@ class AssetsContext {
 		const accessRole: AssetWithBalance['accessRole'] = isOwner
 			? 'OWNER'
 			: (incomingShare?.accessRole ?? AssetSharesAccessRoleOptions.VIEWER);
+		const grantedShares = this.getGrantedShares(asset.id);
+		const isShared = !isOwner || grantedShares.length > 0;
 
 		return {
 			...asset,
@@ -294,7 +297,8 @@ class AssetsContext {
 				Boolean(asset.excluded),
 				incomingShare?.includeInNetWorth
 			),
-			incomingShareId: incomingShare?.id ?? null
+			incomingShareId: incomingShare?.id ?? null,
+			isShared
 		};
 	}
 

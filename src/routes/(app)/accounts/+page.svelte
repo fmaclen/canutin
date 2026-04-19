@@ -8,6 +8,7 @@
 	import Empty from '$lib/components/empty.svelte';
 	import Link from '$lib/components/link.svelte';
 	import Page from '$lib/components/page.svelte';
+	import RecordLink from '$lib/components/record-link.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
@@ -55,6 +56,7 @@
 		autoCalculated: boolean;
 		participantExcluded: boolean;
 		closed: boolean;
+		isShared: boolean;
 	};
 
 	const filters: Array<{
@@ -120,7 +122,8 @@
 			balanceGroup: account.balanceGroup as BalanceGroup,
 			autoCalculated: Boolean(account.autoCalculated),
 			participantExcluded: account.participantExcluded,
-			closed: Boolean(account.closed)
+			closed: Boolean(account.closed),
+			isShared: account.isShared
 		}));
 
 		const comparator = createSortComparator<AccountRow, AccountSortColumn>(sortState, {
@@ -227,7 +230,7 @@
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 	</div>
-	<nav class="px-2">
+	<nav class="px-4">
 		<Link href="/accounts/add" class="text-sm">Add account</Link>
 	</nav>
 </header>
@@ -312,12 +315,13 @@
 										{#each rowsForOption as row (row.id)}
 											<Table.Row class={row.participantExcluded || row.closed ? 'bg-muted/30' : ''}>
 												<Table.Cell>
-													<Link
-														href={`/accounts/${row.id}`}
+													<RecordLink
+														type="account"
+														id={row.id}
+														name={row.name}
+														isShared={row.isShared}
 														class="text-foreground/90 text-sm font-medium"
-													>
-														{row.name}
-													</Link>
+													/>
 												</Table.Cell>
 												<Table.Cell class="text-foreground/80 text-sm">
 													{#if row.institution}

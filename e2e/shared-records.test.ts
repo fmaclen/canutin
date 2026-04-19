@@ -302,7 +302,7 @@ test('shared transaction detail page stays read-only for recipients', async ({ p
 	await expect(page.getByLabel('Amount')).toBeDisabled();
 	await expect(page.getByLabel('Date')).toBeDisabled();
 	await expect(page.getByLabel('Labels')).toBeDisabled();
-	await expect(page.getByLabel('Account')).toBeDisabled();
+	await expect(page.getByLabel('Account', { exact: true })).toBeDisabled();
 	await expect(page.getByLabel('Excluded from totals')).toBeDisabled();
 	await expect(page.getByRole('button', { name: 'Recipient checking' })).toHaveCount(0);
 });

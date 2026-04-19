@@ -21,6 +21,7 @@ export type AccountWithBalance = AccountsResponse & {
 	perspective: AccountSharesPerspectiveOptions;
 	participantExcluded: boolean;
 	incomingShareId: string | null;
+	isShared: boolean;
 };
 
 class AccountsContext {
@@ -222,6 +223,8 @@ class AccountsContext {
 		const accessRole: AccountWithBalance['accessRole'] = isOwner
 			? 'OWNER'
 			: (incomingShare?.accessRole ?? AccountSharesAccessRoleOptions.VIEWER);
+		const grantedShares = this.getGrantedShares(account.id);
+		const isShared = !isOwner || grantedShares.length > 0;
 
 		return {
 			...account,
@@ -236,7 +239,8 @@ class AccountsContext {
 				Boolean(account.excluded),
 				incomingShare?.includeInNetWorth
 			),
-			incomingShareId: incomingShare?.id ?? null
+			incomingShareId: incomingShare?.id ?? null,
+			isShared
 		};
 	}
 
