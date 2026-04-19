@@ -162,7 +162,7 @@ test('user can edit transaction details', async ({ page }) => {
 	await expect(paperclipRow.getByText('Northwind Business')).toBeVisible();
 	await expect(paperclipRow.getByText('Office Supplies')).toBeVisible();
 
-	await page.goto(`/transactions/${transaction.id}`);
+	await page.getByRole('link', { name: 'Paperclip Office Supply Co' }).click();
 	await expect(page).toHaveURL(`/transactions/${transaction.id}`);
 	await expect(page.getByLabel('Description')).toHaveValue('Paperclip Office Supply Co');
 	await expect(page.getByLabel('Amount')).toHaveValue('-$150.00');
@@ -193,7 +193,7 @@ test('user can edit transaction details', async ({ page }) => {
 	await expect(skywardRow.getByText('Business Travel')).toBeVisible();
 	await expect(skywardRow.getByText('Conference', { exact: true })).toBeVisible();
 
-	await page.goto(`/transactions/${transaction.id}`);
+	await page.getByRole('link', { name: 'Skyward Airlines Conference Trip' }).click();
 	await expect(page).toHaveURL(`/transactions/${transaction.id}`);
 	await expect(page.getByLabel('Description')).toHaveValue('Skyward Airlines Conference Trip');
 	await expect(page.getByLabel('Amount')).toHaveValue('-$450.00');
@@ -287,7 +287,7 @@ test('user can delete transaction', async ({ page }) => {
 
 	await expect(page.getByText('StreamFlix Annual Subscription')).toBeVisible();
 
-	await page.goto(`/transactions/${transaction.id}`);
+	await page.getByRole('link', { name: 'StreamFlix Annual Subscription' }).click();
 	await expect(page).toHaveURL(`/transactions/${transaction.id}`);
 
 	await page.getByRole('button', { name: 'Delete' }).first().click();
@@ -365,7 +365,7 @@ test('reuses existing labels instead of creating duplicates', async ({ page }) =
 	const tx2Date = setHours(subDays(new UTCDate(), 2), 12);
 	const tx3Date = setHours(subDays(new UTCDate(), 3), 12);
 
-	const sunriseTransaction = await seedTransaction({
+	await seedTransaction({
 		account: account.id,
 		owner: user.id,
 		date: tx1Date.toISOString(),
@@ -410,7 +410,7 @@ test('reuses existing labels instead of creating duplicates', async ({ page }) =
 	expect(groceriesAfterAdd[0].id).toBe(groceriesLabel.id);
 
 	// Edit existing transaction with existing labels
-	await page.goto(`/transactions/${sunriseTransaction.id}`);
+	await page.getByRole('link', { name: 'Sunrise Grocery Store' }).click();
 	await page.getByLabel('Labels').fill('Groceries, Dining');
 	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(page.getByText('Transaction updated')).toBeVisible();
