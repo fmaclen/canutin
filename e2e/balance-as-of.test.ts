@@ -136,4 +136,10 @@ test('asset detail page (SHARES) shows "As of <date>" next to the Quantity label
 	await expect(time).toContainText('Mar');
 	await expect(time).toContainText('2025');
 	await expect(time).toHaveText(/\b(14|15)\b/);
+
+	// Quantity is a share count, not a currency amount. The input must not render
+	// a currency symbol.
+	const quantity = page.getByLabel('Quantity', { exact: true });
+	await expect(quantity).toBeVisible();
+	await expect(quantity).not.toHaveValue(/\$/);
 });

@@ -131,7 +131,13 @@
 							</span>
 						{/if}
 					</div>
-					<CurrencyField id="quantity" name="quantity" bind:value={formData.quantity} {disabled} />
+					<CurrencyField
+						id="quantity"
+						name="quantity"
+						bind:value={formData.quantity}
+						{disabled}
+						isCurrency={false}
+					/>
 				</FormFieldRow>
 
 				<FormFieldRow>
