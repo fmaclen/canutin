@@ -30,16 +30,38 @@
 		disabled = false
 	}: Props = $props();
 
-	const formattedAsOf = $derived.by(() => {
-		if (!balanceAsOf) return '';
+	const parsedAsOf = $derived.by(() => {
+		if (!balanceAsOf) return null;
 		const parsed = new Date(balanceAsOf);
-		if (Number.isNaN(parsed.getTime())) return '';
-		return parsed.toLocaleDateString(undefined, {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric'
-		});
+		if (Number.isNaN(parsed.getTime())) return null;
+		return parsed;
 	});
+
+	const formattedAsOf = $derived(
+		parsedAsOf
+			? parsedAsOf.toLocaleDateString(undefined, {
+					year: 'numeric',
+					month: 'short',
+					day: 'numeric'
+				})
+			: ''
+	);
+
+	const fullAsOf = $derived(
+		parsedAsOf
+			? parsedAsOf.toLocaleString(undefined, {
+					year: 'numeric',
+					month: 'long',
+					day: 'numeric',
+					hour: '2-digit',
+					minute: '2-digit',
+					second: '2-digit',
+					timeZoneName: 'short'
+				})
+			: ''
+	);
+
+	const isoAsOf = $derived(parsedAsOf ? parsedAsOf.toISOString() : '');
 </script>
 
 <div class="bg-muted border-border overflow-hidden rounded border">
@@ -58,9 +80,15 @@
 							>{m.assets_label_market_value()}</Label
 						>
 						{#if formattedAsOf}
-							<span class="text-muted-foreground text-sm" data-testid="balance-as-of"
-								>{m.assets_text_balance_as_of({ date: formattedAsOf })}</span
-							>
+							{@const asOfParts = m.assets_text_balance_as_of({ date: '\u0000' }).split('\u0000')}
+							<span class="text-muted-foreground text-sm" data-testid="balance-as-of">
+								{asOfParts[0]}<time
+									datetime={isoAsOf}
+									title={fullAsOf}
+									class="border-muted-foreground/60 cursor-help border-b border-dashed"
+									>{formattedAsOf}</time
+								>{asOfParts[1] ?? ''}
+							</span>
 						{/if}
 					</div>
 					<CurrencyField
@@ -92,9 +120,15 @@
 							>{m.assets_label_quantity()}</Label
 						>
 						{#if formattedAsOf}
-							<span class="text-muted-foreground text-sm" data-testid="balance-as-of"
-								>{m.assets_text_balance_as_of({ date: formattedAsOf })}</span
-							>
+							{@const asOfParts = m.assets_text_balance_as_of({ date: '\u0000' }).split('\u0000')}
+							<span class="text-muted-foreground text-sm" data-testid="balance-as-of">
+								{asOfParts[0]}<time
+									datetime={isoAsOf}
+									title={fullAsOf}
+									class="border-muted-foreground/60 cursor-help border-b border-dashed"
+									>{formattedAsOf}</time
+								>{asOfParts[1] ?? ''}
+							</span>
 						{/if}
 					</div>
 					<CurrencyField id="quantity" name="quantity" bind:value={formData.quantity} {disabled} />

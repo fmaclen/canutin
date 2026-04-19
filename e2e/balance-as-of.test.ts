@@ -41,11 +41,18 @@ test('account detail page shows "As of <date>" next to the Balance label', async
 	const asOf = page.getByTestId('balance-as-of').first();
 	await expect(asOf).toBeVisible();
 	await expect(asOf).toHaveText(/^As of /);
-	await expect(asOf).toContainText('Mar');
-	await expect(asOf).toContainText('2025');
-	// Day can render as "15" in en-US; guard against off-by-one by allowing 14 or 15
-	// depending on the runner's timezone.
-	await expect(asOf).toHaveText(/\b(14|15)\b/);
+
+	const time = asOf.locator('time');
+	await expect(time).toBeVisible();
+	await expect(time).toHaveAttribute('datetime', REFERENCE_ASOF);
+	await expect(time).toHaveAttribute('title', /.+/);
+	await expect(time).toHaveClass(/cursor-help/);
+	await expect(time).toHaveClass(/border-dashed/);
+	await expect(time).toHaveClass(/border-b/);
+	await expect(time).toContainText('Mar');
+	await expect(time).toContainText('2025');
+	// Day can render as 14 or 15 depending on the runner's timezone.
+	await expect(time).toHaveText(/\b(14|15)\b/);
 });
 
 test('asset detail page (WHOLE) shows "As of <date>" next to the Market value label', async ({
@@ -76,9 +83,17 @@ test('asset detail page (WHOLE) shows "As of <date>" next to the Market value la
 	const asOf = page.getByTestId('balance-as-of').first();
 	await expect(asOf).toBeVisible();
 	await expect(asOf).toHaveText(/^As of /);
-	await expect(asOf).toContainText('Mar');
-	await expect(asOf).toContainText('2025');
-	await expect(asOf).toHaveText(/\b(14|15)\b/);
+
+	const time = asOf.locator('time');
+	await expect(time).toBeVisible();
+	await expect(time).toHaveAttribute('datetime', REFERENCE_ASOF);
+	await expect(time).toHaveAttribute('title', /.+/);
+	await expect(time).toHaveClass(/cursor-help/);
+	await expect(time).toHaveClass(/border-dashed/);
+	await expect(time).toHaveClass(/border-b/);
+	await expect(time).toContainText('Mar');
+	await expect(time).toContainText('2025');
+	await expect(time).toHaveText(/\b(14|15)\b/);
 });
 
 test('asset detail page (SHARES) shows "As of <date>" next to the Quantity label', async ({
@@ -110,7 +125,15 @@ test('asset detail page (SHARES) shows "As of <date>" next to the Quantity label
 	const asOf = page.getByTestId('balance-as-of').first();
 	await expect(asOf).toBeVisible();
 	await expect(asOf).toHaveText(/^As of /);
-	await expect(asOf).toContainText('Mar');
-	await expect(asOf).toContainText('2025');
-	await expect(asOf).toHaveText(/\b(14|15)\b/);
+
+	const time = asOf.locator('time');
+	await expect(time).toBeVisible();
+	await expect(time).toHaveAttribute('datetime', REFERENCE_ASOF);
+	await expect(time).toHaveAttribute('title', /.+/);
+	await expect(time).toHaveClass(/cursor-help/);
+	await expect(time).toHaveClass(/border-dashed/);
+	await expect(time).toHaveClass(/border-b/);
+	await expect(time).toContainText('Mar');
+	await expect(time).toContainText('2025');
+	await expect(time).toHaveText(/\b(14|15)\b/);
 });
