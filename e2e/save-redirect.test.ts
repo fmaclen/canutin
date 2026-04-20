@@ -47,7 +47,7 @@ test('balance sheet → account → save balance redirects back to /balance-shee
 	await page.getByLabel('Balance', { exact: true }).fill('1500');
 	await page.getByRole('button', { name: 'Update' }).click();
 
-	await expect(page.getByText('Account added successfully')).toBeVisible();
+	await expect(page.getByText('Balance updated')).toBeVisible();
 	await expect(page).toHaveURL('/balance-sheet');
 });
 
@@ -130,7 +130,7 @@ test('accounts list → account → save details redirects back to /accounts', a
 	await page.getByLabel('Name').fill('List Redirect Renamed');
 	await page.getByRole('button', { name: 'Save' }).click();
 
-	await expect(page.getByText('Account updated successfully')).toBeVisible();
+	await expect(page.getByText('Account updated')).toBeVisible();
 	await expect(page).toHaveURL('/accounts');
 });
 
@@ -165,7 +165,7 @@ test('assets list → asset → save balance redirects back to /assets', async (
 	await page.getByLabel('Market value', { exact: true }).fill('6000');
 	await page.getByRole('button', { name: 'Update' }).click();
 
-	await expect(page.getByText('Asset added successfully')).toBeVisible();
+	await expect(page.getByText('Balance updated')).toBeVisible();
 	await expect(page).toHaveURL('/assets');
 });
 
@@ -239,6 +239,6 @@ test('deep link to account with no ?from= stays on detail page after save', asyn
 	await page.getByLabel('Name').fill('Deep Link Renamed');
 	await page.getByRole('button', { name: 'Save' }).click();
 
-	await expect(page.getByText('Account updated successfully')).toBeVisible();
+	await expect(page.getByText('Account updated')).toBeVisible();
 	await expect(page).toHaveURL(`/accounts/${account.id}`);
 });

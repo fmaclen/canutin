@@ -261,7 +261,7 @@ test('reverting an import deletes its records and updates status', async ({ page
 	await expect(page.getByText('This will permanently delete all records')).toBeVisible();
 
 	await page.getByRole('alertdialog').getByRole('button', { name: 'Revert' }).click();
-	await expect(page.getByText('Import reverted successfully')).toBeVisible();
+	await expect(page.getByText('Import reverted')).toBeVisible();
 
 	await expect(page.getByText('Rolled back')).toBeVisible();
 
