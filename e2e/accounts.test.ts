@@ -132,6 +132,7 @@ test('user can add a new account', async ({ page }) => {
 	await page.getByLabel('Balance group').click();
 	await page.getByRole('option', { name: 'Cash' }).click();
 	await page.getByLabel('Category').fill('Savings');
+	await page.getByLabel('Notes').fill('Opened in 2024 for emergency fund');
 	await page.getByLabel('Balance', { exact: true }).fill('5000');
 	await page.getByRole('button', { name: 'Add' }).click();
 	await expect(page.getByText('Account added')).toBeVisible();
@@ -201,12 +202,14 @@ test('user can edit account details and update balance', async ({ page }) => {
 	await expect(page.getByLabel('Name')).toHaveValue('Primary Checking');
 	await expect(page.getByLabel('Institution')).toHaveValue('Bank of America');
 	await expect(page.getByLabel('Category')).toHaveValue('Checking');
+	await expect(page.getByLabel('Notes')).toHaveValue('');
 
 	await page.getByLabel('Name').fill('Business Checking');
 	await page.getByLabel('Institution').fill('Wells Fargo');
 	await page.getByLabel('Category').fill('Checking');
 	await page.getByLabel('Balance group').click();
 	await page.getByRole('option', { name: 'Cash' }).click();
+	await page.getByLabel('Notes').fill('Switched from BoA after the move');
 	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(page.getByText('Account updated')).toBeVisible();
 	await expect(
@@ -232,6 +235,7 @@ test('user can edit account details and update balance', async ({ page }) => {
 	await expect(page.getByLabel('Institution')).toHaveValue('Wells Fargo');
 	await expect(page.getByLabel('Category')).toHaveValue('Checking');
 	await expect(page.getByLabel('Balance group')).toHaveText('Cash');
+	await expect(page.getByLabel('Notes')).toHaveValue('Switched from BoA after the move');
 	await expect(page.getByLabel('Exclude from net worth')).not.toBeChecked();
 
 	await page.getByLabel('Balance', { exact: true }).fill('4500');

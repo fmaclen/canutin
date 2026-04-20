@@ -69,6 +69,7 @@ test('user can add a new transaction', async ({ page }) => {
 	await expect(page.getByRole('option', { name: 'Apex Credit Card' })).not.toBeVisible();
 
 	await page.getByLabel('Labels').fill('Food & Dining, Personal');
+	await page.getByLabel('Notes').fill('Met with Sam to review Q3 plans');
 	await page.getByRole('button', { name: 'Add' }).click();
 	await expect(page.getByText('Transaction added').first()).toBeVisible();
 	await expect(page.url()).toContain('/transactions');
@@ -169,6 +170,7 @@ test('user can edit transaction details', async ({ page }) => {
 	await expect(page.getByLabel('Date')).toHaveValue(formatDateForInput(initialDate));
 	await expect(page.getByLabel('Account')).toHaveText('Northwind Business');
 	await expect(page.getByLabel('Labels')).toHaveValue('Office Supplies');
+	await expect(page.getByLabel('Notes')).toHaveValue('');
 
 	await page.getByLabel('Description').fill('Skyward Airlines Conference Trip');
 	await page.getByLabel('Amount').fill('-450');
@@ -176,6 +178,7 @@ test('user can edit transaction details', async ({ page }) => {
 	await page.getByLabel('Account').click();
 	await page.getByRole('option', { name: 'Eastgate Savings' }).click();
 	await page.getByLabel('Labels').fill('Business Travel, Conference');
+	await page.getByLabel('Notes').fill('Reimbursable — keep receipt for expense report');
 	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(page.getByText('Transaction updated')).toBeVisible();
 	await expect(page).toHaveURL('/transactions');
@@ -195,6 +198,9 @@ test('user can edit transaction details', async ({ page }) => {
 	await expect(page.getByLabel('Date')).toHaveValue(updatedDateStr);
 	await expect(page.getByLabel('Account')).toHaveText('Eastgate Savings');
 	await expect(page.getByLabel('Labels')).toHaveValue('Business Travel, Conference');
+	await expect(page.getByLabel('Notes')).toHaveValue(
+		'Reimbursable — keep receipt for expense report'
+	);
 
 	// TODO: Flaky on mobile - checkbox.check() doesn't change state intermittently
 	await page.getByLabel('Excluded from totals').click();

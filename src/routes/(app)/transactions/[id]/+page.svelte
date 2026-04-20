@@ -29,6 +29,7 @@
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import { AccountsBalanceGroupOptions, type TransactionsResponse } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
@@ -55,6 +56,7 @@
 		date: '',
 		accountId: '',
 		labelsInput: '',
+		notes: '',
 		excluded: false
 	});
 
@@ -95,6 +97,7 @@
 				date: localDate,
 				accountId: result.account,
 				labelsInput: labelNames,
+				notes: result.notes ?? '',
 				excluded: Boolean(result.excluded)
 			};
 		} catch (error) {
@@ -131,6 +134,7 @@
 				description: formData.description.trim() || undefined,
 				value: formData.amount ? parseFloat(formData.amount) : undefined,
 				labels: labelIds.length > 0 ? labelIds : undefined,
+				notes: formData.notes.trim() || undefined,
 				excluded: formData.excluded ? new Date().toISOString() : null
 			};
 
@@ -138,7 +142,11 @@
 				.collection('transactions')
 				.update(currentTransactionId, transactionData);
 
-			transaction = { ...transaction!, description: formData.description.trim() };
+			transaction = {
+				...transaction!,
+				description: formData.description.trim(),
+				notes: formData.notes.trim()
+			};
 			toast.success(m.transactions_edit_success());
 
 			const from = sanitizeFromParam(page.url.searchParams.get('from'));
@@ -321,6 +329,23 @@
 								bind:value={formData.labelsInput}
 								disabled={!canWrite}
 								placeholder={m.transactions_labels_placeholder()}
+							/>
+						</FormFieldRow>
+
+						<FormFieldRow itemsAlignment="items-start">
+							<div
+								class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1 md:pt-2"
+							>
+								<Label for="notes" class="justify-start pr-0 md:justify-end"
+									>{m.transactions_label_notes()}</Label
+								>
+								<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
+							</div>
+							<Textarea
+								id="notes"
+								bind:value={formData.notes}
+								disabled={!canWrite}
+								class="bg-background"
 							/>
 						</FormFieldRow>
 					</Fieldset>

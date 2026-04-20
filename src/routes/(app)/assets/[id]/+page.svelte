@@ -55,6 +55,7 @@
 		balanceGroup: '' as AssetsBalanceGroupOptions | '',
 		assetTypeName: '',
 		symbol: '',
+		notes: '',
 		excluded: false,
 		sold: false,
 		type: '' as AssetsTypeOptions | '',
@@ -88,6 +89,7 @@
 			formData.balanceGroup !== syncState.lastSyncedData.balanceGroup ||
 			formData.assetTypeName !== syncState.lastSyncedData.assetTypeName ||
 			formData.symbol !== syncState.lastSyncedData.symbol ||
+			formData.notes !== syncState.lastSyncedData.notes ||
 			formData.excluded !== syncState.lastSyncedData.excluded ||
 			formData.sold !== syncState.lastSyncedData.sold ||
 			formData.type !== syncState.lastSyncedData.type ||
@@ -101,7 +103,7 @@
 
 	function getAssetVersion(assetData: typeof asset): string {
 		if (!assetData) return '';
-		return `${assetData.updated || assetData.created}_${assetData.name}_${assetData.balanceGroup}_${assetData.symbol}_${assetData.excluded}_${assetData.sold}_${assetData.marketValue}_${assetData.bookValue}_${assetData.quantity}_${assetData.bookPrice}_${assetData.marketPrice}`;
+		return `${assetData.updated || assetData.created}_${assetData.name}_${assetData.balanceGroup}_${assetData.symbol}_${assetData.notes}_${assetData.excluded}_${assetData.sold}_${assetData.marketValue}_${assetData.bookValue}_${assetData.quantity}_${assetData.bookPrice}_${assetData.marketPrice}`;
 	}
 
 	function toFieldValue(value: number | null | undefined) {
@@ -116,6 +118,7 @@
 			balanceGroup: assetData.balanceGroup,
 			assetTypeName: '',
 			symbol: assetData.symbol ?? '',
+			notes: assetData.notes ?? '',
 			excluded: Boolean(assetData.excluded),
 			sold: Boolean(assetData.sold),
 			type: assetData.type ?? '',
@@ -248,6 +251,7 @@
 				balanceGroup: formData.balanceGroup as AssetsBalanceGroupOptions,
 				balanceType: balanceTypeId,
 				symbol: formData.symbol.trim() || undefined,
+				notes: formData.notes.trim() || undefined,
 				excluded: formData.excluded ? new Date().toISOString() : null,
 				sold: formData.sold ? new Date().toISOString() : null
 			};
