@@ -1,9 +1,12 @@
 <script lang="ts">
+	import { setMode, userPrefersMode } from 'mode-watcher';
 	import { toast } from 'svelte-sonner';
 
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import Empty from '$lib/components/empty.svelte';
+	import Fieldset from '$lib/components/fieldset.svelte';
+	import FormFieldRow from '$lib/components/form-field-row.svelte';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
@@ -11,11 +14,18 @@
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import { Label } from '$lib/components/ui/label/index.js';
+	import * as Select from '$lib/components/ui/select/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index';
 	import * as Table from '$lib/components/ui/table/index';
 	import { getImportSessionsContext } from '$lib/import-sessions.svelte';
+	import {
+		interfacePreferences,
+		setInterfaceLocale,
+		type InterfaceThemeMode
+	} from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import type { ImportSessionsResponse } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
@@ -29,6 +39,13 @@
 
 	const importSessionsContext = getImportSessionsContext();
 	const pb = getPocketBaseContext();
+
+	let themeDraft = $state<InterfaceThemeMode>(userPrefersMode.current);
+	let localeDraft = $state<'en' | 'es'>(interfacePreferences.locale);
+
+	const currentTheme = $derived(userPrefersMode.current);
+	const currentLocale = $derived(interfacePreferences.locale);
+	const interfaceIsDirty = $derived(themeDraft !== currentTheme || localeDraft !== currentLocale);
 
 	type SessionRow = Pick<
 		ImportSessionsResponse,
@@ -92,6 +109,37 @@
 		});
 	}
 
+	function handleThemeDraftChange(value: string) {
+		if (value !== 'system' && value !== 'light' && value !== 'dark') {
+			return;
+		}
+		themeDraft = value;
+	}
+
+	function handleLocaleDraftChange(value: string) {
+		if (value !== 'en' && value !== 'es') {
+			return;
+		}
+		localeDraft = value;
+	}
+
+	async function handleInterfaceSubmit() {
+		if (!interfaceIsDirty) return;
+
+		try {
+			if (themeDraft !== currentTheme) {
+				setMode(themeDraft);
+			}
+			if (localeDraft !== currentLocale) {
+				await setInterfaceLocale(localeDraft);
+			}
+			toast.success(m.settings_interface_success());
+		} catch (error) {
+			console.error('[settings] Failed to update interface preferences:', error);
+			toast.error(m.settings_interface_language_failed());
+		}
+	}
+
 	let revertingSessionId: string | null = $state(null);
 
 	async function handleRevert(sessionId: string) {
@@ -127,6 +175,76 @@
 </header>
 
 <Page pageTitle={m.settings_page_title()}>
+	<Section>
+		<SectionTitle title={m.settings_interface_section_title()} />
+		<div class="bg-muted border-border overflow-hidden rounded border">
+			<form
+				onsubmit={(e) => {
+					e.preventDefault();
+					handleInterfaceSubmit();
+				}}
+				class="space-y-0"
+			>
+				<Fieldset isFirst={true}>
+					<FormFieldRow>
+						<Label id="theme-label" for="theme" class="justify-start pr-0 md:justify-end"
+							>{m.settings_interface_theme_label()}</Label
+						>
+						<Select.Root type="single" value={themeDraft} onValueChange={handleThemeDraftChange}>
+							<Select.Trigger id="theme" aria-labelledby="theme-label" class="bg-background w-full">
+								{#if themeDraft === 'light'}
+									{m.settings_interface_theme_light_option()}
+								{:else if themeDraft === 'dark'}
+									{m.settings_interface_theme_dark_option()}
+								{:else}
+									{m.settings_interface_theme_system_option()}
+								{/if}
+							</Select.Trigger>
+							<Select.Content>
+								<Select.Item value="system">
+									{m.settings_interface_theme_system_option()}
+								</Select.Item>
+								<Select.Item value="light">
+									{m.settings_interface_theme_light_option()}
+								</Select.Item>
+								<Select.Item value="dark">
+									{m.settings_interface_theme_dark_option()}
+								</Select.Item>
+							</Select.Content>
+						</Select.Root>
+					</FormFieldRow>
+
+					<FormFieldRow>
+						<Label id="language-label" for="language" class="justify-start pr-0 md:justify-end"
+							>{m.settings_interface_language_label()}</Label
+						>
+						<Select.Root type="single" value={localeDraft} onValueChange={handleLocaleDraftChange}>
+							<Select.Trigger
+								id="language"
+								aria-labelledby="language-label"
+								class="bg-background w-full"
+							>
+								{localeDraft === 'es' ? 'Español' : 'English'}
+							</Select.Trigger>
+							<Select.Content>
+								<Select.Item value="en">English</Select.Item>
+								<Select.Item value="es">Español</Select.Item>
+							</Select.Content>
+						</Select.Root>
+					</FormFieldRow>
+				</Fieldset>
+
+				<footer class="border-border bg-border border-t p-2">
+					<div class="flex justify-end">
+						<Button type="submit" disabled={!interfaceIsDirty}
+							>{m.settings_interface_button_save()}</Button
+						>
+					</div>
+				</footer>
+			</form>
+		</div>
+	</Section>
+
 	<Section>
 		{#if importSessionsContext.isLoading}
 			<div class="bg-background overflow-hidden rounded-sm shadow-md">
