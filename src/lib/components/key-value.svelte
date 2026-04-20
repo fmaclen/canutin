@@ -20,10 +20,10 @@
 	const variantClasses: Record<Variant, string> = {
 		filled: 'shadow-md bg-background',
 		outline: 'border border-border bg-transparent',
-		cash: 'shadow-md bg-cash text-background',
-		debt: 'shadow-md bg-debt text-background',
-		investment: 'shadow-md bg-investment text-background',
-		other: 'shadow-md bg-other-assets text-background'
+		cash: 'shadow-md bg-cash text-white',
+		debt: 'shadow-md bg-debt text-white',
+		investment: 'shadow-md bg-investment text-white',
+		other: 'shadow-md bg-other-assets text-white'
 	};
 </script>
 
