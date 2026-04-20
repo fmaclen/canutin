@@ -30,7 +30,7 @@ test('user can sign up, login and logout', async ({ page }) => {
 	// Enter correct password confirmation
 	await page.getByLabel('Confirm password').fill(DEFAULT_PASSWORD);
 	await page.getByRole('button', { name: 'Create account' }).click();
-	await expect(page.getByText('Your account has been created, you can now log in')).toBeVisible();
+	await expect(page.getByText('Account created, you can now log in')).toBeVisible();
 	await expect(page.getByText('Failed to create record')).not.toBeVisible();
 
 	// It redirects back to login

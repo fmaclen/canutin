@@ -218,7 +218,7 @@
 
 			syncState.lastSyncedData = { ...formData };
 
-			toast.success(m.assets_add_success());
+			toast.success(m.assets_balance_updated());
 
 			const from = sanitizeFromParam(page.url.searchParams.get('from'));
 			if (from) {
@@ -227,7 +227,7 @@
 			}
 		} catch (error) {
 			console.error('Failed to update balance:', error);
-			toast.error(m.assets_add_failed());
+			toast.error(m.assets_balance_failed());
 			syncState.justSaved = false;
 		}
 	}
@@ -296,10 +296,10 @@
 			await assetsContext.createShare(asset.id, shareRecipientEmail, sharePerspective);
 			shareRecipientEmail = '';
 			sharePerspective = AssetSharesPerspectiveOptions.NORMAL;
-			toast.success('Share created');
+			toast.success(m.assets_share_created());
 		} catch (error) {
 			console.error('Failed to create share:', error);
-			toast.error(error instanceof Error ? error.message : 'Failed to create share');
+			toast.error(error instanceof Error ? error.message : m.assets_share_create_failed());
 		}
 	}
 
@@ -308,20 +308,20 @@
 
 		try {
 			await assetsContext.updateShareIncludeInNetWorth(incomingShare.id, includeInNetWorth);
-			toast.success('Preferences updated');
+			toast.success(m.assets_share_preferences_updated());
 		} catch (error) {
 			console.error('Failed to update share preferences:', error);
-			toast.error('Failed to update preferences');
+			toast.error(m.assets_share_preferences_failed());
 		}
 	}
 
 	async function handleRevokeShare(shareId: string) {
 		try {
 			await assetsContext.revokeShare(shareId);
-			toast.success('Share removed');
+			toast.success(m.assets_share_removed());
 		} catch (error) {
 			console.error('Failed to revoke share:', error);
-			toast.error('Failed to remove share');
+			toast.error(m.assets_share_remove_failed());
 		}
 	}
 
@@ -329,11 +329,11 @@
 		if (!incomingShare) return;
 		try {
 			await assetsContext.revokeShare(incomingShare.id);
-			toast.success('You left the shared asset');
+			toast.success(m.assets_share_left());
 			goto(resolve('/assets'));
 		} catch (error) {
 			console.error('Failed to leave share:', error);
-			toast.error('Failed to leave share');
+			toast.error(m.assets_share_leave_failed());
 		}
 	}
 

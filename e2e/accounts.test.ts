@@ -134,7 +134,7 @@ test('user can add a new account', async ({ page }) => {
 	await page.getByLabel('Category').fill('Savings');
 	await page.getByLabel('Balance', { exact: true }).fill('5000');
 	await page.getByRole('button', { name: 'Add' }).click();
-	await expect(page.getByText('Account added successfully')).toBeVisible();
+	await expect(page.getByText('Account added')).toBeVisible();
 	await expect(page).toHaveURL('/accounts');
 
 	const savingsRow = page.getByRole('row', { name: 'High Yield Savings' });
@@ -153,10 +153,10 @@ test('user can add a new account', async ({ page }) => {
 	await page.getByRole('option', { name: 'Debt' }).click();
 	await page.getByLabel('Category').fill('Credit card');
 	await page.getByLabel('Balance', { exact: true }).fill('-1200');
-	await expect(page.getByText('Account added successfully')).not.toBeVisible();
+	await expect(page.getByText('Account added')).not.toBeVisible();
 
 	await page.getByRole('button', { name: 'Add' }).click();
-	await expect(page.getByText('Account added successfully')).toBeVisible();
+	await expect(page.getByText('Account added')).toBeVisible();
 	await expect(page).toHaveURL('/accounts');
 
 	const creditCardRow = page.getByRole('row', { name: 'Credit Card' });
@@ -208,7 +208,7 @@ test('user can edit account details and update balance', async ({ page }) => {
 	await page.getByLabel('Balance group').click();
 	await page.getByRole('option', { name: 'Cash' }).click();
 	await page.getByRole('button', { name: 'Save' }).click();
-	await expect(page.getByText('Account updated successfully')).toBeVisible();
+	await expect(page.getByText('Account updated')).toBeVisible();
 	await expect(
 		page.getByText(
 			'This account has been updated elsewhere and your changes may be based on outdated data'
@@ -236,7 +236,7 @@ test('user can edit account details and update balance', async ({ page }) => {
 
 	await page.getByLabel('Balance', { exact: true }).fill('4500');
 	await page.getByRole('button', { name: 'Update' }).click();
-	await expect(page.getByText('Account added successfully')).toBeVisible();
+	await expect(page.getByText('Balance updated')).toBeVisible();
 	await expect(page).toHaveURL('/accounts');
 	await expect(
 		page.getByRole('row', { name: 'Business Checking' }).locator('td').nth(6)
@@ -246,7 +246,7 @@ test('user can edit account details and update balance', async ({ page }) => {
 	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}(\\?|$)`));
 	await page.getByLabel('Exclude from net worth').check();
 	await page.getByRole('button', { name: 'Save' }).click();
-	await expect(page.getByText('Account updated successfully').first()).toBeVisible();
+	await expect(page.getByText('Account updated').first()).toBeVisible();
 	await expect(page).toHaveURL('/accounts');
 
 	await page.getByRole('row', { name: 'Business Checking' }).getByRole('link').click();
@@ -254,7 +254,7 @@ test('user can edit account details and update balance', async ({ page }) => {
 	await expect(page.getByLabel('Exclude from net worth')).toBeChecked();
 	await page.getByLabel('Exclude from net worth').uncheck();
 	await page.getByRole('button', { name: 'Save' }).click();
-	await expect(page.getByText('Account updated successfully').first()).toBeVisible();
+	await expect(page.getByText('Account updated').first()).toBeVisible();
 	await expect(page).toHaveURL('/accounts');
 
 	await page.getByRole('row', { name: 'Business Checking' }).getByRole('link').click();
@@ -384,7 +384,7 @@ test('user can delete account and cascade deletes transactions and balances', as
 	await expect(dialog.getByText('Are you absolutely sure?')).toBeVisible();
 
 	await dialog.getByRole('button', { name: 'Continue' }).click();
-	await expect(page.getByText('Account deleted successfully')).toBeVisible();
+	await expect(page.getByText('Account deleted')).toBeVisible();
 	await expect(page).toHaveURL('/accounts');
 	await expect(page.getByRole('row', { name: 'Old Checking' })).not.toBeVisible();
 	expect(await recordExists('accounts', checkingAccount.id)).toBe(false);

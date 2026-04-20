@@ -258,9 +258,9 @@ test('user can add a new asset with type WHOLE or SHARES', async ({ page }) => {
 	await page.getByLabel('Book value').fill('12000');
 	await page.getByLabel('Market value').fill('15000');
 	await page.getByRole('button', { name: 'Add' }).click();
-	await expect(page.getByText('Asset added successfully')).toBeVisible();
+	await expect(page.getByText('Asset added')).toBeVisible();
 	await expect(page).toHaveURL('/assets');
-	await expect(page.getByText('Asset added successfully')).not.toBeVisible();
+	await expect(page.getByText('Asset added')).not.toBeVisible();
 
 	const wholeAssetRow = page.getByRole('row', { name: 'Gold Coins' });
 	await expect(wholeAssetRow).toBeVisible();
@@ -290,7 +290,7 @@ test('user can add a new asset with type WHOLE or SHARES', async ({ page }) => {
 	await page.getByLabel('Book price').fill('150');
 	await page.getByLabel('Market price').fill('180');
 	await page.getByRole('button', { name: 'Add' }).click();
-	await expect(page.getByText('Asset added successfully')).toBeVisible();
+	await expect(page.getByText('Asset added')).toBeVisible();
 	await expect(page).toHaveURL('/assets');
 
 	const sharesAssetRow = page.getByRole('row', { name: 'AAPL' });
@@ -321,7 +321,7 @@ test('optional currency fields show placeholder when not set', async ({ page }) 
 	await page.getByLabel('Category').fill('Art');
 	await page.getByLabel('Market value').fill('5000');
 	await page.getByRole('button', { name: 'Add' }).click();
-	await expect(page.getByText('Asset added successfully')).toBeVisible();
+	await expect(page.getByText('Asset added')).toBeVisible();
 	await expect(page).toHaveURL('/assets');
 
 	await page.getByRole('link', { name: 'Art Piece' }).click();
@@ -369,7 +369,7 @@ test('user can edit asset details and update balance', async ({ page }) => {
 	await page.getByLabel('Balance group').click();
 	await page.getByText('Investments').click();
 	await page.getByRole('button', { name: 'Save' }).click();
-	await expect(page.getByText('Asset updated successfully')).toBeVisible();
+	await expect(page.getByText('Asset updated')).toBeVisible();
 	await expect(
 		page.getByText(
 			'This asset has been updated elsewhere and your changes may be based on outdated data'
@@ -395,7 +395,7 @@ test('user can edit asset details and update balance', async ({ page }) => {
 	await page.getByLabel('Market value').fill('12500');
 	await page.getByLabel('Book value').fill('10000');
 	await page.getByRole('button', { name: 'Update' }).click();
-	await expect(page.getByText('Asset added successfully')).toBeVisible();
+	await expect(page.getByText('Balance updated')).toBeVisible();
 	await expect(page).toHaveURL('/assets');
 
 	const updatedRow = page.getByRole('row', { name: 'Rare Coin Collection' });
@@ -408,7 +408,7 @@ test('user can edit asset details and update balance', async ({ page }) => {
 	await expect(page).toHaveURL(new RegExp(`/assets/${wholeAsset.id}(\\?|$)`));
 	await page.getByLabel('Exclude from net worth').check();
 	await page.getByRole('button', { name: 'Save' }).click();
-	await expect(page.getByText('Asset updated successfully').first()).toBeVisible();
+	await expect(page.getByText('Asset updated').first()).toBeVisible();
 	await expect(page).toHaveURL('/assets');
 
 	await page.getByRole('row', { name: 'Rare Coin Collection' }).getByRole('link').click();
@@ -416,7 +416,7 @@ test('user can edit asset details and update balance', async ({ page }) => {
 	await expect(page.getByLabel('Exclude from net worth')).toBeChecked();
 	await page.getByLabel('Exclude from net worth').uncheck();
 	await page.getByRole('button', { name: 'Save' }).click();
-	await expect(page.getByText('Asset updated successfully').first()).toBeVisible();
+	await expect(page.getByText('Asset updated').first()).toBeVisible();
 	await expect(page).toHaveURL('/assets');
 
 	await page.getByRole('row', { name: 'Rare Coin Collection' }).getByRole('link').click();
@@ -463,7 +463,7 @@ test('user can edit shares asset and update balance', async ({ page }) => {
 	await page.getByLabel('Symbol').fill('NVDA');
 	await page.getByLabel('Category').fill('Securities');
 	await page.getByRole('button', { name: 'Save' }).click();
-	await expect(page.getByText('Asset updated successfully')).toBeVisible();
+	await expect(page.getByText('Asset updated')).toBeVisible();
 	await expect(page).toHaveURL('/assets');
 	await expect(page.getByRole('row', { name: 'Apple Inc' })).not.toBeVisible();
 
@@ -476,7 +476,7 @@ test('user can edit shares asset and update balance', async ({ page }) => {
 	await page.getByLabel('Market price').fill('75');
 	await page.getByLabel('Book price').fill('50');
 	await page.getByRole('button', { name: 'Update' }).click();
-	await expect(page.getByText('Asset added successfully')).toBeVisible();
+	await expect(page.getByText('Balance updated')).toBeVisible();
 	await expect(page).toHaveURL('/assets');
 
 	const updatedRow = page.getByRole('row', { name: 'NVIDIA Corporation' });
@@ -608,7 +608,7 @@ test('user can delete asset and cascade deletes balances', async ({ page }) => {
 	await expect(dialog.getByText('Are you absolutely sure?')).toBeVisible();
 
 	await dialog.getByRole('button', { name: 'Continue' }).click();
-	await expect(page.getByText('Asset deleted successfully')).toBeVisible();
+	await expect(page.getByText('Asset deleted')).toBeVisible();
 	await expect(page).toHaveURL('/assets');
 	await expect(page.getByRole('row', { name: 'Old Investment' })).not.toBeVisible();
 
