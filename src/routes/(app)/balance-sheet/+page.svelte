@@ -74,10 +74,13 @@
 
 		function upsert(group: BalanceGroup, typeId: string, name: string) {
 			const map = typeMaps[group];
-			let entry = map.get(typeId);
+			const trimmed = name.trim();
+			const key =
+				!trimmed || trimmed === '(Unknown)' ? `id:${typeId}` : `name:${trimmed.toLowerCase()}`;
+			let entry = map.get(key);
 			if (!entry) {
-				entry = { id: typeId, name, total: 0, items: [] };
-				map.set(typeId, entry);
+				entry = { id: key, name, total: 0, items: [] };
+				map.set(key, entry);
 			}
 			return entry;
 		}
