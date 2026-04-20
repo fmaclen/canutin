@@ -165,6 +165,7 @@
 	}
 	body {
 		@apply bg-background text-foreground;
+		text-wrap: pretty;
 	}
 }
 
