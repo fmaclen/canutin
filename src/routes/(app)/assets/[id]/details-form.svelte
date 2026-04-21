@@ -6,6 +6,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
+	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import { AssetsBalanceGroupOptions, AssetsTypeOptions } from '$lib/pocketbase.schema';
 
@@ -15,6 +16,7 @@
 			balanceGroup: string;
 			assetTypeName: string;
 			symbol: string;
+			notes: string;
 			excluded: boolean;
 			sold: boolean;
 			type: string;
@@ -117,6 +119,16 @@
 						</Select.Item>
 					</Select.Content>
 				</Select.Root>
+			</FormFieldRow>
+
+			<FormFieldRow itemsAlignment="items-start">
+				<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1 md:pt-2">
+					<Label for="notes" class="justify-start pr-0 md:justify-end"
+						>{m.assets_label_notes()}</Label
+					>
+					<span class="text-muted-foreground text-sm">{m.assets_text_optional()}</span>
+				</div>
+				<Textarea id="notes" bind:value={formData.notes} class="bg-background" {disabled} />
 			</FormFieldRow>
 		</Fieldset>
 

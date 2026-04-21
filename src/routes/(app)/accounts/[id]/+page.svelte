@@ -55,6 +55,7 @@
 		institution: '',
 		balanceGroup: '' as AccountsBalanceGroupOptions | '',
 		accountTypeName: '',
+		notes: '',
 		excluded: false,
 		closed: false,
 		value: ''
@@ -80,6 +81,7 @@
 			formData.institution !== syncState.lastSyncedData.institution ||
 			formData.balanceGroup !== syncState.lastSyncedData.balanceGroup ||
 			formData.accountTypeName !== syncState.lastSyncedData.accountTypeName ||
+			formData.notes !== syncState.lastSyncedData.notes ||
 			formData.excluded !== syncState.lastSyncedData.excluded ||
 			formData.closed !== syncState.lastSyncedData.closed
 		);
@@ -87,7 +89,7 @@
 
 	function getAccountVersion(accountData: typeof account): string {
 		if (!accountData) return '';
-		return `${accountData.updated || accountData.created}_${accountData.name}_${accountData.balanceGroup}_${accountData.institution}_${accountData.excluded}_${accountData.closed}`;
+		return `${accountData.updated || accountData.created}_${accountData.name}_${accountData.balanceGroup}_${accountData.institution}_${accountData.notes}_${accountData.excluded}_${accountData.closed}`;
 	}
 
 	async function syncFormWithAccount(accountData: typeof account) {
@@ -98,6 +100,7 @@
 			institution: accountData.institution ?? '',
 			balanceGroup: accountData.balanceGroup,
 			accountTypeName: '',
+			notes: accountData.notes ?? '',
 			excluded: Boolean(accountData.excluded),
 			closed: Boolean(accountData.closed),
 			value: ''
@@ -203,6 +206,7 @@
 				balanceGroup: formData.balanceGroup as AccountsBalanceGroupOptions,
 				balanceType: balanceTypeId,
 				institution: formData.institution.trim() || undefined,
+				notes: formData.notes.trim() || undefined,
 				excluded: formData.excluded ? new Date().toISOString() : null,
 				closed: formData.closed ? new Date().toISOString() : null
 			};

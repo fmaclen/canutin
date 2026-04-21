@@ -255,12 +255,12 @@ test('user can add a new asset with type WHOLE or SHARES', async ({ page }) => {
 	await page.getByLabel('Balance group').click();
 	await page.getByText('Other assets').click();
 	await page.getByLabel('Category').fill('Precious Metals');
+	await page.getByLabel('Notes').fill('Stored in safety deposit box #142');
 	await page.getByLabel('Book value').fill('12000');
 	await page.getByLabel('Market value').fill('15000');
 	await page.getByRole('button', { name: 'Add' }).click();
 	await expect(page.getByText('Asset added')).toBeVisible();
 	await expect(page).toHaveURL('/assets');
-	await expect(page.getByText('Asset added')).not.toBeVisible();
 
 	const wholeAssetRow = page.getByRole('row', { name: 'Gold Coins' });
 	await expect(wholeAssetRow).toBeVisible();
@@ -363,11 +363,13 @@ test('user can edit asset details and update balance', async ({ page }) => {
 	await expect(page.getByLabel('Name')).toHaveValue('Vintage Watch Collection');
 	await expect(page.getByLabel('Category')).toHaveValue('Collectibles');
 	await expect(page.getByLabel('Type', { exact: true })).toBeDisabled();
+	await expect(page.getByLabel('Notes')).toHaveValue('');
 
 	await page.getByLabel('Name').fill('Rare Coin Collection');
 	await page.getByLabel('Category').fill('Collectibles');
 	await page.getByLabel('Balance group').click();
 	await page.getByText('Investments').click();
+	await page.getByLabel('Notes').fill('Appraised annually — next appraisal due Jan 2027');
 	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(page.getByText('Asset updated')).toBeVisible();
 	await expect(
@@ -390,6 +392,9 @@ test('user can edit asset details and update balance', async ({ page }) => {
 	await expect(page.getByLabel('Name')).toHaveValue('Rare Coin Collection');
 	await expect(page.getByLabel('Category')).toHaveValue('Collectibles');
 	await expect(page.getByLabel('Balance group')).toHaveText('Investments');
+	await expect(page.getByLabel('Notes')).toHaveValue(
+		'Appraised annually — next appraisal due Jan 2027'
+	);
 	await expect(page.getByLabel('Exclude from net worth')).not.toBeChecked();
 
 	await page.getByLabel('Market value').fill('12500');

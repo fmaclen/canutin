@@ -149,6 +149,7 @@ export type AccountsRecord = {
 	importSession?: RecordIdString
 	institution?: string
 	name: string
+	notes?: string
 	owner: RecordIdString
 	updated: IsoAutoDateString
 }
@@ -206,6 +207,7 @@ export type AssetsRecord = {
 	id: string
 	importSession?: RecordIdString
 	name: string
+	notes?: string
 	owner: RecordIdString
 	sold?: IsoDateString
 	symbol?: string
@@ -255,6 +257,7 @@ export type TransactionsRecord = {
 	id: string
 	importSession?: RecordIdString
 	labels?: RecordIdString[]
+	notes?: string
 	owner: RecordIdString
 	updated: IsoAutoDateString
 	value?: number

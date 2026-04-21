@@ -19,6 +19,7 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import { AccountsBalanceGroupOptions } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
@@ -33,6 +34,7 @@
 	let institution = $state('');
 	let balanceGroup: AccountsBalanceGroupOptions | '' = $state('');
 	let accountTypeName = $state('');
+	let notes = $state('');
 	let excluded = $state(false);
 	let closed = $state(false);
 	let value = $state('');
@@ -51,6 +53,7 @@
 				balanceType: balanceTypeId,
 				owner: currentOwnerId,
 				institution: institution.trim() || undefined,
+				notes: notes.trim() || undefined,
 				excluded: excluded ? new Date().toISOString() : undefined,
 				closed: closed ? new Date().toISOString() : undefined
 			};
@@ -196,6 +199,16 @@
 								</Select.Item>
 							</Select.Content>
 						</Select.Root>
+					</FormFieldRow>
+
+					<FormFieldRow itemsAlignment="items-start">
+						<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1 md:pt-2">
+							<Label for="notes" class="justify-start pr-0 md:justify-end"
+								>{m.accounts_label_notes()}</Label
+							>
+							<span class="text-muted-foreground text-sm">{m.accounts_text_optional()}</span>
+						</div>
+						<Textarea id="notes" bind:value={notes} class="bg-background" />
 					</FormFieldRow>
 				</Fieldset>
 
