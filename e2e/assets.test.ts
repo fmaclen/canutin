@@ -261,6 +261,9 @@ test('user can add a new asset with type WHOLE or SHARES', async ({ page }) => {
 	await page.getByRole('button', { name: 'Add' }).click();
 	await expect(page.getByText('Asset added')).toBeVisible();
 	await expect(page).toHaveURL('/assets');
+	// HACK: move the mouse off the toast so svelte-sonner doesn't pause its
+	// auto-dismiss timer while the cursor lingers at the post-click position.
+	await page.mouse.move(0, 0);
 	await expect(page.getByText('Asset added')).not.toBeVisible();
 
 	const wholeAssetRow = page.getByRole('row', { name: 'Gold Coins' });
