@@ -1,7 +1,9 @@
 <script lang="ts">
+	import { toast } from 'svelte-sonner';
 	import { slide } from 'svelte/transition';
 
 	import { afterNavigate } from '$app/navigation';
+	import { getAccountsContext } from '$lib/accounts.svelte';
 	import Link from '$lib/components/link.svelte';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
@@ -14,11 +16,24 @@
 	import { m } from '$lib/paraglide/messages';
 	import { getTransactionsContext } from '$lib/transactions.svelte';
 
+	import AddAccountToastLink from './add-account-toast-link.svelte';
 	import TransactionFilters from './transaction-filters.svelte';
 	import TransactionSummary from './transaction-summary.svelte';
 	import TransactionTable from './transaction-table.svelte';
 
 	const txContext = getTransactionsContext();
+	const accountsContext = getAccountsContext();
+	const openAccounts = $derived(accountsContext.accounts.filter((a) => !a.closed && a.canWrite));
+
+	function handleAddTransactionClick(event: MouseEvent) {
+		if (accountsContext.isLoading || openAccounts.length > 0) return;
+
+		event.preventDefault();
+		toast.warning(m.transactions_add_account_required_title(), {
+			description: m.transactions_add_account_required_description(),
+			action: AddAccountToastLink
+		});
+	}
 
 	// Sync filters from URL after navigation (e.g., clicking sidebar link)
 	afterNavigate(() => {
@@ -52,7 +67,9 @@
 		</Breadcrumb.Root>
 	</div>
 	<nav class="px-4">
-		<Link href="/transactions/add" class="text-sm">{m.transactions_add_link()}</Link>
+		<Link href="/transactions/add" class="text-sm" onclick={handleAddTransactionClick}
+			>{m.transactions_add_link()}</Link
+		>
 	</nav>
 </header>
 
