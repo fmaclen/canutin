@@ -45,6 +45,7 @@ export type TransactionRow = {
 	dateIso: string;
 	dateValue: number;
 	description: string;
+	labelIds: string[];
 	labels: string[];
 	accountName: string;
 	accountId: string | null;
@@ -58,9 +59,11 @@ class TransactionsContext {
 	kind: KindFilter = $state('all');
 	search: string = $state('');
 	accountFilter: string | null = $state(null);
+	labelFilter: string | null = $state(null);
 	page: number = $state(1);
 	isLoading: boolean = $state(true);
 	rawTransactions: TransactionsResponse<TransactionExpand>[] = $state([]);
+	transactionLabels: TransactionLabelsResponse[] = $state([]);
 	sortColumn: TransactionSortColumn | null = $state('date');
 	sortDirection: SortDirection | null = $state('desc');
 
@@ -116,6 +119,7 @@ class TransactionsContext {
 		this.kind = 'all';
 		this.search = '';
 		this.accountFilter = null;
+		this.labelFilter = null;
 
 		const sortParam = params.get('sort');
 		const dirParam = params.get('dir');
@@ -169,6 +173,16 @@ class TransactionsContext {
 			}
 		}
 
+		const labelParam = params.get('label');
+		if (labelParam) {
+			const isValid =
+				this.transactionLabels.length === 0 ||
+				this.transactionLabels.some((l) => l.id === labelParam);
+			if (isValid) {
+				this.labelFilter = labelParam;
+			}
+		}
+
 		if (shouldRefresh) {
 			this.refreshTransactions();
 		}
@@ -209,12 +223,32 @@ class TransactionsContext {
 		} else {
 			params.delete('account');
 		}
+		if (this.labelFilter) {
+			params.set('label', this.labelFilter);
+		} else {
+			params.delete('label');
+		}
 	}
 
 	private async init() {
 		// Subscribe FIRST to avoid missing events during initial fetch
 		this.realtimeSubscribe();
+		this.realtimeSubscribeLabels();
+		await this.refreshLabels();
 		await this.refreshTransactions();
+	}
+
+	private async refreshLabels() {
+		try {
+			this.transactionLabels = await this._pb.authedClient
+				.collection('transactionLabels')
+				.getFullList<TransactionLabelsResponse>({
+					sort: 'name',
+					requestKey: 'transactionLabels:list'
+				});
+		} catch (error) {
+			this._pb.handleConnectionError(error, 'transactionLabels', 'refresh');
+		}
 	}
 
 	setSearch(query: string) {
@@ -321,6 +355,15 @@ class TransactionsContext {
 			);
 	}
 
+	private realtimeSubscribeLabels() {
+		this._pb.authedClient
+			.collection('transactionLabels')
+			.subscribe('*', () => this.refreshLabels())
+			.catch((error) =>
+				this._pb.handleSubscriptionError(error, 'transactionLabels', 'subscribe_labels')
+			);
+	}
+
 	private async onTransactionEvent(e: RecordSubscription<TransactionsResponse<TransactionExpand>>) {
 		if (e.action === 'create') {
 			const txn = await this._pb.authedClient
@@ -408,6 +451,7 @@ class TransactionsContext {
 				.map((label) => label.name)
 				.filter((name): name is string => Boolean(name))
 				.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+			const labelIds = txn.labels ?? [];
 			const rawValue = txn.value ?? 0;
 			const value = contextAccount?.perspective === 'INVERSE' ? -rawValue : rawValue;
 			return {
@@ -416,6 +460,7 @@ class TransactionsContext {
 				dateIso,
 				dateValue,
 				description: (txn.description ?? '').trim(),
+				labelIds,
 				labels: labelNames,
 				accountName,
 				accountId: txn.account ?? null,
@@ -446,8 +491,9 @@ class TransactionsContext {
 			if (fromTime !== null && time < fromTime) return false;
 			if (toTime !== null && time >= toTime) return false;
 			if (this.accountFilter && row.accountId !== this.accountFilter) return false;
-			if (this.kind === 'credits') return row.value > 0;
-			if (this.kind === 'debits') return row.value < 0;
+			if (this.labelFilter && !row.labelIds.includes(this.labelFilter)) return false;
+			if (this.kind === 'credits') return row.value > 0 && !row.excluded;
+			if (this.kind === 'debits') return row.value < 0 && !row.excluded;
 			if (this.kind === 'excluded') return row.excluded;
 			return true;
 		});
@@ -571,6 +617,18 @@ class TransactionsContext {
 		this.refreshTransactions();
 	}
 
+	setLabelFilter(labelId: string | null) {
+		this.labelFilter = labelId;
+		this.page = 1;
+
+		const currentPage = get(page);
+		const params = new SvelteURLSearchParams(currentPage.url.searchParams);
+		this.syncFiltersToParams(params);
+
+		this.updateUrl(params);
+		this.refreshTransactions();
+	}
+
 	get sortState(): SortState<TransactionSortColumn> {
 		return { column: this.sortColumn, direction: this.sortDirection };
 	}
@@ -658,6 +716,7 @@ class TransactionsContext {
 
 	dispose() {
 		this._pb.authedClient.collection('transactions').unsubscribe();
+		this._pb.authedClient.collection('transactionLabels').unsubscribe();
 	}
 }
 

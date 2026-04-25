@@ -4,7 +4,13 @@ import { addMonths, format, startOfMonth, startOfYear, subYears } from 'date-fns
 
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
-import { seedAccount, seedAccountBalance, seedTransaction, seedUser } from './pocketbase.helpers';
+import {
+	seedAccount,
+	seedAccountBalance,
+	seedTransaction,
+	seedTransactionLabel,
+	seedUser
+} from './pocketbase.helpers';
 
 type PeriodOption =
 	| 'this-month'
@@ -50,7 +56,8 @@ test('transactions table responds to period and type filters', async ({ page }) 
 		{ description: 'Bonus Payout', value: 1200, monthsOffset: -8, day: 14 },
 		{ description: 'Holiday Flight', value: -500, monthsOffset: -13, day: 16 },
 		{ description: 'Vintage Sale', value: 350, monthsOffset: -18, day: 18 },
-		{ description: 'Excluded Adjustment', value: 75, monthsOffset: 0, day: 20, excluded: true }
+		{ description: 'Excluded Adjustment', value: 75, monthsOffset: 0, day: 20, excluded: true },
+		{ description: 'Excluded Fee', value: -45, monthsOffset: 0, day: 21, excluded: true }
 	];
 
 	const transactions = [] as Array<{
@@ -143,8 +150,8 @@ test('transactions table responds to period and type filters', async ({ page }) 
 		predicate: (txn: { value: number; excluded: boolean }) => boolean;
 	}> = [
 		{ label: 'Any amounts', predicate: () => true },
-		{ label: 'Credits only', predicate: (txn) => txn.value > 0 },
-		{ label: 'Debits only', predicate: (txn) => txn.value < 0 },
+		{ label: 'Credits only', predicate: (txn) => txn.value > 0 && !txn.excluded },
+		{ label: 'Debits only', predicate: (txn) => txn.value < 0 && !txn.excluded },
 		{ label: 'Excluded only', predicate: (txn) => txn.excluded }
 	];
 
@@ -1045,6 +1052,85 @@ test('transactions can be filtered by account', async ({ page }) => {
 
 	// URL should no longer contain account parameter
 	await expect(page).not.toHaveURL(/account=/);
+});
+
+test('transactions can be filtered by label', async ({ page }) => {
+	const user = await seedUser('nora');
+
+	const account = await seedAccount({
+		name: 'Household Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 2500
+	});
+
+	const groceriesLabel = await seedTransactionLabel({ name: 'Groceries', owner: user.id });
+	const utilitiesLabel = await seedTransactionLabel({ name: 'Utilities', owner: user.id });
+	const now = new UTCDate();
+
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Farm Stand Produce',
+		value: -42,
+		labels: [groceriesLabel.id]
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Electric Company Bill',
+		value: -118,
+		labels: [utilitiesLabel.id]
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Unlabeled Cash Withdrawal',
+		value: -80
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	await expect(page.getByText('Farm Stand Produce')).toBeVisible();
+	await expect(page.getByText('Electric Company Bill')).toBeVisible();
+	await expect(page.getByText('Unlabeled Cash Withdrawal')).toBeVisible();
+	await expect(page.getByLabel('Label', { exact: true })).toContainText('All labels');
+
+	await page.getByLabel('Label', { exact: true }).click();
+	await expect(page.getByRole('option', { name: 'Groceries' })).toBeVisible();
+	await expect(page.getByRole('option', { name: 'Utilities' })).toBeVisible();
+	await page.getByRole('option', { name: 'Groceries' }).click();
+
+	await expect(page.getByLabel('Label', { exact: true })).toContainText('Groceries');
+	await expect(page.getByText('Farm Stand Produce')).toBeVisible();
+	await expect(page.getByText('Electric Company Bill')).not.toBeVisible();
+	await expect(page.getByText('Unlabeled Cash Withdrawal')).not.toBeVisible();
+	await expect(page).toHaveURL(/label=/);
+
+	await page.reload();
+	await expect(page.getByLabel('Label', { exact: true })).toContainText('Groceries');
+	await expect(page.getByText('Farm Stand Produce')).toBeVisible();
+	await expect(page.getByText('Electric Company Bill')).not.toBeVisible();
+	await expect(page.getByText('Unlabeled Cash Withdrawal')).not.toBeVisible();
+
+	await page.getByLabel('Clear label filter').click();
+
+	await expect(page.getByLabel('Label', { exact: true })).toContainText('All labels');
+	await expect(page.getByText('Farm Stand Produce')).toBeVisible();
+	await expect(page.getByText('Electric Company Bill')).toBeVisible();
+	await expect(page.getByText('Unlabeled Cash Withdrawal')).toBeVisible();
+	await expect(page).not.toHaveURL(/label=/);
 });
 
 test('account filter works with other filters combined', async ({ page }) => {

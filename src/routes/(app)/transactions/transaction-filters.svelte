@@ -35,6 +35,11 @@
 			? accountsContext.accounts.find((a) => a.id === txContext.accountFilter)
 			: null
 	);
+	let selectedLabel = $derived(
+		txContext.labelFilter
+			? txContext.transactionLabels.find((label) => label.id === txContext.labelFilter)
+			: null
+	);
 
 	let periodPopoverOpen = $state(false);
 
@@ -162,7 +167,7 @@
 	<Popover.Root bind:open={periodPopoverOpen}>
 		<Popover.SelectTrigger
 			aria-label={m.transactions_filter_period_label()}
-			class="bg-background w-full sm:w-48"
+			class="bg-background w-full sm:w-fit"
 		>
 			<span class="truncate">{getPeriodTriggerText()}</span>
 		</Popover.SelectTrigger>
@@ -199,7 +204,7 @@
 	>
 		<Select.Trigger
 			aria-label={m.transactions_filter_kind_label()}
-			class="bg-background w-full sm:w-48"
+			class="bg-background w-full sm:w-fit"
 		>
 			{kindLabel(txContext.kind)}
 		</Select.Trigger>
@@ -216,7 +221,7 @@
 	>
 		<Select.Trigger
 			aria-label={m.transactions_filter_account_label()}
-			class="bg-background w-full sm:w-auto sm:max-w-64 sm:min-w-48"
+			class="bg-background w-full sm:w-fit sm:max-w-64"
 		>
 			{#if selectedAccount}
 				<div class="flex w-full items-center gap-2">
@@ -264,6 +269,46 @@
 						{/each}
 					</Select.Group>
 				{/if}
+			{/each}
+		</Select.Content>
+	</Select.Root>
+	<Select.Root
+		type="single"
+		value={txContext.labelFilter ?? ''}
+		onValueChange={(v) => txContext.setLabelFilter(v || null)}
+	>
+		<Select.Trigger
+			aria-label={m.transactions_filter_label_label()}
+			class="bg-background w-full sm:w-fit sm:max-w-64"
+		>
+			{#if selectedLabel}
+				<div class="flex w-full items-center gap-2">
+					<span class="max-w-40 truncate">{selectedLabel.name}</span>
+					<ClearButton
+						class="ml-auto"
+						onclick={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+							txContext.setLabelFilter(null);
+						}}
+						onpointerdown={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+						}}
+						onpointerup={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+						}}
+						aria-label={m.transactions_filter_label_clear()}
+					/>
+				</div>
+			{:else}
+				{m.transactions_filter_label_all()}
+			{/if}
+		</Select.Trigger>
+		<Select.Content>
+			{#each txContext.transactionLabels as label (label.id)}
+				<Select.Item value={label.id}>{label.name}</Select.Item>
 			{/each}
 		</Select.Content>
 	</Select.Root>

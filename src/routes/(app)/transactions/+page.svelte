@@ -50,6 +50,8 @@
 	$effect(() => {
 		void txContext.period;
 		void txContext.kind;
+		void txContext.accountFilter;
+		void txContext.labelFilter;
 		txContext.page = 1;
 	});
 </script>
