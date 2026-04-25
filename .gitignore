@@ -35,3 +35,7 @@ src/lib/paraglide
 # Temporary files
 /temp
 SCRATCHPAD.md
+
+# Local coding agent package manager noise
+.agents/package.json
+.agents/package-lock.json
