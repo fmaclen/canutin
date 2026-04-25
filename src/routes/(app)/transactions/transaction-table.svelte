@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
 	import Link from '$lib/components/link.svelte';
@@ -12,13 +13,13 @@
 	import { m } from '$lib/paraglide/messages';
 	import { getTransactionsContext, type TransactionSortColumn } from '$lib/transactions.svelte';
 
-	const fromQuery = $derived.by(() => {
-		const currentUrl = page.url;
-		if (!currentUrl) return '';
-		return `?from=${encodeURIComponent(currentUrl.pathname + currentUrl.search)}`;
-	});
-
 	const txContext = getTransactionsContext();
+
+	async function openTransaction(event: MouseEvent, id: string) {
+		event.preventDefault();
+		const from = window.location.pathname + window.location.search;
+		await goto(resolve(`/transactions/${id}?from=${encodeURIComponent(from)}`));
+	}
 
 	function handleSort(column: string) {
 		txContext.setSort(column as TransactionSortColumn);
@@ -133,14 +134,17 @@
 						<Table.Cell>
 							{#if row.description}
 								<Link
-									href="/transactions/{row.id}{fromQuery}"
+									href="/transactions/{row.id}"
+									onclick={(event) => openTransaction(event, row.id)}
 									class="text-foreground/90 text-sm font-medium"
 								>
 									{row.description}
 								</Link>
 							{:else}
-								<Link href="/transactions/{row.id}{fromQuery}" class="text-muted-foreground text-sm"
-									>~</Link
+								<Link
+									href="/transactions/{row.id}"
+									onclick={(event) => openTransaction(event, row.id)}
+									class="text-muted-foreground text-sm">~</Link
 								>
 							{/if}
 						</Table.Cell>

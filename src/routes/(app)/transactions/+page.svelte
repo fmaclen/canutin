@@ -36,7 +36,8 @@
 	}
 
 	// Sync filters from URL after navigation (e.g., clicking sidebar link)
-	afterNavigate(() => {
+	afterNavigate(({ to }) => {
+		if (to?.url.pathname !== '/transactions') return;
 		txContext.syncFromUrl();
 	});
 

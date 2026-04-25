@@ -1118,6 +1118,15 @@ test('transactions can be filtered by label', async ({ page }) => {
 	await expect(page.getByText('Unlabeled Cash Withdrawal')).not.toBeVisible();
 	await expect(page).toHaveURL(/label=/);
 
+	await page.getByRole('link', { name: 'Farm Stand Produce' }).click();
+	await expect(page).toHaveURL(/\/transactions\//);
+
+	await page.goBack();
+	await expect(page.getByLabel('Label', { exact: true })).toContainText('Groceries');
+	await expect(page.getByText('Farm Stand Produce')).toBeVisible();
+	await expect(page.getByText('Electric Company Bill')).not.toBeVisible();
+	await expect(page).toHaveURL(/label=/);
+
 	await page.reload();
 	await expect(page.getByLabel('Label', { exact: true })).toContainText('Groceries');
 	await expect(page.getByText('Farm Stand Produce')).toBeVisible();
@@ -1131,6 +1140,15 @@ test('transactions can be filtered by label', async ({ page }) => {
 	await expect(page.getByText('Electric Company Bill')).toBeVisible();
 	await expect(page.getByText('Unlabeled Cash Withdrawal')).toBeVisible();
 	await expect(page).not.toHaveURL(/label=/);
+
+	await page.getByRole('link', { name: 'Farm Stand Produce' }).click();
+	await expect(page).toHaveURL(/\/transactions\//);
+	await page.getByRole('button', { name: 'Save' }).click();
+	await expect(page.getByText('Transaction updated').first()).toBeVisible();
+	await expect(page).toHaveURL('/transactions');
+	await expect(page).not.toHaveURL(/label=/);
+	await expect(page.getByLabel('Label', { exact: true })).toContainText('All labels');
+	await expect(page.getByText('Electric Company Bill')).toBeVisible();
 });
 
 test('account filter works with other filters combined', async ({ page }) => {
