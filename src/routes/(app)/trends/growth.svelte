@@ -47,6 +47,8 @@
 	};
 
 	let series: Row[] = $state([]);
+	const firstSeriesRow = $derived(series[0] ?? null);
+	const lastSeriesRow = $derived(series.at(-1) ?? null);
 
 	const chartConfig = {
 		net: { label: m.trends_series_net_label(), color: '#45403C' },
@@ -165,7 +167,15 @@
 </script>
 
 {#if series.length}
-	<div class="bg-background overflow-visible rounded-sm shadow-md">
+	<div
+		class="bg-background overflow-visible rounded-sm shadow-md"
+		data-growth-period={period}
+		data-growth-points={series.length}
+		data-growth-start={firstSeriesRow?.date.toISOString().slice(0, 10)}
+		data-growth-end={lastSeriesRow?.date.toISOString().slice(0, 10)}
+		data-growth-start-net={firstSeriesRow?.net}
+		data-growth-end-net={lastSeriesRow?.net}
+	>
 		<Chart.Container config={chartConfig} class="h-96 w-full">
 			<LineChart
 				data={series}

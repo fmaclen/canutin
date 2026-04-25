@@ -196,6 +196,7 @@
 	"period_6m_label": "6M",
 	"period_ytd_label": "YTD",
 	"period_1y_label": "1A",
+	"period_2y_label": "2A",
 	"period_5y_label": "5A",
 	"period_max_label": "MÁX",
 	"transactions_filter_period_label": "Período",

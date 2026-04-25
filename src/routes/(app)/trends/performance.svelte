@@ -41,6 +41,7 @@
 		{ key: '6m', label: m.period_6m_label(), offset: { months: 6 } },
 		{ key: 'ytd', label: m.period_ytd_label(), offset: { ytd: true } },
 		{ key: '1y', label: m.period_1y_label(), offset: { years: 1 } },
+		{ key: '2y', label: m.period_2y_label(), offset: { years: 2 } },
 		{ key: '5y', label: m.period_5y_label(), offset: { years: 5 } },
 		{ key: 'max', label: m.period_max_label(), offset: { max: true } }
 	];
