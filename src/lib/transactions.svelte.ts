@@ -190,19 +190,26 @@ class TransactionsContext {
 	}
 
 	private updateUrl(params: SvelteURLSearchParams) {
-		const currentPage = get(page);
+		const currentUrl = this.currentUrl;
 		const search = params.toString();
-		// Using URL to build the new href (not reactive, just for string building)
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity
-		const newUrl = new URL(currentPage.url.href);
+		const newUrl = new URL(currentUrl.href);
 		newUrl.search = search;
 
-		if (newUrl.href !== currentPage.url.href) {
+		if (newUrl.href !== currentUrl.href) {
 			if (browser) {
 				window.history.replaceState(window.history.state, '', newUrl);
 			}
 		}
 		this.currentListPath = newUrl.pathname + newUrl.search;
+	}
+
+	private get currentUrl() {
+		if (browser) {
+			return new URL(window.location.href);
+		}
+
+		return get(page).url;
 	}
 
 	private syncFiltersToParams(params: SvelteURLSearchParams) {
@@ -259,8 +266,7 @@ class TransactionsContext {
 	}
 
 	private syncSearchToUrl() {
-		const currentPage = get(page);
-		const params = new SvelteURLSearchParams(currentPage.url.searchParams);
+		const params = new SvelteURLSearchParams(this.currentUrl.searchParams);
 
 		if (this.search.trim()) {
 			params.set('q', this.search.trim());
@@ -556,8 +562,7 @@ class TransactionsContext {
 		this._customToDate = to;
 		this._customLabel = null;
 
-		const currentPage = get(page);
-		const params = new SvelteURLSearchParams(currentPage.url.searchParams);
+		const params = new SvelteURLSearchParams(this.currentUrl.searchParams);
 
 		params.delete('period');
 		params.set('periodFrom', toPocketBaseDateString(from).split(' ')[0]);
@@ -574,8 +579,7 @@ class TransactionsContext {
 		this._customLabel = null;
 		this.period = option;
 
-		const currentPage = get(page);
-		const params = new SvelteURLSearchParams(currentPage.url.searchParams);
+		const params = new SvelteURLSearchParams(this.currentUrl.searchParams);
 
 		params.delete('periodFrom');
 		params.delete('periodTo');
@@ -590,8 +594,7 @@ class TransactionsContext {
 	setKind(option: KindFilter) {
 		this.kind = option;
 
-		const currentPage = get(page);
-		const params = new SvelteURLSearchParams(currentPage.url.searchParams);
+		const params = new SvelteURLSearchParams(this.currentUrl.searchParams);
 		this.syncFiltersToParams(params);
 
 		this.updateUrl(params);
@@ -602,8 +605,7 @@ class TransactionsContext {
 		this.accountFilter = accountId;
 		this.page = 1;
 
-		const currentPage = get(page);
-		const params = new SvelteURLSearchParams(currentPage.url.searchParams);
+		const params = new SvelteURLSearchParams(this.currentUrl.searchParams);
 		this.syncFiltersToParams(params);
 
 		this.updateUrl(params);
@@ -614,8 +616,7 @@ class TransactionsContext {
 		this.labelFilter = labelId;
 		this.page = 1;
 
-		const currentPage = get(page);
-		const params = new SvelteURLSearchParams(currentPage.url.searchParams);
+		const params = new SvelteURLSearchParams(this.currentUrl.searchParams);
 		this.syncFiltersToParams(params);
 
 		this.updateUrl(params);
@@ -637,8 +638,7 @@ class TransactionsContext {
 		}
 		this.page = 1;
 
-		const currentPage = get(page);
-		const params = new SvelteURLSearchParams(currentPage.url.searchParams);
+		const params = new SvelteURLSearchParams(this.currentUrl.searchParams);
 		params.set('sort', this.sortColumn);
 		params.set('dir', this.sortDirection);
 
