@@ -329,11 +329,11 @@ test('transactions page shows correct count and net balance in summary', async (
 	await expect(summaryRegion.getByText('$450.67')).toBeVisible();
 
 	// Change filter to "Credits only"
-	// Expected: count = 3 (2 regular credits + 1 excluded credit), net balance = $801.25 (500.75 + 300.50)
+	// Expected: count = 2 (excluded credits are shown only by the excluded filter), net balance = $801.25 (500.75 + 300.50)
 	await page.getByLabel('Type').click();
 	await page.getByRole('option', { name: 'Credits only' }).click();
 
-	await expect(summaryRegion.getByText('3', { exact: true })).toBeVisible();
+	await expect(summaryRegion.getByText('2', { exact: true })).toBeVisible();
 	await expect(summaryRegion.getByText('$801.25')).toBeVisible();
 
 	// Change filter to "Debits only"

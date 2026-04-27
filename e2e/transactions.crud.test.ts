@@ -8,6 +8,7 @@ import {
 	getTransactionLabelsByName,
 	seedAccount,
 	seedAccountBalance,
+	seedAccountShare,
 	seedTransaction,
 	seedTransactionLabel,
 	seedUser
@@ -105,6 +106,60 @@ test('user can add a new transaction', async ({ page }) => {
 	await expect(creditCardRow).toBeVisible();
 	await expect(creditCardRow.getByText('-$500.00')).toBeVisible();
 	await expect(creditCardRow.getByText('Apex Credit Card')).toBeVisible();
+});
+
+test('user sees a helpful prompt when adding a transaction without accounts', async ({ page }) => {
+	const user = await seedUser('nadia');
+	const sharer = await seedUser('oliver');
+
+	const closedAccount = await seedAccount({
+		name: 'Archived Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking',
+		closed: new Date().toISOString()
+	});
+	await seedAccountBalance({
+		account: closedAccount.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 250
+	});
+
+	const sharedAccount = await seedAccount({
+		name: 'Shared Household Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: sharer.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: sharedAccount.id,
+		owner: sharer.id,
+		asOf: new Date().toISOString(),
+		value: 1200
+	});
+	await seedAccountShare({
+		account: sharedAccount.id,
+		recipient: user.id,
+		recipientEmail: user.email,
+		grantedBy: sharer.id,
+		accessRole: 'VIEWER',
+		perspective: 'NORMAL',
+		includeInNetWorth: true
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	await page.getByRole('link', { name: 'Add transaction' }).click();
+	await expect(page.getByText('Add an account first')).toBeVisible();
+	await expect(
+		page.getByText('You need at least one account before recording a transaction')
+	).toBeVisible();
+
+	await page.getByRole('link', { name: 'Add account' }).click();
+	await expect(page).toHaveURL('/accounts/add');
 });
 
 test('user can edit transaction details', async ({ page }) => {

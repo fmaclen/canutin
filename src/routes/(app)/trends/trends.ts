@@ -8,7 +8,7 @@ import type {
 	AssetsResponse
 } from '$lib/pocketbase.schema';
 
-export type PeriodKey = '3m' | '6m' | 'ytd' | '1y' | '5y' | 'max';
+export type PeriodKey = '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | 'max';
 export type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
 
 export function latestIndexBeforeOrEqual<T extends { asOf: string }>(
@@ -48,6 +48,7 @@ export function computeRangeForPeriod(
 	if (period === '6m') return { start: subMonths(now, 6), end: now };
 	if (period === 'ytd') return { start: startOfYear(now), end: now };
 	if (period === '1y') return { start: subYears(now, 1), end: now };
+	if (period === '2y') return { start: subYears(now, 2), end: now };
 	if (period === '5y') return { start: subYears(now, 5), end: now };
 
 	const earliest = findEarliestBalanceDate(rawAccountBalances, rawAssetBalances);

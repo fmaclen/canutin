@@ -39,8 +39,13 @@ test('trends performance table', async ({ page }) => {
 	const oneMonth = subMonths(now, 1);
 	const sixMonths = subMonths(now, 6);
 	const oneYear = subYears(now, 1);
+	const twoYears = subYears(now, 2);
 	const fiveYears = subYears(now, 5);
 	const earliest = subYears(now, 6);
+	const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+	const twoYearsStart = new Date(
+		Date.UTC(twoYears.getUTCFullYear(), twoYears.getUTCMonth(), twoYears.getUTCDate())
+	);
 
 	// YTD balance should be on Jan 1st to match the app's YTD anchor calculation.
 	// The app uses `endOfDay(startOfYear(new Date()))` for YTD, so a balance at
@@ -51,12 +56,13 @@ test('trends performance table', async ({ page }) => {
 	const baselineCash: Array<[Date, number]> = [
 		[earliest, 1000],
 		[fiveYears, 2000],
+		[twoYearsStart, 2600],
 		[oneYear, 3000],
 		[ytd, 4000],
 		[sixMonths, 5000],
 		[oneMonth, 6000],
 		[oneWeek, 7000],
-		[now, 8000]
+		[todayStart, 8000]
 	];
 
 	for (const [date, value] of baselineCash) {
@@ -71,12 +77,13 @@ test('trends performance table', async ({ page }) => {
 	const baselineDebt: Array<[Date, number]> = [
 		[earliest, -1000],
 		[fiveYears, -2000],
+		[twoYearsStart, -2100],
 		[oneYear, -2500],
 		[ytd, -3000],
 		[sixMonths, -3500],
 		[oneMonth, -3200],
 		[oneWeek, -3100],
-		[now, -3000]
+		[todayStart, -3000]
 	];
 
 	for (const [date, value] of baselineDebt) {
@@ -190,15 +197,24 @@ test('trends performance table', async ({ page }) => {
 
 	await goToPageViaSidebar(page, 'Trends');
 
-	// Table columns: Group | 1W | 1M | 6M | YTD | 1Y | 5Y | MAX | Allocation
+	await page.getByRole('tab', { name: '2Y' }).click();
+	const growthChart = page.locator('[data-growth-period="2y"]');
+	await expect(growthChart).toHaveAttribute(
+		'data-growth-start',
+		twoYearsStart.toISOString().slice(0, 10)
+	);
+	await expect(growthChart).toHaveAttribute('data-growth-start-net', '500');
+	await expect(growthChart).toHaveAttribute('data-growth-end-net', '5000');
+
+	// Table columns: Group | 1W | 1M | 6M | YTD | 1Y | 2Y | 5Y | MAX | Allocation
 	// Columns 1-5 (1W, 1M, 6M, YTD, 1Y) can have date collisions depending on
 	// when the test runs (e.g., 1W and YTD collide in early January).
-	// We only assert exact values for stable columns (5Y, MAX) and verify
+	// We only assert exact values for stable columns (2Y, 5Y, MAX) and verify
 	// volatile columns render a percentage or placeholder.
 
 	const netRow = page.getByRole('row', { name: /Net worth/ });
 	const netCells = netRow.getByRole('cell');
-	await expect(netCells).toHaveCount(9, { timeout: 10000 });
+	await expect(netCells).toHaveCount(10, { timeout: 10000 });
 
 	// Volatile periods: just verify they render (percentage button or ~ placeholder)
 	for (const i of [1, 2, 3, 4, 5]) {
@@ -207,8 +223,9 @@ test('trends performance table', async ({ page }) => {
 	}
 
 	// Stable periods: exact values
-	await expect(netCells.nth(6)).toContainText('~'); // 5Y - no data (net was 0)
-	await expect(netCells.nth(7).getByRole('button', { name: '+900%' })).toBeVisible(); // MAX
+	await expect(netCells.nth(6).getByRole('button', { name: '+900%' })).toBeVisible(); // 2Y
+	await expect(netCells.nth(7)).toContainText('~'); // 5Y - no data (net was 0)
+	await expect(netCells.nth(8).getByRole('button', { name: '+900%' })).toBeVisible(); // MAX
 
 	const cashRow = page.getByRole('row', { name: /^Cash/ });
 	const cashCells = cashRow.getByRole('cell');
@@ -218,8 +235,9 @@ test('trends performance table', async ({ page }) => {
 		await expect(cell.getByRole('button').or(cell.getByText('~'))).toBeVisible();
 	}
 
-	await expect(cashCells.nth(6).getByRole('button', { name: '+300%' })).toBeVisible(); // 5Y
-	await expect(cashCells.nth(7).getByRole('button', { name: '+700%' })).toBeVisible(); // MAX
+	await expect(cashCells.nth(6).getByRole('button', { name: '+207.7%' })).toBeVisible(); // 2Y
+	await expect(cashCells.nth(7).getByRole('button', { name: '+300%' })).toBeVisible(); // 5Y
+	await expect(cashCells.nth(8).getByRole('button', { name: '+700%' })).toBeVisible(); // MAX
 
 	const debtRow = page.getByRole('row', { name: /^Debt/ });
 	const debtCells = debtRow.getByRole('cell');
@@ -229,6 +247,7 @@ test('trends performance table', async ({ page }) => {
 		await expect(cell.getByRole('button').or(cell.getByText('~'))).toBeVisible();
 	}
 
-	await expect(debtCells.nth(6).getByRole('button', { name: '+50%' })).toBeVisible(); // 5Y
-	await expect(debtCells.nth(7).getByRole('button', { name: '+200%' })).toBeVisible(); // MAX
+	await expect(debtCells.nth(6).getByRole('button', { name: '+42.9%' })).toBeVisible(); // 2Y
+	await expect(debtCells.nth(7).getByRole('button', { name: '+50%' })).toBeVisible(); // 5Y
+	await expect(debtCells.nth(8).getByRole('button', { name: '+200%' })).toBeVisible(); // MAX
 });

@@ -25,7 +25,7 @@
 	const accountsCtx = getAccountsContext();
 	const assetsCtx = getAssetsContext();
 
-	let period: '3m' | '6m' | 'ytd' | '1y' | '5y' | 'max' = $state('1y');
+	let period: '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | 'max' = $state('1y');
 	let rawAccounts: AccountsResponse[] = $state([]);
 	let rawAssets: AssetsResponse[] = $state([]);
 	let rawAccountBalances: AccountBalancesResponse[] = $state([]);
@@ -152,6 +152,7 @@
 					<Tabs.Trigger value="6m">{m.period_6m_label()}</Tabs.Trigger>
 					<Tabs.Trigger value="ytd">{m.period_ytd_label()}</Tabs.Trigger>
 					<Tabs.Trigger value="1y">{m.period_1y_label()}</Tabs.Trigger>
+					<Tabs.Trigger value="2y">{m.period_2y_label()}</Tabs.Trigger>
 					<Tabs.Trigger value="5y">{m.period_5y_label()}</Tabs.Trigger>
 					<Tabs.Trigger value="max">{m.period_max_label()}</Tabs.Trigger>
 				</Tabs.List>
