@@ -24,6 +24,7 @@
 	const txContext = getTransactionsContext();
 	const accountsContext = getAccountsContext();
 	const openAccounts = $derived(accountsContext.accounts.filter((a) => !a.closed && a.canWrite));
+	txContext.syncFromUrl();
 
 	function handleAddTransactionClick(event: MouseEvent) {
 		if (accountsContext.isLoading || openAccounts.length > 0) return;

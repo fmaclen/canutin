@@ -5,6 +5,7 @@ import { SvelteMap, SvelteSet, SvelteURLSearchParams } from 'svelte/reactivity';
 import { get } from 'svelte/store';
 
 import { browser } from '$app/environment';
+import { replaceState } from '$app/navigation';
 import { page } from '$app/stores';
 
 import { getAccountsContext } from './accounts.svelte';
@@ -101,9 +102,9 @@ class TransactionsContext {
 	}
 
 	syncFromUrl(shouldRefresh = true) {
-		const currentPage = get(page);
-		const params = currentPage.url.searchParams;
-		this.currentListPath = currentPage.url.pathname + currentPage.url.search;
+		const currentUrl = this.currentUrl;
+		const params = currentUrl.searchParams;
+		this.currentListPath = currentUrl.pathname + currentUrl.search;
 
 		this._customFromDate = null;
 		this._customToDate = null;
@@ -197,9 +198,8 @@ class TransactionsContext {
 		newUrl.search = search;
 
 		if (newUrl.href !== currentUrl.href) {
-			if (browser) {
-				window.history.replaceState(window.history.state, '', newUrl);
-			}
+			// eslint-disable-next-line svelte/no-navigation-without-resolve
+			replaceState(newUrl.href, {});
 		}
 		this.currentListPath = newUrl.pathname + newUrl.search;
 	}
