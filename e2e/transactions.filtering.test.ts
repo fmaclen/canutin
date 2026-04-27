@@ -22,68 +22,8 @@ type PeriodOption =
 	| 'last-year'
 	| 'lifetime';
 
-test('transactions table responds to period and type filters', async ({ page }) => {
-	const user = await seedUser('taylor');
-
-	const account = await seedAccount({
-		name: 'Everyday Checking',
-		balanceGroup: AccountsBalanceGroupOptions.CASH,
-		owner: user.id,
-		balanceType: 'Checking'
-	});
-	await seedAccountBalance({
-		account: account.id,
-		owner: user.id,
-		asOf: new Date().toISOString(),
-		value: 1200
-	});
-
-	const now = new UTCDate();
-	const startOfThisMonth = startOfMonth(now);
-
-	const seedDefinitions: Array<{
-		description: string;
-		value: number;
-		monthsOffset: number;
-		day?: number;
-		excluded?: boolean;
-	}> = [
-		{ description: 'Invoice Payment', value: 650, monthsOffset: 0, day: 6 },
-		{ description: 'Groceries Order', value: -120, monthsOffset: 0, day: 8 },
-		{ description: 'Last Month Rent', value: -900, monthsOffset: -1, day: 9 },
-		{ description: 'Consulting Fee', value: 800, monthsOffset: -2, day: 10 },
-		{ description: 'Insurance Premium', value: -400, monthsOffset: -4, day: 12 },
-		{ description: 'Bonus Payout', value: 1200, monthsOffset: -8, day: 14 },
-		{ description: 'Holiday Flight', value: -500, monthsOffset: -13, day: 16 },
-		{ description: 'Vintage Sale', value: 350, monthsOffset: -18, day: 18 },
-		{ description: 'Excluded Adjustment', value: 75, monthsOffset: 0, day: 20, excluded: true },
-		{ description: 'Excluded Fee', value: -45, monthsOffset: 0, day: 21, excluded: true }
-	];
-
-	const transactions = [] as Array<{
-		description: string;
-		value: number;
-		date: Date;
-		excluded: boolean;
-	}>;
-
-	for (const entry of seedDefinitions) {
-		const date = dateForMonthOffset(startOfThisMonth, entry.monthsOffset, entry.day ?? 15);
-		await seedTransaction({
-			account: account.id,
-			owner: user.id,
-			date: date.toISOString(),
-			description: entry.description,
-			value: entry.value,
-			excluded: entry.excluded ? new Date().toISOString() : undefined
-		});
-		transactions.push({
-			description: entry.description,
-			value: entry.value,
-			date,
-			excluded: Boolean(entry.excluded)
-		});
-	}
+test('transactions table responds to period filters', async ({ page }) => {
+	const { user, transactions, now } = await seedFilteringTransactions('taylor');
 
 	await page.goto('/');
 	await signIn(page, user.email);
@@ -140,6 +80,28 @@ test('transactions table responds to period and type filters', async ({ page }) 
 	await expect(page).not.toHaveURL(/period=/);
 	await expect(page.getByLabel('Period')).toContainText('Last 3 months');
 
+	const excludedRow = page.getByRole('row', { name: 'Excluded Adjustment' });
+	await expect(excludedRow).toBeVisible();
+	const excludedAmount = excludedRow.getByText('$75.00');
+	await expect(excludedAmount).toBeVisible();
+
+	const info = test.info();
+	const isMobile = info.project.name?.toLowerCase().includes('mobile') ?? false;
+	if (!isMobile) {
+		await excludedAmount.hover();
+	}
+});
+
+test('transactions table responds to type filters', async ({ page }) => {
+	const { user, transactions } = await seedFilteringTransactions('taylor-types');
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	await expect(page.getByRole('row', { name: 'Invoice Payment' })).toBeVisible();
+	await expect(page.getByLabel('Type')).toContainText('Any amounts');
+
 	// Set period to "Lifetime" so type filter tests can check all transactions
 	await page.getByLabel('Period').click();
 	await page.getByRole('button', { name: 'Lifetime' }).click();
@@ -177,17 +139,6 @@ test('transactions table responds to period and type filters', async ({ page }) 
 
 	await page.getByLabel('Type').click();
 	await page.getByRole('option', { name: 'Any amounts' }).click();
-	const excludedRow = page.getByRole('row', { name: 'Excluded Adjustment' });
-	await expect(excludedRow).toBeVisible();
-	// Excluded amounts are wrapped in a Tooltip.Trigger (button), not a link
-	const excludedAmount = excludedRow.getByText('$75.00');
-	await expect(excludedAmount).toBeVisible();
-
-	const info = test.info();
-	const isMobile = info.project.name?.toLowerCase().includes('mobile') ?? false;
-	if (!isMobile) {
-		await excludedAmount.hover();
-	}
 });
 
 test('transactions pagination navigates between pages', async ({ page }) => {
@@ -440,6 +391,71 @@ function dateForMonthOffset(baseMonth: Date, monthsOffset: number, day: number) 
 	const safeDay = Math.min(day, 28);
 	const targetMonth = addMonths(baseMonth, monthsOffset);
 	return new UTCDate(targetMonth.getUTCFullYear(), targetMonth.getUTCMonth(), safeDay, 12, 0, 0, 0);
+}
+
+async function seedFilteringTransactions(userName: string) {
+	const user = await seedUser(userName);
+
+	const account = await seedAccount({
+		name: 'Everyday Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 1200
+	});
+
+	const now = new UTCDate();
+	const startOfThisMonth = startOfMonth(now);
+	const seedDefinitions: Array<{
+		description: string;
+		value: number;
+		monthsOffset: number;
+		day?: number;
+		excluded?: boolean;
+	}> = [
+		{ description: 'Invoice Payment', value: 650, monthsOffset: 0, day: 6 },
+		{ description: 'Groceries Order', value: -120, monthsOffset: 0, day: 8 },
+		{ description: 'Last Month Rent', value: -900, monthsOffset: -1, day: 9 },
+		{ description: 'Consulting Fee', value: 800, monthsOffset: -2, day: 10 },
+		{ description: 'Insurance Premium', value: -400, monthsOffset: -4, day: 12 },
+		{ description: 'Bonus Payout', value: 1200, monthsOffset: -8, day: 14 },
+		{ description: 'Holiday Flight', value: -500, monthsOffset: -13, day: 16 },
+		{ description: 'Vintage Sale', value: 350, monthsOffset: -18, day: 18 },
+		{ description: 'Excluded Adjustment', value: 75, monthsOffset: 0, day: 20, excluded: true },
+		{ description: 'Excluded Fee', value: -45, monthsOffset: 0, day: 21, excluded: true }
+	];
+
+	const transactions = [] as Array<{
+		description: string;
+		value: number;
+		date: Date;
+		excluded: boolean;
+	}>;
+
+	for (const entry of seedDefinitions) {
+		const date = dateForMonthOffset(startOfThisMonth, entry.monthsOffset, entry.day ?? 15);
+		await seedTransaction({
+			account: account.id,
+			owner: user.id,
+			date: date.toISOString(),
+			description: entry.description,
+			value: entry.value,
+			excluded: entry.excluded ? new Date().toISOString() : undefined
+		});
+		transactions.push({
+			description: entry.description,
+			value: entry.value,
+			date,
+			excluded: Boolean(entry.excluded)
+		});
+	}
+
+	return { user, transactions, now };
 }
 
 function getPeriodRange(option: PeriodOption, reference: Date) {
