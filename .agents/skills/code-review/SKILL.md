@@ -1,106 +1,89 @@
 ---
 name: code-review
-description: Checklist for reviewing code changes - quality, logic, framework patterns, tests
+description: 'How to review code before declaring a milestone done'
 ---
 
-# Code Review Conventions
+# Code Review
 
-## Overview
+Review code before the orchestrator calls a milestone done. Findings are the product. Be specific, local, and willing to flag small violations.
 
-Guidance for reviewing code changes. **Be ruthless and nitpicky.** Every violation matters - flag it, even if it seems minor. Reference specific convention skills for detailed rules.
+## Output
 
-## What to Check
+Structured return, in this order:
 
-### Code Quality (Check Every New Function)
+1. **Skills loaded.** List every convention skill you opened for this review (see the Conventions section for the path-driven rules). The orchestrator gates on this - a review that skipped a relevant skill is a failed review.
+2. **Per-skill status.** For each loaded skill, one line: `<skill>: clean` if nothing to report, or `<skill>: <N> findings` and the findings listed below. A skill with zero findings must still appear - silence is not the same as clean.
+3. **Findings**, ordered by severity. Each finding includes `path:line`, the violated rule (named to the skill it came from), and the concrete fix direction.
+4. **Residual risks and testing gaps.** Things the review could not verify, areas not covered by the diff that adjacent behavior would benefit from, and strategic opportunities (see below).
 
-Review against [code-quality.md](../code-quality/SKILL.md). For **every** new or modified function/method:
+Do not rewrite the diff unless the orchestrator explicitly assigns implementation.
 
-- **No explicit return types** - TypeScript must infer them (exception: class getters only)
-- **No `any` types** - Use `unknown` or proper types
-- **No unused code** - Check for unused imports, variables, interfaces, types, functions, parameters
-- **No unused parameters with defaults** - If no caller passes a value, inline it
-- **No variable shadowing** - Parameter names must not shadow imports or outer scope variables
+## Correctness
 
-### Comments and Return Types (Commonly Overlooked)
+- Behavior matches the user request and does not add unrequested behavior.
+- State is initialized, updated, reset, and cleaned up on relevant lifecycle paths.
+- Edge cases are handled where the changed behavior requires them.
+- Failures are surfaced through the project failures-and-logs pattern.
+- No silent failures, swallowed promises, or user-visible raw error messages.
 
-- **Redundant comments** - Remove comments that explain self-explanatory code:
-  - Bad: `// Loop through users` above `for (const user of users)`
-  - Bad: `// Check if empty` above `if (items.length === 0)`
-- **Useful comments** - Keep comments that explain the "why", not the "what":
-  - Good: `// Process sequentially to avoid creating duplicate labels`
-  - Good: `// Subscribe FIRST to avoid missing events during initial fetch`
+## Conventions
 
-### Error Handling
+Review against every convention skill that applies to the diff. Combine every rule that matches:
 
-Review against [error-handling.md](../error-handling/SKILL.md):
+- Always read `code-quality` - types, comments, structure, UI text, dependencies.
+- Read `testing` whenever the diff touches any path under `tests/` or `e2e/` - correct test tier, stable assertions, no explicit timeouts, no over-specific implementation checks.
+- Read `svelte5` whenever the diff touches any `.svelte` or `.svelte.ts` file - Svelte 5 syntax and component patterns.
+- Read `pocketbase` whenever the diff touches PocketBase collections, generated schema, hooks, migrations, imports, or `pocketbase/`.
+- Read `failures-and-logs` whenever the diff touches error surfaces - logging level, tags, user-safe messages.
 
-- User actions show friendly toasts via `svelte-sonner`
-- Subscriptions use `logError` (no toast - transient errors)
-- Backend Go hooks use `log.Printf` with `[tag]` prefix
-- No raw error messages shown to users
-- No silently swallowed errors
+A finding missed because the relevant convention skill was not in context counts as a review failure. If a diff spans multiple areas, load all of them before producing findings.
 
-### Logic and Correctness
+For every new or modified function, check type usage, return-type inference, unused code, defaults, indirection, and naming against `code-quality`.
 
-- State properly initialized, updated, and reset (especially on logout/cleanup paths)
-- Edge cases handled (empty states, errors, timeouts)
-- No silent failures or unhandled promise rejections
-- Cleanup on unmount/logout (timers, subscriptions, state flags)
+## Pattern of violations
 
-### Performance
+When a finding's violation also appears in nearby unchanged code, the writer probably matched a bad legacy pattern rather than read the rule. Flag this explicitly: the finding header should say `Pattern of violations: <rule>` and list every instance you found in the touched files, not just the line in the diff. Recommend deleting the legacy instances in the same change - same logic as `code-quality`'s "delete dead code adjacent to what you're touching" rule, applied to convention drift.
 
-- **Query efficiency** - Avoid N+1 queries; batch where possible
-- **Unnecessary re-fetches** - Don't fetch data already available in context/state
-- **Expensive computations** - Memoize or debounce where appropriate
-- **Large dataset handling** - Pagination, virtualization, or lazy loading for lists
-- Use PocketBase Logs API to inspect query performance when in doubt (see [pocketbase.md](../pocketbase/SKILL.md))
+This converts the second-most-common review escape ("the writer copied the surrounding style") into a self-correcting signal. If you skip this and only flag the one new line, the next chunk of work in the same area will reproduce the same drift.
 
-### Framework Patterns
+## Simplification
 
-Review against [svelte5.md](../svelte5/SKILL.md), [realtime.md](../realtime/SKILL.md), and [pocketbase.md](../pocketbase/SKILL.md):
+Treat avoidable added surface area as a review finding, even when tests pass. The review should catch cases where the diff could delete, inline, collapse, or narrow instead of adding code.
 
-- Following "the Svelte way" / "the PocketBase way"
-- Reusing existing patterns vs introducing new ones
-- Check similar files for established conventions
+Flag local, concrete cases:
 
-### Test Coverage
+- One-use helpers, constants, intermediate values, wrappers, or aliases.
+- Redundant assertions after observable behavior is already covered.
+- New branches, guards, configuration, state, or helpers not required by the behavior under test.
+- Dead code, stale comments, unused imports, or useless wrappers adjacent to touched code.
+- Broad changes where a smaller deletion or inlining solves the same problem.
 
-Review against [testing.md](../testing/SKILL.md):
+Put broad or additive cleanup ideas in residual risks/follow-up instead of findings.
 
-- Main feature of the PR has test coverage
-- New logic paths have coverage
-- Critical user flows tested E2E
-- Selector priority followed: `getByText` > `getByLabel` > `getByRole` > `getByTestId`
-- No explicit timeouts (`setTimeout`, `waitForTimeout`, timeout options)
-- Blank lines after `expect` blocks before the next action
-- Tests are flat (no `test.describe` blocks)
-- Real person names for test emails; no role-based emails like `owner@example.com`
+## Strategic Opportunities
 
-### UI Text
+Note when the diff appears to patch around a larger design seam. These are not blocking findings unless the local diff is wrong.
 
-- Sentence case for all UI labels (e.g., "Add account" not "Add Account")
-- No trailing periods in UI text
-- No ellipsis for loading states
+Look for:
 
-### Code Smells
+- Duplicated policy or state transitions.
+- Scattered ownership of one product behavior.
+- Repeated defensive guards around an unclear invariant.
+- Tests that are hard because the design boundary is wrong.
+- Code where the small fix works but leaves the next similar bug likely.
 
-- Imperative patterns where reactive alternatives exist
-- Manual implementations where project dependencies handle it
-- Magic numbers without context
-- Inconsistent patterns with rest of codebase
+Return these as `Strategic opportunities`, not findings. Include the smallest next investigation that would validate the opportunity.
+
+## Tests
+
+- The main behavior has coverage at the right tier.
+- New tests fail for the original bug or behavior gap when that is practical.
+- Assertions prove observable behavior without over-specifying implementation details.
+- Existing coverage is simplified when the diff makes old assertions redundant.
 
 ## Process
 
-1. Read relevant convention skills before reviewing
-2. Check **every** new function against Code Quality rules above
-3. Compare new code against similar existing code
-4. Flag deviations from established patterns
-5. Verify the main feature works and has tests
-
-## See Also
-
-- [code-quality.md](../code-quality/SKILL.md) - TypeScript, formatting, commits
-- [svelte5.md](../svelte5/SKILL.md) - Svelte 5 patterns
-- [realtime.md](../realtime/SKILL.md) - PocketBase subscription patterns
-- [pocketbase.md](../pocketbase/SKILL.md) - Backend conventions
-- [testing.md](../testing/SKILL.md) - E2E testing patterns
+1. Resolve which convention skills apply (see Conventions) and read each one before reviewing.
+2. Compare the diff against nearby established patterns.
+3. Walk correctness, each loaded convention skill, simplification, tests, and strategic opportunities.
+4. Produce the structured return defined in Output.

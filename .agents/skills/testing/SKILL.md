@@ -1,110 +1,109 @@
 ---
 name: testing
-description: Playwright E2E tests (desktop + mobile), PocketBase seeding helpers, selectors, isolation, troubleshooting
+description: 'How tests are organized, written, and run across tiers'
 ---
 
-# Testing Conventions
+# Testing
 
-## Overview
+## Preference order
 
-E2E tests using Playwright, running on both desktop and mobile viewports, against a real local PocketBase backend. Prefer E2E tests over unit tests whenever a test can be meaningfully expressed as a user flow.
+Prefer real systems over mocks. Tests that exercise the actual stack - real PocketBase, real browser - give the most confidence. The same concern is never covered at more than one tier; if an E2E already proves a flow, do not add a unit test for the helper underneath it.
 
-## Structure
+In order of preference:
 
-| Location                    | Purpose                   |
-| --------------------------- | ------------------------- |
-| `e2e/*.test.ts`             | Test files                |
-| `e2e/pocketbase.helpers.ts` | PocketBase test utilities |
-| `e2e/playwright.helpers.ts` | UI navigation helpers     |
-| `e2e/global.setup.ts`       | Global Playwright setup   |
-| `playwright.config.ts`      | Playwright configuration  |
+1. **E2E** (`e2e/*.test.ts`) - UI-reachable flow exercised through Playwright against the real local PocketBase backend.
+2. **API/backend tests** - backend behavior with no UI, real PocketBase through the test helpers. Add this tier only when the behavior has no useful UI surface.
+3. **Unit tests** - pure logic with no DB. Only when none of the above apply.
 
-## Running Tests
+Pick the most-preferred tier the behavior reaches. If a feature is UI-driven, write an E2E even when the bug is in backend-adjacent data code - the E2E proves the end-to-end fix and the lower-level code is covered transitively.
+
+Top-level commands:
 
 ```bash
-bun run test                              # All tests (desktop + mobile)
-bun run test -- -g 'test name'            # By name pattern
-bun run test -- filename.test.ts          # Single file
-bun run test --project=desktop            # Desktop only
-bun run test --project=mobile             # Mobile only
+bun run test                         # All Playwright tests (desktop + mobile)
+bun run test -- e2e/file.test.ts     # Single file - desktop and mobile in one run
+bun run test -- -g 'test name'       # By name pattern
 ```
 
-## Playwright Projects
+## E2E
 
-Defined in `playwright.config.ts`:
+### When to write
 
-| Project   | Scope           | Viewport           |
-| --------- | --------------- | ------------------ |
-| `desktop` | `e2e/*.test.ts` | Desktop Chrome     |
-| `mobile`  | `e2e/*.test.ts` | iPhone 13 (WebKit) |
+A new user-visible behavior, a bug that surfaces in the UI, or a flow that an API/backend test cannot prove (layout interaction, navigation, auth redirects, realtime UI behavior).
 
-## Test Isolation
+### Patterns
 
-Every test starts fresh:
+Read existing nearby tests before writing a new file. Copy the shape, not the quirks. Understand why a pattern exists before reusing it.
 
-1. Call `resetDatabase()` in `beforeEach` when the test mutates shared state (deletes the users collection, cascading to everything owned by users)
-2. **Use real name emails** via `seedUser('alice')`, `seedUser('bob')`, `seedUser('charlie')`, etc. — the helper suffixes a random 8-char id so emails are globally unique
-3. Never use role-based emails like `owner@example.com` - always use real names
-4. Never reuse names already used in other test files
-5. Password is handled by helpers via `DEFAULT_PASSWORD` - never hardcode passwords
+Key rules:
 
-## Selector Priority
+- Use the helpers in [`e2e/playwright.helpers.ts`](../../../e2e/playwright.helpers.ts) for navigation and auth. Drive tests through the same happy path a real user takes when practical.
+- Use the helpers in [`e2e/pocketbase.helpers.ts`](../../../e2e/pocketbase.helpers.ts) for seeding (`resetDatabase`, `seedUser`, `getUserPB`, `seedAccount`, `seedTransaction`, `seedAssetBalance`).
+- Reset shared state with `resetDatabase()` in `beforeEach` when the test mutates shared state.
+- Real-name users: `alice`, `bob`, `charlie`. Never role-based names like `owner` unless the UI text itself requires that role.
+- Never reuse names already used in other test files when the helper derives globally unique emails from the name.
+- Keep tests flat - no `test.describe` blocks.
+- Add assertions to existing tests when possible; test setup is expensive.
 
-Use in this order (most to least preferred):
+### Selectors
 
-1. `getByText()` - Visible text
-2. `getByLabel()` - Form labels
-3. `getByRole()` - ARIA roles
-4. `getByTestId()` - Last resort
+In order of preference: `getByText` (visible text) -> `getByLabel` (form labels) -> `getByRole` (ARIA roles) -> `getByTestId` (last resort).
 
-## Assertions
+### Assertions
 
-- **Negative before positive** when checking state before an action
-- **Never use explicit timeouts** - rely on Playwright's auto-waiting
-- **Blank line after expect blocks** - separate action/expect groups with blank lines
+- **Negative before positive** when checking state around an action: assert the not-yet state, take the action, assert the after state.
+- Use `await expect(locator).toBeVisible()` to wait. Playwright auto-waits - never `setTimeout`, never `waitForTimeout`.
+- **No preventive custom timeouts.** Playwright's defaults are correct for almost everything. A `{ timeout: N }` argument is only acceptable when (a) a real run has actually failed without it and (b) the line carries a `// HACK:` comment naming what is slow and why no other fix is feasible. Adding a timeout "to be safe" before any failure has been observed is a code-review block.
+- **Block grouping.** A block is consecutive actions followed by the expects that verify them. Blank lines separate blocks; never inside a block - not between consecutive actions, not between consecutive expects in the same block.
 
 ```typescript
-// Correct: blank lines only after expect blocks
-await page.getByRole('button', { name: 'Submit' }).click();
-await expect(page.getByText('Success')).toBeVisible();
+// Correct: blank line only between action/expect blocks
+await login(page, alice.email);
+await page.getByRole('link', { name: 'Transactions' }).click();
+await expect(page.getByText('Transactions')).toBeVisible();
 
-await page.getByRole('link', { name: 'Next' }).click();
-await expect(page).toHaveURL('/next');
+await page.getByRole('button', { name: 'Add transaction' }).click();
+await expect(page.getByRole('dialog')).toBeVisible();
 ```
 
-## Test Utilities
+### Running
 
-See `e2e/pocketbase.helpers.ts` for the full list. Key functions:
-
-- `resetDatabase()` — cascade-deletes all user-owned records
-- `seedUser(name)` — creates a user, returns the record (with generated email)
-- `getUserPB(email)` — returns a `TypedPocketBase` authenticated as that user
-- `seedAccount({ owner, ... })`, `seedAssetBalance(...)`, `seedTransaction(...)`, etc.
-
-UI helpers live in `e2e/playwright.helpers.ts`. Key functions:
-
-- Login helpers that fill the auth form using `DEFAULT_PASSWORD`
-
-## Anti-patterns
-
-- **Never use `setTimeout`** or `waitForTimeout` - use assertions
-- **Never hardcode waits** - Playwright auto-waits for elements
-- **Never share state between tests** - each test is isolated
-- **Never use `test.describe()` blocks** - keep tests flat for simplicity
-- **Prefer adding assertions to existing tests** - test setup is expensive; add related checks to existing tests rather than creating new ones
-
-## Troubleshooting
-
-Port already in use (orphaned preview server):
+Defaults - what you want before pushing:
 
 ```bash
-lsof -ti:42069 | xargs kill -9   # Vite preview
-lsof -ti:42070 | xargs kill -9   # PocketBase
+bun run test                         # All E2E
+bun run test -- e2e/file.test.ts     # Single file - desktop and mobile in one run
+bun run test -- -g 'test name'       # By name pattern
 ```
 
-In a worktree, check `.env` (or `.worktree.json` if the worktree scripts are in use) for the actual ports before killing.
+Debug variants (single browser, faster loop while iterating):
 
-## Seeding a User for QA
+```bash
+bun run test -- e2e/file.test.ts --project=desktop
+bun run test -- e2e/file.test.ts --project=mobile
+```
+
+Flake check - use Playwright's repeater, never a shell loop:
+
+```bash
+bun run test -- e2e/file.test.ts --repeat-each=10
+```
+
+### Never run two test commands at once
+
+Wait for each test run to finish before starting the next. Two test commands running at the same time fight over the same backend and preview server and produce false flake. To run several files together, pass them to a single Playwright invocation instead of launching multiple processes.
+
+If a previous run ended early (Ctrl-C, killed terminal, crashed reporter) the preview server may linger and the next run will fail to bind. Killing a preview server is always safe - preview only exists to serve tests. Never kill a dev server or backend server; the user owns those.
+
+### Local verification before push
+
+Run one or two targeted smoke tests related to the change before pushing - never the full file when a focused `-g` pattern covers the behavior you actually touched. CI will run the whole suite; your job locally is to catch the obvious regression cheaply.
+
+```bash
+bun run test -- -g 'name of the test you care about'
+```
+
+## Seeding a user for QA
 
 The user's preferred QA bootstrap is a one-liner that creates a basic user via the existing helpers:
 
@@ -114,8 +113,17 @@ bun -e "import('./e2e/pocketbase.helpers').then(m => m.seedUser('alice').then(u 
 
 Use the printed email with `DEFAULT_PASSWORD` (`123qweasdzxc`) to log in.
 
-## See Also
+## Code quality in tests
 
-- [realtime.md](../realtime/SKILL.md) - PocketBase subscription patterns
-- [pocketbase.md](../pocketbase/SKILL.md) - Backend API access
-- [code-quality.md](../code-quality/SKILL.md) - TypeScript and style rules
+Test code follows the same rules as production code (see [code-quality](../code-quality/SKILL.md)). Most-violated in tests:
+
+- No `any` - use proper types.
+- No explicit return types - let TypeScript infer.
+- No unused imports or variables.
+- Sentence case for UI-text assertion strings.
+
+## Troubleshooting
+
+- **Preview server port already in use** - Playwright's preview server lingered from a previous run that ended early. Kill it and rerun after checking the port in `.env` or `.worktree.json`. Preview servers are always safe to kill. Never apply this to a dev or backend server - those belong to the user.
+- **PocketBase port already in use** - check `.env` or `.worktree.json` for the actual `PB_PORT`. Do not kill the user's main dev backend.
+- **Generated messages missing** - run the relevant quality/build command so Paraglide regenerates output; do not hand-edit generated files.

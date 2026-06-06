@@ -1,161 +1,74 @@
-# AGENTS.md
+# Canutin
 
-SvelteKit + PocketBase personal finance application using Bun.
+Canutin is a personal finance application: SvelteKit on the frontend, PocketBase for the backend and database, and Bun for local tooling.
 
-## Quick Start
+> This file is `AGENTS.md`. `CLAUDE.md` is a symlink to it - edit `AGENTS.md`.
 
-- **Package manager:** Bun (`bun install`, `bun run`, `bunx`)
-- **Quality check:** `bun run quality` (run before committing)
-- **Dev servers:** Always running — don't start them
-- **Go 1.21+:** Required to build the PocketBase binary (first `bun run pb` compiles it)
+## Your role
+
+Before you call any other tool, read any other file, or respond to the user, open your role skill. The skill body is not auto-injected - opening it is your first action.
+
+1. If your prompt explicitly assigns you the **Executor** role, read [.agents/skills/executor/SKILL.md](./.agents/skills/executor/SKILL.md).
+2. Otherwise you are the **Orchestrator**. Read [.agents/skills/orchestrator/SKILL.md](./.agents/skills/orchestrator/SKILL.md).
+3. If your system prompt opens with `"You are Codex"`, also read [.agents/skills/codex/SKILL.md](./.agents/skills/codex/SKILL.md).
+4. If your system prompt opens with `"You are OpenCode"`, also read [.agents/skills/opencode/SKILL.md](./.agents/skills/opencode/SKILL.md).
+
+A common failure is treating a task-specific request like "review this PR" or "write a test" as license to load only the matching skill and skip the role. Load the role first, every session, before any task-specific skill.
 
 ## Skills
 
-Load skills from `.agents/skills/<skill>/SKILL.md` based on the task.
+Each skill lives at `.agents/skills/<slug>/SKILL.md`.
 
-Preferred intent aliases exist for discoverability:
+### Context
 
-| Alias           | Canonical     |
-| --------------- | ------------- |
-| `tests`         | `testing`     |
-| `review`        | `code-review` |
-| `pr`            | `deliver`     |
-| `worktree`      | `setup`       |
-| `orchestrate`   | `pm`          |
-| `working-notes` | `scratchpads` |
+| Synopsis                                                                  | Slug         |
+| ------------------------------------------------------------------------- | ------------ |
+| How the codebase is organized: stack, structure, data flow, layout        | architecture |
+| How authentication works across environments and how routes are protected | auth-system  |
+| How PocketBase, Go hooks, generated types, and backend access work        | pocketbase   |
+| How PocketBase realtime subscriptions are set up and cleaned up           | realtime     |
+| How code reaches each environment and what runs where                     | deployment   |
 
 ### Conventions
 
-| Task                      | Skill                                                        |
-| ------------------------- | ------------------------------------------------------------ |
-| Writing Svelte components | [svelte5](./.agents/skills/svelte5/SKILL.md)                 |
-| Calling PocketBase / Go   | [pocketbase](./.agents/skills/pocketbase/SKILL.md)           |
-| PocketBase subscriptions  | [realtime](./.agents/skills/realtime/SKILL.md)               |
-| Auth implementation       | [auth-system](./.agents/skills/auth-system/SKILL.md)         |
-| Error handling            | [error-handling](./.agents/skills/error-handling/SKILL.md)   |
-| Writing tests             | [testing](./.agents/skills/testing/SKILL.md)                 |
-| Code style and commits    | [code-quality](./.agents/skills/code-quality/SKILL.md)       |
-| Reviewing changes         | [code-review](./.agents/skills/code-review/SKILL.md)         |
-| Writing GitHub issues     | [issue-writing](./.agents/skills/issue-writing/SKILL.md)     |
-| Frontend design           | [frontend-design](./.agents/skills/frontend-design/SKILL.md) |
-| Deployment context        | [deployment](./.agents/skills/deployment/SKILL.md)           |
-| Working notes             | [scratchpads](./.agents/skills/scratchpads/SKILL.md)         |
+| Synopsis                                                                 | Slug              |
+| ------------------------------------------------------------------------ | ----------------- |
+| Code rules the linter doesn't catch: types, comments, structure, UI text | code-quality      |
+| How failures throw, log, trace, and surface to users across the stack    | failures-and-logs |
+| Frontend writing conventions in this Svelte 5 codebase                   | svelte5           |
+| Backend writing conventions in this PocketBase codebase                  | pocketbase        |
+| How tests are organized, written, and run across tiers                   | testing           |
+| How frontend design work should preserve and extend visual quality       | frontend-design   |
 
-### PocketBase Tasks
+### Shipping
 
-| Task                 | Skill                                              |
-| -------------------- | -------------------------------------------------- |
-| Schema changes       | [pb-migrate](./.agents/skills/pb-migrate/SKILL.md) |
-| Bulk import / revert | [pb-import](./.agents/skills/pb-import/SKILL.md)   |
+| Synopsis                                             | Slug            |
+| ---------------------------------------------------- | --------------- |
+| How to review code before declaring a milestone done | code-review     |
+| How to commit, push, and open PRs in this repo       | commits-and-prs |
 
-### Workflow Skills
+### Operations
 
-| Task                      | Skill                                                              |
-| ------------------------- | ------------------------------------------------------------------ |
-| Worktree setup            | [setup](./.agents/skills/setup/SKILL.md)                           |
-| Local verification        | [verify](./.agents/skills/verify/SKILL.md)                         |
-| Failure triage discipline | [failure-discipline](./.agents/skills/failure-discipline/SKILL.md) |
-| PR handoff                | [deliver](./.agents/skills/deliver/SKILL.md)                       |
-| PM orchestration          | [pm](./.agents/skills/pm/SKILL.md)                                 |
+| Synopsis                                                                    | Slug               |
+| --------------------------------------------------------------------------- | ------------------ |
+| How to create and reuse worktrees for autonomous work                       | setup              |
+| How to verify changes locally before requesting review                      | verify             |
+| How to diagnose failed checks and avoid wasting CI                          | failure-discipline |
+| How to change PocketBase schema safely                                      | pb-migrate         |
+| How to import and revert PocketBase data                                    | pb-import          |
 
-## Commands
+### Authoring
 
-- `/pm` — reviewer-orchestrator mode for multi-step work
-- `/review` — review-focused routing to `code-review`
-- `/tests` — test-focused routing to `testing`
-- `/pr` — PR-focused routing to `deliver`
-- `/worktree` — worktree-focused routing to `setup`
+| Synopsis                                                                       | Slug          |
+| ------------------------------------------------------------------------------ | ------------- |
+| How to write GitHub issues that describe the problem, not the solution         | issue-writing |
+| Where to put working notes, plans, and research so they don't pollute the repo | working-notes |
 
-## Architecture
+### Harness
 
-### Backend: PocketBase
+Load when your tool list matches the harness. The agent must check tool availability and load proactively - this is not auto-injected.
 
-- Dev server: `http://127.0.0.1:42070` (run with `bun run pb`; override with `PB_PORT`)
-- Types auto-generated in `src/lib/pocketbase.schema.ts`
-- Custom Go hooks for balance calculations: `pocketbase/main.go`
-- Collections: accounts, transactions, assets, assetBalances, accountBalances, balanceTypes, transactionLabels, accountShares, assetShares, users
-
-### Frontend: SvelteKit with Svelte 5
-
-Context stores in `src/lib/*.svelte.ts`:
-
-- `auth.svelte.ts` — authentication state
-- `pocketbase.svelte.ts` — PocketBase client wrapper
-- `accounts.svelte.ts` — account data with real-time updates
-- `assets.svelte.ts` — asset tracking
-- `transactions.svelte.ts` — transaction filtering/pagination
-- `balance-types.svelte.ts` — chart of accounts types
-- `cashflow.svelte.ts` — cashflow calculations
-
-Route structure:
-
-- `src/routes/(app)/` — protected routes (requires auth)
-- `src/routes/(guest)/` — public routes (auth pages)
-
-### i18n
-
-- Paraglide JS via Inlang
-- Locales: English (en), Spanish (es)
-- Messages: `$lib/paraglide/messages.js`
-
-## Commands Reference
-
-```bash
-# Development
-bun run dev              # Vite dev server (default :5173, override with VITE_PORT)
-bun run pb               # PocketBase backend (default :42070, override with PB_PORT)
-bun run pb:reset         # Reset dev database
-
-# Quality
-bun run quality          # Format + lint + type-check
-bun run test             # Playwright E2E tests (desktop + mobile)
-
-# Build
-bun run build            # Production build
-bun run preview          # Preview build (default :42069, override with VITE_PREVIEW_PORT or VITE_PORT)
-
-# Worktrees
-bun run worktree:setup <n> <branch> [--base <base>]
-bun run worktree:teardown <n> [--prune]
-```
-
-## Branches & PRs
-
-- **Branch naming:** `{issue-number}-{short-description}` for issue-driven work; `chore/description` for maintenance
-- **Base branch:** `next` for v2 features
-- **PR title:** `type: description` (conventional commits)
-- **PR body:** Short, include `Closes #123`
-
-## Skill Maintenance
-
-If you discover a repeatable multi-step workflow during a session — something you had to figure out through trial and error, or a sequence the user regularly requests — capture it as a skill so future agents don't have to rediscover the same steps.
-
-Signs you should ask the user whether to capture a skill:
-
-- You spent significant effort discovering a working sequence of commands or decisions
-- The user corrected you on a project-specific pattern that isn't documented anywhere
-- A task required more than three non-obvious steps that depend on project conventions
-- You see yourself repeating the same workflow across multiple requests in one session
-
-When you notice any of these, ask the user if they want to capture it as a skill. Do not create or modify skills without user confirmation.
-
-When creating a new skill (after user confirms):
-
-- Add it to `.agents/skills/<name>/SKILL.md` with frontmatter (`name`, `description`)
-- Keep it focused on one workflow or concern
-- Write the steps as a blueprint another agent can follow without guessing
-- Cross-reference other skills instead of duplicating their content
-- Add a row to the appropriate table in this file so the skill is discoverable
-
-When updating an existing skill (after user confirms):
-
-- Prefer extending the existing skill over creating a new overlapping one
-- Remove or correct any guidance that no longer matches the repo
-- If the skill and the repo disagree, trust the repo and update the skill
-
-## Notes
-
-- PocketBase is built from source on first `bun run pb` (version pinned in `pocketbase/go.mod`)
-- Frozen lockfile (`bun.lock`) ensures reproducible builds
-- All dependencies are `devDependencies` (SvelteKit bundles everything at build time)
-- `CLAUDE.md`, `.claude/`, `.cursor/`, and `.opencode/` are symlinks pointing at this file and `.agents/`
+| Synopsis                                                                                 | Slug     |
+| ---------------------------------------------------------------------------------------- | -------- |
+| Harness-specific quirks for Codex sessions - spawn_agent rules and validation gotchas    | codex    |
+| Harness-specific quirks for opencode sessions - plan mode rules and delegation reminders | opencode |

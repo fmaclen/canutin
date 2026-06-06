@@ -1,119 +1,65 @@
 ---
 name: code-quality
-description: TypeScript strict mode, Prettier, conventional commits, code style, git workflow
+description: "Code rules the linter doesn't catch: types, comments, structure, UI text"
 ---
 
-# Code Quality Conventions
+# Code Quality
 
-## Overview
+## Skill rules outrank neighbors
 
-TypeScript strict mode, Prettier formatting, and conventional commits.
+This skill - and every convention skill in your bundle - takes precedence over patterns in existing code. Legacy violations are not permission to add new ones; they are signal that the area is owed a cleanup pass. Do not infer conventions by skimming nearby files. Read the skill, then write.
 
-## Commands
+When a touched file already contains an instance of the rule you are now applying, delete that instance in the same diff. Same logic as the "delete dead code adjacent to what you're touching" rule below, applied to convention drift instead of dead code. Compatibility shims and `// keep for now` exemptions require a documented reason the user has agreed to.
 
-```bash
-bun run quality   # Format + lint + type check (run before committing)
-bun run lint      # ESLint only
-bun run check     # svelte-check only
-```
+## Types
 
-## TypeScript
+- No `any` - use `unknown` or a proper type
+- No explicit return types - let TypeScript infer. Exceptions: class getters and places where a framework requires an explicit signature
+- No `@ts-ignore` - fix the underlying issue
+- No disabling lint rules - fix the code instead. Exception: `svelte/no-navigation-without-resolve` for dynamic URLs (see [svelte5](../svelte5/SKILL.md#navigation))
+- Prefer type guards (functions returning `x is T`) over `as` assertions - `as` silences the compiler without proving anything
 
-### Rules
+## Comments
 
-- **Never use `any`** - Use `unknown` or proper types
-- **Never use explicit return types** - Let TypeScript infer (exception: class getters with complex inline types)
-- **Never use `@ts-ignore`** - Fix the underlying issue
-- **Never disable linter rules** - Fix the code instead
-  - Exception: `svelte/no-navigation-without-resolve` for dynamic URLs (see [svelte5.md](../svelte5/SKILL.md#navigation))
-- **Avoid default parameter values** - Only use when strictly necessary; prefer explicit arguments at call sites
+- Self-documenting code first - clear names and structure beat narration
+- Only durable comments - non-obvious rules, constraints, workarounds, tradeoffs
+- Prefix intentional comments so cleanup passes can tell them from disposable narration:
+- `NOTE:` important context, rules, or constraints that are easy to miss
+- `HACK:` deliberate workarounds or temporary compromises
+- `TODO:` planned follow-up work that is intentionally deferred
+- `FIXME:` known broken or risky behavior that still needs correction
+- For multiline intentional comments, prefix only the first line; continuation lines use plain `//`
+- Keep pragma/framework comments in their required syntax when tooling depends on them
+- Update or delete stale comments when the code changes
 
-### Type Narrowing
+## Structure
 
-Prefer type guards over type assertions:
+- Every named function or variable is indirection - a jump the reader must make or a name they must hold in memory. Pay that cost only when it removes real duplication, or, for variables, when the name conveys information the expression does not
+- Extract a function only when the same logic already appears in 3+ places, or in 2 places where the duplication is multi-line or carries subtle conditions that are easy to get wrong if copied
+- A function called from exactly one place is never the right answer - inline it. The alternative is a longer top-to-bottom procedural function, and that's fine
+- Anticipated future duplication does not count - wait for the duplication to exist
+- YAGNI - never add functionality, parameters, exports, or configuration for a speculative future use case. Wait for the use case to exist
+- Never leave old code behind for backwards compatibility - delete what's being replaced. Compatibility shims, deprecated wrappers, and "just in case" code paths are speculation about the past in the same way YAGNI is speculation about the future. If a real caller breaks, that's a signal, not a regression
+- Avoid wrapper layers - re-exports, aliases, thin adapter modules, delegation. Callers should reference the receiver directly
+- Prefer a larger refactor that simplifies several things at once over a surgical change threaded through complexity that should be removed. Before starting, zoom out and consider whether the change should be bigger
+- Name an intermediate value only when the name conveys information the expression does not; a `const` assigned and consumed on the following line is noise
+- Don't abbreviate names unless the abbreviation is broadly known
+- No default parameter values - function arguments should be required. Only add a fallback (`= value`) when there is a clear, justified reason
+- Always delete dead code and useless comments adjacent to what you're touching, even when they fall outside the current change - unused imports, variables, functions, unreachable paths, stale narration. Deletions are cheap to review and easy to revert, and unchecked rot compounds
 
-```typescript
-// Good: type guard
-if (isUser(data)) { ... }
+## UI Text
 
-// Avoid: type assertion
-const user = data as User;
-```
+- Sentence case (except acronyms and proper names)
+- No trailing periods in single-sentence UI text - labels, buttons, headings, tooltips, descriptions, toasts
+- No ellipsis (`...` or `…`) to indicate loading or progress - use a spinner component or `toast.loading()`. Write "Creating account", not "Creating account..."
 
-## Formatting
+## Libraries
 
-- **Prettier** with 100 char line width
-- **Tabs** for indentation
-- Config: `.prettierrc`
-
-## Import Organization
-
-Sort order (handled by Prettier):
-
-1. Built-in modules
-2. Third-party modules
-3. `$env/*` aliases
-4. `$app/*` aliases
-5. `$lib/*` aliases
-6. Relative imports
-
-## Commit Messages
-
-Format: `type: description`
-
-| Type       | Usage                        |
-| ---------- | ---------------------------- |
-| `feat`     | New feature                  |
-| `fix`      | Bug fix                      |
-| `refactor` | Code change (no feature/fix) |
-| `docs`     | Documentation only           |
-| `test`     | Adding/updating tests        |
-| `chore`    | Maintenance tasks            |
-
-Examples:
-
-- `feat: add account sharing`
-- `fix: resolve balance calculation race condition`
-- `refactor: extract transaction dedup logic`
-
-## Code Style
-
-- **Keep code self-documenting** - Prefer clear names and structure over narration
-- **No unnecessary comments** - Only comment complex business logic or non-obvious algorithms
-- **Use line-comment prefixes for intentional comments** - `// NOTE:`, `// HACK:`, `// TODO:`, or `// FIXME:` for durable comments
-  - `NOTE:` for important context, rules, or constraints that are easy to miss
-  - `HACK:` for deliberate workarounds or temporary compromises
-  - `TODO:` for planned follow-up work that is still intentionally deferred
-  - `FIXME:` for known broken or risky behavior
-- **Remove or update stale comments** - If the code changes, keep the comment accurate or delete it
-- **Extract when used 2-3+ times** - Avoid premature abstraction
-- **Inline single-use logic** - Don't extract functions used only once
-- **Remove unused code** - Delete dead imports, variables, functions
-- **Sentence case for UI labels** - Except acronyms/proper names
-- **No trailing periods in UI text** - Labels, buttons, headings
-- **No ellipsis in UI text** - Never use `...` or `…` for loading. Use a spinner or `toast.loading()` instead
-- **Use project dependencies** - Don't manually implement what libraries provide (e.g., `date-fns` for time math)
+- Use project dependencies - don't reimplement what they provide
+- Use `date-fns` for date/time math: comparisons, ranges, calendar boundaries
+- Avoid manual millisecond arithmetic for calendar boundaries - it breaks on timezone, DST, and month-boundary edges
 
 ## Dependencies
 
-- All packages go in `devDependencies` (SvelteKit bundles everything at build time)
-- Use `bun add -d` (not `bun add`) when adding packages
-- Use `bun install` (not npm)
-
-## Git Workflow
-
-- **Never commit without explicit user approval** - Each commit triggers CI
-- **Show changes first** - Let the user review before committing
-- **Use `gh` CLI for GitHub operations** - Repo is private, client is authenticated
-
-## Anti-patterns
-
-- **Never mention AI tools in commits** - No references to Claude, GPT, etc.
-- **Never add co-author tags** - No `Co-Authored-By`
-- **Never commit secrets** - Use environment variables
-
-## See Also
-
-- [issue-writing.md](../issue-writing/SKILL.md) - GitHub issue authoring guidance
-- [testing.md](../testing/SKILL.md) - Test conventions
-- [svelte5.md](../svelte5/SKILL.md) - Svelte 5 patterns
+- All packages go in `devDependencies` - this project has no `dependencies` section
+- Use `bun add -d` to add, `bun install` to install - never npm
