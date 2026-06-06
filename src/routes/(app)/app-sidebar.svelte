@@ -1,7 +1,3 @@
-<script lang="ts" module>
-	// (module script intentionally left empty)
-</script>
-
 <script lang="ts">
 	import ArrowLeftRightIcon from '@lucide/svelte/icons/arrow-left-right';
 	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
@@ -46,9 +42,9 @@
 			icon: LandmarkIcon
 		},
 		{
-			name: m.sidebar_investments(),
-			url: resolve('/investments'),
-			icon: LandmarkIcon
+			name: m.sidebar_holdings(),
+			url: resolve('/holdings'),
+			icon: LayoutListIcon
 		},
 		{
 			name: m.sidebar_accounts(),

@@ -4,37 +4,35 @@ import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
 import { getUserPB, seedAccount, seedUser } from './pocketbase.helpers';
 
-test('user can create a security and add a holding in an investment account', async ({ page }) => {
+test('user can add a holding in an investment account', async ({ page }) => {
 	const user = await seedUser('sierra');
 	const testToken = user.id.slice(0, 6);
 	const accountName = `Retirement Brokerage ${testToken}`;
 	const securityName = `Vanguard Total Market ${testToken}`;
 	const tickerSymbol = `VTI${testToken.slice(0, 3).toUpperCase()}`;
 
-	await page.goto('/');
-	await signIn(page, user.email);
-	await goToPageViaSidebar(page, 'Investments');
-	await expect(page.getByText('Investments').first()).toBeVisible();
-	await expect(page.getByRole('row', { name: new RegExp(securityName) })).not.toBeVisible();
-
-	await page.getByLabel('Security name').fill(securityName);
-	await page.getByLabel('Ticker symbol').fill(tickerSymbol);
-	await page.getByRole('button', { name: 'Create security' }).click();
-	await expect(page.getByText('Security added')).toBeVisible();
 	await seedAccount({
 		name: accountName,
 		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
 		owner: user.id,
 		balanceType: 'Brokerage'
 	});
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Holdings');
+	await expect(page.getByText('Holdings').first()).toBeVisible();
+	await expect(page.getByRole('row', { name: new RegExp(securityName) })).not.toBeVisible();
 
-	await page.getByLabel('Security', { exact: true }).selectOption({
-		label: `${securityName} (${tickerSymbol})`
-	});
-	await page.getByLabel('Account').selectOption({ label: accountName });
+	await page.getByRole('link', { name: 'Add holding' }).click();
+	await expect(page.getByText('Add holding').first()).toBeVisible();
+	await page.getByRole('button', { name: 'Add new' }).click();
+	await page.getByPlaceholder('Security name').fill(securityName);
+	await page.getByPlaceholder('Ticker symbol').fill(tickerSymbol);
+	await page.getByLabel('Account').click();
+	await page.getByRole('option', { name: accountName }).click();
 	await page.getByLabel('Quantity').fill('10');
 	await page.getByLabel('Market price').fill('100');
-	await page.getByRole('button', { name: 'Add holding' }).click();
+	await page.getByRole('button', { name: 'Add', exact: true }).click();
 	await expect(page.getByText('Holding added')).toBeVisible();
 
 	const holdingRow = page.getByRole('row', { name: new RegExp(securityName) });
@@ -48,6 +46,45 @@ test('user can create a security and add a holding in an investment account', as
 		.collection('holdings')
 		.getFirstListItem(`owner = "${user.id}" && quantity = 10`);
 	expect('marketValue' in holding).toBe(false);
+});
+
+test('user can add a holding with an existing security', async ({ page }) => {
+	const user = await seedUser('nora');
+	const testToken = user.id.slice(0, 6);
+	const accountName = `Nora Brokerage ${testToken}`;
+	const securityName = `Nora Index Fund ${testToken}`;
+	const tickerSymbol = `NIF${testToken.slice(0, 3).toUpperCase()}`;
+
+	await seedAccount({
+		name: accountName,
+		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+		owner: user.id,
+		balanceType: 'Brokerage'
+	});
+	const userPB = await getUserPB(user.email);
+	await userPB.collection('securities').create({
+		owner: user.id,
+		name: securityName,
+		symbol: tickerSymbol
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await page.goto('/holdings/add');
+	await page.getByLabel('Security').click();
+	await page.getByRole('option', { name: `${securityName} (${tickerSymbol})` }).click();
+	await page.getByLabel('Account').click();
+	await page.getByRole('option', { name: accountName }).click();
+	await page.getByLabel('Quantity').fill('4');
+	await page.getByLabel('Market price').fill('25');
+	await page.getByRole('button', { name: 'Add', exact: true }).click();
+	await expect(page.getByText('Holding added')).toBeVisible();
+
+	const holdingRow = page.getByRole('row', { name: new RegExp(securityName) });
+	await expect(holdingRow).toContainText(accountName);
+	await expect(holdingRow).toContainText('4');
+	await expect(holdingRow).toContainText('$25.00');
+	await expect(holdingRow).toContainText('$100.00');
 });
 
 test('holding rules reject unrelated records and non-investment accounts', async () => {
