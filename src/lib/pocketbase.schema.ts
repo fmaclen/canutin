@@ -18,7 +18,9 @@ export enum Collections {
 	AssetShares = "assetShares",
 	Assets = "assets",
 	BalanceTypes = "balanceTypes",
+	Holdings = "holdings",
 	ImportSessions = "importSessions",
+	Securities = "securities",
 	TransactionLabels = "transactionLabels",
 	Transactions = "transactions",
 	Users = "users",
@@ -223,6 +225,17 @@ export type BalanceTypesRecord = {
 	updated: IsoAutoDateString
 }
 
+export type HoldingsRecord = {
+	account?: RecordIdString
+	created: IsoAutoDateString
+	id: string
+	marketPrice: number
+	owner: RecordIdString
+	quantity: number
+	security: RecordIdString
+	updated: IsoAutoDateString
+}
+
 export enum ImportSessionsStatusOptions {
 	"pending" = "pending",
 	"completed" = "completed",
@@ -236,6 +249,15 @@ export type ImportSessionsRecord = {
 	recordsCreated?: number
 	recordsSkipped?: number
 	status: ImportSessionsStatusOptions
+	updated: IsoAutoDateString
+}
+
+export type SecuritiesRecord = {
+	created: IsoAutoDateString
+	id: string
+	name: string
+	owner: RecordIdString
+	symbol?: string
 	updated: IsoAutoDateString
 }
 
@@ -289,7 +311,9 @@ export type AssetBalancesResponse<Texpand = unknown> = Required<AssetBalancesRec
 export type AssetSharesResponse<Texpand = unknown> = Required<AssetSharesRecord> & BaseSystemFields<Texpand>
 export type AssetsResponse<Texpand = unknown> = Required<AssetsRecord> & BaseSystemFields<Texpand>
 export type BalanceTypesResponse<Texpand = unknown> = Required<BalanceTypesRecord> & BaseSystemFields<Texpand>
+export type HoldingsResponse<Texpand = unknown> = Required<HoldingsRecord> & BaseSystemFields<Texpand>
 export type ImportSessionsResponse<Texpand = unknown> = Required<ImportSessionsRecord> & BaseSystemFields<Texpand>
+export type SecuritiesResponse<Texpand = unknown> = Required<SecuritiesRecord> & BaseSystemFields<Texpand>
 export type TransactionLabelsResponse<Texpand = unknown> = Required<TransactionLabelsRecord> & BaseSystemFields<Texpand>
 export type TransactionsResponse<Texpand = unknown> = Required<TransactionsRecord> & BaseSystemFields<Texpand>
 export type UsersResponse<Texpand = unknown> = Required<UsersRecord> & AuthSystemFields<Texpand>
@@ -309,7 +333,9 @@ export type CollectionRecords = {
 	assetShares: AssetSharesRecord
 	assets: AssetsRecord
 	balanceTypes: BalanceTypesRecord
+	holdings: HoldingsRecord
 	importSessions: ImportSessionsRecord
+	securities: SecuritiesRecord
 	transactionLabels: TransactionLabelsRecord
 	transactions: TransactionsRecord
 	users: UsersRecord
@@ -328,7 +354,9 @@ export type CollectionResponses = {
 	assetShares: AssetSharesResponse
 	assets: AssetsResponse
 	balanceTypes: BalanceTypesResponse
+	holdings: HoldingsResponse
 	importSessions: ImportSessionsResponse
+	securities: SecuritiesResponse
 	transactionLabels: TransactionLabelsResponse
 	transactions: TransactionsResponse
 	users: UsersResponse

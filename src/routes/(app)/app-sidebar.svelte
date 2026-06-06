@@ -46,6 +46,11 @@
 			icon: LandmarkIcon
 		},
 		{
+			name: m.sidebar_investments(),
+			url: resolve('/investments'),
+			icon: LandmarkIcon
+		},
+		{
 			name: m.sidebar_accounts(),
 			url: resolve('/accounts'),
 			icon: WalletCardsIcon
