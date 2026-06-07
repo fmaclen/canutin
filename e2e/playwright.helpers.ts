@@ -32,6 +32,7 @@ export async function signOut(page: Page, userLabel: string) {
 const SIDEBAR_ROUTES: Record<string, string> = {
 	Accounts: '/accounts',
 	Assets: '/assets',
+	Holdings: '/holdings',
 	Transactions: '/transactions',
 	'Balance sheet': '/balance-sheet',
 	'Big picture': '/big-picture',

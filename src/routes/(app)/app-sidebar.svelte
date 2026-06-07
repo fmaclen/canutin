@@ -1,9 +1,6 @@
-<script lang="ts" module>
-	// (module script intentionally left empty)
-</script>
-
 <script lang="ts">
 	import ArrowLeftRightIcon from '@lucide/svelte/icons/arrow-left-right';
+	import ChartCandlestickIcon from '@lucide/svelte/icons/chart-candlestick';
 	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
 	import LandmarkIcon from '@lucide/svelte/icons/landmark';
 	import LayoutListIcon from '@lucide/svelte/icons/layout-list';
@@ -36,6 +33,11 @@
 			name: m.sidebar_trends(),
 			url: resolve('/trends'),
 			icon: ChartLineIcon
+		},
+		{
+			name: m.sidebar_holdings(),
+			url: resolve('/holdings'),
+			icon: ChartCandlestickIcon
 		}
 	]);
 

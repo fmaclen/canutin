@@ -56,6 +56,7 @@
 		balanceGroup: '' as AccountsBalanceGroupOptions | '',
 		accountTypeName: '',
 		notes: '',
+		tracksSecurities: false,
 		excluded: false,
 		closed: false,
 		value: ''
@@ -73,7 +74,7 @@
 	);
 	let includeInNetWorth = $derived(incomingShare?.includeInNetWorth ?? true);
 
-	function isDirty(): boolean {
+	function isDirty() {
 		if (!syncState.lastSyncedData) return false;
 
 		return (
@@ -82,14 +83,15 @@
 			formData.balanceGroup !== syncState.lastSyncedData.balanceGroup ||
 			formData.accountTypeName !== syncState.lastSyncedData.accountTypeName ||
 			formData.notes !== syncState.lastSyncedData.notes ||
+			formData.tracksSecurities !== syncState.lastSyncedData.tracksSecurities ||
 			formData.excluded !== syncState.lastSyncedData.excluded ||
 			formData.closed !== syncState.lastSyncedData.closed
 		);
 	}
 
-	function getAccountVersion(accountData: typeof account): string {
+	function getAccountVersion(accountData: typeof account) {
 		if (!accountData) return '';
-		return `${accountData.updated || accountData.created}_${accountData.name}_${accountData.balanceGroup}_${accountData.institution}_${accountData.notes}_${accountData.excluded}_${accountData.closed}`;
+		return `${accountData.updated || accountData.created}_${accountData.name}_${accountData.balanceGroup}_${accountData.institution}_${accountData.notes}_${accountData.tracksSecurities}_${accountData.excluded}_${accountData.closed}`;
 	}
 
 	async function syncFormWithAccount(accountData: typeof account) {
@@ -101,6 +103,7 @@
 			balanceGroup: accountData.balanceGroup,
 			accountTypeName: '',
 			notes: accountData.notes ?? '',
+			tracksSecurities: Boolean(accountData.tracksSecurities),
 			excluded: Boolean(accountData.excluded),
 			closed: Boolean(accountData.closed),
 			value: ''
@@ -207,6 +210,7 @@
 				balanceType: balanceTypeId,
 				institution: formData.institution.trim() || undefined,
 				notes: formData.notes.trim() || undefined,
+				tracksSecurities: formData.tracksSecurities,
 				excluded: formData.excluded ? new Date().toISOString() : null,
 				closed: formData.closed ? new Date().toISOString() : null
 			};
@@ -323,7 +327,14 @@
 	</div>
 	<nav class="px-4">
 		{#if account}
-			<Link href={`/transactions?account=${account.id}`} class="text-sm">Transactions</Link>
+			<Link
+				href={account.tracksSecurities
+					? `${resolve('/transactions')}?view=securities&account=${account.id}`
+					: `${resolve('/transactions')}?account=${account.id}`}
+				class="text-sm"
+			>
+				{account.tracksSecurities ? m.transactions_security_link() : m.sidebar_transactions()}
+			</Link>
 		{/if}
 	</nav>
 </header>

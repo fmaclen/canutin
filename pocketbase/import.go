@@ -14,21 +14,25 @@ import (
 var spaceRe = regexp.MustCompile(`\s+`)
 
 type importPayload struct {
-	SessionLabel string              `json:"sessionLabel"`
-	Accounts     []importAccount     `json:"accounts"`
-	Assets       []importAsset       `json:"assets"`
-	Transactions []importTransaction `json:"transactions"`
+	SessionLabel         string                      `json:"sessionLabel"`
+	Accounts             []importAccount             `json:"accounts"`
+	Assets               []importAsset               `json:"assets"`
+	Securities           []importSecurity            `json:"securities"`
+	Transactions         []importTransaction         `json:"transactions"`
+	SecurityBalances     []importSecurityBalance     `json:"securityBalances"`
+	SecurityTransactions []importSecurityTransaction `json:"securityTransactions"`
 }
 
 type importAccount struct {
-	Name           string         `json:"name"`
-	Institution    string         `json:"institution"`
-	BalanceGroup   string         `json:"balanceGroup"`
-	BalanceType    string         `json:"balanceType"`
-	AutoCalculated bool           `json:"autoCalculated"`
-	Closed         bool           `json:"closed"`
-	Excluded       bool           `json:"excluded"`
-	Balance        *importBalance `json:"balance"`
+	Name             string         `json:"name"`
+	Institution      string         `json:"institution"`
+	BalanceGroup     string         `json:"balanceGroup"`
+	BalanceType      string         `json:"balanceType"`
+	AutoCalculated   bool           `json:"autoCalculated"`
+	Closed           bool           `json:"closed"`
+	Excluded         bool           `json:"excluded"`
+	TracksSecurities bool           `json:"tracksSecurities"`
+	Balance          *importBalance `json:"balance"`
 }
 
 type importAsset struct {
@@ -40,6 +44,11 @@ type importAsset struct {
 	Sold         bool            `json:"sold"`
 	Excluded     bool            `json:"excluded"`
 	Balance      *importAssetBal `json:"balance"`
+}
+
+type importSecurity struct {
+	Name   string `json:"name"`
+	Symbol string `json:"symbol"`
 }
 
 type importBalance struct {
@@ -66,6 +75,38 @@ type importTransaction struct {
 	Excluded    bool     `json:"excluded"`
 }
 
+type importSecurityBalance struct {
+	AccountID      string   `json:"accountId"`
+	AccountName    string   `json:"accountName"`
+	SecurityID     string   `json:"securityId"`
+	SecurityName   string   `json:"securityName"`
+	SecuritySymbol string   `json:"securitySymbol"`
+	AsOf           string   `json:"asOf"`
+	Quantity       *float64 `json:"quantity"`
+	Price          *float64 `json:"price"`
+	Value          *float64 `json:"value"`
+	CostBasis      *float64 `json:"costBasis"`
+}
+
+type importSecurityTransaction struct {
+	AccountID      string   `json:"accountId"`
+	AccountName    string   `json:"accountName"`
+	SecurityID     string   `json:"securityId"`
+	SecurityName   string   `json:"securityName"`
+	SecuritySymbol string   `json:"securitySymbol"`
+	Date           string   `json:"date"`
+	Type           string   `json:"type"`
+	Subtype        string   `json:"subtype"`
+	Name           string   `json:"name"`
+	Description    string   `json:"description"`
+	Quantity       *float64 `json:"quantity"`
+	Price          *float64 `json:"price"`
+	Amount         *float64 `json:"amount"`
+	Fees           *float64 `json:"fees"`
+	Notes          string   `json:"notes"`
+	ExternalID     string   `json:"externalId"`
+}
+
 type importCounts struct {
 	Created  int `json:"created"`
 	Existing int `json:"existing"`
@@ -73,12 +114,15 @@ type importCounts struct {
 }
 
 type importResult struct {
-	SessionID       string       `json:"sessionId"`
-	Accounts        importCounts `json:"accounts"`
-	Assets          importCounts `json:"assets"`
-	Transactions    importCounts `json:"transactions"`
-	AccountBalances importCounts `json:"accountBalances"`
-	AssetBalances   importCounts `json:"assetBalances"`
+	SessionID            string       `json:"sessionId"`
+	Accounts             importCounts `json:"accounts"`
+	Assets               importCounts `json:"assets"`
+	Securities           importCounts `json:"securities"`
+	Transactions         importCounts `json:"transactions"`
+	AccountBalances      importCounts `json:"accountBalances"`
+	AssetBalances        importCounts `json:"assetBalances"`
+	SecurityBalances     importCounts `json:"securityBalances"`
+	SecurityTransactions importCounts `json:"securityTransactions"`
 }
 
 func normalizeDescription(desc string) string {
@@ -145,6 +189,118 @@ func cachedFindOrCreate(cache map[string]string, key string, app core.App, colle
 	return rec.Id, nil
 }
 
+func setOptionalNumber(record *core.Record, field string, value *float64) {
+	if value != nil {
+		record.Set(field, *value)
+	}
+}
+
+type optionalImportNumber struct {
+	field string
+	value *float64
+}
+
+func matchesOptionalImportNumbers(record *core.Record, fields []optionalImportNumber) bool {
+	for _, field := range fields {
+		if field.value == nil {
+			continue
+		}
+		value, ok, err := optionalJSONNumber(record, field.field)
+		if err != nil || !ok || value != *field.value {
+			return false
+		}
+	}
+	return true
+}
+
+func hasMatchingSecurityImportRecord(app core.App, collectionName string, filter string, params map[string]any, label string, fields []optionalImportNumber) bool {
+	candidates, err := app.FindRecordsByFilter(collectionName, filter, "", 0, 0, params)
+	if err != nil {
+		return false
+	}
+
+	for _, candidate := range candidates {
+		if label != "" {
+			candidateLabel := normalizeDescription(candidate.GetString("name"))
+			if candidateLabel == "" {
+				candidateLabel = normalizeDescription(candidate.GetString("description"))
+			}
+			if candidateLabel != label {
+				continue
+			}
+		}
+		if matchesOptionalImportNumbers(candidate, fields) {
+			return true
+		}
+	}
+	return false
+}
+
+func resolveImportAccount(app core.App, ownerID string, acctIndex map[string]string, accountID string, accountName string) (string, error) {
+	if strings.TrimSpace(accountID) != "" {
+		return strings.TrimSpace(accountID), nil
+	}
+
+	for key, id := range acctIndex {
+		if strings.HasPrefix(key, accountName+"|") {
+			return id, nil
+		}
+	}
+
+	found, err := app.FindFirstRecordByFilter("accounts",
+		"name = {:name} && owner = {:owner}",
+		map[string]any{"name": accountName, "owner": ownerID},
+	)
+	if err != nil {
+		return "", err
+	}
+	acctIndex[accountName+"||"] = found.Id
+	return found.Id, nil
+}
+
+func importAccountTracksSecurities(app core.App, ownerID string, accountID string) bool {
+	account, err := app.FindRecordById("accounts", accountID)
+	return err == nil && account.GetString("owner") == ownerID && account.GetBool("tracksSecurities")
+}
+
+func findOrCreateImportSecurity(app core.App, ownerID string, securityCache map[string]string, securityID string, name string, symbol string, sessionID string) (string, bool, error) {
+	if strings.TrimSpace(securityID) != "" {
+		return strings.TrimSpace(securityID), false, nil
+	}
+
+	normalizedSymbol := normalizeSecuritySymbol(symbol)
+	normalizedName := normalizedSecurityName(name)
+	key := normalizedSymbol
+	if key == "" {
+		key = normalizedName
+	}
+	key += "::" + ownerID
+
+	if id, ok := securityCache[key]; ok {
+		return id, false, nil
+	}
+
+	securityFilter := "normalizedName = {:normalizedName} && owner = {:owner}"
+	securityParams := map[string]any{"normalizedName": normalizedName, "owner": ownerID}
+	if normalizedSymbol != "" {
+		securityFilter = "normalizedSymbol = {:normalizedSymbol} && owner = {:owner}"
+		securityParams = map[string]any{"normalizedSymbol": normalizedSymbol, "owner": ownerID}
+	}
+
+	rec, created, err := findOrCreate(app, "securities", securityFilter, securityParams, map[string]any{
+		"name":          name,
+		"symbol":        symbol,
+		"owner":         ownerID,
+		"importSession": sessionID,
+	})
+	if err != nil {
+		return "", false, err
+	}
+
+	securityCache[key] = rec.Id
+	return rec.Id, created, nil
+}
+
 func handleImport(app core.App, re *core.RequestEvent) error {
 	info, _ := re.RequestInfo()
 	auth := info.Auth
@@ -157,8 +313,8 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 	if payload.SessionLabel == "" {
 		return re.JSON(http.StatusBadRequest, map[string]string{"error": "sessionLabel is required"})
 	}
-	if len(payload.Accounts) == 0 && len(payload.Assets) == 0 && len(payload.Transactions) == 0 {
-		return re.JSON(http.StatusBadRequest, map[string]string{"error": "At least one of accounts, assets, or transactions is required"})
+	if len(payload.Accounts) == 0 && len(payload.Assets) == 0 && len(payload.Securities) == 0 && len(payload.Transactions) == 0 && len(payload.SecurityBalances) == 0 && len(payload.SecurityTransactions) == 0 {
+		return re.JSON(http.StatusBadRequest, map[string]string{"error": "At least one import collection is required"})
 	}
 
 	ownerID := auth.Id
@@ -182,6 +338,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 
 	btCache := map[string]string{}
 	lblCache := map[string]string{}
+	securityCache := map[string]string{}
 	acctIndex := map[string]string{}
 
 	for _, acct := range payload.Accounts {
@@ -205,15 +362,16 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		}
 
 		rec, created, err := findOrCreate(app, "accounts", acctFilter, acctParams, map[string]any{
-			"name":           acct.Name,
-			"institution":    institution,
-			"balanceGroup":   acct.BalanceGroup,
-			"balanceType":    btID,
-			"autoCalculated": boolToTimestamp(acct.AutoCalculated),
-			"closed":         boolToTimestamp(acct.Closed),
-			"excluded":       boolToTimestamp(acct.Excluded),
-			"owner":          ownerID,
-			"importSession":  session.Id,
+			"name":             acct.Name,
+			"institution":      institution,
+			"balanceGroup":     acct.BalanceGroup,
+			"balanceType":      btID,
+			"autoCalculated":   boolToTimestamp(acct.AutoCalculated),
+			"closed":           boolToTimestamp(acct.Closed),
+			"excluded":         boolToTimestamp(acct.Excluded),
+			"tracksSecurities": acct.TracksSecurities,
+			"owner":            ownerID,
+			"importSession":    session.Id,
 		})
 		if err != nil {
 			continue
@@ -319,26 +477,24 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		}
 	}
 
-	for _, tx := range payload.Transactions {
-		var accountID string
-		for key, id := range acctIndex {
-			if strings.HasPrefix(key, tx.AccountName+"|") {
-				accountID = id
-				break
-			}
+	for _, security := range payload.Securities {
+		_, created, err := findOrCreateImportSecurity(app, ownerID, securityCache, "", security.Name, security.Symbol, session.Id)
+		if err != nil {
+			result.Securities.Skipped++
+			continue
 		}
+		if created {
+			result.Securities.Created++
+		} else {
+			result.Securities.Existing++
+		}
+	}
 
-		if accountID == "" {
-			found, err := app.FindFirstRecordByFilter("accounts",
-				"name = {:name} && owner = {:owner}",
-				map[string]any{"name": tx.AccountName, "owner": ownerID},
-			)
-			if err != nil {
-				result.Transactions.Skipped++
-				continue
-			}
-			accountID = found.Id
-			acctIndex[tx.AccountName+"||"] = accountID
+	for _, tx := range payload.Transactions {
+		accountID, err := resolveImportAccount(app, ownerID, acctIndex, "", tx.AccountName)
+		if err != nil {
+			result.Transactions.Skipped++
+			continue
 		}
 
 		isDuplicate := false
@@ -402,10 +558,148 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		}
 	}
 
+	for _, balance := range payload.SecurityBalances {
+		accountID, err := resolveImportAccount(app, ownerID, acctIndex, balance.AccountID, balance.AccountName)
+		if err != nil {
+			result.SecurityBalances.Skipped++
+			continue
+		}
+		if !importAccountTracksSecurities(app, ownerID, accountID) {
+			result.SecurityBalances.Skipped++
+			continue
+		}
+		securityID, securityCreated, err := findOrCreateImportSecurity(app, ownerID, securityCache, balance.SecurityID, balance.SecurityName, balance.SecuritySymbol, session.Id)
+		if err != nil {
+			result.SecurityBalances.Skipped++
+			continue
+		}
+		if securityCreated {
+			result.Securities.Created++
+		}
+
+		if hasMatchingSecurityImportRecord(app, "securityBalances",
+			"account = {:account} && security = {:security} && asOf = {:asOf} && owner = {:owner}",
+			map[string]any{
+				"account":  accountID,
+				"security": securityID,
+				"asOf":     datePart(balance.AsOf) + " 00:00:00.000Z",
+				"owner":    ownerID,
+			},
+			"",
+			[]optionalImportNumber{
+				{field: "quantity", value: balance.Quantity},
+				{field: "price", value: balance.Price},
+				{field: "value", value: balance.Value},
+				{field: "costBasis", value: balance.CostBasis},
+			},
+		) {
+			result.SecurityBalances.Skipped++
+			continue
+		}
+
+		coll, _ := app.FindCollectionByNameOrId("securityBalances")
+		rec := core.NewRecord(coll)
+		rec.Set("account", accountID)
+		rec.Set("security", securityID)
+		rec.Set("asOf", balance.AsOf)
+		rec.Set("owner", ownerID)
+		rec.Set("importSession", session.Id)
+		setOptionalNumber(rec, "quantity", balance.Quantity)
+		setOptionalNumber(rec, "price", balance.Price)
+		setOptionalNumber(rec, "value", balance.Value)
+		setOptionalNumber(rec, "costBasis", balance.CostBasis)
+		if err := app.Save(rec); err == nil {
+			result.SecurityBalances.Created++
+		} else {
+			result.SecurityBalances.Skipped++
+		}
+	}
+
+	for _, tx := range payload.SecurityTransactions {
+		accountID, err := resolveImportAccount(app, ownerID, acctIndex, tx.AccountID, tx.AccountName)
+		if err != nil {
+			result.SecurityTransactions.Skipped++
+			continue
+		}
+		if !importAccountTracksSecurities(app, ownerID, accountID) {
+			result.SecurityTransactions.Skipped++
+			continue
+		}
+		securityID, securityCreated, err := findOrCreateImportSecurity(app, ownerID, securityCache, tx.SecurityID, tx.SecurityName, tx.SecuritySymbol, session.Id)
+		if err != nil {
+			result.SecurityTransactions.Skipped++
+			continue
+		}
+		if securityCreated {
+			result.Securities.Created++
+		}
+
+		if tx.ExternalID != "" {
+			_, err := app.FindFirstRecordByFilter("securityTransactions",
+				"account = {:account} && externalId = {:eid} && owner = {:owner}",
+				map[string]any{"account": accountID, "eid": tx.ExternalID, "owner": ownerID},
+			)
+			if err == nil {
+				result.SecurityTransactions.Skipped++
+				continue
+			}
+		} else {
+			txLabel := normalizeDescription(tx.Description)
+			if strings.TrimSpace(tx.Name) != "" {
+				txLabel = normalizeDescription(tx.Name)
+			}
+			if hasMatchingSecurityImportRecord(app, "securityTransactions",
+				"account = {:account} && security = {:security} && date = {:date} && type = {:type} && owner = {:owner}",
+				map[string]any{
+					"account":  accountID,
+					"security": securityID,
+					"date":     datePart(tx.Date) + " 00:00:00.000Z",
+					"type":     tx.Type,
+					"owner":    ownerID,
+				},
+				txLabel,
+				[]optionalImportNumber{
+					{field: "quantity", value: tx.Quantity},
+					{field: "price", value: tx.Price},
+					{field: "amount", value: tx.Amount},
+					{field: "fees", value: tx.Fees},
+				},
+			) {
+				result.SecurityTransactions.Skipped++
+				continue
+			}
+		}
+
+		coll, _ := app.FindCollectionByNameOrId("securityTransactions")
+		rec := core.NewRecord(coll)
+		rec.Set("account", accountID)
+		rec.Set("security", securityID)
+		rec.Set("date", tx.Date)
+		rec.Set("type", tx.Type)
+		rec.Set("subtype", tx.Subtype)
+		rec.Set("name", tx.Name)
+		rec.Set("description", tx.Description)
+		rec.Set("notes", tx.Notes)
+		rec.Set("externalId", tx.ExternalID)
+		rec.Set("owner", ownerID)
+		rec.Set("importSession", session.Id)
+		setOptionalNumber(rec, "quantity", tx.Quantity)
+		setOptionalNumber(rec, "price", tx.Price)
+		setOptionalNumber(rec, "amount", tx.Amount)
+		setOptionalNumber(rec, "fees", tx.Fees)
+		if err := app.Save(rec); err == nil {
+			result.SecurityTransactions.Created++
+		} else {
+			result.SecurityTransactions.Skipped++
+		}
+	}
+
 	totalCreated := result.Accounts.Created + result.Assets.Created + result.Transactions.Created +
-		result.AccountBalances.Created + result.AssetBalances.Created
+		result.Securities.Created + result.AccountBalances.Created + result.AssetBalances.Created +
+		result.SecurityBalances.Created + result.SecurityTransactions.Created
 	totalSkipped := result.Accounts.Existing + result.Assets.Existing + result.Transactions.Skipped +
-		result.AccountBalances.Skipped + result.AssetBalances.Skipped
+		result.Securities.Existing + result.Securities.Skipped + result.AccountBalances.Skipped +
+		result.AssetBalances.Skipped + result.SecurityBalances.Skipped + result.SecurityTransactions.Skipped
 
 	session.Set("status", "completed")
 	session.Set("recordsCreated", totalCreated)
@@ -440,7 +734,7 @@ func handleRevert(app core.App, re *core.RequestEvent) error {
 		return re.JSON(http.StatusBadRequest, map[string]string{"error": "Session already reverted"})
 	}
 
-	collections := []string{"transactions", "accountBalances", "assetBalances", "accounts", "assets"}
+	collections := []string{"transactions", "securityTransactions", "accountBalances", "assetBalances", "securityBalances", "accounts", "assets", "securities"}
 	totalDeleted := 0
 
 	err = app.RunInTransaction(func(txApp core.App) error {

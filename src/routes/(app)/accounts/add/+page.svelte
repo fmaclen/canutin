@@ -19,6 +19,7 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import { Switch } from '$lib/components/ui/switch/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import { AccountsBalanceGroupOptions } from '$lib/pocketbase.schema';
@@ -35,6 +36,7 @@
 	let balanceGroup: AccountsBalanceGroupOptions | '' = $state('');
 	let accountTypeName = $state('');
 	let notes = $state('');
+	let tracksSecurities = $state(false);
 	let excluded = $state(false);
 	let closed = $state(false);
 	let value = $state('');
@@ -54,6 +56,7 @@
 				owner: currentOwnerId,
 				institution: institution.trim() || undefined,
 				notes: notes.trim() || undefined,
+				tracksSecurities,
 				excluded: excluded ? new Date().toISOString() : undefined,
 				closed: closed ? new Date().toISOString() : undefined
 			};
@@ -209,6 +212,27 @@
 							<span class="text-muted-foreground text-sm">{m.accounts_text_optional()}</span>
 						</div>
 						<Textarea id="notes" bind:value={notes} class="bg-background" />
+					</FormFieldRow>
+
+					<FormFieldRow itemsAlignment="items-start">
+						<Label for="tracks-securities" class="justify-start pr-0 md:justify-end md:pt-2.5">
+							{m.accounts_label_securities_tracking()}
+						</Label>
+						<div class="bg-background border-border space-y-1 rounded border px-3 py-2">
+							<div class="flex items-center gap-3">
+								<Switch id="tracks-securities" bind:checked={tracksSecurities} />
+								<span class="text-sm font-medium">
+									{tracksSecurities
+										? m.accounts_label_track_securities()
+										: m.accounts_label_balance_only()}
+								</span>
+							</div>
+							<p class="text-muted-foreground text-sm">
+								{tracksSecurities
+									? m.accounts_helper_track_securities()
+									: m.accounts_helper_balance_only()}
+							</p>
+						</div>
 					</FormFieldRow>
 				</Fieldset>
 

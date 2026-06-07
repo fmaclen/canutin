@@ -63,6 +63,10 @@ func main() {
 			return handleRevert(e.App, re)
 		}).Bind(apis.RequireAuth())
 
+		e.Router.POST("/api/canutin/securities/with-initial-balance", createSecurityWithInitialBalanceHandler(e.App)).Bind(
+			apis.RequireAuth("users"),
+		)
+
 		e.Router.POST("/api/shares/accounts", createAccountShareHandler(e.App)).Bind(
 			apis.RequireAuth("users"),
 		)
@@ -75,6 +79,34 @@ func main() {
 
 	app.OnRecordUpdateRequest("accountShares", "assetShares").BindFunc(func(e *core.RecordRequestEvent) error {
 		if err := validateShareUpdateRequest(e); err != nil {
+			return err
+		}
+		return e.Next()
+	})
+
+	app.OnRecordValidate("securities").BindFunc(func(e *core.RecordEvent) error {
+		normalizeSecurityRecord(e.Record)
+		return e.Next()
+	})
+
+	app.OnRecordValidate("securityBalances").BindFunc(func(e *core.RecordEvent) error {
+		normalizeSecurityDatedRecord(e.Record, "asOf")
+		if err := validateSecurityAccountCapability(e.App, e.Record); err != nil {
+			return err
+		}
+		return e.Next()
+	})
+
+	app.OnRecordValidate("securityTransactions").BindFunc(func(e *core.RecordEvent) error {
+		normalizeSecurityDatedRecord(e.Record, "date")
+		if err := validateSecurityAccountCapability(e.App, e.Record); err != nil {
+			return err
+		}
+		return e.Next()
+	})
+
+	app.OnRecordValidate("accounts").BindFunc(func(e *core.RecordEvent) error {
+		if err := preventSecuritiesDisable(e.App, e.Record); err != nil {
 			return err
 		}
 		return e.Next()

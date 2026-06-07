@@ -7,6 +7,7 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { setImportSessionsContext } from '$lib/import-sessions.svelte';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+	import { setSecuritiesContext } from '$lib/securities.svelte';
 
 	import AppSidebar from './app-sidebar.svelte';
 
@@ -16,12 +17,14 @@
 	const balanceTypesContext = setBalanceTypesContext(pb);
 	const accountsContext = setAccountsContext(pb, balanceTypesContext);
 	const assetsContext = setAssetsContext(pb, balanceTypesContext);
+	const securitiesContext = setSecuritiesContext(pb);
 	const importSessionsContext = setImportSessionsContext(pb);
 
 	onDestroy(() => {
 		balanceTypesContext.dispose();
 		accountsContext.dispose();
 		assetsContext.dispose();
+		securitiesContext.dispose();
 		importSessionsContext.dispose();
 	});
 </script>

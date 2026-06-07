@@ -6,6 +6,8 @@ import type {
 	AssetBalancesRecord,
 	AssetsRecord,
 	BalanceTypesRecord,
+	SecuritiesRecord,
+	SecurityBalancesRecord,
 	TransactionLabelsRecord,
 	TransactionsRecord,
 	TypedPocketBase,
@@ -90,6 +92,7 @@ export async function seedAccount(accountInput: {
 	closed?: AccountsRecord['closed'];
 	autoCalculated?: AccountsRecord['autoCalculated'];
 	excluded?: AccountsRecord['excluded'];
+	tracksSecurities?: AccountsRecord['tracksSecurities'];
 }) {
 	const pbAdmin = await getAdminPB();
 	const balanceType = await getOrCreateBalanceType(
@@ -143,6 +146,29 @@ export async function seedAssetBalance(assetBalanceInput: {
 }) {
 	const pb = await getAdminPB();
 	return await pb.collection('assetBalances').create(assetBalanceInput);
+}
+
+export async function seedSecurity(securityInput: {
+	name: SecuritiesRecord['name'];
+	owner: SecuritiesRecord['owner'];
+	symbol?: SecuritiesRecord['symbol'];
+}) {
+	const pb = await getAdminPB();
+	return await pb.collection('securities').create(securityInput);
+}
+
+export async function seedSecurityBalance(securityBalanceInput: {
+	account: SecurityBalancesRecord['account'];
+	owner: SecurityBalancesRecord['owner'];
+	security: SecurityBalancesRecord['security'];
+	asOf: SecurityBalancesRecord['asOf'];
+	quantity?: number | null;
+	price?: number | null;
+	value?: number | null;
+	costBasis?: number | null;
+}) {
+	const pb = await getAdminPB();
+	return await pb.collection('securityBalances').create(securityBalanceInput);
 }
 
 export async function updateAsset(
