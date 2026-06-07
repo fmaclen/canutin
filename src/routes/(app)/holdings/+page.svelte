@@ -8,7 +8,6 @@
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
-	import { Button } from '$lib/components/ui/button/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
@@ -33,8 +32,8 @@
 	}
 </script>
 
-<header class="bg-background flex h-16 shrink-0 items-center gap-2 border-b">
-	<div class="flex items-center gap-2 px-4">
+<header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
+	<div class="flex items-center gap-2">
 		<Sidebar.Trigger class="-ml-1" />
 		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
 		<Breadcrumb.Root>
@@ -45,14 +44,14 @@
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 	</div>
+	<nav class="px-4">
+		<Link href={resolve('/holdings/add')} class="text-sm">{m.holdings_button_add()}</Link>
+	</nav>
 </header>
 
 <Page pageTitle={m.holdings_page_title()}>
 	<Section>
-		<div class="flex items-center justify-between gap-3">
-			<SectionTitle title={m.holdings_section_title()} />
-			<Button href={resolve('/holdings/add')} size="sm">{m.holdings_button_add()}</Button>
-		</div>
+		<SectionTitle title={m.holdings_section_title()} />
 		{#if securitiesContext.isLoading}
 			<div class="bg-background overflow-hidden rounded-sm shadow-md">
 				<Skeleton class="h-64" />
@@ -105,24 +104,34 @@
 										<span class="text-muted-foreground">~</span>
 									{/if}
 								</Table.Cell>
-								<Table.Cell class="text-foreground/80 max-w-80 truncate text-sm">
-									{row.accounts.join(', ')}
+								<Table.Cell class="text-foreground/80 max-w-80 text-sm">
+									<div class="flex flex-wrap gap-x-1.5 gap-y-0.5">
+										{#each row.accounts as account (account.id)}
+											<Link href={resolve(`/accounts/${account.id}`)}>
+												{account.name}
+											</Link>
+										{/each}
+									</div>
 								</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">
-									<NumberDisplay value={formatQuantity(row.quantity)} sentiment="neutral" />
+									{#if row.quantity === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<NumberDisplay value={formatQuantity(row.quantity)} />
+									{/if}
 								</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">
 									{#if row.value === null}
 										<span class="text-muted-foreground">~</span>
 									{:else}
-										<Currency value={row.value} decimalScale={2} sentiment="neutral" />
+										<Currency value={row.value} decimalScale={2} />
 									{/if}
 								</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">
 									{#if row.costBasis === null}
 										<span class="text-muted-foreground">~</span>
 									{:else}
-										<Currency value={row.costBasis} decimalScale={2} sentiment="neutral" />
+										<Currency value={row.costBasis} decimalScale={2} />
 									{/if}
 								</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">

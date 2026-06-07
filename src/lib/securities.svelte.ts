@@ -39,7 +39,7 @@ export type SecurityAggregate = {
 	id: string;
 	name: string;
 	symbol: string | null;
-	accounts: string[];
+	accounts: Array<{ id: string; name: string }>;
 	quantity: number | null;
 	value: number | null;
 	costBasis: number | null;
@@ -242,8 +242,8 @@ class SecuritiesContext {
 				name: security.name,
 				symbol: security.symbol || null,
 				accounts: balances
-					.map((balance) => balance.accountName)
-					.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })),
+					.map((balance) => ({ id: balance.accountId, name: balance.accountName }))
+					.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
 				...summary
 			});
 		}
