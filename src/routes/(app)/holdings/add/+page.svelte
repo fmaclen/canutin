@@ -3,6 +3,7 @@
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAuthContext } from '$lib/auth.svelte';
 	import CurrencyField from '$lib/components/currency-field.svelte';
@@ -21,6 +22,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import type { SecuritiesResponse } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+	import { sanitizeFromParam } from '$lib/utils';
 
 	const pb = getPocketBaseContext();
 	const auth = getAuthContext();
@@ -29,7 +31,7 @@
 	const ownerId = $derived(auth.currentUser?.record?.id);
 	const investmentAccounts = $derived(
 		accountsContext.accounts.filter(
-			(account) => account.balanceGroup === 'INVESTMENT' && !account.closed
+			(account) => account.balanceGroup === 'INVESTMENT' && !account.closed && account.canWrite
 		)
 	);
 
@@ -102,12 +104,26 @@
 			});
 
 			toast.success(m.holdings_add_success());
-			await goto(resolve('/holdings'));
+			const from = sanitizeFromParam(page.url.searchParams.get('from'));
+			if (from) {
+				// eslint-disable-next-line svelte/no-navigation-without-resolve -- sanitized dynamic ?from= redirect
+				await goto(from);
+			} else {
+				await goto(resolve('/holdings'));
+			}
 		} catch (error) {
 			console.error('[holdingsAdd]', error);
 			toast.error(m.holdings_add_failed());
 		}
 	}
+
+	$effect(() => {
+		const requestedAccountId = page.url.searchParams.get('account');
+		if (!requestedAccountId) return;
+		if (investmentAccounts.some((account) => account.id === requestedAccountId)) {
+			selectedAccount = requestedAccountId;
+		}
+	});
 
 	$effect(() => {
 		if (ownerId) void refreshSecurities();

@@ -10,9 +10,12 @@
 	import { getAuthContext } from '$lib/auth.svelte';
 	import { getBalanceTypesContext } from '$lib/balance-types.svelte';
 	import CheckboxLabel from '$lib/components/checkbox-label.svelte';
+	import Currency from '$lib/components/currency.svelte';
+	import Empty from '$lib/components/empty.svelte';
 	import Fieldset from '$lib/components/fieldset.svelte';
 	import FormFieldRow from '$lib/components/form-field-row.svelte';
 	import Link from '$lib/components/link.svelte';
+	import Number from '$lib/components/number.svelte';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
@@ -25,10 +28,13 @@
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+	import * as Table from '$lib/components/ui/table/index';
 	import { m } from '$lib/paraglide/messages';
 	import {
 		AccountsBalanceGroupOptions,
-		AccountSharesPerspectiveOptions
+		AccountSharesPerspectiveOptions,
+		type HoldingsResponse,
+		type SecuritiesResponse
 	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { sanitizeFromParam } from '$lib/utils';
@@ -47,6 +53,9 @@
 	const account = $derived(accountId ? accountsContext.getAccount(accountId) : null);
 	const isLoading = $derived(accountsContext.isLoading);
 	const canWrite = $derived(Boolean(account?.canWrite));
+	const isInvestmentAccount = $derived(
+		account?.balanceGroup === AccountsBalanceGroupOptions.INVESTMENT
+	);
 	const incomingShare = $derived(account ? accountsContext.getIncomingShare(account.id) : null);
 	const grantedShares = $derived(account ? accountsContext.getGrantedShares(account.id) : []);
 
@@ -67,11 +76,21 @@
 		justSaved: false,
 		initialized: false
 	});
+	let securities = $state<SecuritiesResponse[]>([]);
+	let holdings = $state<HoldingsResponse[]>([]);
+	let isHoldingsLoaded = $state(false);
+	const accountHoldings = $derived(holdings.filter((holding) => holding.account === accountId));
+	const securitiesById = $derived(new Map(securities.map((security) => [security.id, security])));
+	const holdingsMarketValueTotal = $derived(
+		accountHoldings.reduce((sum, holding) => sum + holding.quantity * holding.marketPrice, 0)
+	);
 	let shareRecipientEmail = $state('');
 	let sharePerspective = $state<AccountSharesPerspectiveOptions>(
 		AccountSharesPerspectiveOptions.NORMAL
 	);
 	let includeInNetWorth = $derived(incomingShare?.includeInNetWorth ?? true);
+	let holdingsLoadAccountId = $state('');
+	let holdingsRefreshToken = 0;
 
 	function isDirty(): boolean {
 		if (!syncState.lastSyncedData) return false;
@@ -155,6 +174,58 @@
 		} else {
 			syncFormWithAccount(account);
 		}
+	});
+
+	function getMarketValueSentiment(value: number) {
+		if (value > 0) return 'positive';
+		if (value < 0) return 'negative';
+		return 'neutral';
+	}
+
+	async function refreshHoldings(currentAccountId: string, refreshToken: number) {
+		try {
+			const nextSecurities = await pb.authedClient.collection('securities').getFullList({
+				sort: 'name',
+				requestKey: null
+			});
+			if (accountId !== currentAccountId || holdingsRefreshToken !== refreshToken) return;
+
+			const nextHoldings = await pb.authedClient.collection('holdings').getFullList({
+				filter: `account='${currentAccountId}'`,
+				requestKey: null
+			});
+			if (accountId !== currentAccountId || holdingsRefreshToken !== refreshToken) return;
+
+			securities = nextSecurities;
+			holdings = nextHoldings;
+			isHoldingsLoaded = true;
+		} catch (error) {
+			if (accountId !== currentAccountId || holdingsRefreshToken !== refreshToken) return;
+
+			pb.handleConnectionError(error, 'accountHoldings', 'refresh');
+			isHoldingsLoaded = true;
+		}
+	}
+
+	$effect(() => {
+		const currentAccountId = accountId;
+		if (!currentAccountId || !isInvestmentAccount) {
+			if (holdingsLoadAccountId) {
+				holdingsRefreshToken += 1;
+				holdingsLoadAccountId = '';
+				isHoldingsLoaded = false;
+				holdings = [];
+			}
+			return;
+		}
+		if (holdingsLoadAccountId === currentAccountId) return;
+
+		const refreshToken = holdingsRefreshToken + 1;
+		holdingsRefreshToken = refreshToken;
+		holdingsLoadAccountId = currentAccountId;
+		isHoldingsLoaded = false;
+		holdings = [];
+		void refreshHoldings(currentAccountId, refreshToken);
 	});
 
 	async function handleUpdateBalance() {
@@ -387,6 +458,102 @@
 			<DetailsForm {formData} onSubmit={handleUpdateDetails} disabled={!canWrite} />
 		{/if}
 	</Section>
+
+	{#if isLoading || isInvestmentAccount}
+		<Section>
+			<div class="flex items-center justify-between gap-4">
+				<SectionTitle title={m.holdings_section_title()} />
+				{#if account && canWrite && !account.closed}
+					<Link
+						href={`/holdings/add?account=${account.id}&from=${encodeURIComponent(`/accounts/${account.id}`)}`}
+						class="text-sm whitespace-nowrap"
+					>
+						{m.holdings_add_link()}
+					</Link>
+				{/if}
+			</div>
+			{#if isLoading || !account || !isHoldingsLoaded}
+				<Skeleton class="h-48" />
+			{:else if accountHoldings.length === 0}
+				<Empty>{m.holdings_empty()}</Empty>
+			{:else}
+				<div class="bg-background overflow-hidden rounded-sm shadow-md">
+					<Table.Root>
+						<Table.Header>
+							<Table.Row>
+								<Table.Head class="text-left whitespace-nowrap">
+									{m.holdings_table_header_security()}
+								</Table.Head>
+								<Table.Head class="text-left whitespace-nowrap">
+									{m.holdings_table_header_symbol()}
+								</Table.Head>
+								<Table.Head class="text-right whitespace-nowrap">
+									{m.holdings_table_header_quantity()}
+								</Table.Head>
+								<Table.Head class="text-right whitespace-nowrap">
+									{m.holdings_table_header_market_price()}
+								</Table.Head>
+								<Table.Head class="text-right whitespace-nowrap">
+									{m.holdings_table_header_market_value()}
+								</Table.Head>
+							</Table.Row>
+						</Table.Header>
+						<Table.Body>
+							{#each accountHoldings as holding (holding.id)}
+								{@const security = securitiesById.get(holding.security)}
+								{@const marketValue = holding.quantity * holding.marketPrice}
+								<Table.Row>
+									<Table.Cell>
+										<span class="text-foreground/90 text-sm font-medium">
+											{security ? security.name : m.holdings_unknown_security()}
+										</span>
+									</Table.Cell>
+									<Table.Cell class="text-foreground/80 text-sm tracking-wide uppercase">
+										{#if security?.symbol}
+											{security.symbol}
+										{:else}
+											<span class="text-muted-foreground">~</span>
+										{/if}
+									</Table.Cell>
+									<Table.Cell class="text-right tabular-nums">
+										<Number
+											value={holding.quantity.toLocaleString(undefined, {
+												maximumFractionDigits: 8
+											})}
+										/>
+									</Table.Cell>
+									<Table.Cell class="text-right tabular-nums">
+										<Currency value={holding.marketPrice} decimalScale={2} sentiment="neutral" />
+									</Table.Cell>
+									<Table.Cell class="text-right tabular-nums">
+										<Currency
+											value={marketValue}
+											decimalScale={2}
+											sentiment={getMarketValueSentiment(marketValue)}
+										/>
+									</Table.Cell>
+								</Table.Row>
+							{/each}
+						</Table.Body>
+						<Table.Footer>
+							<Table.Row class="border-t-2">
+								<Table.Cell colspan={4} class="text-muted-foreground text-xs font-normal">
+									{m.holdings_total_market_value_label()}
+								</Table.Cell>
+								<Table.Cell class="text-foreground text-right tabular-nums">
+									<Currency
+										value={holdingsMarketValueTotal}
+										decimalScale={2}
+										sentiment={getMarketValueSentiment(holdingsMarketValueTotal)}
+									/>
+								</Table.Cell>
+							</Table.Row>
+						</Table.Footer>
+					</Table.Root>
+				</div>
+			{/if}
+		</Section>
+	{/if}
 
 	<Section>
 		<SectionTitle title="Sharing" />
