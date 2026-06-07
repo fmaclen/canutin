@@ -38,7 +38,7 @@ Render passed-in content with snippets:
 Access default content via `children` prop:
 
 ```svelte
-let { children } = $props();
+let {children} = $props();
 {@render children?.()}
 ```
 

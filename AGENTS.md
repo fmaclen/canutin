@@ -49,13 +49,13 @@ Each skill lives at `.agents/skills/<slug>/SKILL.md`.
 
 ### Operations
 
-| Synopsis                                                                    | Slug               |
-| --------------------------------------------------------------------------- | ------------------ |
-| How to create and reuse worktrees for autonomous work                       | setup              |
-| How to verify changes locally before requesting review                      | verify             |
-| How to diagnose failed checks and avoid wasting CI                          | failure-discipline |
-| How to change PocketBase schema safely                                      | pb-migrate         |
-| How to import and revert PocketBase data                                    | pb-import          |
+| Synopsis                                               | Slug               |
+| ------------------------------------------------------ | ------------------ |
+| How to create and reuse worktrees for autonomous work  | setup              |
+| How to verify changes locally before requesting review | verify             |
+| How to diagnose failed checks and avoid wasting CI     | failure-discipline |
+| How to change PocketBase schema safely                 | pb-migrate         |
+| How to import and revert PocketBase data               | pb-import          |
 
 ### Authoring
 
