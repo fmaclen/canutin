@@ -168,12 +168,12 @@
 
 	async function handleSecuritySubmit() {
 		const currentOwnerId = ownerId;
-		if (!currentOwnerId || !securityAccountId || !securityId) return;
+		if (!currentOwnerId || !securityAccountId || !selectedSecurity) return;
 
 		try {
 			await pb.authedClient.collection('securityTransactions').create({
 				account: securityAccountId,
-				security: securityId,
+				security: selectedSecurity.id,
 				owner: currentOwnerId,
 				date: new Date(securityDate + 'T12:00:00Z').toISOString(),
 				type: securityType,
@@ -364,9 +364,19 @@
 									{/if}
 								</Select.Trigger>
 								<Select.Content>
-									{#each securitiesContext.securities as security (security.id)}
-										<Select.Item value={security.id}>{security.name}</Select.Item>
-									{/each}
+									{#if securitiesContext.isLoading}
+										<Select.Item value="__loading_securities__" disabled>
+											{m.transactions_securities_loading()}
+										</Select.Item>
+									{:else if securitiesContext.securities.length === 0}
+										<Select.Item value="__empty_securities__" disabled>
+											{m.transactions_securities_empty()}
+										</Select.Item>
+									{:else}
+										{#each securitiesContext.securities as security (security.id)}
+											<Select.Item value={security.id}>{security.name}</Select.Item>
+										{/each}
+									{/if}
 								</Select.Content>
 							</Select.Root>
 						</FormFieldRow>
