@@ -30,14 +30,14 @@
 			icon: LayoutListIcon
 		},
 		{
-			name: m.sidebar_trends(),
-			url: resolve('/trends'),
-			icon: ChartLineIcon
-		},
-		{
 			name: m.sidebar_holdings(),
 			url: resolve('/holdings'),
 			icon: ChartCandlestickIcon
+		},
+		{
+			name: m.sidebar_trends(),
+			url: resolve('/trends'),
+			icon: ChartLineIcon
 		}
 	]);
 
