@@ -69,6 +69,9 @@
 						{m.transactions_security_table_header_security()}
 					</Table.Head>
 					<Table.Head class="text-left whitespace-nowrap">
+						{m.holdings_table_header_symbol()}
+					</Table.Head>
+					<Table.Head class="text-left whitespace-nowrap">
 						{m.transactions_security_table_header_type()}
 					</Table.Head>
 					<Table.Head class="text-left whitespace-nowrap">
@@ -99,13 +102,15 @@
 						>
 							{formatDate(row.date)}
 						</Table.Cell>
-						<Table.Cell>
-							<div class="flex flex-col">
-								<span class="text-foreground/90 text-sm font-medium">{row.securityName}</span>
-								{#if row.securitySymbol}
-									<span class="text-muted-foreground text-xs">{row.securitySymbol}</span>
-								{/if}
-							</div>
+						<Table.Cell class="whitespace-nowrap">
+							<span class="text-foreground/90 text-sm font-medium">{row.securityName}</span>
+						</Table.Cell>
+						<Table.Cell class="text-muted-foreground whitespace-nowrap">
+							{#if row.securitySymbol}
+								<span class="text-sm">{row.securitySymbol}</span>
+							{:else}
+								<span class="text-sm">~</span>
+							{/if}
 						</Table.Cell>
 						<Table.Cell>
 							<div class="flex flex-col">
