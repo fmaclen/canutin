@@ -103,10 +103,6 @@ export class PocketBaseContext {
 		const errorType = this.getErrorType(error, 'connection');
 		const message = errorType.isAuth ? m.error_auth_failed() : m.error_connection_failed();
 		toast.error(message, { id: errorType.toastId });
-
-		if (errorType.isAuth) {
-			this.authedClient.authStore.clear();
-		}
 	}
 
 	handleSubscriptionError(error: unknown, context: string, operation: string) {
@@ -114,10 +110,6 @@ export class PocketBaseContext {
 		const errorType = this.getErrorType(error, 'subscription');
 		const message = errorType.isAuth ? m.error_auth_failed() : m.error_subscription_failed();
 		toast.error(message, { id: errorType.toastId });
-
-		if (errorType.isAuth) {
-			this.authedClient.authStore.clear();
-		}
 	}
 }
 

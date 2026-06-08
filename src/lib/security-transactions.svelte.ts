@@ -8,6 +8,7 @@ import { replaceState } from '$app/navigation';
 import { page } from '$app/stores';
 
 import { getAccountsContext } from './accounts.svelte';
+import { getAuthContext } from './auth.svelte';
 import {
 	SecurityTransactionsTypeOptions,
 	type AccountsResponse,
@@ -60,9 +61,12 @@ class SecurityTransactionsContext {
 	rawTransactions: SecurityTransaction[] = $state([]);
 
 	private _pb: PocketBaseContext;
+	private _auth: ReturnType<typeof getAuthContext>;
 	private _accountsContext: ReturnType<typeof getAccountsContext>;
 	private _loadingDelayTimer: ReturnType<typeof setTimeout> | null = null;
 	private _refreshTimer: ReturnType<typeof setTimeout> | null = null;
+	private _activeUserId = '';
+	private _isSubscribed = false;
 
 	private static readonly LOADING_DELAY_MS = 150;
 
@@ -70,6 +74,7 @@ class SecurityTransactionsContext {
 
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
+		this._auth = getAuthContext();
 		this._accountsContext = getAccountsContext();
 		this.syncFromUrl(false);
 		this.init();
@@ -136,6 +141,12 @@ class SecurityTransactionsContext {
 	}
 
 	async refreshTransactions() {
+		if (!this._activeUserId) {
+			this.rawTransactions = [];
+			this.isLoading = false;
+			return;
+		}
+
 		if (this._loadingDelayTimer) {
 			clearTimeout(this._loadingDelayTimer);
 			this._loadingDelayTimer = null;
@@ -178,21 +189,52 @@ class SecurityTransactionsContext {
 		}
 	}
 
-	private async init() {
-		this.realtimeSubscribe();
-		await this.refreshTransactions();
+	private init() {
+		$effect(() => {
+			const userId = this._auth.currentUserId;
+			if (userId === this._activeUserId) return;
+			this._activeUserId = userId;
+
+			if (!userId) {
+				this.unsubscribeRealtime();
+				this.rawTransactions = [];
+				this.isLoading = false;
+				return;
+			}
+
+			this.isLoading = true;
+			queueMicrotask(() => {
+				if (userId !== this._activeUserId) return;
+				this.realtimeSubscribe();
+				this.syncFromUrl(false);
+				void this.refreshTransactions();
+			});
+		});
 	}
 
 	private realtimeSubscribe() {
+		if (this._isSubscribed || !this._activeUserId) return;
+
 		this._pb.authedClient
 			.collection('securityTransactions')
 			.subscribe('*', this.onTransactionEvent.bind(this))
-			.catch((error) =>
-				this._pb.handleSubscriptionError(error, 'securityTransactions', 'subscribe_transactions')
-			);
+			.catch((error) => {
+				if (this._activeUserId) {
+					this._pb.handleSubscriptionError(error, 'securityTransactions', 'subscribe_transactions');
+				}
+			});
+		this._isSubscribed = true;
+	}
+
+	private unsubscribeRealtime() {
+		if (!this._isSubscribed) return;
+		this._isSubscribed = false;
+		this._pb.authedClient.collection('securityTransactions').unsubscribe('*');
 	}
 
 	private onTransactionEvent(event: RecordSubscription<SecurityTransaction>) {
+		if (!this._activeUserId) return;
+
 		if (!event.action) return;
 		if (this._refreshTimer) clearTimeout(this._refreshTimer);
 		this._refreshTimer = setTimeout(() => {
@@ -213,7 +255,6 @@ class SecurityTransactionsContext {
 
 	private syncFiltersToUrl() {
 		const params = new SvelteURLSearchParams(this.currentUrl.searchParams);
-		params.set('view', 'securities');
 
 		if (this.search.trim()) {
 			params.set('q', this.search.trim());
@@ -309,7 +350,7 @@ class SecurityTransactionsContext {
 	dispose() {
 		if (this._loadingDelayTimer) clearTimeout(this._loadingDelayTimer);
 		if (this._refreshTimer) clearTimeout(this._refreshTimer);
-		this._pb.authedClient.collection('securityTransactions').unsubscribe('*');
+		this.unsubscribeRealtime();
 	}
 }
 

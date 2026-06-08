@@ -1,11 +1,9 @@
 <script lang="ts">
 	import { toast } from 'svelte-sonner';
-	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import { slide } from 'svelte/transition';
 
 	import { afterNavigate, goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import Link from '$lib/components/link.svelte';
 	import Page from '$lib/components/page.svelte';
@@ -18,30 +16,17 @@
 	import { Skeleton } from '$lib/components/ui/skeleton/index';
 	import * as Tabs from '$lib/components/ui/tabs/index';
 	import { m } from '$lib/paraglide/messages';
-	import { getSecurityTransactionsContext } from '$lib/security-transactions.svelte';
 	import { getTransactionsContext } from '$lib/transactions.svelte';
 
 	import AddAccountToastLink from './add-account-toast-link.svelte';
-	import SecurityTransactionFilters from './security-transaction-filters.svelte';
-	import SecurityTransactionTable from './security-transaction-table.svelte';
 	import TransactionFilters from './transaction-filters.svelte';
 	import TransactionSummary from './transaction-summary.svelte';
 	import TransactionTable from './transaction-table.svelte';
 
 	const txContext = getTransactionsContext();
-	const securityTxContext = getSecurityTransactionsContext();
 	const accountsContext = getAccountsContext();
 	const openAccounts = $derived(accountsContext.accounts.filter((a) => !a.closed && a.canWrite));
-	const activeView = $derived(
-		page.url.searchParams.get('view') === 'securities' ? 'securities' : 'cash'
-	);
-	const addTransactionHref = $derived(
-		activeView === 'securities'
-			? `${resolve('/transactions/add')}?mode=security`
-			: resolve('/transactions/add')
-	);
 	txContext.syncFromUrl();
-	securityTxContext.syncFromUrl();
 
 	function handleAddTransactionClick(event: MouseEvent) {
 		if (accountsContext.isLoading || openAccounts.length > 0) return;
@@ -54,22 +39,9 @@
 	}
 
 	async function handleViewChange(value: string | undefined) {
-		const nextView = value === 'securities' ? 'securities' : 'cash';
-		const params = new SvelteURLSearchParams(page.url.searchParams);
-		if (nextView === 'securities') {
-			params.set('view', 'securities');
-			const accountId = params.get('account');
-			if (!accountsContext.accounts.some((account) => account.id === accountId)) {
-				params.delete('account');
-			}
-		} else {
-			params.delete('view');
-			params.delete('security');
-			params.delete('type');
-		}
-		const search = params.toString();
-		// eslint-disable-next-line svelte/no-navigation-without-resolve -- query params are appended to a resolved base route
-		await goto(`${resolve('/transactions')}${search ? `?${search}` : ''}`, {
+		if (value !== 'holdings') return;
+
+		await goto(resolve('/transactions/holdings'), {
 			replaceState: true,
 			noScroll: true,
 			keepFocus: true
@@ -80,7 +52,6 @@
 	afterNavigate(({ to }) => {
 		if (to?.url.pathname !== '/transactions') return;
 		txContext.syncFromUrl();
-		securityTxContext.syncFromUrl();
 	});
 
 	// Keep page within valid bounds
@@ -97,11 +68,6 @@
 		void txContext.labelFilter;
 		txContext.page = 1;
 	});
-
-	$effect(() => {
-		if (activeView !== 'securities' || accountsContext.accounts.length === 0) return;
-		securityTxContext.syncFromUrl();
-	});
 </script>
 
 <header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
@@ -117,7 +83,7 @@
 		</Breadcrumb.Root>
 	</div>
 	<nav class="px-4">
-		<Link href={addTransactionHref} class="text-sm" onclick={handleAddTransactionClick}
+		<Link href={resolve('/transactions/add')} class="text-sm" onclick={handleAddTransactionClick}
 			>{m.transactions_add_link()}</Link
 		>
 	</nav>
@@ -125,12 +91,12 @@
 
 <Page pageTitle={m.sidebar_transactions()}>
 	<Section>
-		<Tabs.Root value={activeView} onValueChange={handleViewChange}>
+		<Tabs.Root value="cash" onValueChange={handleViewChange}>
 			<nav class="flex items-center justify-between space-x-2">
 				<SectionTitle title={m.transactions_section_title()} />
 				<Tabs.List>
 					<Tabs.Trigger value="cash">{m.transactions_view_cash()}</Tabs.Trigger>
-					<Tabs.Trigger value="securities">{m.transactions_view_securities()}</Tabs.Trigger>
+					<Tabs.Trigger value="holdings">{m.transactions_view_securities()}</Tabs.Trigger>
 				</Tabs.List>
 			</nav>
 
@@ -164,16 +130,6 @@
 						<Skeleton class="min-h-32" />
 					{:else}
 						<TransactionTable />
-					{/if}
-				</div>
-			</Tabs.Content>
-			<Tabs.Content value="securities">
-				<div class="flex flex-col space-y-2">
-					<SecurityTransactionFilters />
-					{#if securityTxContext.isLoading && securityTxContext.rawTransactions.length === 0}
-						<Skeleton class="min-h-32" />
-					{:else}
-						<SecurityTransactionTable />
 					{/if}
 				</div>
 			</Tabs.Content>

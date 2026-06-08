@@ -175,8 +175,7 @@
 			});
 
 			toast.success(m.transactions_security_add_success());
-			// eslint-disable-next-line svelte/no-navigation-without-resolve -- query params are appended to a resolved base route
-			await goto(`${resolve('/transactions')}?view=securities`);
+			await goto(resolve('/transactions/holdings'));
 		} catch (error) {
 			console.error('[securityTransactions:create]', error);
 			toast.error(m.transactions_security_add_failed());

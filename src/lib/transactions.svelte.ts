@@ -9,6 +9,7 @@ import { replaceState } from '$app/navigation';
 import { page } from '$app/stores';
 
 import { getAccountsContext } from './accounts.svelte';
+import { getAuthContext } from './auth.svelte';
 import type {
 	AccountsResponse,
 	TransactionLabelsResponse,
@@ -75,6 +76,8 @@ class TransactionsContext {
 	private _customLabel: string | null = $state(null);
 	private _searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 	private _loadingDelayTimer: ReturnType<typeof setTimeout> | null = null;
+	private _activeUserId = '';
+	private _isSubscribed = false;
 
 	private static readonly LOADING_DELAY_MS = 150;
 	private static readonly SEARCH_DEBOUNCE_MS = 300;
@@ -93,9 +96,11 @@ class TransactionsContext {
 	readonly pageSize = 50;
 
 	private _pb: PocketBaseContext;
+	private _auth: ReturnType<typeof getAuthContext>;
 	private _accountsContext: ReturnType<typeof getAccountsContext>;
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
+		this._auth = getAuthContext();
 		this._accountsContext = getAccountsContext();
 		this.syncFromUrl(false);
 		this.init();
@@ -230,21 +235,45 @@ class TransactionsContext {
 		}
 	}
 
-	private async init() {
-		// Subscribe FIRST to avoid missing events during initial fetch
+	private init() {
+		$effect(() => {
+			const userId = this._auth.currentUserId;
+			if (userId === this._activeUserId) return;
+			this._activeUserId = userId;
+
+			if (!userId) {
+				this.unsubscribeRealtime();
+				this.rawTransactions = [];
+				this.transactionLabels = [];
+				this.isLoading = false;
+				return;
+			}
+
+			this.isLoading = true;
+			queueMicrotask(() => {
+				void this.refreshForCurrentUser(userId);
+			});
+		});
+	}
+
+	private async refreshForCurrentUser(userId: string) {
 		this.realtimeSubscribe();
 		this.realtimeSubscribeLabels();
+		this.syncFromUrl(false);
 		await this.refreshLabels();
+		if (userId !== this._activeUserId) return;
 		await this.refreshTransactions();
 	}
 
 	private async refreshLabels() {
+		if (!this._activeUserId) return;
+
 		try {
 			this.transactionLabels = await this._pb.authedClient
 				.collection('transactionLabels')
 				.getFullList<TransactionLabelsResponse>({
 					sort: 'name',
-					requestKey: 'transactionLabels:list'
+					requestKey: null
 				});
 		} catch (error) {
 			this._pb.handleConnectionError(error, 'transactionLabels', 'refresh');
@@ -278,6 +307,12 @@ class TransactionsContext {
 	}
 
 	async refreshTransactions() {
+		if (!this._activeUserId) {
+			this.rawTransactions = [];
+			this.isLoading = false;
+			return;
+		}
+
 		if (this._loadingDelayTimer) {
 			clearTimeout(this._loadingDelayTimer);
 			this._loadingDelayTimer = null;
@@ -331,7 +366,7 @@ class TransactionsContext {
 					expand: 'account,labels',
 					batch: 200,
 					filter,
-					requestKey: 'transactions:list'
+					requestKey: null
 				});
 			this.rawTransactions = list;
 		} catch (error) {
@@ -346,24 +381,42 @@ class TransactionsContext {
 	}
 
 	private realtimeSubscribe() {
+		if (this._isSubscribed || !this._activeUserId) return;
+
 		this._pb.authedClient
 			.collection('transactions')
 			.subscribe('*', this.onTransactionEvent.bind(this))
-			.catch((error) =>
-				this._pb.handleSubscriptionError(error, 'transactions', 'subscribe_transactions')
-			);
+			.catch((error) => {
+				if (this._activeUserId) {
+					this._pb.handleSubscriptionError(error, 'transactions', 'subscribe_transactions');
+				}
+			});
+		this._isSubscribed = true;
 	}
 
 	private realtimeSubscribeLabels() {
+		if (!this._activeUserId) return;
+
 		this._pb.authedClient
 			.collection('transactionLabels')
 			.subscribe('*', () => this.refreshLabels())
-			.catch((error) =>
-				this._pb.handleSubscriptionError(error, 'transactionLabels', 'subscribe_labels')
-			);
+			.catch((error) => {
+				if (this._activeUserId) {
+					this._pb.handleSubscriptionError(error, 'transactionLabels', 'subscribe_labels');
+				}
+			});
+	}
+
+	private unsubscribeRealtime() {
+		if (!this._isSubscribed) return;
+		this._isSubscribed = false;
+		this._pb.authedClient.collection('transactions').unsubscribe('*');
+		this._pb.authedClient.collection('transactionLabels').unsubscribe('*');
 	}
 
 	private async onTransactionEvent(e: RecordSubscription<TransactionsResponse<TransactionExpand>>) {
+		if (!this._activeUserId) return;
+
 		if (e.action === 'create') {
 			const txn = await this._pb.authedClient
 				.collection('transactions')
@@ -708,8 +761,7 @@ class TransactionsContext {
 	}
 
 	dispose() {
-		this._pb.authedClient.collection('transactions').unsubscribe();
-		this._pb.authedClient.collection('transactionLabels').unsubscribe();
+		this.unsubscribeRealtime();
 	}
 }
 
