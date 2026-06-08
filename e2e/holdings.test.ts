@@ -5,7 +5,6 @@ import { goToPageViaSidebar, signIn } from './playwright.helpers';
 import {
 	getUserPB,
 	pbSend,
-	resetDatabase,
 	seedAccount,
 	seedSecurity,
 	seedSecurityBalance,
@@ -13,10 +12,6 @@ import {
 } from './pocketbase.helpers';
 
 const CREATE_SECURITY_WITH_INITIAL_BALANCE_PATH = '/api/canutin/securities/with-initial-balance';
-
-test.beforeEach(async () => {
-	await resetDatabase();
-});
 
 test('security with initial balance can use any account', async () => {
 	const user = await seedUser('charlie');
@@ -172,7 +167,8 @@ test('holdings aggregate latest security balances and edit security details', as
 	const fundRow = page.getByRole('row', { name: 'Total Market Fund' });
 	await expect(fundRow).toBeVisible();
 	await expect(fundRow).toContainText('VTI');
-	await expect(fundRow).toContainText('Roth IRA, Taxable brokerage');
+	await expect(fundRow.getByRole('link', { name: 'Roth IRA' })).toBeVisible();
+	await expect(fundRow.getByRole('link', { name: 'Taxable brokerage' })).toBeVisible();
 	await expect(fundRow).toContainText('7');
 	await expect(fundRow).toContainText('$84.00');
 	await expect(fundRow).toContainText('$70.00');
@@ -222,9 +218,12 @@ test('holdings aggregate latest security balances and edit security details', as
 	await page.getByLabel('Account').click();
 	await expect(page.getByRole('option', { name: 'Taxable brokerage' })).toBeVisible();
 	await expect(page.getByRole('option', { name: 'Roth IRA' })).toBeVisible();
-	await expect(page.getByRole('option', { name: 'Checking' })).not.toBeVisible();
+	await expect(page.getByRole('option', { name: 'Checking' })).toBeVisible();
 	await expect(page.getByRole('option', { name: 'Closed brokerage' })).not.toBeVisible();
 	await page.getByRole('option', { name: 'Roth IRA' }).click();
+	await expect(page.getByLabel('Name')).not.toBeVisible();
+	await page.getByLabel('Security').click();
+	await page.getByRole('option', { name: 'Add security' }).click();
 	await page.getByLabel('Name').fill('Emerging Market Fund');
 	await page.getByLabel('Symbol').fill('EMF');
 	await page.getByLabel('As of').fill('2026-03-01');

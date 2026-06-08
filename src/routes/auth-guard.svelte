@@ -44,4 +44,6 @@
 	});
 </script>
 
-{@render children?.()}
+{#if !auth.isLoading}
+	{@render children?.()}
+{/if}

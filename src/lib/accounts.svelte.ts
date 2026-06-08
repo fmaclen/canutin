@@ -1,6 +1,7 @@
 import { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 
+import { getAuthContext } from './auth.svelte';
 import { setBalanceTypesContext } from './balance-types.svelte';
 import {
 	AccountSharesAccessRoleOptions,
@@ -35,6 +36,7 @@ class AccountsContext {
 	isLoading: boolean = $state(true);
 
 	private _pb: PocketBaseContext;
+	private _auth: ReturnType<typeof getAuthContext>;
 	private balanceTypesContext: ReturnType<typeof setBalanceTypesContext>;
 
 	constructor(
@@ -42,12 +44,13 @@ class AccountsContext {
 		balanceTypesContext: ReturnType<typeof setBalanceTypesContext>
 	) {
 		this._pb = pb;
+		this._auth = getAuthContext();
 		this.balanceTypesContext = balanceTypesContext;
 		this.init();
 	}
 
 	private get currentUserId() {
-		return this._pb.authedClient.authStore.record?.id ?? '';
+		return this._auth.currentUserId;
 	}
 
 	getTypeName(id: string) {
@@ -98,9 +101,23 @@ class AccountsContext {
 		await this.refreshShares();
 	}
 
-	private async init() {
+	private init() {
+		this.realtimeSubscribe();
+		$effect(() => {
+			const userId = this.currentUserId;
+			if (!userId) {
+				this.accounts = [];
+				this.shares = [];
+				this.isLoading = false;
+				return;
+			}
+			this.isLoading = true;
+			void this.refreshForCurrentUser();
+		});
+	}
+
+	private async refreshForCurrentUser() {
 		try {
-			this.realtimeSubscribe();
 			await this.refreshShares();
 			await this.refreshAccounts();
 			this.lastBalanceEvent = Date.now();
@@ -112,14 +129,18 @@ class AccountsContext {
 	}
 
 	private async refreshShares() {
+		const userId = this.currentUserId;
 		this.shares = await this._pb.authedClient.collection('accountShares').getFullList({
+			filter: `grantedBy='${userId}' || recipient='${userId}'`,
 			sort: 'recipientEmail',
 			requestKey: null
 		});
 	}
 
 	private async refreshAccounts() {
+		const userId = this.currentUserId;
 		const list = await this._pb.authedClient.collection('accounts').getFullList<AccountsResponse>({
+			filter: `owner='${userId}' || accountShares_via_account.recipient ?= '${userId}'`,
 			requestKey: null
 		});
 		const accountBalances = await Promise.all(
@@ -239,7 +260,8 @@ class AccountsContext {
 			.collection('accountBalances')
 			.getList<AccountBalancesResponse>(1, 1, {
 				filter: `account='${accountId}'`,
-				sort: '-asOf,-created,-id'
+				sort: '-asOf,-created,-id',
+				requestKey: null
 			});
 		const item = res.items[0];
 		return { value: item?.value ?? 0, asOf: item?.asOf ?? '' };

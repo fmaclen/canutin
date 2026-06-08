@@ -183,7 +183,7 @@ test('duplicate import skips existing records', async ({ page }) => {
 	await expect(page.getByText('olivia-scraper-run-2')).toBeVisible();
 });
 
-test('existing balance-only account imports skip security records without changing the account', async () => {
+test('existing account imports security records', async () => {
 	const user = await seedUser('vance');
 
 	await pbSend(

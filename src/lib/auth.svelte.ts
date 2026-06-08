@@ -7,6 +7,7 @@ import type { UsersResponse } from '$lib/pocketbase.schema';
 
 export class AuthContext {
 	currentUser: BaseAuthStore | null = $state(null);
+	currentUserId: string = $state('');
 	isLoading: boolean = $state(true);
 	error: string | null = $state(null);
 
@@ -15,6 +16,7 @@ export class AuthContext {
 	constructor(pb: PocketBase) {
 		this._pb = pb;
 		this.currentUser = this._pb.authStore;
+		this.currentUserId = this._pb.authStore.record?.id ?? '';
 		this.init();
 	}
 
@@ -34,11 +36,13 @@ export class AuthContext {
 		try {
 			await this._pb.collection('users').authRefresh();
 			this.currentUser = this._pb.authStore;
+			this.currentUserId = this._pb.authStore.record?.id ?? '';
 			return true;
 		} catch {
 			this.unsubscribeFromCurrentUser();
 			this._pb.authStore.clear();
 			this.currentUser = null;
+			this.currentUserId = '';
 			toast.error(m.error_auth_failed(), { id: 'auth-error' });
 			return false;
 		}
@@ -69,6 +73,7 @@ export class AuthContext {
 			this.unsubscribeFromCurrentUser();
 			this._pb.authStore.clear();
 			this.currentUser = null;
+			this.currentUserId = '';
 		}
 	}
 
@@ -89,6 +94,7 @@ export class AuthContext {
 		try {
 			await this._pb.collection('users').authWithPassword(email, password);
 			this.currentUser = this._pb.authStore;
+			this.currentUserId = this._pb.authStore.record?.id ?? '';
 			this.subscribeToCurrentUser();
 			return { success: true } as const;
 		} catch (e: unknown) {
@@ -105,6 +111,7 @@ export class AuthContext {
 		try {
 			await this._pb.collection('users').create({ email, password, passwordConfirm });
 			this.currentUser = this._pb.authStore;
+			this.currentUserId = this._pb.authStore.record?.id ?? '';
 			return { success: true } as const;
 		} catch (e: unknown) {
 			this.error = this.getErrorMessage(e, m.auth_signup_failed());
@@ -121,6 +128,7 @@ export class AuthContext {
 			this._pb.authStore.clear();
 		} finally {
 			this.currentUser = null;
+			this.currentUserId = '';
 		}
 	}
 }

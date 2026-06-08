@@ -1,5 +1,5 @@
 import { UTCDate } from '@date-fns/utc';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { setHours, subDays } from 'date-fns';
 
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
@@ -13,6 +13,23 @@ import {
 	seedTransactionLabel,
 	seedUser
 } from './pocketbase.helpers';
+
+async function selectCashflowActivity(page: Page) {
+	await page.getByLabel('Activity').click();
+	await page.getByRole('option', { name: 'Cashflow' }).click();
+}
+
+function getCashflowPanel(page: Page) {
+	return page.getByRole('tabpanel').filter({
+		has: page.getByPlaceholder('Search transactions')
+	});
+}
+
+async function waitForAccountFilterOption(page: Page, accountName: string) {
+	await getCashflowPanel(page).getByLabel('Account').click();
+	await expect(page.getByRole('option', { name: accountName })).toBeVisible();
+	await page.keyboard.press('Escape');
+}
 
 test('user can add a new transaction', async ({ page }) => {
 	const user = await seedUser('bella');
@@ -50,24 +67,22 @@ test('user can add a new transaction', async ({ page }) => {
 	await expect(page.getByText('Moonbeam Cafe')).not.toBeVisible();
 	await expect(page.getByText('Freelance Design Project')).not.toBeVisible();
 
+	await waitForAccountFilterOption(page, 'Meridian Checking');
 	await page.getByRole('link', { name: 'Add transaction' }).click();
 	await expect(page).toHaveURL('/transactions/add');
+	await expect(page.getByLabel('Description')).not.toBeVisible();
+	await selectCashflowActivity(page);
 
 	await page.getByLabel('Description').fill('Moonbeam Cafe');
 	await page.getByLabel('Amount').fill('-45.50');
 	await page.getByLabel('Date').fill(formatDateForInput(new UTCDate()));
 	await page.getByLabel('Account').click();
 
-	await expect(page.getByText('Cash')).toBeVisible();
-	await expect(page.getByText('Debt')).toBeVisible();
 	await expect(page.getByRole('option', { name: 'Meridian Checking' })).toBeVisible();
 	await expect(page.getByRole('option', { name: 'Apex Credit Card' })).toBeVisible();
 
 	await page.getByRole('option', { name: 'Meridian Checking' }).click();
-	await expect(page.getByText('Cash')).not.toBeVisible();
-	await expect(page.getByText('Debt')).not.toBeVisible();
-	await expect(page.getByRole('option', { name: 'Meridian Checking' })).not.toBeVisible();
-	await expect(page.getByRole('option', { name: 'Apex Credit Card' })).not.toBeVisible();
+	await expect(page.getByLabel('Account')).toContainText('Meridian Checking');
 
 	await page.getByLabel('Labels').fill('Food & Dining, Personal');
 	await page.getByLabel('Notes').fill('Met with Sam to review Q3 plans');
@@ -81,23 +96,20 @@ test('user can add a new transaction', async ({ page }) => {
 	await expect(moonbeamRow.getByText('Food & Dining')).toBeVisible();
 	await expect(moonbeamRow.getByText('Personal')).toBeVisible();
 
+	await waitForAccountFilterOption(page, 'Apex Credit Card');
 	await page.getByRole('link', { name: 'Add transaction' }).click();
 	await expect(page).toHaveURL('/transactions/add');
+	await selectCashflowActivity(page);
 
 	await page.getByLabel('Description').fill('Credit Card Payment');
 	await page.getByLabel('Amount').fill('-500');
 	await page.getByLabel('Date').fill(formatDateForInput(subDays(new UTCDate(), 1)));
 	await page.getByLabel('Account').click();
-	await expect(page.getByText('Cash')).toBeVisible();
-	await expect(page.getByText('Debt')).toBeVisible();
 	await expect(page.getByRole('option', { name: 'Meridian Checking' })).toBeVisible();
 	await expect(page.getByRole('option', { name: 'Apex Credit Card' })).toBeVisible();
 
 	await page.getByRole('option', { name: 'Apex Credit Card' }).click();
-	await expect(page.getByText('Cash')).not.toBeVisible();
-	await expect(page.getByText('Debt')).not.toBeVisible();
-	await expect(page.getByRole('option', { name: 'Meridian Checking' })).not.toBeVisible();
-	await expect(page.getByRole('option', { name: 'Apex Credit Card' })).not.toBeVisible();
+	await expect(page.getByLabel('Account')).toContainText('Apex Credit Card');
 
 	await page.getByRole('button', { name: 'Add' }).click();
 	await expect(page.getByText('Transaction added').first()).toBeVisible();
@@ -108,7 +120,7 @@ test('user can add a new transaction', async ({ page }) => {
 	await expect(creditCardRow.getByText('Apex Credit Card')).toBeVisible();
 });
 
-test('user sees a helpful prompt when adding a transaction without accounts', async ({ page }) => {
+test('user selects activity before transaction fields are shown', async ({ page }) => {
 	const user = await seedUser('nadia');
 	const sharer = await seedUser('oliver');
 
@@ -148,18 +160,32 @@ test('user sees a helpful prompt when adding a transaction without accounts', as
 		includeInNetWorth: true
 	});
 
+	const writableAccount = await seedAccount({
+		name: 'Primary Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: writableAccount.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 800
+	});
+
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Transactions');
 
 	await page.getByRole('link', { name: 'Add transaction' }).click();
-	await expect(page.getByText('Add an account first')).toBeVisible();
-	await expect(
-		page.getByText('You need at least one account before recording a transaction')
-	).toBeVisible();
-
-	await page.getByRole('link', { name: 'Add account' }).click();
-	await expect(page).toHaveURL('/accounts/add');
+	await expect(page).toHaveURL('/transactions/add');
+	await expect(page.getByLabel('Account')).not.toBeVisible();
+	await selectCashflowActivity(page);
+	await expect(page.getByLabel('Account')).toBeVisible();
+	await page.getByLabel('Account').click();
+	await expect(page.getByRole('option', { name: 'Primary Checking' })).toBeVisible();
+	await expect(page.getByRole('option', { name: 'Archived Checking' })).not.toBeVisible();
+	await expect(page.getByRole('option', { name: 'Shared Household Checking' })).not.toBeVisible();
 });
 
 test('user can edit transaction details', async ({ page }) => {
@@ -211,6 +237,7 @@ test('user can edit transaction details', async ({ page }) => {
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Transactions');
+	await waitForAccountFilterOption(page, 'Northwind Business');
 
 	const paperclipRow = page.getByRole('row', { name: /Paperclip Office Supply Co/ });
 	await expect(paperclipRow).toBeVisible();
@@ -392,6 +419,7 @@ test('transactions list updates in real-time when new transaction is added', asy
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Transactions');
+	const cashflowPanel = getCashflowPanel(page);
 
 	await page.getByLabel('Period').click();
 	await Promise.all([
@@ -403,7 +431,7 @@ test('transactions list updates in real-time when new transaction is added', asy
 	]);
 	await expect(page.getByLabel('Period')).toContainText('Last year');
 
-	await page.getByLabel('Type').click();
+	await cashflowPanel.getByLabel('Type').click();
 	await Promise.all([
 		page.waitForResponse(
 			(response) =>
@@ -411,7 +439,7 @@ test('transactions list updates in real-time when new transaction is added', asy
 		),
 		page.getByRole('option', { name: 'Debits only' }).click()
 	]);
-	await expect(page.getByLabel('Type')).toContainText('Debits only');
+	await expect(cashflowPanel.getByLabel('Type')).toContainText('Debits only');
 	await expect(seededTransactionRow).toHaveCount(0);
 
 	await seedTransaction({
@@ -477,8 +505,9 @@ test('reuses existing labels instead of creating duplicates', async ({ page }) =
 	expect(await getTransactionLabelsByName(user.id, 'Groceries')).toHaveLength(1);
 	expect(await getTransactionLabelsByName(user.id, 'Dining')).toHaveLength(1);
 
-	// Add new transaction with existing label
+	await waitForAccountFilterOption(page, 'Pinewood Checking');
 	await page.getByRole('link', { name: 'Add transaction' }).click();
+	await selectCashflowActivity(page);
 	await page.getByLabel('Description').fill('Farmers Market');
 	await page.getByLabel('Amount').fill('-75');
 	await page.getByLabel('Date').fill(formatDateForInput(new UTCDate()));
@@ -492,7 +521,6 @@ test('reuses existing labels instead of creating duplicates', async ({ page }) =
 	expect(groceriesAfterAdd).toHaveLength(1);
 	expect(groceriesAfterAdd[0].id).toBe(groceriesLabel.id);
 
-	// Edit existing transaction with existing labels
 	await page.getByRole('link', { name: 'Sunrise Grocery Store' }).click();
 	await page.getByLabel('Labels').fill('Groceries, Dining');
 	await page.getByRole('button', { name: 'Save' }).click();
@@ -506,7 +534,6 @@ test('reuses existing labels instead of creating duplicates', async ({ page }) =
 	expect(groceriesAfterEdit[0].id).toBe(groceriesLabel.id);
 	expect(diningAfterEdit[0].id).toBe(diningLabel.id);
 
-	// Batch edit with existing label
 	const deliRow = page.getByRole('row', { name: 'Downtown Deli' });
 	const marketRow = page.getByRole('row', { name: 'Corner Market' });
 	await deliRow.getByRole('checkbox').check();
@@ -516,7 +543,7 @@ test('reuses existing labels instead of creating duplicates', async ({ page }) =
 	await page.getByRole('link', { name: 'Edit 2 transactions' }).click();
 	await expect(page).toHaveURL('/transactions/batch');
 
-	// Edit checkboxes order: Description (0), Amount (1), Date (2), Account (3), Labels (4), Excluded (5)
+	// NOTE: Edit checkboxes order: Description (0), Amount (1), Date (2), Account (3), Labels (4), Excluded (5)
 	const editCheckboxes = page.getByRole('checkbox', { name: 'Edit' });
 	await editCheckboxes.nth(4).check();
 	await page.getByLabel('Labels').fill('Dining');
