@@ -77,7 +77,7 @@
 	</div>
 	<nav class="px-4">
 		<Link
-			href={`${resolve('/transactions/add')}?mode=security`}
+			href={`${resolve('/transactions/add')}?mode=holdings`}
 			class="text-sm"
 			onclick={handleAddTransactionClick}>{m.transactions_add_link()}</Link
 		>

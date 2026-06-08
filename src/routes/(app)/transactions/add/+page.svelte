@@ -28,7 +28,7 @@
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
 
-	type TransactionMode = '' | 'cash' | 'security';
+	type TransactionMode = '' | 'cash' | 'holdings';
 
 	const pb = getPocketBaseContext();
 	const auth = getAuthContext();
@@ -40,10 +40,11 @@
 	const openSecurityAccounts = $derived(openAccounts);
 	const securityTypeOptions = Object.values(SecurityTransactionsTypeOptions);
 
+	const rawMode = $derived(page.url.searchParams.get('mode'));
 	const mode = $derived<TransactionMode>(
-		page.url.searchParams.get('mode') === 'security'
-			? 'security'
-			: page.url.searchParams.get('mode') === 'cash'
+		rawMode === 'holdings' || rawMode === 'security'
+			? 'holdings'
+			: rawMode === 'cash'
 				? 'cash'
 				: ''
 	);
@@ -59,7 +60,6 @@
 	let securityDate = $state('');
 	let securityType = $state<SecurityTransactionsTypeOptions>(SecurityTransactionsTypeOptions.buy);
 	let securitySubtype = $state('');
-	let securityName = $state('');
 	let securityDescription = $state('');
 	let quantity = $state('');
 	let price = $state('');
@@ -71,10 +71,23 @@
 		securityId ? securitiesContext.securities.find((security) => security.id === securityId) : null
 	);
 
+	$effect(() => {
+		if (rawMode !== 'security') return;
+
+		const params = new SvelteURLSearchParams(page.url.searchParams);
+		params.set('mode', 'holdings');
+		const search = params.toString();
+		goto(`${resolve('/transactions/add')}?${search}`, {
+			replaceState: true,
+			noScroll: true,
+			keepFocus: true
+		});
+	});
+
 	async function handleModeChange(value: string | undefined) {
 		const params = new SvelteURLSearchParams(page.url.searchParams);
-		if (value === 'security') {
-			params.set('mode', 'security');
+		if (value === 'holdings') {
+			params.set('mode', 'holdings');
 		} else if (value === 'cash') {
 			params.set('mode', 'cash');
 		} else {
@@ -165,7 +178,6 @@
 				date: new Date(securityDate + 'T12:00:00Z').toISOString(),
 				type: securityType,
 				subtype: securitySubtype.trim() || undefined,
-				name: securityName.trim() || undefined,
 				description: securityDescription.trim() || undefined,
 				quantity: parseNullableNumber(quantity),
 				price: parseNullableNumber(price),
@@ -211,7 +223,7 @@
 					event.preventDefault();
 					if (mode === 'cash') {
 						handleCashSubmit();
-					} else if (mode === 'security') {
+					} else if (mode === 'holdings') {
 						handleSecuritySubmit();
 					}
 				}}
@@ -226,7 +238,7 @@
 							<Select.Trigger id="activity" class="bg-background w-full">
 								{#if mode === 'cash'}
 									{m.transactions_mode_cash()}
-								{:else if mode === 'security'}
+								{:else if mode === 'holdings'}
 									{m.transactions_mode_security()}
 								{:else}
 									<span class="text-muted-foreground">
@@ -236,7 +248,7 @@
 							</Select.Trigger>
 							<Select.Content>
 								<Select.Item value="cash">{m.transactions_mode_cash()}</Select.Item>
-								<Select.Item value="security">{m.transactions_mode_security()}</Select.Item>
+								<Select.Item value="holdings">{m.transactions_mode_security()}</Select.Item>
 							</Select.Content>
 						</Select.Root>
 					</FormFieldRow>
@@ -316,7 +328,7 @@
 							/>
 						</FormFieldRow>
 					</Fieldset>
-				{:else if mode === 'security'}
+				{:else if mode === 'holdings'}
 					<Fieldset>
 						<FormFieldRow>
 							<Label for="security-account" class="justify-start pr-0 md:justify-end">
@@ -377,32 +389,22 @@
 
 						<FormFieldRow>
 							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-								<Label for="security-description" class="justify-start pr-0 md:justify-end">
-									{m.transactions_label_description()}
-								</Label>
-								<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
-							</div>
-							<Input id="security-description" bind:value={securityDescription} />
-						</FormFieldRow>
-
-						<FormFieldRow>
-							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-								<Label for="security-name" class="justify-start pr-0 md:justify-end">
-									{m.transactions_security_label_name()}
-								</Label>
-								<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
-							</div>
-							<Input id="security-name" bind:value={securityName} />
-						</FormFieldRow>
-
-						<FormFieldRow>
-							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
 								<Label for="security-subtype" class="justify-start pr-0 md:justify-end">
 									{m.transactions_security_label_subtype()}
 								</Label>
 								<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
 							</div>
 							<Input id="security-subtype" bind:value={securitySubtype} />
+						</FormFieldRow>
+
+						<FormFieldRow>
+							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+								<Label for="security-description" class="justify-start pr-0 md:justify-end">
+									{m.transactions_label_description()}
+								</Label>
+								<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
+							</div>
+							<Input id="security-description" bind:value={securityDescription} />
 						</FormFieldRow>
 					</Fieldset>
 
