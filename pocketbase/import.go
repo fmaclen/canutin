@@ -24,15 +24,14 @@ type importPayload struct {
 }
 
 type importAccount struct {
-	Name             string         `json:"name"`
-	Institution      string         `json:"institution"`
-	BalanceGroup     string         `json:"balanceGroup"`
-	BalanceType      string         `json:"balanceType"`
-	AutoCalculated   bool           `json:"autoCalculated"`
-	Closed           bool           `json:"closed"`
-	Excluded         bool           `json:"excluded"`
-	TracksSecurities bool           `json:"tracksSecurities"`
-	Balance          *importBalance `json:"balance"`
+	Name           string         `json:"name"`
+	Institution    string         `json:"institution"`
+	BalanceGroup   string         `json:"balanceGroup"`
+	BalanceType    string         `json:"balanceType"`
+	AutoCalculated bool           `json:"autoCalculated"`
+	Closed         bool           `json:"closed"`
+	Excluded       bool           `json:"excluded"`
+	Balance        *importBalance `json:"balance"`
 }
 
 type importAsset struct {
@@ -258,11 +257,6 @@ func resolveImportAccount(app core.App, ownerID string, acctIndex map[string]str
 	return found.Id, nil
 }
 
-func importAccountTracksSecurities(app core.App, ownerID string, accountID string) bool {
-	account, err := app.FindRecordById("accounts", accountID)
-	return err == nil && account.GetString("owner") == ownerID && account.GetBool("tracksSecurities")
-}
-
 func findOrCreateImportSecurity(app core.App, ownerID string, securityCache map[string]string, securityID string, name string, symbol string, sessionID string) (string, bool, error) {
 	if strings.TrimSpace(securityID) != "" {
 		return strings.TrimSpace(securityID), false, nil
@@ -362,16 +356,15 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		}
 
 		rec, created, err := findOrCreate(app, "accounts", acctFilter, acctParams, map[string]any{
-			"name":             acct.Name,
-			"institution":      institution,
-			"balanceGroup":     acct.BalanceGroup,
-			"balanceType":      btID,
-			"autoCalculated":   boolToTimestamp(acct.AutoCalculated),
-			"closed":           boolToTimestamp(acct.Closed),
-			"excluded":         boolToTimestamp(acct.Excluded),
-			"tracksSecurities": acct.TracksSecurities,
-			"owner":            ownerID,
-			"importSession":    session.Id,
+			"name":           acct.Name,
+			"institution":    institution,
+			"balanceGroup":   acct.BalanceGroup,
+			"balanceType":    btID,
+			"autoCalculated": boolToTimestamp(acct.AutoCalculated),
+			"closed":         boolToTimestamp(acct.Closed),
+			"excluded":       boolToTimestamp(acct.Excluded),
+			"owner":          ownerID,
+			"importSession":  session.Id,
 		})
 		if err != nil {
 			continue
@@ -564,10 +557,6 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			result.SecurityBalances.Skipped++
 			continue
 		}
-		if !importAccountTracksSecurities(app, ownerID, accountID) {
-			result.SecurityBalances.Skipped++
-			continue
-		}
 		securityID, securityCreated, err := findOrCreateImportSecurity(app, ownerID, securityCache, balance.SecurityID, balance.SecurityName, balance.SecuritySymbol, session.Id)
 		if err != nil {
 			result.SecurityBalances.Skipped++
@@ -618,10 +607,6 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 	for _, tx := range payload.SecurityTransactions {
 		accountID, err := resolveImportAccount(app, ownerID, acctIndex, tx.AccountID, tx.AccountName)
 		if err != nil {
-			result.SecurityTransactions.Skipped++
-			continue
-		}
-		if !importAccountTracksSecurities(app, ownerID, accountID) {
 			result.SecurityTransactions.Skipped++
 			continue
 		}

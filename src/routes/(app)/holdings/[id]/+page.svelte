@@ -51,9 +51,7 @@
 		justSaved: false
 	});
 	const eligibleAccounts = $derived(
-		accountsContext.accounts.filter(
-			(account) => !account.closed && account.canWrite && Boolean(account.tracksSecurities)
-		)
+		accountsContext.accounts.filter((account) => !account.closed && account.canWrite)
 	);
 
 	function formatQuantity(value: number | null) {

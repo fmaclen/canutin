@@ -18,10 +18,10 @@ test.beforeEach(async () => {
 	await resetDatabase();
 });
 
-test('security with initial balance rolls back when balance validation fails', async () => {
+test('security with initial balance can use any account', async () => {
 	const user = await seedUser('charlie');
-	const cashOnly = await seedAccount({
-		name: 'Cash only account',
+	const checking = await seedAccount({
+		name: 'Checking account',
 		balanceGroup: AccountsBalanceGroupOptions.CASH,
 		balanceType: 'Checking',
 		owner: user.id
@@ -36,7 +36,7 @@ test('security with initial balance rolls back when balance validation fails', a
 				owner: user.id
 			},
 			balance: {
-				account: cashOnly.id,
+				account: checking.id,
 				owner: user.id,
 				asOf: '2026-03-01T00:00:00.000Z',
 				quantity: 4,
@@ -47,7 +47,7 @@ test('security with initial balance rolls back when balance validation fails', a
 		},
 		user.email
 	);
-	expect(response.status).toBe(400);
+	expect(response.status).toBe(200);
 
 	const pb = await getUserPB(user.email);
 	const securities = await pb.collection('securities').getFullList({
@@ -56,8 +56,8 @@ test('security with initial balance rolls back when balance validation fails', a
 	const balances = await pb.collection('securityBalances').getFullList({
 		filter: `owner='${user.id}'`
 	});
-	expect(securities).toHaveLength(0);
-	expect(balances).toHaveLength(0);
+	expect(securities).toHaveLength(1);
+	expect(balances).toHaveLength(1);
 });
 
 test('holdings aggregate latest security balances and edit security details', async ({ page }) => {
@@ -67,15 +67,13 @@ test('holdings aggregate latest security balances and edit security details', as
 		name: 'Taxable brokerage',
 		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
 		balanceType: 'Brokerage',
-		owner: user.id,
-		tracksSecurities: true
+		owner: user.id
 	});
 	const roth = await seedAccount({
 		name: 'Roth IRA',
 		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
 		balanceType: 'Retirement',
-		owner: user.id,
-		tracksSecurities: true
+		owner: user.id
 	});
 	await seedAccount({
 		name: 'Checking',
@@ -88,7 +86,6 @@ test('holdings aggregate latest security balances and edit security details', as
 		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
 		balanceType: 'Brokerage',
 		owner: user.id,
-		tracksSecurities: true,
 		closed: new Date().toISOString()
 	});
 

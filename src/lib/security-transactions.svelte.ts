@@ -109,7 +109,7 @@ class SecurityTransactionsContext {
 	}
 
 	get securityAccounts() {
-		return this._accountsContext.accounts.filter((account) => Boolean(account.tracksSecurities));
+		return this._accountsContext.accounts;
 	}
 
 	setSearch(query: string) {

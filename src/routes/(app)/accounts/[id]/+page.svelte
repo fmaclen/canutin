@@ -56,7 +56,6 @@
 		balanceGroup: '' as AccountsBalanceGroupOptions | '',
 		accountTypeName: '',
 		notes: '',
-		tracksSecurities: false,
 		excluded: false,
 		closed: false,
 		value: ''
@@ -83,7 +82,6 @@
 			formData.balanceGroup !== syncState.lastSyncedData.balanceGroup ||
 			formData.accountTypeName !== syncState.lastSyncedData.accountTypeName ||
 			formData.notes !== syncState.lastSyncedData.notes ||
-			formData.tracksSecurities !== syncState.lastSyncedData.tracksSecurities ||
 			formData.excluded !== syncState.lastSyncedData.excluded ||
 			formData.closed !== syncState.lastSyncedData.closed
 		);
@@ -91,7 +89,7 @@
 
 	function getAccountVersion(accountData: typeof account) {
 		if (!accountData) return '';
-		return `${accountData.updated || accountData.created}_${accountData.name}_${accountData.balanceGroup}_${accountData.institution}_${accountData.notes}_${accountData.tracksSecurities}_${accountData.excluded}_${accountData.closed}`;
+		return `${accountData.updated || accountData.created}_${accountData.name}_${accountData.balanceGroup}_${accountData.institution}_${accountData.notes}_${accountData.excluded}_${accountData.closed}`;
 	}
 
 	async function syncFormWithAccount(accountData: typeof account) {
@@ -103,7 +101,6 @@
 			balanceGroup: accountData.balanceGroup,
 			accountTypeName: '',
 			notes: accountData.notes ?? '',
-			tracksSecurities: Boolean(accountData.tracksSecurities),
 			excluded: Boolean(accountData.excluded),
 			closed: Boolean(accountData.closed),
 			value: ''
@@ -112,7 +109,7 @@
 		await balanceTypesContext.ensureLoaded(accountData.balanceType);
 		newFormData.accountTypeName = balanceTypesContext.getName(accountData.balanceType);
 
-		newFormData.value = accountData.balance.toString();
+		newFormData.value = accountData.cashBalance.toString();
 
 		formData = newFormData;
 		syncState.lastSyncedData = { ...newFormData };
@@ -210,7 +207,6 @@
 				balanceType: balanceTypeId,
 				institution: formData.institution.trim() || undefined,
 				notes: formData.notes.trim() || undefined,
-				tracksSecurities: formData.tracksSecurities,
 				excluded: formData.excluded ? new Date().toISOString() : null,
 				closed: formData.closed ? new Date().toISOString() : null
 			};
@@ -327,13 +323,8 @@
 	</div>
 	<nav class="px-4">
 		{#if account}
-			<Link
-				href={account.tracksSecurities
-					? `${resolve('/transactions')}?view=securities&account=${account.id}`
-					: `${resolve('/transactions')}?account=${account.id}`}
-				class="text-sm"
-			>
-				{account.tracksSecurities ? m.transactions_security_link() : m.sidebar_transactions()}
+			<Link href={`${resolve('/transactions')}?account=${account.id}`} class="text-sm">
+				{m.sidebar_transactions()}
 			</Link>
 		{/if}
 	</nav>

@@ -22,14 +22,13 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import * as Tabs from '$lib/components/ui/tabs/index';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import { SecurityTransactionsTypeOptions } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
 
-	type TransactionMode = 'cash' | 'security';
+	type TransactionMode = '' | 'cash' | 'security';
 
 	const pb = getPocketBaseContext();
 	const auth = getAuthContext();
@@ -38,15 +37,15 @@
 
 	const ownerId = $derived(auth.currentUser?.record?.id);
 	const openAccounts = $derived(accountsContext.accounts.filter((a) => !a.closed && a.canWrite));
-	const openSecurityAccounts = $derived(
-		accountsContext.accounts.filter(
-			(account) => !account.closed && account.canWrite && Boolean(account.tracksSecurities)
-		)
-	);
+	const openSecurityAccounts = $derived(openAccounts);
 	const securityTypeOptions = Object.values(SecurityTransactionsTypeOptions);
 
 	const mode = $derived<TransactionMode>(
-		page.url.searchParams.get('mode') === 'security' ? 'security' : 'cash'
+		page.url.searchParams.get('mode') === 'security'
+			? 'security'
+			: page.url.searchParams.get('mode') === 'cash'
+				? 'cash'
+				: ''
 	);
 	let description = $state('');
 	let amount = $state('');
@@ -67,17 +66,17 @@
 	let securityAmount = $state('');
 	let fees = $state('');
 	let securityNotes = $state('');
-	let externalId = $state('');
 
 	const selectedSecurity = $derived(
 		securityId ? securitiesContext.securities.find((security) => security.id === securityId) : null
 	);
 
 	async function handleModeChange(value: string | undefined) {
-		const nextMode = value === 'security' ? 'security' : 'cash';
 		const params = new SvelteURLSearchParams(page.url.searchParams);
-		if (nextMode === 'security') {
+		if (value === 'security') {
 			params.set('mode', 'security');
+		} else if (value === 'cash') {
+			params.set('mode', 'cash');
 		} else {
 			params.delete('mode');
 		}
@@ -172,8 +171,7 @@
 				price: parseNullableNumber(price),
 				amount: parseNullableNumber(securityAmount),
 				fees: parseNullableNumber(fees),
-				notes: securityNotes.trim() || undefined,
-				externalId: externalId.trim() || undefined
+				notes: securityNotes.trim() || undefined
 			});
 
 			toast.success(m.transactions_security_add_success());
@@ -206,299 +204,283 @@
 
 <Page pageTitle={m.transactions_add_page_title()}>
 	<Section>
-		<Tabs.Root value={mode} onValueChange={handleModeChange}>
-			<nav class="flex items-center justify-between space-x-2">
-				<SectionTitle title={m.transactions_section_details()} />
-				<Tabs.List>
-					<Tabs.Trigger value="cash">{m.transactions_mode_cash()}</Tabs.Trigger>
-					<Tabs.Trigger value="security">{m.transactions_mode_security()}</Tabs.Trigger>
-				</Tabs.List>
-			</nav>
+		<SectionTitle title={m.transactions_section_details()} />
 
-			<Tabs.Content value="cash">
-				<div class="bg-muted border-border overflow-hidden rounded border">
-					<form
-						onsubmit={(event) => {
-							event.preventDefault();
-							handleCashSubmit();
-						}}
-						class="space-y-0"
-					>
-						<Fieldset isFirst={true}>
-							<FormFieldRow>
-								<Label for="description" class="justify-start pr-0 md:justify-end">
+		<div class="bg-muted border-border overflow-hidden rounded border">
+			<form
+				onsubmit={(event) => {
+					event.preventDefault();
+					if (mode === 'cash') {
+						handleCashSubmit();
+					} else if (mode === 'security') {
+						handleSecuritySubmit();
+					}
+				}}
+				class="space-y-0"
+			>
+				<Fieldset isFirst={true}>
+					<FormFieldRow>
+						<Label for="activity" class="justify-start pr-0 md:justify-end">
+							{m.transactions_label_activity()}
+						</Label>
+						<Select.Root type="single" value={mode} onValueChange={handleModeChange}>
+							<Select.Trigger id="activity" class="bg-background w-full">
+								{#if mode === 'cash'}
+									{m.transactions_mode_cash()}
+								{:else if mode === 'security'}
+									{m.transactions_mode_security()}
+								{:else}
+									<span class="text-muted-foreground">
+										{m.transactions_activity_select_placeholder()}
+									</span>
+								{/if}
+							</Select.Trigger>
+							<Select.Content>
+								<Select.Item value="cash">{m.transactions_mode_cash()}</Select.Item>
+								<Select.Item value="security">{m.transactions_mode_security()}</Select.Item>
+							</Select.Content>
+						</Select.Root>
+					</FormFieldRow>
+				</Fieldset>
+
+				{#if mode === 'cash'}
+					<Fieldset>
+						<FormFieldRow>
+							<Label for="account" class="justify-start pr-0 md:justify-end">
+								{m.transactions_label_account()}
+							</Label>
+							<AccountPicker
+								accounts={openAccounts}
+								bind:value={accountId}
+								id="account"
+								placeholder={m.transactions_account_select_placeholder()}
+							/>
+						</FormFieldRow>
+
+						<FormFieldRow>
+							<Label for="date" class="justify-start pr-0 md:justify-end">
+								{m.transactions_label_date()}
+							</Label>
+							<Input id="date" type="date" bind:value={date} required />
+						</FormFieldRow>
+
+						<FormFieldRow>
+							<Label for="description" class="justify-start pr-0 md:justify-end">
+								{m.transactions_label_description()}
+							</Label>
+							<Input id="description" bind:value={description} />
+						</FormFieldRow>
+
+						<FormFieldRow>
+							<Label for="amount" class="justify-start pr-0 md:justify-end">
+								{m.transactions_label_amount()}
+							</Label>
+							<CurrencyField id="amount" name="amount" bind:value={amount} required />
+						</FormFieldRow>
+
+						<FormFieldRow>
+							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+								<Label for="labels" class="justify-start pr-0 md:justify-end">
+									{m.transactions_label_labels()}
+								</Label>
+								<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
+							</div>
+							<Input
+								id="labels"
+								bind:value={labelsInput}
+								placeholder={m.transactions_labels_placeholder()}
+							/>
+						</FormFieldRow>
+
+						<FormFieldRow itemsAlignment="items-start">
+							<div
+								class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1 md:pt-2"
+							>
+								<Label for="notes" class="justify-start pr-0 md:justify-end">
+									{m.transactions_label_notes()}
+								</Label>
+								<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
+							</div>
+							<Textarea id="notes" bind:value={notes} class="bg-background" />
+						</FormFieldRow>
+					</Fieldset>
+
+					<Fieldset>
+						<FormFieldRow>
+							<Label class="justify-start pr-0 md:justify-end">
+								{m.transactions_label_mark_as()}
+							</Label>
+							<CheckboxLabel
+								id="excluded"
+								bind:checked={excluded}
+								label={m.transactions_label_excluded_from_totals()}
+							/>
+						</FormFieldRow>
+					</Fieldset>
+				{:else if mode === 'security'}
+					<Fieldset>
+						<FormFieldRow>
+							<Label for="security-account" class="justify-start pr-0 md:justify-end">
+								{m.transactions_label_account()}
+							</Label>
+							<AccountPicker
+								accounts={openSecurityAccounts}
+								bind:value={securityAccountId}
+								id="security-account"
+								placeholder={m.transactions_account_select_placeholder()}
+							/>
+						</FormFieldRow>
+
+						<FormFieldRow>
+							<Label for="security-date" class="justify-start pr-0 md:justify-end">
+								{m.transactions_label_date()}
+							</Label>
+							<Input id="security-date" type="date" bind:value={securityDate} required />
+						</FormFieldRow>
+
+						<FormFieldRow>
+							<Label for="security" class="justify-start pr-0 md:justify-end">
+								{m.transactions_security_label_security()}
+							</Label>
+							<Select.Root type="single" bind:value={securityId}>
+								<Select.Trigger id="security" class="bg-background w-full">
+									{#if selectedSecurity}
+										{selectedSecurity.name}
+									{:else}
+										<span class="text-muted-foreground">
+											{m.transactions_security_select_placeholder()}
+										</span>
+									{/if}
+								</Select.Trigger>
+								<Select.Content>
+									{#each securitiesContext.securities as security (security.id)}
+										<Select.Item value={security.id}>{security.name}</Select.Item>
+									{/each}
+								</Select.Content>
+							</Select.Root>
+						</FormFieldRow>
+
+						<FormFieldRow>
+							<Label for="security-type" class="justify-start pr-0 md:justify-end">
+								{m.transactions_security_label_type()}
+							</Label>
+							<Select.Root type="single" bind:value={securityType}>
+								<Select.Trigger id="security-type" class="bg-background w-full">
+									{securityTypeLabel(securityType)}
+								</Select.Trigger>
+								<Select.Content>
+									{#each securityTypeOptions as type (type)}
+										<Select.Item value={type}>{securityTypeLabel(type)}</Select.Item>
+									{/each}
+								</Select.Content>
+							</Select.Root>
+						</FormFieldRow>
+
+						<FormFieldRow>
+							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+								<Label for="security-description" class="justify-start pr-0 md:justify-end">
 									{m.transactions_label_description()}
 								</Label>
-								<Input id="description" bind:value={description} />
-							</FormFieldRow>
+								<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
+							</div>
+							<Input id="security-description" bind:value={securityDescription} />
+						</FormFieldRow>
 
-							<FormFieldRow>
-								<Label for="amount" class="justify-start pr-0 md:justify-end">
+						<FormFieldRow>
+							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+								<Label for="security-name" class="justify-start pr-0 md:justify-end">
+									{m.transactions_security_label_name()}
+								</Label>
+								<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
+							</div>
+							<Input id="security-name" bind:value={securityName} />
+						</FormFieldRow>
+
+						<FormFieldRow>
+							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+								<Label for="security-subtype" class="justify-start pr-0 md:justify-end">
+									{m.transactions_security_label_subtype()}
+								</Label>
+								<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
+							</div>
+							<Input id="security-subtype" bind:value={securitySubtype} />
+						</FormFieldRow>
+					</Fieldset>
+
+					<Fieldset>
+						<FormFieldRow>
+							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+								<Label for="quantity" class="justify-start pr-0 md:justify-end">
+									{m.transactions_security_label_quantity()}
+								</Label>
+								<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
+							</div>
+							<CurrencyField
+								id="quantity"
+								name="quantity"
+								bind:value={quantity}
+								isCurrency={false}
+							/>
+						</FormFieldRow>
+
+						<FormFieldRow>
+							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+								<Label for="price" class="justify-start pr-0 md:justify-end">
+									{m.transactions_security_label_price()}
+								</Label>
+								<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
+							</div>
+							<CurrencyField id="price" name="price" bind:value={price} />
+						</FormFieldRow>
+
+						<FormFieldRow>
+							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+								<Label for="security-amount" class="justify-start pr-0 md:justify-end">
 									{m.transactions_label_amount()}
 								</Label>
-								<CurrencyField id="amount" name="amount" bind:value={amount} required />
-							</FormFieldRow>
-
-							<FormFieldRow>
-								<Label for="date" class="justify-start pr-0 md:justify-end">
-									{m.transactions_label_date()}
-								</Label>
-								<Input id="date" type="date" bind:value={date} required />
-							</FormFieldRow>
-
-							<FormFieldRow>
-								<Label for="account" class="justify-start pr-0 md:justify-end">
-									{m.transactions_label_account()}
-								</Label>
-								<AccountPicker
-									accounts={openAccounts}
-									bind:value={accountId}
-									id="account"
-									placeholder={m.transactions_account_select_placeholder()}
-								/>
-							</FormFieldRow>
-
-							<FormFieldRow>
-								<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-									<Label for="labels" class="justify-start pr-0 md:justify-end">
-										{m.transactions_label_labels()}
-									</Label>
-									<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span
-									>
-								</div>
-								<Input
-									id="labels"
-									bind:value={labelsInput}
-									placeholder={m.transactions_labels_placeholder()}
-								/>
-							</FormFieldRow>
-
-							<FormFieldRow itemsAlignment="items-start">
-								<div
-									class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1 md:pt-2"
-								>
-									<Label for="notes" class="justify-start pr-0 md:justify-end">
-										{m.transactions_label_notes()}
-									</Label>
-									<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span
-									>
-								</div>
-								<Textarea id="notes" bind:value={notes} class="bg-background" />
-							</FormFieldRow>
-						</Fieldset>
-
-						<Fieldset>
-							<FormFieldRow>
-								<Label class="justify-start pr-0 md:justify-end">
-									{m.transactions_label_mark_as()}
-								</Label>
-								<CheckboxLabel
-									id="excluded"
-									bind:checked={excluded}
-									label={m.transactions_label_excluded_from_totals()}
-								/>
-							</FormFieldRow>
-						</Fieldset>
-
-						<footer class="border-border bg-border border-t p-2">
-							<div class="flex justify-end">
-								<Button type="submit">{m.transactions_button_add()}</Button>
+								<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
 							</div>
-						</footer>
-					</form>
-				</div>
-			</Tabs.Content>
+							<CurrencyField
+								id="security-amount"
+								name="security-amount"
+								bind:value={securityAmount}
+							/>
+						</FormFieldRow>
 
-			<Tabs.Content value="security">
-				<div class="bg-muted border-border overflow-hidden rounded border">
-					<form
-						onsubmit={(event) => {
-							event.preventDefault();
-							handleSecuritySubmit();
-						}}
-						class="space-y-0"
-					>
-						<Fieldset isFirst={true}>
-							<FormFieldRow>
-								<Label for="security-account" class="justify-start pr-0 md:justify-end">
-									{m.transactions_label_account()}
+						<FormFieldRow>
+							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+								<Label for="fees" class="justify-start pr-0 md:justify-end">
+									{m.transactions_security_label_fees()}
 								</Label>
-								<AccountPicker
-									accounts={openSecurityAccounts}
-									bind:value={securityAccountId}
-									id="security-account"
-									placeholder={m.transactions_account_select_placeholder()}
-								/>
-							</FormFieldRow>
-
-							<FormFieldRow>
-								<Label for="security" class="justify-start pr-0 md:justify-end">
-									{m.transactions_security_label_security()}
-								</Label>
-								<Select.Root type="single" bind:value={securityId}>
-									<Select.Trigger id="security" class="bg-background w-full">
-										{#if selectedSecurity}
-											{selectedSecurity.name}
-										{:else}
-											<span class="text-muted-foreground">
-												{m.transactions_security_select_placeholder()}
-											</span>
-										{/if}
-									</Select.Trigger>
-									<Select.Content>
-										{#each securitiesContext.securities as security (security.id)}
-											<Select.Item value={security.id}>{security.name}</Select.Item>
-										{/each}
-									</Select.Content>
-								</Select.Root>
-							</FormFieldRow>
-
-							<FormFieldRow>
-								<Label for="security-date" class="justify-start pr-0 md:justify-end">
-									{m.transactions_label_date()}
-								</Label>
-								<Input id="security-date" type="date" bind:value={securityDate} required />
-							</FormFieldRow>
-
-							<FormFieldRow>
-								<Label for="security-type" class="justify-start pr-0 md:justify-end">
-									{m.transactions_security_label_type()}
-								</Label>
-								<Select.Root type="single" bind:value={securityType}>
-									<Select.Trigger id="security-type" class="bg-background w-full">
-										{securityTypeLabel(securityType)}
-									</Select.Trigger>
-									<Select.Content>
-										{#each securityTypeOptions as type (type)}
-											<Select.Item value={type}>{securityTypeLabel(type)}</Select.Item>
-										{/each}
-									</Select.Content>
-								</Select.Root>
-							</FormFieldRow>
-
-							<FormFieldRow>
-								<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-									<Label for="security-subtype" class="justify-start pr-0 md:justify-end">
-										{m.transactions_security_label_subtype()}
-									</Label>
-									<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span
-									>
-								</div>
-								<Input id="security-subtype" bind:value={securitySubtype} />
-							</FormFieldRow>
-
-							<FormFieldRow>
-								<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-									<Label for="security-name" class="justify-start pr-0 md:justify-end">
-										{m.transactions_security_label_name()}
-									</Label>
-									<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span
-									>
-								</div>
-								<Input id="security-name" bind:value={securityName} />
-							</FormFieldRow>
-
-							<FormFieldRow>
-								<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-									<Label for="security-description" class="justify-start pr-0 md:justify-end">
-										{m.transactions_label_description()}
-									</Label>
-									<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span
-									>
-								</div>
-								<Input id="security-description" bind:value={securityDescription} />
-							</FormFieldRow>
-						</Fieldset>
-
-						<Fieldset>
-							<FormFieldRow>
-								<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-									<Label for="quantity" class="justify-start pr-0 md:justify-end">
-										{m.transactions_security_label_quantity()}
-									</Label>
-									<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span
-									>
-								</div>
-								<CurrencyField
-									id="quantity"
-									name="quantity"
-									bind:value={quantity}
-									isCurrency={false}
-								/>
-							</FormFieldRow>
-
-							<FormFieldRow>
-								<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-									<Label for="price" class="justify-start pr-0 md:justify-end">
-										{m.transactions_security_label_price()}
-									</Label>
-									<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span
-									>
-								</div>
-								<CurrencyField id="price" name="price" bind:value={price} />
-							</FormFieldRow>
-
-							<FormFieldRow>
-								<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-									<Label for="security-amount" class="justify-start pr-0 md:justify-end">
-										{m.transactions_label_amount()}
-									</Label>
-									<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span
-									>
-								</div>
-								<CurrencyField
-									id="security-amount"
-									name="security-amount"
-									bind:value={securityAmount}
-								/>
-							</FormFieldRow>
-
-							<FormFieldRow>
-								<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-									<Label for="fees" class="justify-start pr-0 md:justify-end">
-										{m.transactions_security_label_fees()}
-									</Label>
-									<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span
-									>
-								</div>
-								<CurrencyField id="fees" name="fees" bind:value={fees} />
-							</FormFieldRow>
-						</Fieldset>
-
-						<Fieldset>
-							<FormFieldRow itemsAlignment="items-start">
-								<div
-									class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1 md:pt-2"
-								>
-									<Label for="security-notes" class="justify-start pr-0 md:justify-end">
-										{m.transactions_label_notes()}
-									</Label>
-									<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span
-									>
-								</div>
-								<Textarea id="security-notes" bind:value={securityNotes} class="bg-background" />
-							</FormFieldRow>
-
-							<FormFieldRow>
-								<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-									<Label for="external-id" class="justify-start pr-0 md:justify-end">
-										{m.transactions_security_label_external_id()}
-									</Label>
-									<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span
-									>
-								</div>
-								<Input id="external-id" bind:value={externalId} />
-							</FormFieldRow>
-						</Fieldset>
-
-						<footer class="border-border bg-border border-t p-2">
-							<div class="flex justify-end">
-								<Button type="submit">{m.transactions_button_add()}</Button>
+								<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
 							</div>
-						</footer>
-					</form>
-				</div>
-			</Tabs.Content>
-		</Tabs.Root>
+							<CurrencyField id="fees" name="fees" bind:value={fees} />
+						</FormFieldRow>
+					</Fieldset>
+
+					<Fieldset>
+						<FormFieldRow itemsAlignment="items-start">
+							<div
+								class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1 md:pt-2"
+							>
+								<Label for="security-notes" class="justify-start pr-0 md:justify-end">
+									{m.transactions_label_notes()}
+								</Label>
+								<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
+							</div>
+							<Textarea id="security-notes" bind:value={securityNotes} class="bg-background" />
+						</FormFieldRow>
+					</Fieldset>
+				{/if}
+
+				{#if mode}
+					<footer class="border-border bg-border border-t p-2">
+						<div class="flex justify-end">
+							<Button type="submit">{m.transactions_button_add()}</Button>
+						</div>
+					</footer>
+				{/if}
+			</form>
+		</div>
 	</Section>
 </Page>

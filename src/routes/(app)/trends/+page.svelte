@@ -13,7 +13,8 @@
 		AccountBalancesResponse,
 		AccountsResponse,
 		AssetBalancesResponse,
-		AssetsResponse
+		AssetsResponse,
+		SecurityBalancesResponse
 	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { projectSignedValue } from '$lib/sharing';
@@ -29,16 +30,27 @@
 	let rawAccounts: AccountsResponse[] = $state([]);
 	let rawAssets: AssetsResponse[] = $state([]);
 	let rawAccountBalances: AccountBalancesResponse[] = $state([]);
+	let rawSecurityBalances: Pick<
+		SecurityBalancesResponse<number, number, number, number>,
+		'id' | 'account' | 'security' | 'value' | 'asOf'
+	>[] = $state([]);
 	let rawAssetBalances: AssetBalancesResponse[] = $state([]);
 
 	async function refreshBalances() {
 		try {
-			const [accountBalancesAll, assetBalancesAll] = await Promise.all([
+			const [accountBalancesAll, securityBalancesAll, assetBalancesAll] = await Promise.all([
 				pb.authedClient.collection('accountBalances').getFullList<AccountBalancesResponse>({
 					sort: 'asOf,created,id',
 					fields: 'id,account,value,asOf',
 					requestKey: 'trends:accountBalances'
 				}),
+				pb.authedClient
+					.collection('securityBalances')
+					.getFullList<SecurityBalancesResponse<number, number, number, number>>({
+						sort: 'asOf,created,id',
+						fields: 'id,account,security,value,asOf',
+						requestKey: 'trends:securityBalances'
+					}),
 				pb.authedClient.collection('assetBalances').getFullList<AssetBalancesResponse>({
 					sort: 'asOf,created,id',
 					fields: 'id,asset,marketValue,asOf',
@@ -66,6 +78,15 @@
 						value: projectSignedValue(balance.value, account.perspective)
 					};
 				});
+			const securityBalances = securityBalancesAll
+				.filter((b) => activeAccounts.has(b.account))
+				.map((balance) => {
+					const account = activeAccounts.get(balance.account)!;
+					return {
+						...balance,
+						value: projectSignedValue(balance.value ?? 0, account.perspective)
+					};
+				});
 			const assetBalances = assetBalancesAll
 				.filter((b) => activeAssets.has(b.asset))
 				.map((balance) => {
@@ -79,6 +100,7 @@
 			rawAccounts = Array.from(activeAccounts.values());
 			rawAssets = Array.from(activeAssets.values());
 			rawAccountBalances = accountBalances;
+			rawSecurityBalances = securityBalances;
 			rawAssetBalances = assetBalances;
 		} catch (error) {
 			pb.handleConnectionError(error, 'trends', 'refresh_balances');
@@ -163,6 +185,7 @@
 				{rawAccounts}
 				{rawAssets}
 				{rawAccountBalances}
+				{rawSecurityBalances}
 				{rawAssetBalances}
 			/>
 		</Section>
@@ -170,6 +193,12 @@
 
 	<Section>
 		<SectionTitle title={m.trends_performance_section_title()} />
-		<Performance {rawAccounts} {rawAssets} {rawAccountBalances} {rawAssetBalances} />
+		<Performance
+			{rawAccounts}
+			{rawAssets}
+			{rawAccountBalances}
+			{rawSecurityBalances}
+			{rawAssetBalances}
+		/>
 	</Section>
 </Page>

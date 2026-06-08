@@ -105,13 +105,6 @@ func main() {
 		return e.Next()
 	})
 
-	app.OnRecordValidate("accounts").BindFunc(func(e *core.RecordEvent) error {
-		if err := preventSecuritiesDisable(e.App, e.Record); err != nil {
-			return err
-		}
-		return e.Next()
-	})
-
 	app.OnRecordAfterCreateSuccess("transactions").BindFunc(func(e *core.RecordEvent) error {
 		if aid := e.Record.GetString("account"); aid != "" {
 			enqueueBalance(aid)

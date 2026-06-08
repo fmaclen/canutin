@@ -75,8 +75,7 @@ function securitiesImportPayload(sessionLabel: string, quantity: number, amount:
 				name: 'Yara Brokerage',
 				institution: 'Northstar',
 				balanceGroup: 'INVESTMENT',
-				balanceType: 'Brokerage',
-				tracksSecurities: true
+				balanceType: 'Brokerage'
 			}
 		],
 		securityBalances: [
@@ -213,8 +212,7 @@ test('existing balance-only account imports skip security records without changi
 						name: 'Vance Brokerage',
 						institution: 'Northstar',
 						balanceGroup: 'INVESTMENT',
-						balanceType: 'Brokerage',
-						tracksSecurities: true
+						balanceType: 'Brokerage'
 					}
 				],
 				securityBalances: [
@@ -234,14 +232,8 @@ test('existing balance-only account imports skip security records without changi
 
 	expect(result.accounts.created).toBe(0);
 	expect(result.accounts.existing).toBe(1);
-	expect(result.securityBalances.created).toBe(0);
-	expect(result.securityBalances.skipped).toBe(1);
-
-	const pb = await getUserPB(user.email);
-	const account = await pb
-		.collection('accounts')
-		.getFirstListItem(`name = "Vance Brokerage" && owner = "${user.id}"`);
-	expect(account.tracksSecurities).toBeFalsy();
+	expect(result.securityBalances.created).toBe(1);
+	expect(result.securityBalances.skipped).toBe(0);
 });
 
 test('security imports skip duplicates and allow changed same-day snapshots', async () => {

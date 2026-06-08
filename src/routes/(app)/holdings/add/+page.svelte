@@ -36,9 +36,7 @@
 
 	const ownerId = $derived(auth.currentUser?.record?.id);
 	const eligibleAccounts = $derived(
-		accountsContext.accounts.filter(
-			(account) => !account.closed && account.canWrite && Boolean(account.tracksSecurities)
-		)
+		accountsContext.accounts.filter((account) => !account.closed && account.canWrite)
 	);
 	const sortedSecurities = $derived(
 		[...securitiesContext.securities].sort((a, b) =>

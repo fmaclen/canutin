@@ -7,13 +7,17 @@ import {
 	AccountSharesPerspectiveOptions,
 	type AccountBalancesResponse,
 	type AccountSharesResponse,
-	type AccountsResponse
+	type AccountsResponse,
+	type SecurityBalancesResponse
 } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
 import { participantExcluded, projectSignedValue } from './sharing';
 
+type SecurityBalance = SecurityBalancesResponse<number, number, number, number>;
+
 export type AccountWithBalance = AccountsResponse & {
 	balance: number;
+	cashBalance: number;
 	balanceAsOf: string;
 	isOwner: boolean;
 	canWrite: boolean;
@@ -118,11 +122,24 @@ class AccountsContext {
 		const list = await this._pb.authedClient.collection('accounts').getFullList<AccountsResponse>({
 			requestKey: null
 		});
+		const accountBalances = await Promise.all(
+			list.map((account) => this.getLatestAccountBalance(account.id))
+		);
+		const securityBalanceTotals = await this.getLatestSecurityBalanceTotals(
+			list.map((account) => account.id)
+		);
 		const next: AccountWithBalance[] = [];
-		for (const account of list) {
+		for (const [index, account] of list.entries()) {
 			await this.balanceTypesContext.ensureLoaded(account.balanceType);
-			const balanceData = await this.getLatestAccountBalance(account.id);
-			next.push(this.toAccountWithBalance(account, balanceData.value, balanceData.asOf));
+			const balanceData = accountBalances[index];
+			next.push(
+				this.toAccountWithBalance(
+					account,
+					balanceData.value,
+					securityBalanceTotals.get(account.id) ?? 0,
+					balanceData.asOf
+				)
+			);
 		}
 		this.accounts = next;
 	}
@@ -137,64 +154,35 @@ class AccountsContext {
 			.subscribe('*', this.onAccountBalanceEvent.bind(this))
 			.catch((error) => this._pb.handleSubscriptionError(error, 'accounts', 'subscribe_balances'));
 		this._pb.authedClient
+			.collection('securityBalances')
+			.subscribe('*', this.onSecurityBalanceEvent.bind(this))
+			.catch((error) =>
+				this._pb.handleSubscriptionError(error, 'accounts', 'subscribe_security_balances')
+			);
+		this._pb.authedClient
 			.collection('accountShares')
 			.subscribe('*', this.onAccountShareEvent.bind(this))
 			.catch((error) => this._pb.handleSubscriptionError(error, 'accounts', 'subscribe_shares'));
 	}
 
 	private async onAccountEvent(e: RecordSubscription<AccountsResponse>) {
-		if (e.action === 'create') {
-			await this.balanceTypesContext.ensureLoaded(e.record.balanceType);
-			const balanceData = await this.getLatestAccountBalance(e.record.id);
-			this.accounts = [
-				...this.accounts,
-				this.toAccountWithBalance(e.record, balanceData.value, balanceData.asOf)
-			];
-		} else if (e.action === 'update') {
-			const existing = this.accounts.find((a) => a.id === e.record.id);
-			const balance = existing
-				? projectSignedValue(existing.balance, existing.perspective)
-				: (await this.getLatestAccountBalance(e.record.id)).value;
-			const balanceAsOf = existing?.balanceAsOf ?? '';
-			await this.balanceTypesContext.ensureLoaded(e.record.balanceType);
-			this.accounts = this.accounts.map((x) =>
-				x.id === e.record.id ? this.toAccountWithBalance(e.record, balance, balanceAsOf) : x
-			);
-		} else if (e.action === 'delete') {
-			this.accounts = this.accounts.filter((x) => x.id !== e.record.id);
-		}
+		if (!e.action) return;
+		await this.refreshAccounts();
+		this.lastBalanceEvent = Date.now();
 	}
 
 	private onAccountBalanceEvent(e: RecordSubscription<AccountBalancesResponse>) {
 		if (!e.action) return;
-		const accountId = e.record.account;
-		const newAsOf = e.record.asOf;
-		const rawValue = e.record.value ?? 0;
+		void this.refreshAccounts().then(() => {
+			this.lastBalanceEvent = Date.now();
+		});
+	}
 
-		if (e.action === 'create' || e.action === 'update') {
-			const account = this.accounts.find((x) => x.id === accountId);
-			if (!account) {
-				void this.refreshAccounts().then(() => {
-					this.lastBalanceEvent = Date.now();
-				});
-				return;
-			}
-
-			if (!account.balanceAsOf || newAsOf >= account.balanceAsOf) {
-				this.accounts = this.accounts.map((x) =>
-					x.id === accountId
-						? {
-								...x,
-								balance: projectSignedValue(rawValue, x.perspective),
-								balanceAsOf: newAsOf
-							}
-						: x
-				);
-				this.lastBalanceEvent = Date.now();
-			}
-		} else if (e.action === 'delete') {
-			void this.refetchAccountBalance(accountId);
-		}
+	private onSecurityBalanceEvent(e: RecordSubscription<SecurityBalance>) {
+		if (!e.action) return;
+		void this.refreshAccounts().then(() => {
+			this.lastBalanceEvent = Date.now();
+		});
 	}
 
 	private async onAccountShareEvent(e: RecordSubscription<AccountSharesResponse>) {
@@ -212,7 +200,8 @@ class AccountsContext {
 
 	private toAccountWithBalance(
 		account: AccountsResponse,
-		rawBalance: number,
+		rawCashBalance: number,
+		rawSecurityBalance: number,
 		balanceAsOf: string
 	): AccountWithBalance {
 		const incomingShare = this.getIncomingShare(account.id);
@@ -228,7 +217,8 @@ class AccountsContext {
 
 		return {
 			...account,
-			balance: projectSignedValue(rawBalance, perspective),
+			balance: projectSignedValue(rawCashBalance + rawSecurityBalance, perspective),
+			cashBalance: projectSignedValue(rawCashBalance, perspective),
 			balanceAsOf,
 			isOwner,
 			canWrite: isOwner,
@@ -244,24 +234,6 @@ class AccountsContext {
 		};
 	}
 
-	private async refetchAccountBalance(accountId: string) {
-		try {
-			const balanceData = await this.getLatestAccountBalance(accountId);
-			this.accounts = this.accounts.map((x) =>
-				x.id === accountId
-					? {
-							...x,
-							balance: projectSignedValue(balanceData.value, x.perspective),
-							balanceAsOf: balanceData.asOf
-						}
-					: x
-			);
-			this.lastBalanceEvent = Date.now();
-		} catch (error) {
-			console.error('[accounts:refetch_balance]', error);
-		}
-	}
-
 	private async getLatestAccountBalance(accountId: string) {
 		const res = await this._pb.authedClient
 			.collection('accountBalances')
@@ -273,9 +245,41 @@ class AccountsContext {
 		return { value: item?.value ?? 0, asOf: item?.asOf ?? '' };
 	}
 
+	private async getLatestSecurityBalanceTotals(accountIds: string[]) {
+		const accountIdSet = new Set(accountIds);
+		const totals = new Map<string, number>();
+		if (accountIdSet.size === 0) return totals;
+
+		const balances = await this._pb.authedClient
+			.collection('securityBalances')
+			.getFullList<SecurityBalance>({
+				sort: 'account,security,-asOf,-created,-id',
+				requestKey: null
+			});
+		const seen = new Set<string>();
+		for (const balance of balances) {
+			if (!accountIdSet.has(balance.account)) continue;
+			const key = `${balance.account}:${balance.security}`;
+			if (seen.has(key)) continue;
+			seen.add(key);
+			totals.set(
+				balance.account,
+				(totals.get(balance.account) ?? 0) + this.toNumber(balance.value)
+			);
+		}
+		return totals;
+	}
+
+	private toNumber(value: number | string | null | undefined) {
+		if (value === null || value === undefined || value === '') return 0;
+		const numberValue = typeof value === 'number' ? value : Number(value);
+		return Number.isFinite(numberValue) ? numberValue : 0;
+	}
+
 	dispose() {
 		this._pb.authedClient.collection('accounts').unsubscribe();
 		this._pb.authedClient.collection('accountBalances').unsubscribe();
+		this._pb.authedClient.collection('securityBalances').unsubscribe('*');
 		this._pb.authedClient.collection('accountShares').unsubscribe();
 	}
 }

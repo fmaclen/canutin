@@ -6,7 +6,6 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
-	import { Switch } from '$lib/components/ui/switch/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import { AccountsBalanceGroupOptions } from '$lib/pocketbase.schema';
@@ -18,7 +17,6 @@
 			balanceGroup: string;
 			accountTypeName: string;
 			notes: string;
-			tracksSecurities: boolean;
 			excluded: boolean;
 			closed: boolean;
 		};
@@ -139,27 +137,6 @@
 					<span class="text-muted-foreground text-sm">{m.accounts_text_optional()}</span>
 				</div>
 				<Textarea id="notes" bind:value={formData.notes} class="bg-background" {disabled} />
-			</FormFieldRow>
-
-			<FormFieldRow itemsAlignment="items-start">
-				<Label for="tracks-securities" class="justify-start pr-0 md:justify-end md:pt-2.5">
-					{m.accounts_label_securities_tracking()}
-				</Label>
-				<div class="bg-background border-border space-y-1 rounded border px-3 py-2">
-					<div class="flex items-center gap-3">
-						<Switch id="tracks-securities" bind:checked={formData.tracksSecurities} {disabled} />
-						<span class="text-sm font-medium">
-							{formData.tracksSecurities
-								? m.accounts_label_track_securities()
-								: m.accounts_label_balance_only()}
-						</span>
-					</div>
-					<p class="text-muted-foreground text-sm">
-						{formData.tracksSecurities
-							? m.accounts_helper_track_securities()
-							: m.accounts_helper_balance_only()}
-					</p>
-				</div>
 			</FormFieldRow>
 		</Fieldset>
 

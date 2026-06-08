@@ -154,7 +154,6 @@ export type AccountsRecord = {
 	name: string
 	notes?: string
 	owner: RecordIdString
-	tracksSecurities?: boolean
 	updated: IsoAutoDateString
 }
 

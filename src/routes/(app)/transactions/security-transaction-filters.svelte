@@ -18,9 +18,7 @@
 	const accountsContext = getAccountsContext();
 	const securitiesContext = getSecuritiesContext();
 
-	const securityAccounts = $derived(
-		accountsContext.accounts.filter((account) => Boolean(account.tracksSecurities))
-	);
+	const securityAccounts = $derived(accountsContext.accounts);
 	const selectedAccount = $derived(
 		securityTxContext.accountFilter
 			? accountsContext.accounts.find((account) => account.id === securityTxContext.accountFilter)

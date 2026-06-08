@@ -177,9 +177,7 @@ class SecuritiesContext {
 
 	private getEligibleAccountMap() {
 		return new SvelteMap(
-			this.accounts
-				.filter((account) => !account.closed && Boolean(account.tracksSecurities))
-				.map((account) => [account.id, account])
+			this.accounts.filter((account) => !account.closed).map((account) => [account.id, account])
 		);
 	}
 

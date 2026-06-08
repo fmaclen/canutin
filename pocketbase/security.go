@@ -137,9 +137,6 @@ func validateSecurityAccountCapability(app core.App, record *core.Record) error 
 	if account.GetString("owner") != ownerID {
 		return fmt.Errorf("account owner must match record owner")
 	}
-	if !account.GetBool("tracksSecurities") {
-		return fmt.Errorf("account must track securities")
-	}
 
 	security, err := app.FindRecordById("securities", securityID)
 	if err != nil {
@@ -208,23 +205,4 @@ func optionalJSONNumber(record *core.Record, field string) (float64, bool, error
 	default:
 		return 0, false, fmt.Errorf("not a number")
 	}
-}
-
-func preventSecuritiesDisable(app core.App, record *core.Record) error {
-	if record.Original().GetBool("tracksSecurities") == record.GetBool("tracksSecurities") {
-		return nil
-	}
-	if record.GetBool("tracksSecurities") {
-		return nil
-	}
-
-	params := map[string]any{"account": record.Id, "owner": record.GetString("owner")}
-	if _, err := app.FindFirstRecordByFilter("securityBalances", "account = {:account} && owner = {:owner}", params); err == nil {
-		return fmt.Errorf("tracksSecurities cannot be disabled while security balances exist")
-	}
-	if _, err := app.FindFirstRecordByFilter("securityTransactions", "account = {:account} && owner = {:owner}", params); err == nil {
-		return fmt.Errorf("tracksSecurities cannot be disabled while security transactions exist")
-	}
-
-	return nil
 }

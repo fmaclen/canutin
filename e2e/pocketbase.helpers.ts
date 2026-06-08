@@ -92,7 +92,6 @@ export async function seedAccount(accountInput: {
 	closed?: AccountsRecord['closed'];
 	autoCalculated?: AccountsRecord['autoCalculated'];
 	excluded?: AccountsRecord['excluded'];
-	tracksSecurities?: AccountsRecord['tracksSecurities'];
 }) {
 	const pbAdmin = await getAdminPB();
 	const balanceType = await getOrCreateBalanceType(

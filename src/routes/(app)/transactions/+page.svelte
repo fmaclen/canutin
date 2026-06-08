@@ -59,10 +59,7 @@
 		if (nextView === 'securities') {
 			params.set('view', 'securities');
 			const accountId = params.get('account');
-			const isSecurityAccount = accountsContext.accounts.some(
-				(account) => account.id === accountId && Boolean(account.tracksSecurities)
-			);
-			if (!isSecurityAccount) {
+			if (!accountsContext.accounts.some((account) => account.id === accountId)) {
 				params.delete('account');
 			}
 		} else {
