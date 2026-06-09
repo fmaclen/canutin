@@ -9,6 +9,7 @@ export class AuthContext {
 	currentUser: BaseAuthStore | null = $state(null);
 	currentUserId: string = $state('');
 	isLoading: boolean = $state(true);
+	isSubmitting: boolean = $state(false);
 	error: string | null = $state(null);
 
 	private _pb: PocketBase;
@@ -90,7 +91,7 @@ export class AuthContext {
 
 	async login(email: string, password: string) {
 		this.error = null;
-		this.isLoading = true;
+		this.isSubmitting = true;
 		try {
 			await this._pb.collection('users').authWithPassword(email, password);
 			this.currentUser = this._pb.authStore;
@@ -101,13 +102,13 @@ export class AuthContext {
 			this.error = this.getErrorMessage(e, m.auth_login_failed());
 			return { success: false, error: this.error } as const;
 		} finally {
-			this.isLoading = false;
+			this.isSubmitting = false;
 		}
 	}
 
 	async signup(email: string, password: string, passwordConfirm: string) {
 		this.error = null;
-		this.isLoading = true;
+		this.isSubmitting = true;
 		try {
 			await this._pb.collection('users').create({ email, password, passwordConfirm });
 			this.currentUser = this._pb.authStore;
@@ -117,7 +118,7 @@ export class AuthContext {
 			this.error = this.getErrorMessage(e, m.auth_signup_failed());
 			return { success: false, error: this.error } as const;
 		} finally {
-			this.isLoading = false;
+			this.isSubmitting = false;
 		}
 	}
 

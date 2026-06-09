@@ -21,6 +21,7 @@
 		const isDemo = pathname === '/demo';
 		const isGuestRoute = isAuth || isDemo;
 		const isRoot = pathname === '/';
+		const isAuthenticated = Boolean(auth.currentUserId);
 
 		// Don't redirect away from /demo while demo is starting or seeding
 		if (isDemo && (demo.isStarting || demo.isSeeding)) {
@@ -30,7 +31,7 @@
 		// Decide desired target based on auth state and current location
 		type Target = '/auth' | '/big-picture' | null;
 		let target: Target = null;
-		if (auth.currentUser?.isValid) {
+		if (isAuthenticated) {
 			// If already authenticated, avoid staying on guest routes or root
 			if (isGuestRoute || isRoot) target = '/big-picture';
 		} else {
