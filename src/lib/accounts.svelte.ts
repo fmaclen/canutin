@@ -1,5 +1,6 @@
 import { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 import { getAuthContext } from './auth.svelte';
 import { setBalanceTypesContext } from './balance-types.svelte';
@@ -268,8 +269,8 @@ class AccountsContext {
 	}
 
 	private async getLatestSecurityBalanceTotals(accountIds: string[]) {
-		const accountIdSet = new Set(accountIds);
-		const totals = new Map<string, number>();
+		const accountIdSet = new SvelteSet(accountIds);
+		const totals = new SvelteMap<string, number>();
 		if (accountIdSet.size === 0) return totals;
 
 		const balances = await this._pb.authedClient
@@ -278,7 +279,7 @@ class AccountsContext {
 				sort: 'account,security,-asOf,-created,-id',
 				requestKey: null
 			});
-		const seen = new Set<string>();
+		const seen = new SvelteSet<string>();
 		for (const balance of balances) {
 			if (!accountIdSet.has(balance.account)) continue;
 			const key = `${balance.account}:${balance.security}`;

@@ -42,11 +42,7 @@
 
 	const rawMode = $derived(page.url.searchParams.get('mode'));
 	const mode = $derived<TransactionMode>(
-		rawMode === 'holdings' || rawMode === 'security'
-			? 'holdings'
-			: rawMode === 'cash'
-				? 'cash'
-				: ''
+		rawMode === 'holdings' || rawMode === 'security' ? 'holdings' : rawMode === 'cash' ? 'cash' : ''
 	);
 	let description = $state('');
 	let amount = $state('');
@@ -77,6 +73,7 @@
 		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.set('mode', 'holdings');
 		const search = params.toString();
+		// eslint-disable-next-line svelte/no-navigation-without-resolve -- query params are appended to a resolved base route
 		goto(`${resolve('/transactions/add')}?${search}`, {
 			replaceState: true,
 			noScroll: true,
