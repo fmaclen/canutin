@@ -1,5 +1,5 @@
 import { m } from '$lib/paraglide/messages';
-import { AccountsBalanceGroupOptions, type AccountsResponse } from '$lib/pocketbase.schema';
+import { AccountsBalanceGroupOptions } from '$lib/pocketbase.schema';
 
 export const BALANCE_GROUP_ORDER = Object.values(AccountsBalanceGroupOptions);
 
@@ -27,16 +27,4 @@ export function getBalanceGroupMeta() {
 			color: 'bg-other-assets'
 		}
 	};
-}
-
-export function groupAccountsByBalanceGroup<T extends AccountsResponse>(accounts: T[]) {
-	const grouped = new Map<AccountsBalanceGroupOptions, T[]>();
-	for (const account of accounts) {
-		const group = account.balanceGroup as AccountsBalanceGroupOptions;
-		if (!grouped.has(group)) {
-			grouped.set(group, []);
-		}
-		grouped.get(group)!.push(account);
-	}
-	return grouped;
 }

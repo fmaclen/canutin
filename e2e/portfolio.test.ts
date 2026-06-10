@@ -48,7 +48,7 @@ test('portfolio and trades flow covers security creation, balances, filters, and
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Portfolio');
-	await expect(page.getByText('No current holdings yet')).toBeVisible();
+	await expect(page.getByText('No positions yet')).toBeVisible();
 
 	await page.goto('/trades/securities');
 	await page.getByRole('link', { name: 'Add security' }).click();
@@ -105,7 +105,7 @@ test('portfolio and trades flow covers security creation, balances, filters, and
 	await expect(page.getByRole('row', { name: /Vanguard Total Stock Market ETF/ })).toContainText(
 		'$2,000.00'
 	);
-	await expect(page.getByRole('row', { name: /Holdings value/ })).toContainText('$2,000.00');
+	await expect(page.getByRole('row', { name: /Portfolio value/ })).toContainText('$2,000.00');
 	await expect(page.getByRole('row', { name: /Total balance/ })).toContainText('$3,000.00');
 	await page.getByRole('main').getByRole('link', { name: 'Trades' }).click();
 	await expect(page).toHaveURL(`/trades?account=${brokerageAccount.id}`);
@@ -184,7 +184,7 @@ test('portfolio unknown values render as unknown and do not inflate account tota
 
 	await page.goto(`/accounts/${account.id}`);
 	await expect(page.getByRole('row', { name: /Cash balance/ })).toContainText('$750.00');
-	await expect(page.getByRole('row', { name: /Holdings value/ })).toContainText('~');
+	await expect(page.getByRole('row', { name: /Portfolio value/ })).toContainText('~');
 	await expect(page.getByRole('row', { name: /Total balance/ })).toContainText('$750.00');
 });
 

@@ -6,9 +6,10 @@
 	import * as Table from '$lib/components/ui/table/index';
 	import { m } from '$lib/paraglide/messages';
 	import {
-		getSecurityTransactionsContext,
-		type SecurityTransactionTypeFilter
-	} from '$lib/security-transactions.svelte';
+		formatSecurityQuantity,
+		securityTransactionTypeLabel
+	} from '$lib/security-transaction-display';
+	import { getSecurityTransactionsContext } from '$lib/security-transactions.svelte';
 
 	const securityTxContext = getSecurityTransactionsContext();
 
@@ -18,38 +19,8 @@
 		day: 'numeric',
 		timeZone: 'UTC'
 	});
-	const decimalFormatter = new Intl.NumberFormat(undefined, {
-		minimumFractionDigits: 0,
-		maximumFractionDigits: 6
-	});
-
 	function formatDate(date: Date) {
 		return dateFormatter.format(date);
-	}
-
-	function typeLabel(type: SecurityTransactionTypeFilter) {
-		switch (type) {
-			case 'buy':
-				return m.trades_type_buy();
-			case 'sell':
-				return m.trades_type_sell();
-			case 'cancel':
-				return m.trades_type_cancel();
-			case 'cash':
-				return m.trades_type_cash();
-			case 'fee':
-				return m.trades_type_fee();
-			case 'transfer':
-				return m.trades_type_transfer();
-			case 'all':
-			default:
-				return m.trades_filter_type_all();
-		}
-	}
-
-	function formatQuantity(value: number | null) {
-		if (value === null) return null;
-		return decimalFormatter.format(value);
 	}
 </script>
 
@@ -114,7 +85,7 @@
 						</Table.Cell>
 						<Table.Cell>
 							<div class="flex flex-col">
-								<span class="text-sm">{typeLabel(row.type)}</span>
+								<span class="text-sm">{securityTransactionTypeLabel(row.type)}</span>
 								{#if row.subtype}
 									<span class="text-muted-foreground text-xs">{row.subtype}</span>
 								{/if}
@@ -143,9 +114,8 @@
 							{/if}
 						</Table.Cell>
 						<Table.Cell class="text-right whitespace-nowrap tabular-nums">
-							{@const formattedQuantity = formatQuantity(row.quantity)}
-							{#if formattedQuantity}
-								<DisplayNumber value={formattedQuantity} />
+							{#if row.quantity !== null}
+								<DisplayNumber value={formatSecurityQuantity(row.quantity)} />
 							{:else}
 								<span class="text-muted-foreground text-sm">~</span>
 							{/if}

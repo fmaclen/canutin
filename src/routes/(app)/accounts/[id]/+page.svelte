@@ -53,22 +53,22 @@
 	const canWrite = $derived(Boolean(account?.canWrite));
 	const incomingShare = $derived(account ? accountsContext.getIncomingShare(account.id) : null);
 	const grantedShares = $derived(account ? accountsContext.getGrantedShares(account.id) : []);
-	const holdingsBalances = $derived(
+	const positionsBalances = $derived(
 		account
 			? securitiesContext.securities.flatMap((security) =>
 					securitiesContext
 						.getAccountBalances(security.id)
-						.filter((balance) => balance.accountId === account.id)
+						.filter((balance) => balance.accountId === account.id && balance.quantity !== 0)
 				)
 			: []
 	);
-	const holdingsValue = $derived(
-		holdingsBalances.every((balance) => balance.value !== null)
-			? holdingsBalances.reduce((sum, balance) => sum + (balance.value ?? 0), 0)
+	const positionsValue = $derived(
+		positionsBalances.every((balance) => balance.value !== null)
+			? positionsBalances.reduce((sum, balance) => sum + (balance.value ?? 0), 0)
 			: null
 	);
-	const holdingsRows = $derived(
-		holdingsBalances
+	const positionsRows = $derived(
+		positionsBalances
 			.map((balance) => ({
 				...balance,
 				securityName: securitiesContext.getSecurity(balance.securityId)?.name ?? ''
@@ -409,7 +409,7 @@
 				onSubmit={handleUpdateBalance}
 				disabled={!canWrite}
 			/>
-			{#if holdingsBalances.length > 0}
+			{#if positionsBalances.length > 0}
 				<p class="text-muted-foreground text-sm">{m.accounts_text_cash_balance_only()}</p>
 				<div class="bg-background overflow-hidden rounded-sm shadow-md">
 					<Table.Root>
@@ -422,7 +422,7 @@
 									<Currency value={account.cashBalance} decimalScale={2} sentiment="neutral" />
 								</Table.Cell>
 							</Table.Row>
-							{#each holdingsRows as row (row.id)}
+							{#each positionsRows as row (row.id)}
 								<Table.Row>
 									<Table.Cell class="pl-6">
 										<Link
@@ -446,10 +446,10 @@
 									{m.accounts_label_portfolio_value()}
 								</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">
-									{#if holdingsValue === null}
+									{#if positionsValue === null}
 										<span class="text-muted-foreground">~</span>
 									{:else}
-										<Currency value={holdingsValue} decimalScale={2} sentiment="neutral" />
+										<Currency value={positionsValue} decimalScale={2} sentiment="neutral" />
 									{/if}
 								</Table.Cell>
 							</Table.Row>
@@ -480,7 +480,7 @@
 	</Section>
 
 	<Section>
-		<SectionTitle title="Sharing" />
+		<SectionTitle title={m.accounts_section_sharing()} />
 		{#if isLoading || !account}
 			<Skeleton class="h-40" />
 		{:else if canWrite}

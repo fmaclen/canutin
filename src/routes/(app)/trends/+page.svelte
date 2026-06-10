@@ -11,9 +11,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import type {
 		AccountBalancesResponse,
-		AccountsResponse,
 		AssetBalancesResponse,
-		AssetsResponse,
 		SecurityBalancesResponse
 	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
@@ -22,18 +20,19 @@
 
 	import ChartNetWorth from './growth.svelte';
 	import Performance from './performance.svelte';
+	import type { TrendAccount, TrendAsset } from './trends';
 
 	const pb = getPocketBaseContext();
 	const accountsCtx = getAccountsContext();
 	const assetsCtx = getAssetsContext();
 
 	let period: '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | 'max' = $state('1y');
-	let rawAccounts: AccountsResponse[] = $state([]);
-	let rawAssets: AssetsResponse[] = $state([]);
+	let rawAccounts: TrendAccount[] = $state([]);
+	let rawAssets: TrendAsset[] = $state([]);
 	let rawAccountBalances: AccountBalancesResponse[] = $state([]);
 	let rawSecurityBalances: Pick<
 		SecurityBalancesResponse<number, number, number, number>,
-		'id' | 'account' | 'security' | 'value' | 'asOf'
+		'id' | 'account' | 'security' | 'value' | 'quantity' | 'asOf'
 	>[] = $state([]);
 	let rawAssetBalances: AssetBalancesResponse[] = $state([]);
 
@@ -49,7 +48,7 @@
 					.collection('securityBalances')
 					.getFullList<SecurityBalancesResponse<number, number, number, number>>({
 						sort: 'asOf,created,id',
-						fields: 'id,account,security,value,asOf',
+						fields: 'id,account,security,value,quantity,asOf',
 						requestKey: 'trends:securityBalances'
 					}),
 				pb.authedClient.collection('assetBalances').getFullList<AssetBalancesResponse>({
@@ -59,48 +58,63 @@
 				})
 			]);
 
-			const activeAccounts = new Map(
+			const includedAccounts = new Map(
 				(accountsCtx?.accounts ?? [])
-					.filter((a) => !a.participantExcluded && !a.closed)
+					.filter((a) => !a.participantExcluded)
 					.map((a) => [a.id, a] as const)
 			);
-			const activeAssets = new Map(
+			const includedAssets = new Map(
 				(assetsCtx?.assets ?? [])
-					.filter((a) => !a.participantExcluded && !a.sold)
+					.filter((a) => !a.participantExcluded)
 					.map((a) => [a.id, a] as const)
 			);
 
 			const accountBalances = accountBalancesAll
-				.filter((b) => activeAccounts.has(b.account))
+				.filter((b) => includedAccounts.has(b.account))
 				.map((balance) => {
-					const account = activeAccounts.get(balance.account)!;
+					const account = includedAccounts.get(balance.account)!;
 					return {
 						...balance,
-						value: projectSignedValue(balance.value, account.perspective)
+						value:
+							account.closed && new Date(balance.asOf) >= new Date(account.closed)
+								? 0
+								: projectSignedValue(balance.value, account.perspective)
 					};
 				});
 			const securityBalances = securityBalancesAll
-				.filter((b) => activeAccounts.has(b.account))
+				.filter((b) => includedAccounts.has(b.account))
 				.map((balance) => {
-					const account = activeAccounts.get(balance.account)!;
+					const account = includedAccounts.get(balance.account)!;
 					const value = toNumber(balance.value);
 					return {
 						...balance,
-						value: value === null ? null : projectSignedValue(value, account.perspective)
+						value:
+							account.closed && new Date(balance.asOf) >= new Date(account.closed)
+								? 0
+								: value === null
+									? null
+									: projectSignedValue(value, account.perspective),
+						quantity:
+							account.closed && new Date(balance.asOf) >= new Date(account.closed)
+								? 0
+								: balance.quantity
 					};
 				});
 			const assetBalances = assetBalancesAll
-				.filter((b) => activeAssets.has(b.asset))
+				.filter((b) => includedAssets.has(b.asset))
 				.map((balance) => {
-					const asset = activeAssets.get(balance.asset)!;
+					const asset = includedAssets.get(balance.asset)!;
 					return {
 						...balance,
-						marketValue: projectSignedValue(balance.marketValue, asset.perspective)
+						marketValue:
+							asset.sold && new Date(balance.asOf) >= new Date(asset.sold)
+								? 0
+								: projectSignedValue(balance.marketValue, asset.perspective)
 					};
 				});
 
-			rawAccounts = Array.from(activeAccounts.values());
-			rawAssets = Array.from(activeAssets.values());
+			rawAccounts = Array.from(includedAccounts.values());
+			rawAssets = Array.from(includedAssets.values());
 			rawAccountBalances = accountBalances;
 			rawSecurityBalances = securityBalances;
 			rawAssetBalances = assetBalances;

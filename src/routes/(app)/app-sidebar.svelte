@@ -8,7 +8,7 @@
 	import type { ComponentProps } from 'svelte';
 
 	import { resolve } from '$app/paths';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import CanutinIcon from '$lib/components/canutin-icon.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { m } from '$lib/paraglide/messages.js';
@@ -21,41 +21,34 @@
 	const insights = $derived([
 		{
 			name: m.sidebar_big_picture(),
-			url: resolve('/big-picture'),
+			url: '/big-picture',
 			icon: PresentationIcon
 		},
 		{
 			name: m.sidebar_balance_sheet(),
-			url: resolve('/balance-sheet'),
+			url: '/balance-sheet',
 			icon: LayoutListIcon
 		},
 		{
-			name: m.sidebar_portfolio(),
-			url: resolve('/portfolio'),
+			name: m.portfolio_page_title(),
+			url: '/portfolio',
 			icon: ChartCandlestickIcon
 		},
 		{
 			name: m.sidebar_trends(),
-			url: resolve('/trends'),
+			url: '/trends',
 			icon: ChartLineIcon
 		}
-	]);
+	] as const);
 
-	const dataSources = $derived([
-		{
-			name: m.sidebar_assets(),
-			icon: LandmarkIcon
-		}
-	]);
-
-	function isActive(path: '/' | '/assets') {
-		const currentPath = $page.url.pathname;
+	function isActive(path: '/assets') {
+		const currentPath = page.url.pathname;
 		return currentPath === resolve(path);
 	}
 
 	function isPrefixActive(path: '/accounts' | '/transactions' | '/trades') {
 		const resolvedPath = resolve(path);
-		const currentPath = $page.url.pathname;
+		const currentPath = page.url.pathname;
 		return currentPath === resolvedPath || currentPath.startsWith(`${resolvedPath}/`);
 	}
 </script>
@@ -117,18 +110,16 @@
 						</Sidebar.MenuSubItem>
 					</Sidebar.MenuSub>
 				</Sidebar.MenuItem>
-				{#each dataSources as item (item.name)}
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton isActive={isActive('/assets')}>
-							{#snippet child({ props })}
-								<a href={resolve('/assets')} {...props}>
-									<item.icon />
-									<span>{item.name}</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-				{/each}
+				<Sidebar.MenuItem>
+					<Sidebar.MenuButton isActive={isActive('/assets')}>
+						{#snippet child({ props })}
+							<a href={resolve('/assets')} {...props}>
+								<LandmarkIcon />
+								<span>{m.sidebar_assets()}</span>
+							</a>
+						{/snippet}
+					</Sidebar.MenuButton>
+				</Sidebar.MenuItem>
 			</Sidebar.Menu>
 		</Sidebar.Group>
 	</Sidebar.Content>

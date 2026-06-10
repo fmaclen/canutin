@@ -1,4 +1,3 @@
-import { compareDesc } from 'date-fns';
 import { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
@@ -7,6 +6,10 @@ import { getAccountsContext } from './accounts.svelte';
 import { getAuthContext } from './auth.svelte';
 import type { SecuritiesResponse, SecurityBalancesResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
+import {
+	compareSecurityBalanceRecency,
+	resolveSecurityBalanceValues
+} from './security-balance-values';
 import { projectSignedValue } from './sharing';
 import { toNumber } from './utils';
 
@@ -51,25 +54,16 @@ const DEBOUNCE_MS = 200;
 class SecuritiesContext {
 	securities: SecuritiesResponse[] = $state([]);
 	isLoading: boolean = $state(true);
-	holdingsLoaded = false;
+	positionsLoaded = false;
 
-	holdingsValueByAccount = $derived.by(() => {
-		const latestValued = new SvelteMap<string, { value: number; balance: SecurityBalance }>();
-		for (const balance of this.securityBalances) {
-			const value = toNumber(balance.value);
-			if (value === null) continue;
-			const key = `${balance.account}:${balance.security}`;
-			const existing = latestValued.get(key);
-			if (!existing || this.compareBalanceRecency(balance, existing.balance) < 0) {
-				latestValued.set(key, { value, balance });
-			}
-		}
+	positionsValueByAccount = $derived.by(() => {
 		const totals = new SvelteMap<string, number>();
-		for (const [key, latestBalance] of this.getLatestBalancesByAccountSecurity()) {
-			if (toNumber(latestBalance.quantity) === 0) continue;
-			const valued = latestValued.get(key);
-			if (!valued) continue;
-			totals.set(latestBalance.account, (totals.get(latestBalance.account) ?? 0) + valued.value);
+		for (const resolved of resolveSecurityBalanceValues(this.securityBalances).values()) {
+			if (resolved.value === null) continue;
+			totals.set(
+				resolved.balance.account,
+				(totals.get(resolved.balance.account) ?? 0) + resolved.value
+			);
 		}
 		return totals;
 	});
@@ -89,7 +83,7 @@ class SecuritiesContext {
 	}
 
 	get aggregateRows() {
-		return this.computeAggregateRows().filter((row) => row.quantity === null || row.quantity !== 0);
+		return this.computeAggregateRows();
 	}
 
 	getSecurity(id: string) {
@@ -141,14 +135,16 @@ class SecuritiesContext {
 			const userId = this._auth.currentUserId;
 			if (!userId) {
 				this.refreshSequence++;
+				if (this.refreshTimer) clearTimeout(this.refreshTimer);
+				this.refreshTimer = null;
 				this.securities = [];
 				this.securityBalances = [];
-				this.holdingsLoaded = false;
+				this.positionsLoaded = false;
 				this.isLoading = false;
 				return;
 			}
 			this.isLoading = true;
-			this.holdingsLoaded = false;
+			this.positionsLoaded = false;
 			void this.refreshForCurrentUser();
 		});
 	}
@@ -165,7 +161,7 @@ class SecuritiesContext {
 
 	private async refreshAll() {
 		const token = ++this.refreshSequence;
-		this.holdingsLoaded = false;
+		this.positionsLoaded = false;
 		const [securities, securityBalances] = await Promise.all([
 			this._pb.authedClient.collection('securities').getFullList<SecuritiesResponse>({
 				sort: 'name',
@@ -179,7 +175,7 @@ class SecuritiesContext {
 		if (token !== this.refreshSequence) return;
 		this.securities = securities;
 		this.securityBalances = securityBalances;
-		this.holdingsLoaded = true;
+		this.positionsLoaded = true;
 		this._accounts.notifyBalancesChanged();
 	}
 
@@ -222,7 +218,7 @@ class SecuritiesContext {
 		for (const balance of this.securityBalances) {
 			const key = `${balance.account}:${balance.security}`;
 			const existing = latestBalances.get(key);
-			if (!existing || this.compareBalanceRecency(balance, existing) < 0) {
+			if (!existing || compareSecurityBalanceRecency(balance, existing) < 0) {
 				latestBalances.set(key, balance);
 			}
 		}
@@ -231,34 +227,16 @@ class SecuritiesContext {
 
 	private getLatestAccountBalanceRows() {
 		const accounts = this.getEligibleAccountMap();
-		const latestValued = new SvelteMap<string, { value: number; balance: SecurityBalance }>();
-		const latestCosted = new SvelteMap<string, { costBasis: number; balance: SecurityBalance }>();
-		for (const balance of this.securityBalances) {
-			const key = `${balance.account}:${balance.security}`;
-			const value = toNumber(balance.value);
-			if (value !== null) {
-				const existing = latestValued.get(key);
-				if (!existing || this.compareBalanceRecency(balance, existing.balance) < 0) {
-					latestValued.set(key, { value, balance });
-				}
-			}
-
-			const costBasis = toNumber(balance.costBasis);
-			if (costBasis !== null) {
-				const existing = latestCosted.get(key);
-				if (!existing || this.compareBalanceRecency(balance, existing.balance) < 0) {
-					latestCosted.set(key, { costBasis, balance });
-				}
-			}
-		}
+		const resolvedValues = resolveSecurityBalanceValues(this.securityBalances);
 
 		const rows: SecurityAccountBalance[] = [];
-		for (const [key, balance] of this.getLatestBalancesByAccountSecurity()) {
+		for (const resolved of resolvedValues.values()) {
+			const balance = resolved.balance;
 			const account = accounts.get(balance.account);
 			if (!account) continue;
 
-			const rawValue = latestValued.get(key)?.value ?? null;
-			const rawCostBasis = latestCosted.get(key)?.costBasis ?? null;
+			const rawValue = resolved.value;
+			const rawCostBasis = resolved.costBasis;
 			const value = rawValue === null ? null : projectSignedValue(rawValue, account.perspective);
 			const costBasis =
 				rawCostBasis === null ? null : projectSignedValue(rawCostBasis, account.perspective);
@@ -329,14 +307,6 @@ class SecuritiesContext {
 			costBasis,
 			gainLoss: value === null || !valuesComplete || costBasis === null ? null : value - costBasis
 		};
-	}
-
-	private compareBalanceRecency(a: SecurityBalance, b: SecurityBalance) {
-		const asOfCompare = compareDesc(new Date(a.asOf), new Date(b.asOf));
-		if (asOfCompare !== 0) return asOfCompare;
-		const createdCompare = compareDesc(new Date(a.created), new Date(b.created));
-		if (createdCompare !== 0) return createdCompare;
-		return b.id.localeCompare(a.id);
 	}
 
 	dispose() {

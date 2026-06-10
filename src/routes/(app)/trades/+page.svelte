@@ -54,7 +54,7 @@
 		</Breadcrumb.Root>
 	</div>
 	<nav class="flex items-center gap-4 px-4">
-		<Link href={resolve('/trades/securities')} class="text-sm">{m.sidebar_securities()}</Link>
+		<Link href={resolve('/trades/securities')} class="text-sm">{m.securities_title()}</Link>
 		<Separator orientation="vertical" class="data-[orientation=vertical]:h-4" />
 		<Link href={resolve('/trades/add')} class="text-sm">
 			{m.trades_add_link()}

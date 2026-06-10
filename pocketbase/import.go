@@ -200,22 +200,10 @@ type optionalImportNumber struct {
 	value *float64
 }
 
-func matchesOptionalImportNumbers(record *core.Record, fields []optionalImportNumber) bool {
-	for _, field := range fields {
-		if field.value == nil {
-			continue
-		}
-		value, ok, err := optionalJSONNumber(record, field.field)
-		if err != nil || !ok || value != *field.value {
-			return false
-		}
-	}
-	return true
-}
-
 func hasMatchingSecurityImportRecord(app core.App, collectionName string, filter string, params map[string]any, label string, fields []optionalImportNumber) bool {
 	candidates, err := app.FindRecordsByFilter(collectionName, filter, "", 0, 0, params)
 	if err != nil {
+		log.Printf("[import] failed to find duplicate %s records: %v", collectionName, err)
 		return false
 	}
 
@@ -229,7 +217,18 @@ func hasMatchingSecurityImportRecord(app core.App, collectionName string, filter
 				continue
 			}
 		}
-		if matchesOptionalImportNumbers(candidate, fields) {
+		matchesNumbers := true
+		for _, field := range fields {
+			if field.value == nil {
+				continue
+			}
+			value, ok, err := optionalJSONNumber(candidate, field.field)
+			if err != nil || !ok || value != *field.value {
+				matchesNumbers = false
+				break
+			}
+		}
+		if matchesNumbers {
 			return true
 		}
 	}
@@ -264,7 +263,7 @@ func findOrCreateImportSecurity(app core.App, ownerID string, securityCache map[
 	}
 
 	symbol = normalizeSecuritySymbol(symbol)
-	normalizedName := normalizedSecurityName(name)
+	normalizedName := securityNameKey(name)
 	key := symbol
 	if key == "" {
 		key = normalizedName
@@ -570,13 +569,11 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		accountID, err := resolveImportAccount(app, ownerID, acctIndex, balance.AccountID, balance.AccountName)
 		if err != nil {
 			log.Printf("[import] failed to resolve account for securityBalances record (accountName=%q): %v", balance.AccountName, err)
-			result.SecurityBalances.Skipped++
 			continue
 		}
 		securityID, securityCreated, err := findOrCreateImportSecurity(app, ownerID, securityCache, balance.SecurityID, balance.SecurityName, balance.SecuritySymbol, session.Id)
 		if err != nil {
 			log.Printf("[import] failed to find or create securities record for securityBalances (name=%q, symbol=%q): %v", balance.SecurityName, balance.SecuritySymbol, err)
-			result.SecurityBalances.Skipped++
 			continue
 		}
 		if securityCreated {
@@ -618,7 +615,6 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			result.SecurityBalances.Created++
 		} else {
 			log.Printf("[import] failed to save securityBalances record (account=%s, security=%s, asOf=%s): %v", accountID, securityID, balance.AsOf, err)
-			result.SecurityBalances.Skipped++
 		}
 	}
 
@@ -626,13 +622,11 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		accountID, err := resolveImportAccount(app, ownerID, acctIndex, tx.AccountID, tx.AccountName)
 		if err != nil {
 			log.Printf("[import] failed to resolve account for securityTransactions record (accountName=%q): %v", tx.AccountName, err)
-			result.SecurityTransactions.Skipped++
 			continue
 		}
 		securityID, securityCreated, err := findOrCreateImportSecurity(app, ownerID, securityCache, tx.SecurityID, tx.SecurityName, tx.SecuritySymbol, session.Id)
 		if err != nil {
 			log.Printf("[import] failed to find or create securities record for securityTransactions (name=%q, symbol=%q): %v", tx.SecurityName, tx.SecuritySymbol, err)
-			result.SecurityTransactions.Skipped++
 			continue
 		}
 		if securityCreated {
@@ -696,7 +690,6 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			result.SecurityTransactions.Created++
 		} else {
 			log.Printf("[import] failed to save securityTransactions record (account=%s, security=%s, date=%s): %v", accountID, securityID, tx.Date, err)
-			result.SecurityTransactions.Skipped++
 		}
 	}
 

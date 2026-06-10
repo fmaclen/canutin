@@ -85,9 +85,6 @@ func main() {
 	})
 
 	validateSecurityWriteRequest := func(e *core.RecordRequestEvent) error {
-		if err := validateSecurityOwnerImmutable(e.Record); err != nil {
-			return err
-		}
 		if e.Auth == nil || !e.Auth.IsSuperuser() {
 			if err := validateAccountOpen(e.App, e.Record.GetString("account"), e.Auth); err != nil {
 				return err
@@ -98,20 +95,19 @@ func main() {
 	app.OnRecordCreateRequest("securityBalances", "securityTransactions").BindFunc(validateSecurityWriteRequest)
 	app.OnRecordUpdateRequest("securityBalances", "securityTransactions").BindFunc(validateSecurityWriteRequest)
 
-	app.OnRecordUpdateRequest("securities").BindFunc(func(e *core.RecordRequestEvent) error {
+	app.OnRecordValidate("securities").BindFunc(func(e *core.RecordEvent) error {
+		normalizeSecurityRecord(e.Record)
 		if err := validateSecurityOwnerImmutable(e.Record); err != nil {
 			return err
 		}
 		return e.Next()
 	})
 
-	app.OnRecordValidate("securities").BindFunc(func(e *core.RecordEvent) error {
-		normalizeSecurityRecord(e.Record)
-		return e.Next()
-	})
-
 	app.OnRecordValidate("securityBalances").BindFunc(func(e *core.RecordEvent) error {
 		normalizeSecurityDatedRecord(e.Record, "asOf")
+		if err := validateSecurityOwnerImmutable(e.Record); err != nil {
+			return err
+		}
 		if err := validateSecurityRecordIntegrity(e.App, e.Record); err != nil {
 			return err
 		}
@@ -120,6 +116,9 @@ func main() {
 
 	app.OnRecordValidate("securityTransactions").BindFunc(func(e *core.RecordEvent) error {
 		normalizeSecurityDatedRecord(e.Record, "date")
+		if err := validateSecurityOwnerImmutable(e.Record); err != nil {
+			return err
+		}
 		if err := validateSecurityRecordIntegrity(e.App, e.Record); err != nil {
 			return err
 		}

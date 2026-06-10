@@ -22,6 +22,7 @@
 	import * as Table from '$lib/components/ui/table/index';
 	import { m } from '$lib/paraglide/messages';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
+	import { formatSecurityQuantity } from '$lib/security-transaction-display';
 
 	import BalanceFields from '../balance-fields.svelte';
 	import { createSecurityBalanceFormData, toSecurityBalanceInput } from '../balance-form';
@@ -54,13 +55,6 @@
 	const eligibleAccounts = $derived(
 		accountsContext.accounts.filter((account) => !account.closed && account.canWrite)
 	);
-
-	function formatQuantity(value: number | null) {
-		if (value === null) return '~';
-		return new Intl.NumberFormat('en-US', {
-			maximumFractionDigits: 8
-		}).format(value);
-	}
 
 	function formatDate(value: string) {
 		return format(new Date(value), 'MMM d, yyyy');
@@ -125,7 +119,7 @@
 			});
 			toast.success(m.securities_edit_success());
 		} catch (error) {
-			console.error('[securities:update_security]', error);
+			console.error('[securityDetail]', error);
 			syncState.justSaved = false;
 			toast.error(m.securities_edit_failed());
 		}
@@ -136,7 +130,7 @@
 		const currentOwnerId = ownerId;
 		if (!currentSecurityId || !currentOwnerId || isSavingBalance) return;
 		if (!balanceFormData.accountId) {
-			toast.error(m.securities_account_required());
+			toast.error(m.account_required());
 			return;
 		}
 
@@ -149,7 +143,7 @@
 			balanceFormData = createSecurityBalanceFormData();
 			toast.success(m.securities_balance_updated());
 		} catch (error) {
-			console.error('[securities:add_balance]', error);
+			console.error('[securityDetail]', error);
 			toast.error(m.securities_balance_failed());
 		} finally {
 			isSavingBalance = false;
@@ -165,7 +159,7 @@
 			<Breadcrumb.List>
 				<Breadcrumb.Item>
 					<Breadcrumb.Link href={resolve('/trades/securities')}
-						>{m.sidebar_securities()}</Breadcrumb.Link
+						>{m.securities_title()}</Breadcrumb.Link
 					>
 				</Breadcrumb.Item>
 				<Breadcrumb.Separator />
@@ -268,7 +262,14 @@
 										{row.accountName}
 									</Table.Cell>
 									<Table.Cell class="text-right tabular-nums">
-										<NumberDisplay value={formatQuantity(row.quantity)} sentiment="neutral" />
+										{#if row.quantity === null}
+											<span class="text-muted-foreground">~</span>
+										{:else}
+											<NumberDisplay
+												value={formatSecurityQuantity(row.quantity)}
+												sentiment="neutral"
+											/>
+										{/if}
 									</Table.Cell>
 									<Table.Cell class="text-right tabular-nums">
 										{#if row.price === null}
@@ -315,7 +316,7 @@
 								</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">
 									<NumberDisplay
-										value={formatQuantity(summary?.quantity ?? null)}
+										value={formatSecurityQuantity(summary?.quantity ?? 0)}
 										sentiment="neutral"
 									/>
 								</Table.Cell>

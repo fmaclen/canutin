@@ -14,17 +14,11 @@
 	import * as Table from '$lib/components/ui/table/index';
 	import { m } from '$lib/paraglide/messages';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
+	import { formatSecurityQuantity } from '$lib/security-transaction-display';
 
 	const securitiesContext = getSecuritiesContext();
 
 	const rows = $derived(securitiesContext.aggregateRows);
-
-	function formatQuantity(value: number | null) {
-		if (value === null) return '~';
-		return new Intl.NumberFormat('en-US', {
-			maximumFractionDigits: 8
-		}).format(value);
-	}
 
 	function sentiment(value: number | null) {
 		if (value === null || value === 0) return 'neutral';
@@ -39,7 +33,7 @@
 		<Breadcrumb.Root>
 			<Breadcrumb.List>
 				<Breadcrumb.Item>
-					<Breadcrumb.Page>{m.sidebar_portfolio()}</Breadcrumb.Page>
+					<Breadcrumb.Page>{m.portfolio_page_title()}</Breadcrumb.Page>
 				</Breadcrumb.Item>
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
@@ -48,7 +42,7 @@
 
 <Page pageTitle={m.portfolio_page_title()}>
 	<Section>
-		<SectionTitle title={m.portfolio_section_holdings()} />
+		<SectionTitle title={m.portfolio_section_positions()} />
 		{#if securitiesContext.isLoading}
 			<div class="bg-background overflow-hidden rounded-sm shadow-md">
 				<Skeleton class="h-64" />
@@ -114,7 +108,7 @@
 									{#if row.quantity === null}
 										<span class="text-muted-foreground">~</span>
 									{:else}
-										<NumberDisplay value={formatQuantity(row.quantity)} />
+										<NumberDisplay value={formatSecurityQuantity(row.quantity)} />
 									{/if}
 								</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">

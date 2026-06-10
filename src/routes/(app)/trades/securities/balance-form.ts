@@ -1,5 +1,7 @@
 import { format } from 'date-fns';
 
+import { toNumber } from '$lib/utils';
+
 export type SecurityBalanceFormData = {
 	accountId: string;
 	asOf: string;
@@ -25,15 +27,9 @@ export function toSecurityBalanceInput(formData: SecurityBalanceFormData, owner:
 		account: formData.accountId,
 		owner,
 		asOf: new Date(`${formData.asOf}T12:00:00Z`).toISOString(),
-		quantity: parseOptionalNumber(formData.quantity),
-		price: parseOptionalNumber(formData.price),
-		value: parseOptionalNumber(formData.value),
-		costBasis: parseOptionalNumber(formData.costBasis)
+		quantity: toNumber(formData.quantity),
+		price: toNumber(formData.price),
+		value: toNumber(formData.value),
+		costBasis: toNumber(formData.costBasis)
 	};
-}
-
-function parseOptionalNumber(value: string) {
-	if (value.trim() === '') return null;
-	const parsed = Number(value);
-	return Number.isFinite(parsed) ? parsed : null;
 }

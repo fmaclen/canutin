@@ -12,9 +12,14 @@
 		AssetBalancesResponse,
 		AssetsResponse
 	} from '$lib/pocketbase.schema';
-	import { toNumber } from '$lib/utils';
 
-	import { buildPreparedMaps, type BalanceGroup, type TrendSecurityBalance } from './trends';
+	import {
+		advanceTrendSecurityValue,
+		buildPreparedMaps,
+		type BalanceGroup,
+		type TrendSecurityBalance,
+		type TrendSecurityValueState
+	} from './trends';
 
 	let {
 		rawAccounts = $bindable(),
@@ -107,7 +112,12 @@
 				const datePoint = ascendingDates[dateIndex];
 				while (pointer + 1 < balances.length && new Date(balances[pointer + 1].asOf) <= datePoint)
 					pointer++;
-				const value = pointer >= 0 ? (balances[pointer].value ?? 0) : 0;
+				const value =
+					meta.closed && datePoint >= new Date(meta.closed)
+						? 0
+						: pointer >= 0
+							? (balances[pointer].value ?? 0)
+							: 0;
 				const group = meta.balanceGroup as BalanceGroup;
 				if (group === 'CASH') totalsAscending[dateIndex].cash += value;
 				else if (group === 'DEBT') totalsAscending[dateIndex].debt += value;
@@ -120,22 +130,22 @@
 			const accountId = balances[0]?.account;
 			const meta = accountId ? accountById.get(accountId) : null;
 			if (!meta) continue;
-			let pointer = -1;
-			let lastKnownValue: number | null = null;
+			const securityValueState = {
+				index: -1,
+				lastKnownValue: null,
+				soldOut: false
+			} satisfies TrendSecurityValueState;
 			for (let dateIndex = 0; dateIndex < ascendingDates.length; dateIndex++) {
 				const datePoint = ascendingDates[dateIndex];
-				while (pointer + 1 < balances.length && new Date(balances[pointer + 1].asOf) <= datePoint) {
-					pointer++;
-					const known = toNumber(balances[pointer].value);
-					if (known !== null) lastKnownValue = known;
-				}
-				if (lastKnownValue === null) continue;
+				if (meta.closed && datePoint >= new Date(meta.closed)) continue;
+				const value = advanceTrendSecurityValue(balances, datePoint, securityValueState);
+				if (value === null) continue;
 				const group = meta.balanceGroup as BalanceGroup;
-				if (group === 'CASH') totalsAscending[dateIndex].cash += lastKnownValue;
-				else if (group === 'DEBT') totalsAscending[dateIndex].debt += lastKnownValue;
-				else if (group === 'INVESTMENT') totalsAscending[dateIndex].investment += lastKnownValue;
-				else totalsAscending[dateIndex].other += lastKnownValue;
-				totalsAscending[dateIndex].net += lastKnownValue;
+				if (group === 'CASH') totalsAscending[dateIndex].cash += value;
+				else if (group === 'DEBT') totalsAscending[dateIndex].debt += value;
+				else if (group === 'INVESTMENT') totalsAscending[dateIndex].investment += value;
+				else totalsAscending[dateIndex].other += value;
+				totalsAscending[dateIndex].net += value;
 			}
 		}
 		for (const [assetId, balances] of assetBalancesByAssetId) {
@@ -146,7 +156,12 @@
 				const datePoint = ascendingDates[dateIndex];
 				while (pointer + 1 < balances.length && new Date(balances[pointer + 1].asOf) <= datePoint)
 					pointer++;
-				const value = pointer >= 0 ? (balances[pointer].marketValue ?? 0) : 0;
+				const value =
+					meta.sold && datePoint >= new Date(meta.sold)
+						? 0
+						: pointer >= 0
+							? (balances[pointer].marketValue ?? 0)
+							: 0;
 				const group = meta.balanceGroup as BalanceGroup;
 				if (group === 'CASH') totalsAscending[dateIndex].cash += value;
 				else if (group === 'DEBT') totalsAscending[dateIndex].debt += value;

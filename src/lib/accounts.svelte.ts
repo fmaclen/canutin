@@ -27,9 +27,9 @@ export type AccountWithBalance = AccountsResponse & {
 	isShared: boolean;
 };
 
-type HoldingsSource = {
-	holdingsValueByAccount: ReadonlyMap<string, number>;
-	holdingsLoaded: boolean;
+type PositionsSource = {
+	positionsValueByAccount: ReadonlyMap<string, number>;
+	positionsLoaded: boolean;
 };
 
 const DEBOUNCE_MS = 200;
@@ -40,7 +40,7 @@ class AccountsContext {
 			this.toAccountWithBalance(
 				record,
 				cashBalance,
-				this.holdingsSource?.holdingsValueByAccount.get(record.id) ?? 0,
+				this.positionsSource?.positionsValueByAccount.get(record.id) ?? 0,
 				balanceAsOf
 			)
 		)
@@ -51,7 +51,7 @@ class AccountsContext {
 
 	private rawAccounts: { record: AccountsResponse; cashBalance: number; balanceAsOf: string }[] =
 		$state([]);
-	private holdingsSource: HoldingsSource | null = $state(null);
+	private positionsSource: PositionsSource | null = $state(null);
 	private accountsLoaded = false;
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
@@ -73,14 +73,14 @@ class AccountsContext {
 		return this._auth.currentUserId;
 	}
 
-	connectHoldings(source: HoldingsSource) {
-		this.holdingsSource = source;
+	connectPositions(source: PositionsSource) {
+		this.positionsSource = source;
 	}
 
 	notifyBalancesChanged() {
 		if (
 			this.lastBalanceEvent === 0 &&
-			!(this.accountsLoaded && this.holdingsSource?.holdingsLoaded)
+			!(this.accountsLoaded && this.positionsSource?.positionsLoaded)
 		) {
 			return;
 		}
@@ -140,6 +140,8 @@ class AccountsContext {
 			const userId = this.currentUserId;
 			if (!userId) {
 				this.refreshSequence++;
+				if (this.refreshTimer) clearTimeout(this.refreshTimer);
+				this.refreshTimer = null;
 				this.rawAccounts = [];
 				this.shares = [];
 				this.accountsLoaded = false;
@@ -155,29 +157,33 @@ class AccountsContext {
 	}
 
 	private async refreshForCurrentUser() {
+		const userId = this.currentUserId;
+		const token = ++this.refreshSequence;
 		try {
-			await this.refreshShares();
-			await this.refreshAccounts();
+			await this.refreshShares(userId, token);
+			await this.refreshAccounts(userId, token);
 			this.notifyBalancesChanged();
 		} catch (error) {
+			if (userId !== this.currentUserId || token !== this.refreshSequence) return;
 			this._pb.handleConnectionError(error, 'accounts', 'init');
 		} finally {
-			this.isLoading = false;
+			if (userId === this.currentUserId && token === this.refreshSequence) this.isLoading = false;
 		}
 	}
 
-	private async refreshShares() {
-		const userId = this.currentUserId;
-		this.shares = await this._pb.authedClient.collection('accountShares').getFullList({
+	private async refreshShares(userId = this.currentUserId, token = this.refreshSequence) {
+		if (!userId || userId !== this.currentUserId || token !== this.refreshSequence) return;
+		const shares = await this._pb.authedClient.collection('accountShares').getFullList({
 			filter: `grantedBy='${userId}' || recipient='${userId}'`,
 			sort: 'recipientEmail',
 			requestKey: null
 		});
+		if (userId !== this.currentUserId || token !== this.refreshSequence) return;
+		this.shares = shares;
 	}
 
-	private async refreshAccounts() {
-		const token = ++this.refreshSequence;
-		const userId = this.currentUserId;
+	private async refreshAccounts(userId = this.currentUserId, token = this.refreshSequence) {
+		if (!userId || userId !== this.currentUserId || token !== this.refreshSequence) return;
 		const [accounts, accountBalances] = await Promise.all([
 			this._pb.authedClient.collection('accounts').getFullList<AccountsResponse>({
 				filter: `owner='${userId}' || accountShares_via_account.recipient ?= '${userId}'`,
@@ -191,7 +197,7 @@ class AccountsContext {
 		for (const account of accounts) {
 			await this.balanceTypesContext.ensureLoaded(account.balanceType);
 		}
-		if (token !== this.refreshSequence) return;
+		if (userId !== this.currentUserId || token !== this.refreshSequence) return;
 
 		const latestCashByAccount = new SvelteMap<string, AccountBalancesResponse>();
 		for (const balance of accountBalances) {
@@ -229,10 +235,14 @@ class AccountsContext {
 	}
 
 	private onAccountShareEvent(e: RecordSubscription<AccountSharesResponse>) {
+		const userId = this.currentUserId;
+		if (!userId) return;
+		const isRelevantShare = e.record.grantedBy === userId || e.record.recipient === userId;
 		if (e.action === 'create') {
-			this.shares = [...this.shares, e.record];
+			if (isRelevantShare) this.shares = [...this.shares, e.record];
 		} else if (e.action === 'update') {
-			this.shares = this.shares.map((share) => (share.id === e.record.id ? e.record : share));
+			if (isRelevantShare)
+				this.shares = this.shares.map((share) => (share.id === e.record.id ? e.record : share));
 		} else if (e.action === 'delete') {
 			this.shares = this.shares.filter((share) => share.id !== e.record.id);
 		}
@@ -242,12 +252,17 @@ class AccountsContext {
 
 	private scheduleRefresh() {
 		if (this.refreshTimer) clearTimeout(this.refreshTimer);
+		const userId = this.currentUserId;
+		if (!userId) return;
+		const token = ++this.refreshSequence;
 		this.refreshTimer = setTimeout(async () => {
 			this.refreshTimer = null;
 			try {
-				await this.refreshAccounts();
+				await this.refreshShares(userId, token);
+				await this.refreshAccounts(userId, token);
 				this.notifyBalancesChanged();
 			} catch (error) {
+				if (userId !== this.currentUserId || token !== this.refreshSequence) return;
 				this._pb.handleConnectionError(error, 'accounts', 'refresh');
 			}
 		}, DEBOUNCE_MS);

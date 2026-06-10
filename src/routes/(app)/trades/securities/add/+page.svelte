@@ -38,13 +38,8 @@
 	const eligibleAccounts = $derived(
 		accountsContext.accounts.filter((account) => !account.closed && account.canWrite)
 	);
-	const sortedSecurities = $derived(
-		[...securitiesContext.securities].sort((a, b) =>
-			a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
-		)
-	);
 	const selectedSecurity = $derived(
-		sortedSecurities.find((security) => security.id === securityId) ?? null
+		securitiesContext.securities.find((security) => security.id === securityId) ?? null
 	);
 	const isNewSecurity = $derived(securityId === newSecurityValue);
 
@@ -56,7 +51,7 @@
 			return;
 		}
 		if (!balanceFormData.accountId) {
-			toast.error(m.securities_account_required());
+			toast.error(m.account_required());
 			return;
 		}
 		const securityName = name.trim();
@@ -88,7 +83,7 @@
 			toast.success(m.securities_add_success());
 			await goto(resolve('/trades/securities'));
 		} catch (error) {
-			console.error('[securities:create_security]', error);
+			console.error('[securitiesAdd]', error);
 			toast.error(m.securities_add_failed());
 		} finally {
 			isSaving = false;
@@ -108,7 +103,7 @@
 				<Breadcrumb.Separator />
 				<Breadcrumb.Item>
 					<Breadcrumb.Link href={resolve('/trades/securities')}
-						>{m.sidebar_securities()}</Breadcrumb.Link
+						>{m.securities_title()}</Breadcrumb.Link
 					>
 				</Breadcrumb.Item>
 				<Breadcrumb.Separator />
@@ -153,10 +148,10 @@
 										>{m.securities_select_add_option()}</Select.Item
 									>
 								</Select.Group>
-								{#if sortedSecurities.length > 0}
+								{#if securitiesContext.securities.length > 0}
 									<Select.Group>
 										<Select.Label>{m.securities_select_group_existing()}</Select.Label>
-										{#each sortedSecurities as security (security.id)}
+										{#each securitiesContext.securities as security (security.id)}
 											<Select.Item value={security.id}>{security.name}</Select.Item>
 										{/each}
 									</Select.Group>

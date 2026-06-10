@@ -1,11 +1,10 @@
 import { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 import { SvelteURLSearchParams } from 'svelte/reactivity';
-import { get } from 'svelte/store';
 
 import { browser } from '$app/environment';
 import { replaceState } from '$app/navigation';
-import { page } from '$app/stores';
+import { page } from '$app/state';
 
 import { getAccountsContext } from './accounts.svelte';
 import { getAuthContext } from './auth.svelte';
@@ -37,9 +36,7 @@ export type SecurityTransactionTypeFilter = 'all' | SecurityTransactionsTypeOpti
 export type SecurityTransactionRow = {
 	id: string;
 	date: Date;
-	dateIso: string;
 	dateValue: number;
-	securityId: string | null;
 	securityName: string;
 	securitySymbol: string | null;
 	type: SecurityTransactionsTypeOptions;
@@ -70,8 +67,10 @@ class SecurityTransactionsContext {
 	private _refreshTimer: ReturnType<typeof setTimeout> | null = null;
 	private _activeUserId = '';
 	private _isSubscribed = false;
+	private _refreshSequence = 0;
 
 	private static readonly LOADING_DELAY_MS = 150;
+	private static readonly REFRESH_DEBOUNCE_MS = 200;
 
 	readonly typeOptions = Object.values(SecurityTransactionsTypeOptions);
 
@@ -98,8 +97,7 @@ class SecurityTransactionsContext {
 
 		const accountParam = params.get('account');
 		if (accountParam) {
-			const accounts = this.securityAccounts;
-			if (accounts.some((account) => account.id === accountParam)) {
+			if (this._accountsContext.accounts.some((account) => account.id === accountParam)) {
 				this.accountFilter = accountParam;
 			}
 		}
@@ -118,10 +116,6 @@ class SecurityTransactionsContext {
 		}
 
 		if (shouldRefresh) this.refreshTransactions();
-	}
-
-	get securityAccounts() {
-		return this._accountsContext.accounts;
 	}
 
 	setSearch(query: string) {
@@ -147,12 +141,14 @@ class SecurityTransactionsContext {
 		this.refreshTransactions();
 	}
 
-	async refreshTransactions() {
-		if (!this._activeUserId) {
+	async refreshTransactions(userId = this._activeUserId) {
+		if (userId && userId !== this._activeUserId) return;
+		if (!userId) {
 			this.rawTransactions = [];
 			this.isLoading = false;
 			return;
 		}
+		const refreshId = ++this._refreshSequence;
 
 		if (this._loadingDelayTimer) {
 			clearTimeout(this._loadingDelayTimer);
@@ -160,6 +156,7 @@ class SecurityTransactionsContext {
 		}
 
 		this._loadingDelayTimer = setTimeout(() => {
+			if (userId !== this._activeUserId || refreshId !== this._refreshSequence) return;
 			this.isLoading = true;
 		}, SecurityTransactionsContext.LOADING_DELAY_MS);
 
@@ -176,7 +173,7 @@ class SecurityTransactionsContext {
 			}
 
 			const filter = filterParts.length > 0 ? filterParts.join(' && ') : undefined;
-			this.rawTransactions = await this._pb.authedClient
+			const transactions = await this._pb.authedClient
 				.collection('securityTransactions')
 				.getFullList<SecurityTransaction>({
 					sort: '-date,-created,-id',
@@ -185,14 +182,18 @@ class SecurityTransactionsContext {
 					filter,
 					requestKey: null
 				});
+			if (userId !== this._activeUserId || refreshId !== this._refreshSequence) return;
+			this.rawTransactions = transactions;
 		} catch (error) {
+			if (userId !== this._activeUserId || refreshId !== this._refreshSequence) return;
 			this._pb.handleConnectionError(error, 'securityTransactions', 'refresh');
 		} finally {
 			if (this._loadingDelayTimer) {
 				clearTimeout(this._loadingDelayTimer);
 				this._loadingDelayTimer = null;
 			}
-			this.isLoading = false;
+			if (userId === this._activeUserId && refreshId === this._refreshSequence)
+				this.isLoading = false;
 		}
 	}
 
@@ -200,10 +201,19 @@ class SecurityTransactionsContext {
 		$effect(() => {
 			const userId = this._auth.currentUserId;
 			if (userId === this._activeUserId) return;
+			this.unsubscribeRealtime();
+			this._refreshSequence++;
+			if (this._refreshTimer) {
+				clearTimeout(this._refreshTimer);
+				this._refreshTimer = null;
+			}
+			if (this._loadingDelayTimer) {
+				clearTimeout(this._loadingDelayTimer);
+				this._loadingDelayTimer = null;
+			}
 			this._activeUserId = userId;
 
 			if (!userId) {
-				this.unsubscribeRealtime();
 				this.rawTransactions = [];
 				this.isLoading = false;
 				return;
@@ -212,22 +222,24 @@ class SecurityTransactionsContext {
 			this.isLoading = true;
 			queueMicrotask(() => {
 				if (userId !== this._activeUserId) return;
-				this.realtimeSubscribe();
+				this.realtimeSubscribe(userId);
 				this.syncFromUrl(false);
-				void this.refreshTransactions();
+				void this.refreshTransactions(userId);
 			});
 		});
 	}
 
-	private realtimeSubscribe() {
-		if (this._isSubscribed || !this._activeUserId) return;
+	private realtimeSubscribe(userId = this._activeUserId) {
+		if (this._isSubscribed || !userId || userId !== this._activeUserId) return;
 
 		this._pb.authedClient
 			.collection('securityTransactions')
-			.subscribe('*', this.onTransactionEvent.bind(this))
+			.subscribe<SecurityTransaction>('*', (event) => this.onTransactionEvent(event, userId))
 			.catch((error) => {
-				if (this._activeUserId) {
+				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'securityTransactions', 'subscribe_transactions');
+				} else {
+					console.error('[securityTransactionsStore] Stale subscription failed:', error);
 				}
 			});
 		this._isSubscribed = true;
@@ -239,17 +251,18 @@ class SecurityTransactionsContext {
 		this._pb.authedClient.collection('securityTransactions').unsubscribe('*');
 	}
 
-	private onTransactionEvent(event: RecordSubscription<SecurityTransaction>) {
-		if (!this._activeUserId) return;
+	private onTransactionEvent(event: RecordSubscription<SecurityTransaction>, userId: string) {
+		if (!userId || userId !== this._activeUserId) return;
 
 		if (!event.action) return;
 		if (this._refreshTimer) clearTimeout(this._refreshTimer);
 		this._refreshTimer = setTimeout(() => {
 			this._refreshTimer = null;
-			this.refreshTransactions().catch((error) =>
+			if (userId !== this._activeUserId) return;
+			this.refreshTransactions(userId).catch((error) =>
 				this._pb.handleConnectionError(error, 'securityTransactions', 'realtime_refresh')
 			);
-		}, 200);
+		}, SecurityTransactionsContext.REFRESH_DEBOUNCE_MS);
 	}
 
 	private get currentUrl() {
@@ -257,7 +270,7 @@ class SecurityTransactionsContext {
 			return new URL(window.location.href);
 		}
 
-		return get(page).url;
+		return page.url;
 	}
 
 	private syncFiltersToUrl() {
@@ -306,9 +319,7 @@ class SecurityTransactionsContext {
 			return {
 				id: transaction.id,
 				date,
-				dateIso: transaction.date,
 				dateValue,
-				securityId: transaction.security || null,
 				securityName: expandedSecurity?.name ?? '',
 				securitySymbol: expandedSecurity?.symbol || null,
 				type: transaction.type,

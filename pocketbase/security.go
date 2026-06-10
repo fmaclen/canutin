@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/http"
 	"strings"
 
 	"github.com/pocketbase/pocketbase/apis"
@@ -14,24 +15,24 @@ import (
 )
 
 type createSecurityWithInitialBalanceBody struct {
-	Security createSecurityBody  `json:"security" form:"security"`
-	Balance  securityBalanceBody `json:"balance" form:"balance"`
+	Security createSecurityBody  `json:"security"`
+	Balance  securityBalanceBody `json:"balance"`
 }
 
 type createSecurityBody struct {
-	Name   string `json:"name" form:"name"`
-	Symbol string `json:"symbol" form:"symbol"`
-	Owner  string `json:"owner" form:"owner"`
+	Name   string `json:"name"`
+	Symbol string `json:"symbol"`
+	Owner  string `json:"owner"`
 }
 
 type securityBalanceBody struct {
-	Account   string   `json:"account" form:"account"`
-	Owner     string   `json:"owner" form:"owner"`
-	AsOf      string   `json:"asOf" form:"asOf"`
-	Quantity  *float64 `json:"quantity" form:"quantity"`
-	Price     *float64 `json:"price" form:"price"`
-	Value     *float64 `json:"value" form:"value"`
-	CostBasis *float64 `json:"costBasis" form:"costBasis"`
+	Account   string   `json:"account"`
+	Owner     string   `json:"owner"`
+	AsOf      string   `json:"asOf"`
+	Quantity  *float64 `json:"quantity"`
+	Price     *float64 `json:"price"`
+	Value     *float64 `json:"value"`
+	CostBasis *float64 `json:"costBasis"`
 }
 
 func createSecurityWithInitialBalanceHandler(app core.App) func(*core.RequestEvent) error {
@@ -91,7 +92,7 @@ func createSecurityWithInitialBalanceHandler(app core.App) func(*core.RequestEve
 			return re.BadRequestError("Failed to create security", err)
 		}
 
-		return re.JSON(200, security)
+		return re.JSON(http.StatusOK, security)
 	}
 }
 
@@ -99,7 +100,7 @@ func normalizeSecurityName(name string) string {
 	return strings.TrimSpace(spaceRe.ReplaceAllString(name, " "))
 }
 
-func normalizedSecurityName(name string) string {
+func securityNameKey(name string) string {
 	return strings.ToLower(normalizeSecurityName(name))
 }
 
@@ -113,7 +114,7 @@ func normalizeSecurityRecord(record *core.Record) {
 
 	record.Set("name", name)
 	record.Set("symbol", symbol)
-	record.Set("normalizedName", normalizedSecurityName(name))
+	record.Set("normalizedName", securityNameKey(name))
 }
 
 func normalizeSecurityDatedRecord(record *core.Record, field string) {
@@ -149,11 +150,8 @@ func validateSecurityRecordIntegrity(app core.App, record *core.Record) error {
 	}
 
 	security, err := app.FindRecordById("securities", securityID)
-	if err != nil {
-		return apis.NewBadRequestError("Security not found", nil)
-	}
-	if security.GetString("owner") != ownerID {
-		return apis.NewForbiddenError("Security owner must match record owner", nil)
+	if err != nil || security.GetString("owner") != ownerID {
+		return apis.NewNotFoundError("Security not found", nil)
 	}
 
 	return nil
@@ -164,7 +162,7 @@ func validateSecurityRecordIntegrity(app core.App, record *core.Record) error {
 // history, are not rejected.
 func validateAccountOpen(app core.App, accountID string, auth *core.Record) error {
 	account, err := app.FindRecordById("accounts", accountID)
-	if err != nil || auth == nil || (account.GetString("owner") != auth.Id && !auth.IsSuperuser()) {
+	if err != nil || auth == nil || account.GetString("owner") != auth.Id {
 		return apis.NewNotFoundError("Account not found", nil)
 	}
 	if account.GetString("closed") != "" {

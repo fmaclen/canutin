@@ -14,15 +14,16 @@
 		AssetBalancesResponse,
 		AssetsResponse
 	} from '$lib/pocketbase.schema';
-	import { toNumber } from '$lib/utils';
 
 	import {
+		advanceTrendSecurityValue,
 		buildPreparedMaps,
 		computeRangeForPeriod,
 		latestIndexBeforeOrEqual,
 		type BalanceGroup,
 		type PeriodKey,
-		type TrendSecurityBalance
+		type TrendSecurityBalance,
+		type TrendSecurityValueState
 	} from './trends';
 
 	let {
@@ -137,8 +138,7 @@
 		const accountIndexPointer = new SvelteMap<string, number>();
 		for (const [accountId, balances] of accountBalancesByAccountId)
 			accountIndexPointer.set(accountId, latestIndexBeforeOrEqual(balances, datePoints[0], -1));
-		const securityIndexPointer = new SvelteMap<string, number>();
-		const securityLastKnownValue = new SvelteMap<string, number>();
+		const securityValueState = new SvelteMap<string, TrendSecurityValueState>();
 		const assetIndexPointer = new SvelteMap<string, number>();
 		for (const [assetId, balances] of assetBalancesByAssetId)
 			assetIndexPointer.set(assetId, latestIndexBeforeOrEqual(balances, datePoints[0], -1));
@@ -156,7 +156,12 @@
 				const previousIndex = accountIndexPointer.get(accountId) ?? -1;
 				const index = latestIndexBeforeOrEqual(balances, datePoint, previousIndex);
 				accountIndexPointer.set(accountId, index);
-				const value = index >= 0 ? (balances[index].value ?? 0) : 0;
+				const value =
+					meta.closed && datePoint >= new Date(meta.closed)
+						? 0
+						: index >= 0
+							? (balances[index].value ?? 0)
+							: 0;
 				const group = meta.balanceGroup as BalanceGroup;
 				if (group === 'CASH') cash += value;
 				else if (group === 'DEBT') debt += value;
@@ -168,15 +173,15 @@
 				const accountId = balances[0]?.account;
 				const meta = accountId ? accountById.get(accountId) : null;
 				if (!meta) continue;
-				const previousIndex = securityIndexPointer.get(key) ?? -1;
-				const index = latestIndexBeforeOrEqual(balances, datePoint, previousIndex);
-				securityIndexPointer.set(key, index);
-				for (let i = previousIndex + 1; i <= index; i++) {
-					const known = toNumber(balances[i].value);
-					if (known !== null) securityLastKnownValue.set(key, known);
-				}
-				const value = securityLastKnownValue.get(key);
-				if (value === undefined) continue;
+				if (meta.closed && datePoint >= new Date(meta.closed)) continue;
+				const state = securityValueState.get(key) ?? {
+					index: -1,
+					lastKnownValue: null,
+					soldOut: false
+				};
+				securityValueState.set(key, state);
+				const value = advanceTrendSecurityValue(balances, datePoint, state);
+				if (value === null) continue;
 				const group = meta.balanceGroup as BalanceGroup;
 				if (group === 'CASH') cash += value;
 				else if (group === 'DEBT') debt += value;
@@ -190,7 +195,12 @@
 				const previousIndex = assetIndexPointer.get(assetId) ?? -1;
 				const index = latestIndexBeforeOrEqual(balances, datePoint, previousIndex);
 				assetIndexPointer.set(assetId, index);
-				const value = index >= 0 ? (balances[index].marketValue ?? 0) : 0;
+				const value =
+					meta.sold && datePoint >= new Date(meta.sold)
+						? 0
+						: index >= 0
+							? (balances[index].marketValue ?? 0)
+							: 0;
 				const group = meta.balanceGroup as BalanceGroup;
 				if (group === 'CASH') cash += value;
 				else if (group === 'DEBT') debt += value;

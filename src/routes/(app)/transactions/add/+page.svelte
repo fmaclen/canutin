@@ -42,7 +42,7 @@
 		const currentOwnerId = ownerId;
 		if (!currentOwnerId) return;
 		if (!accountId) {
-			toast.error(m.securities_account_required());
+			toast.error(m.account_required());
 			return;
 		}
 

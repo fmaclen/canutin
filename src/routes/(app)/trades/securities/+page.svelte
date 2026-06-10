@@ -14,11 +14,6 @@
 	import { getSecuritiesContext } from '$lib/securities.svelte';
 
 	const securitiesContext = getSecuritiesContext();
-	const rows = $derived(
-		securitiesContext.securities.toSorted((a, b) =>
-			a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
-		)
-	);
 </script>
 
 <header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
@@ -32,7 +27,7 @@
 				</Breadcrumb.Item>
 				<Breadcrumb.Separator />
 				<Breadcrumb.Item>
-					<Breadcrumb.Page>{m.sidebar_securities()}</Breadcrumb.Page>
+					<Breadcrumb.Page>{m.securities_title()}</Breadcrumb.Page>
 				</Breadcrumb.Item>
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
@@ -43,14 +38,14 @@
 	</nav>
 </header>
 
-<Page pageTitle={m.sidebar_securities()}>
+<Page pageTitle={m.securities_title()}>
 	<Section>
-		<SectionTitle title={m.sidebar_securities()} />
+		<SectionTitle title={m.securities_title()} />
 		{#if securitiesContext.isLoading}
 			<div class="bg-background overflow-hidden rounded-sm shadow-md">
 				<Skeleton class="h-64" />
 			</div>
-		{:else if rows.length === 0}
+		{:else if securitiesContext.securities.length === 0}
 			<Empty>{m.securities_empty()}</Empty>
 		{:else}
 			<div class="bg-background overflow-hidden rounded-sm shadow-md">
@@ -66,7 +61,7 @@
 						</Table.Row>
 					</Table.Header>
 					<Table.Body>
-						{#each rows as row (row.id)}
+						{#each securitiesContext.securities as row (row.id)}
 							<Table.Row>
 								<Table.Cell>
 									<Link

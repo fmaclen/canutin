@@ -3,7 +3,7 @@
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
@@ -95,7 +95,7 @@
 
 	const defaultSort: SortState<AccountSortColumn> = { column: 'balance', direction: 'desc' };
 	const sortState = $derived.by(() => {
-		const urlSort = getSortFromUrl($page.url);
+		const urlSort = getSortFromUrl(page.url);
 		if (
 			urlSort.column &&
 			urlSort.direction &&
@@ -108,7 +108,7 @@
 
 	function handleSort(column: string) {
 		const newState = toggleSort(sortState, column as AccountSortColumn);
-		const newUrl = setSortInUrl($page.url, newState);
+		const newUrl = setSortInUrl(page.url, newState);
 		// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic URL computed at runtime
 		goto(newUrl, { replaceState: true, keepFocus: true });
 	}
@@ -236,7 +236,7 @@
 	</nav>
 </header>
 
-<Page pageTitle="Accounts">
+<Page pageTitle={m.sidebar_accounts()}>
 	<Section>
 		{#if !isLoaded}
 			<div class="bg-background overflow-hidden rounded-sm shadow-md">

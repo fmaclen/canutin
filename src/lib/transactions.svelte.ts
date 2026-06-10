@@ -2,11 +2,10 @@ import { UTCDate } from '@date-fns/utc';
 import type { RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 import { SvelteMap, SvelteSet, SvelteURLSearchParams } from 'svelte/reactivity';
-import { get } from 'svelte/store';
 
 import { browser } from '$app/environment';
 import { replaceState } from '$app/navigation';
-import { page } from '$app/stores';
+import { page } from '$app/state';
 
 import { getAccountsContext } from './accounts.svelte';
 import { getAuthContext } from './auth.svelte';
@@ -78,6 +77,7 @@ class TransactionsContext {
 	private _loadingDelayTimer: ReturnType<typeof setTimeout> | null = null;
 	private _activeUserId = '';
 	private _isSubscribed = false;
+	private _refreshSequence = 0;
 
 	private static readonly LOADING_DELAY_MS = 150;
 	private static readonly SEARCH_DEBOUNCE_MS = 300;
@@ -214,7 +214,7 @@ class TransactionsContext {
 			return new URL(window.location.href);
 		}
 
-		return get(page).url;
+		return page.url;
 	}
 
 	private syncFiltersToParams(params: SvelteURLSearchParams) {
@@ -239,10 +239,15 @@ class TransactionsContext {
 		$effect(() => {
 			const userId = this._auth.currentUserId;
 			if (userId === this._activeUserId) return;
+			this.unsubscribeRealtime();
+			this._refreshSequence++;
+			if (this._loadingDelayTimer) {
+				clearTimeout(this._loadingDelayTimer);
+				this._loadingDelayTimer = null;
+			}
 			this._activeUserId = userId;
 
 			if (!userId) {
-				this.unsubscribeRealtime();
 				this.rawTransactions = [];
 				this.transactionLabels = [];
 				this.isLoading = false;
@@ -257,25 +262,28 @@ class TransactionsContext {
 	}
 
 	private async refreshForCurrentUser(userId: string) {
-		this.realtimeSubscribe();
-		this.realtimeSubscribeLabels();
+		this.realtimeSubscribe(userId);
+		this.realtimeSubscribeLabels(userId);
 		this.syncFromUrl(false);
-		await this.refreshLabels();
+		await this.refreshLabels(userId);
 		if (userId !== this._activeUserId) return;
-		await this.refreshTransactions();
+		await this.refreshTransactions(userId);
 	}
 
-	private async refreshLabels() {
-		if (!this._activeUserId) return;
+	private async refreshLabels(userId = this._activeUserId) {
+		if (!userId || userId !== this._activeUserId) return;
 
 		try {
-			this.transactionLabels = await this._pb.authedClient
+			const labels = await this._pb.authedClient
 				.collection('transactionLabels')
 				.getFullList<TransactionLabelsResponse>({
 					sort: 'name',
 					requestKey: null
 				});
+			if (userId !== this._activeUserId) return;
+			this.transactionLabels = labels;
 		} catch (error) {
+			if (userId !== this._activeUserId) return;
 			this._pb.handleConnectionError(error, 'transactionLabels', 'refresh');
 		}
 	}
@@ -306,12 +314,14 @@ class TransactionsContext {
 		this.updateUrl(params);
 	}
 
-	async refreshTransactions() {
-		if (!this._activeUserId) {
+	async refreshTransactions(userId = this._activeUserId) {
+		if (userId && userId !== this._activeUserId) return;
+		if (!userId) {
 			this.rawTransactions = [];
 			this.isLoading = false;
 			return;
 		}
+		const refreshId = ++this._refreshSequence;
 
 		if (this._loadingDelayTimer) {
 			clearTimeout(this._loadingDelayTimer);
@@ -319,6 +329,7 @@ class TransactionsContext {
 		}
 
 		this._loadingDelayTimer = setTimeout(() => {
+			if (userId !== this._activeUserId || refreshId !== this._refreshSequence) return;
 			this.isLoading = true;
 		}, TransactionsContext.LOADING_DELAY_MS);
 
@@ -368,41 +379,50 @@ class TransactionsContext {
 					filter,
 					requestKey: null
 				});
+			if (userId !== this._activeUserId || refreshId !== this._refreshSequence) return;
 			this.rawTransactions = list;
 		} catch (error) {
+			if (userId !== this._activeUserId || refreshId !== this._refreshSequence) return;
 			this._pb.handleConnectionError(error, 'transactions', 'refresh');
 		} finally {
 			if (this._loadingDelayTimer) {
 				clearTimeout(this._loadingDelayTimer);
 				this._loadingDelayTimer = null;
 			}
-			this.isLoading = false;
+			if (userId === this._activeUserId && refreshId === this._refreshSequence)
+				this.isLoading = false;
 		}
 	}
 
-	private realtimeSubscribe() {
-		if (this._isSubscribed || !this._activeUserId) return;
+	private realtimeSubscribe(userId = this._activeUserId) {
+		if (this._isSubscribed || !userId || userId !== this._activeUserId) return;
 
 		this._pb.authedClient
 			.collection('transactions')
-			.subscribe('*', this.onTransactionEvent.bind(this))
+			.subscribe<TransactionsResponse<TransactionExpand>>('*', (event) =>
+				this.onTransactionEvent(event, userId)
+			)
 			.catch((error) => {
-				if (this._activeUserId) {
+				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'transactions', 'subscribe_transactions');
+				} else {
+					console.error('[transactionsStore] Stale transaction subscription failed:', error);
 				}
 			});
 		this._isSubscribed = true;
 	}
 
-	private realtimeSubscribeLabels() {
-		if (!this._activeUserId) return;
+	private realtimeSubscribeLabels(userId = this._activeUserId) {
+		if (!userId || userId !== this._activeUserId) return;
 
 		this._pb.authedClient
 			.collection('transactionLabels')
-			.subscribe('*', () => this.refreshLabels())
+			.subscribe('*', () => this.refreshLabels(userId))
 			.catch((error) => {
-				if (this._activeUserId) {
+				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'transactionLabels', 'subscribe_labels');
+				} else {
+					console.error('[transactionsStore] Stale label subscription failed:', error);
 				}
 			});
 	}
@@ -414,8 +434,11 @@ class TransactionsContext {
 		this._pb.authedClient.collection('transactionLabels').unsubscribe('*');
 	}
 
-	private async onTransactionEvent(e: RecordSubscription<TransactionsResponse<TransactionExpand>>) {
-		if (!this._activeUserId) return;
+	private async onTransactionEvent(
+		e: RecordSubscription<TransactionsResponse<TransactionExpand>>,
+		userId: string
+	) {
+		if (!userId || userId !== this._activeUserId) return;
 
 		if (e.action === 'create') {
 			const txn = await this._pb.authedClient
@@ -423,6 +446,7 @@ class TransactionsContext {
 				.getOne<TransactionsResponse<TransactionExpand>>(e.record.id, {
 					expand: 'account,labels'
 				});
+			if (userId !== this._activeUserId) return;
 			this.rawTransactions = [...this.rawTransactions, txn];
 		} else if (e.action === 'update') {
 			const txn = await this._pb.authedClient
@@ -430,6 +454,7 @@ class TransactionsContext {
 				.getOne<TransactionsResponse<TransactionExpand>>(e.record.id, {
 					expand: 'account,labels'
 				});
+			if (userId !== this._activeUserId) return;
 			this.rawTransactions = this.rawTransactions.map((x) => (x.id === e.record.id ? txn : x));
 		} else if (e.action === 'delete') {
 			this.rawTransactions = this.rawTransactions.filter((x) => x.id !== e.record.id);

@@ -24,6 +24,7 @@
 	import { SecurityTransactionsTypeOptions } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
+	import { securityTransactionTypeLabel } from '$lib/security-transaction-display';
 	import { toNumber } from '$lib/utils';
 
 	const pb = getPocketBaseContext();
@@ -52,28 +53,11 @@
 		securityId ? securitiesContext.securities.find((security) => security.id === securityId) : null
 	);
 
-	function typeLabel(option: SecurityTransactionsTypeOptions) {
-		switch (option) {
-			case SecurityTransactionsTypeOptions.buy:
-				return m.trades_type_buy();
-			case SecurityTransactionsTypeOptions.sell:
-				return m.trades_type_sell();
-			case SecurityTransactionsTypeOptions.cancel:
-				return m.trades_type_cancel();
-			case SecurityTransactionsTypeOptions.cash:
-				return m.trades_type_cash();
-			case SecurityTransactionsTypeOptions.fee:
-				return m.trades_type_fee();
-			case SecurityTransactionsTypeOptions.transfer:
-				return m.trades_type_transfer();
-		}
-	}
-
 	async function handleSubmit() {
 		const currentOwnerId = ownerId;
 		if (!currentOwnerId || isSaving) return;
 		if (!accountId) {
-			toast.error(m.securities_account_required());
+			toast.error(m.account_required());
 			return;
 		}
 		if (!selectedSecurity) {
@@ -101,7 +85,7 @@
 			toast.success(m.trades_add_success());
 			await goto(resolve('/trades'));
 		} catch (error) {
-			console.error('[securityTransactions:create]', error);
+			console.error('[tradesAdd]', error);
 			toast.error(m.trades_add_failed());
 		} finally {
 			isSaving = false;
@@ -200,11 +184,11 @@
 						</Label>
 						<Select.Root type="single" bind:value={type} disabled={isSaving}>
 							<Select.Trigger id="type" class="bg-background w-full">
-								{typeLabel(type)}
+								{securityTransactionTypeLabel(type)}
 							</Select.Trigger>
 							<Select.Content>
 								{#each typeOptions as option (option)}
-									<Select.Item value={option}>{typeLabel(option)}</Select.Item>
+									<Select.Item value={option}>{securityTransactionTypeLabel(option)}</Select.Item>
 								{/each}
 							</Select.Content>
 						</Select.Root>

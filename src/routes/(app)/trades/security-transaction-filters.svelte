@@ -9,6 +9,7 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
+	import { securityTransactionTypeLabel } from '$lib/security-transaction-display';
 	import {
 		getSecurityTransactionsContext,
 		type SecurityTransactionTypeFilter
@@ -18,7 +19,6 @@
 	const accountsContext = getAccountsContext();
 	const securitiesContext = getSecuritiesContext();
 
-	const securityAccounts = $derived(accountsContext.accounts);
 	const selectedAccount = $derived(
 		securityTxContext.accountFilter
 			? accountsContext.accounts.find((account) => account.id === securityTxContext.accountFilter)
@@ -35,26 +35,6 @@
 	function handleSearchInput(event: Event) {
 		const target = event.target as HTMLInputElement;
 		securityTxContext.setSearch(target.value);
-	}
-
-	function typeLabel(type: SecurityTransactionTypeFilter) {
-		switch (type) {
-			case 'buy':
-				return m.trades_type_buy();
-			case 'sell':
-				return m.trades_type_sell();
-			case 'cancel':
-				return m.trades_type_cancel();
-			case 'cash':
-				return m.trades_type_cash();
-			case 'fee':
-				return m.trades_type_fee();
-			case 'transfer':
-				return m.trades_type_transfer();
-			case 'all':
-			default:
-				return m.trades_filter_type_all();
-		}
 	}
 </script>
 
@@ -84,7 +64,7 @@
 		{/if}
 	</div>
 	<AccountPicker
-		accounts={securityAccounts}
+		accounts={accountsContext.accounts}
 		value={securityTxContext.accountFilter ?? ''}
 		{selectedAccount}
 		onValueChange={(value) => securityTxContext.setAccountFilter(value || null)}
@@ -142,12 +122,12 @@
 			securityTxContext.setTypeFilter((value || 'all') as SecurityTransactionTypeFilter)}
 	>
 		<Select.Trigger aria-label={m.trades_filter_type_label()} class="bg-background w-full sm:w-fit">
-			{typeLabel(securityTxContext.typeFilter)}
+			{securityTransactionTypeLabel(securityTxContext.typeFilter)}
 		</Select.Trigger>
 		<Select.Content>
-			<Select.Item value="all">{typeLabel('all')}</Select.Item>
+			<Select.Item value="all">{securityTransactionTypeLabel('all')}</Select.Item>
 			{#each securityTxContext.typeOptions as type (type)}
-				<Select.Item value={type}>{typeLabel(type)}</Select.Item>
+				<Select.Item value={type}>{securityTransactionTypeLabel(type)}</Select.Item>
 			{/each}
 		</Select.Content>
 	</Select.Root>
