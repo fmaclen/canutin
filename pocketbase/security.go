@@ -2,11 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"strings"
 
+	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tools/router"
 	"github.com/pocketbase/pocketbase/tools/types"
 )
 
@@ -48,6 +51,10 @@ func createSecurityWithInitialBalanceHandler(app core.App) func(*core.RequestEve
 
 		var security *core.Record
 		if err := app.RunInTransaction(func(txApp core.App) error {
+			if err := validateAccountOpen(txApp, body.Balance.Account, re.Auth); err != nil {
+				return err
+			}
+
 			securitiesCollection, err := txApp.FindCollectionByNameOrId("securities")
 			if err != nil {
 				return err
@@ -77,7 +84,11 @@ func createSecurityWithInitialBalanceHandler(app core.App) func(*core.RequestEve
 			setOptionalNumber(balance, "costBasis", body.Balance.CostBasis)
 			return txApp.Save(balance)
 		}); err != nil {
-			return re.BadRequestError("Failed to create holding", err)
+			var apiErr *router.ApiError
+			if errors.As(err, &apiErr) {
+				return apiErr
+			}
+			return re.BadRequestError("Failed to create security", err)
 		}
 
 		return re.JSON(200, security)
@@ -103,7 +114,6 @@ func normalizeSecurityRecord(record *core.Record) {
 	record.Set("name", name)
 	record.Set("symbol", symbol)
 	record.Set("normalizedName", normalizedSecurityName(name))
-	record.Set("normalizedSymbol", symbol)
 }
 
 func normalizeSecurityDatedRecord(record *core.Record, field string) {
@@ -114,7 +124,7 @@ func normalizeSecurityDatedRecord(record *core.Record, field string) {
 	record.Set(field, datePart(value)+" 00:00:00.000Z")
 }
 
-func validateSecurityAccountCapability(app core.App, record *core.Record) error {
+func validateSecurityRecordIntegrity(app core.App, record *core.Record) error {
 	switch record.Collection().Name {
 	case "securityBalances":
 		if err := validateOptionalJSONNumbers(record, "quantity", "price", "value", "costBasis"); err != nil {
@@ -132,27 +142,48 @@ func validateSecurityAccountCapability(app core.App, record *core.Record) error 
 
 	account, err := app.FindRecordById("accounts", accountID)
 	if err != nil {
-		return fmt.Errorf("account not found")
+		return apis.NewBadRequestError("Account not found", nil)
 	}
 	if account.GetString("owner") != ownerID {
-		return fmt.Errorf("account owner must match record owner")
+		return apis.NewForbiddenError("Account owner must match record owner", nil)
 	}
 
 	security, err := app.FindRecordById("securities", securityID)
 	if err != nil {
-		return fmt.Errorf("security not found")
+		return apis.NewBadRequestError("Security not found", nil)
 	}
 	if security.GetString("owner") != ownerID {
-		return fmt.Errorf("security owner must match record owner")
+		return apis.NewForbiddenError("Security owner must match record owner", nil)
 	}
 
+	return nil
+}
+
+// NOTE: bound to request-driven hooks (and the with-initial-balance endpoint) instead of
+// OnRecordValidate so that programmatic saves, like import restoring a closed account's
+// history, are not rejected.
+func validateAccountOpen(app core.App, accountID string, auth *core.Record) error {
+	account, err := app.FindRecordById("accounts", accountID)
+	if err != nil || auth == nil || (account.GetString("owner") != auth.Id && !auth.IsSuperuser()) {
+		return apis.NewNotFoundError("Account not found", nil)
+	}
+	if account.GetString("closed") != "" {
+		return apis.NewBadRequestError("Account is closed", nil)
+	}
+	return nil
+}
+
+func validateSecurityOwnerImmutable(record *core.Record) error {
+	if !record.IsNew() && record.GetString("owner") != record.Original().GetString("owner") {
+		return apis.NewForbiddenError("Owner cannot be changed", nil)
+	}
 	return nil
 }
 
 func validateOptionalJSONNumbers(record *core.Record, fields ...string) error {
 	for _, field := range fields {
 		if _, _, err := optionalJSONNumber(record, field); err != nil {
-			return fmt.Errorf("%s must be a JSON number or null", field)
+			return apis.NewBadRequestError(field+" must be a JSON number or null", nil)
 		}
 	}
 	return nil

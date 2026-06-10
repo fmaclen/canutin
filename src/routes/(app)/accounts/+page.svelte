@@ -2,6 +2,7 @@
 	import { SvelteMap } from 'svelte/reactivity';
 
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import Currency from '$lib/components/currency.svelte';
@@ -230,8 +231,8 @@
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 	</div>
-	<nav class="px-4">
-		<Link href="/accounts/add" class="text-sm">Add account</Link>
+	<nav class="flex items-center gap-4 px-4">
+		<Link href={resolve('/accounts/add')} class="text-sm">{m.accounts_add_page_title()}</Link>
 	</nav>
 </header>
 

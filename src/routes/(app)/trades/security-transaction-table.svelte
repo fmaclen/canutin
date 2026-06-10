@@ -30,20 +30,20 @@
 	function typeLabel(type: SecurityTransactionTypeFilter) {
 		switch (type) {
 			case 'buy':
-				return m.transactions_security_type_buy();
+				return m.trades_type_buy();
 			case 'sell':
-				return m.transactions_security_type_sell();
+				return m.trades_type_sell();
 			case 'cancel':
-				return m.transactions_security_type_cancel();
+				return m.trades_type_cancel();
 			case 'cash':
-				return m.transactions_security_type_cash();
+				return m.trades_type_cash();
 			case 'fee':
-				return m.transactions_security_type_fee();
+				return m.trades_type_fee();
 			case 'transfer':
-				return m.transactions_security_type_transfer();
+				return m.trades_type_transfer();
 			case 'all':
 			default:
-				return m.transactions_security_filter_type_all();
+				return m.trades_filter_type_all();
 		}
 	}
 
@@ -55,7 +55,7 @@
 
 {#if securityTxContext.filteredRows.length === 0}
 	<Empty>
-		{m.transactions_security_table_empty()}
+		{m.trades_table_empty()}
 	</Empty>
 {:else}
 	<div class="bg-background overflow-hidden rounded-sm shadow-md">
@@ -66,13 +66,13 @@
 						{m.transactions_table_header_date()}
 					</Table.Head>
 					<Table.Head class="text-left whitespace-nowrap">
-						{m.transactions_security_table_header_security()}
+						{m.trades_table_header_security()}
 					</Table.Head>
 					<Table.Head class="text-left whitespace-nowrap">
-						{m.holdings_table_header_symbol()}
+						{m.securities_table_header_symbol()}
 					</Table.Head>
 					<Table.Head class="text-left whitespace-nowrap">
-						{m.transactions_security_table_header_type()}
+						{m.trades_table_header_type()}
 					</Table.Head>
 					<Table.Head class="text-left whitespace-nowrap">
 						{m.transactions_table_header_description()}
@@ -81,16 +81,16 @@
 						{m.transactions_table_header_account()}
 					</Table.Head>
 					<Table.Head class="text-right whitespace-nowrap">
-						{m.transactions_security_table_header_quantity()}
+						{m.trades_table_header_quantity()}
 					</Table.Head>
 					<Table.Head class="text-right whitespace-nowrap">
-						{m.transactions_security_table_header_price()}
+						{m.trades_table_header_price()}
 					</Table.Head>
 					<Table.Head class="text-right whitespace-nowrap">
 						{m.transactions_table_header_amount()}
 					</Table.Head>
 					<Table.Head class="text-right whitespace-nowrap">
-						{m.transactions_security_table_header_fees()}
+						{m.trades_table_header_fees()}
 					</Table.Head>
 				</Table.Row>
 			</Table.Header>

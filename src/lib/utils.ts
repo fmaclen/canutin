@@ -5,6 +5,13 @@ export function cn(...inputs: ClassValue[]) {
 	return twMerge(clsx(inputs));
 }
 
+export function toNumber(value: unknown) {
+	if (value === null || value === undefined || value === '') return null;
+	const numberValue =
+		typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN;
+	return Number.isFinite(numberValue) ? numberValue : null;
+}
+
 // Validates a `?from=` redirect target. Returns the value only if it is a
 // same-origin relative path (starts with a single `/`, not `//` or `/\`, and
 // contains no protocol scheme before the first slash). Returns null otherwise.

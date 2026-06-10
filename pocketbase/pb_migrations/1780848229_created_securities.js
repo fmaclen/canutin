@@ -61,20 +61,6 @@ migrate((app) => {
         "type": "text"
       },
       {
-        "autogeneratePattern": "",
-        "hidden": true,
-        "id": "text3171053027",
-        "max": 0,
-        "min": 0,
-        "name": "normalizedSymbol",
-        "pattern": "",
-        "presentable": false,
-        "primaryKey": false,
-        "required": false,
-        "system": false,
-        "type": "text"
-      },
-      {
         "cascadeDelete": true,
         "collectionId": "_pb_users_auth_",
         "hidden": false,
@@ -124,7 +110,7 @@ migrate((app) => {
     "id": "pbc_1452358580",
     "indexes": [
       "CREATE UNIQUE INDEX idx_securities_owner_normalizedName ON securities (owner, normalizedName)",
-      "CREATE UNIQUE INDEX idx_securities_owner_normalizedSymbol ON securities (owner, normalizedSymbol) WHERE normalizedSymbol != ''",
+      "CREATE UNIQUE INDEX idx_securities_owner_symbol ON securities (owner, symbol) WHERE symbol != ''",
       "CREATE INDEX idx_securities_importSession ON securities (importSession, owner)"
     ],
     "listRule": "owner = @request.auth.id",

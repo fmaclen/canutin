@@ -212,7 +212,7 @@
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 	</div>
-	<nav class="px-4">
+	<nav class="flex items-center gap-4 px-4">
 		<Link href="/assets/add" class="text-sm">Add asset</Link>
 	</nav>
 </header>

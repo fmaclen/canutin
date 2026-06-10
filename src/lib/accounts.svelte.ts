@@ -1,6 +1,6 @@
 import { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
-import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+import { SvelteMap } from 'svelte/reactivity';
 
 import { getAuthContext } from './auth.svelte';
 import { setBalanceTypesContext } from './balance-types.svelte';
@@ -9,13 +9,10 @@ import {
 	AccountSharesPerspectiveOptions,
 	type AccountBalancesResponse,
 	type AccountSharesResponse,
-	type AccountsResponse,
-	type SecurityBalancesResponse
+	type AccountsResponse
 } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
 import { participantExcluded, projectSignedValue } from './sharing';
-
-type SecurityBalance = SecurityBalancesResponse<number, number, number, number>;
 
 export type AccountWithBalance = AccountsResponse & {
 	balance: number;
@@ -30,15 +27,37 @@ export type AccountWithBalance = AccountsResponse & {
 	isShared: boolean;
 };
 
+type HoldingsSource = {
+	holdingsValueByAccount: ReadonlyMap<string, number>;
+	holdingsLoaded: boolean;
+};
+
+const DEBOUNCE_MS = 200;
+
 class AccountsContext {
-	accounts: AccountWithBalance[] = $state([]);
+	accounts: AccountWithBalance[] = $derived.by(() =>
+		this.rawAccounts.map(({ record, cashBalance, balanceAsOf }) =>
+			this.toAccountWithBalance(
+				record,
+				cashBalance,
+				this.holdingsSource?.holdingsValueByAccount.get(record.id) ?? 0,
+				balanceAsOf
+			)
+		)
+	);
 	shares: AccountSharesResponse[] = $state([]);
 	lastBalanceEvent: number = $state(0);
 	isLoading: boolean = $state(true);
 
+	private rawAccounts: { record: AccountsResponse; cashBalance: number; balanceAsOf: string }[] =
+		$state([]);
+	private holdingsSource: HoldingsSource | null = $state(null);
+	private accountsLoaded = false;
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
 	private balanceTypesContext: ReturnType<typeof setBalanceTypesContext>;
+	private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+	private refreshSequence = 0;
 
 	constructor(
 		pb: PocketBaseContext,
@@ -52,6 +71,20 @@ class AccountsContext {
 
 	private get currentUserId() {
 		return this._auth.currentUserId;
+	}
+
+	connectHoldings(source: HoldingsSource) {
+		this.holdingsSource = source;
+	}
+
+	notifyBalancesChanged() {
+		if (
+			this.lastBalanceEvent === 0 &&
+			!(this.accountsLoaded && this.holdingsSource?.holdingsLoaded)
+		) {
+			return;
+		}
+		this.lastBalanceEvent = Date.now();
 	}
 
 	getTypeName(id: string) {
@@ -94,7 +127,6 @@ class AccountsContext {
 	async updateShareIncludeInNetWorth(shareId: string, includeInNetWorth: boolean) {
 		await this._pb.authedClient.collection('accountShares').update(shareId, { includeInNetWorth });
 		await this.refreshShares();
-		await this.refreshAccounts();
 	}
 
 	async revokeShare(shareId: string) {
@@ -107,12 +139,17 @@ class AccountsContext {
 		$effect(() => {
 			const userId = this.currentUserId;
 			if (!userId) {
-				this.accounts = [];
+				this.refreshSequence++;
+				this.rawAccounts = [];
 				this.shares = [];
+				this.accountsLoaded = false;
+				this.lastBalanceEvent = 0;
 				this.isLoading = false;
 				return;
 			}
 			this.isLoading = true;
+			this.accountsLoaded = false;
+			this.lastBalanceEvent = 0;
 			void this.refreshForCurrentUser();
 		});
 	}
@@ -121,7 +158,7 @@ class AccountsContext {
 		try {
 			await this.refreshShares();
 			await this.refreshAccounts();
-			this.lastBalanceEvent = Date.now();
+			this.notifyBalancesChanged();
 		} catch (error) {
 			this._pb.handleConnectionError(error, 'accounts', 'init');
 		} finally {
@@ -139,75 +176,59 @@ class AccountsContext {
 	}
 
 	private async refreshAccounts() {
+		const token = ++this.refreshSequence;
 		const userId = this.currentUserId;
-		const list = await this._pb.authedClient.collection('accounts').getFullList<AccountsResponse>({
-			filter: `owner='${userId}' || accountShares_via_account.recipient ?= '${userId}'`,
-			requestKey: null
-		});
-		const accountBalances = await Promise.all(
-			list.map((account) => this.getLatestAccountBalance(account.id))
-		);
-		const securityBalanceTotals = await this.getLatestSecurityBalanceTotals(
-			list.map((account) => account.id)
-		);
-		const next: AccountWithBalance[] = [];
-		for (const [index, account] of list.entries()) {
+		const [accounts, accountBalances] = await Promise.all([
+			this._pb.authedClient.collection('accounts').getFullList<AccountsResponse>({
+				filter: `owner='${userId}' || accountShares_via_account.recipient ?= '${userId}'`,
+				requestKey: null
+			}),
+			this._pb.authedClient.collection('accountBalances').getFullList<AccountBalancesResponse>({
+				sort: 'account,-asOf,-created,-id',
+				requestKey: null
+			})
+		]);
+		for (const account of accounts) {
 			await this.balanceTypesContext.ensureLoaded(account.balanceType);
-			const balanceData = accountBalances[index];
-			next.push(
-				this.toAccountWithBalance(
-					account,
-					balanceData.value,
-					securityBalanceTotals.get(account.id) ?? 0,
-					balanceData.asOf
-				)
-			);
 		}
-		this.accounts = next;
+		if (token !== this.refreshSequence) return;
+
+		const latestCashByAccount = new SvelteMap<string, AccountBalancesResponse>();
+		for (const balance of accountBalances) {
+			if (!latestCashByAccount.has(balance.account)) {
+				latestCashByAccount.set(balance.account, balance);
+			}
+		}
+		this.rawAccounts = accounts.map((record) => {
+			const cash = latestCashByAccount.get(record.id);
+			return { record, cashBalance: cash?.value ?? 0, balanceAsOf: cash?.asOf ?? '' };
+		});
+		this.accountsLoaded = true;
 	}
 
 	private realtimeSubscribe() {
 		this._pb.authedClient
 			.collection('accounts')
-			.subscribe('*', this.onAccountEvent.bind(this))
+			.subscribe('*', this.onCollectionEvent.bind(this))
 			.catch((error) => this._pb.handleSubscriptionError(error, 'accounts', 'subscribe_accounts'));
 		this._pb.authedClient
 			.collection('accountBalances')
-			.subscribe('*', this.onAccountBalanceEvent.bind(this))
+			.subscribe('*', this.onCollectionEvent.bind(this))
 			.catch((error) => this._pb.handleSubscriptionError(error, 'accounts', 'subscribe_balances'));
-		this._pb.authedClient
-			.collection('securityBalances')
-			.subscribe('*', this.onSecurityBalanceEvent.bind(this))
-			.catch((error) =>
-				this._pb.handleSubscriptionError(error, 'accounts', 'subscribe_security_balances')
-			);
 		this._pb.authedClient
 			.collection('accountShares')
 			.subscribe('*', this.onAccountShareEvent.bind(this))
 			.catch((error) => this._pb.handleSubscriptionError(error, 'accounts', 'subscribe_shares'));
 	}
 
-	private async onAccountEvent(e: RecordSubscription<AccountsResponse>) {
+	private onCollectionEvent(
+		e: RecordSubscription<AccountsResponse> | RecordSubscription<AccountBalancesResponse>
+	) {
 		if (!e.action) return;
-		await this.refreshAccounts();
-		this.lastBalanceEvent = Date.now();
+		this.scheduleRefresh();
 	}
 
-	private onAccountBalanceEvent(e: RecordSubscription<AccountBalancesResponse>) {
-		if (!e.action) return;
-		void this.refreshAccounts().then(() => {
-			this.lastBalanceEvent = Date.now();
-		});
-	}
-
-	private onSecurityBalanceEvent(e: RecordSubscription<SecurityBalance>) {
-		if (!e.action) return;
-		void this.refreshAccounts().then(() => {
-			this.lastBalanceEvent = Date.now();
-		});
-	}
-
-	private async onAccountShareEvent(e: RecordSubscription<AccountSharesResponse>) {
+	private onAccountShareEvent(e: RecordSubscription<AccountSharesResponse>) {
 		if (e.action === 'create') {
 			this.shares = [...this.shares, e.record];
 		} else if (e.action === 'update') {
@@ -216,8 +237,20 @@ class AccountsContext {
 			this.shares = this.shares.filter((share) => share.id !== e.record.id);
 		}
 
-		await this.refreshAccounts();
-		this.lastBalanceEvent = Date.now();
+		this.scheduleRefresh();
+	}
+
+	private scheduleRefresh() {
+		if (this.refreshTimer) clearTimeout(this.refreshTimer);
+		this.refreshTimer = setTimeout(async () => {
+			this.refreshTimer = null;
+			try {
+				await this.refreshAccounts();
+				this.notifyBalancesChanged();
+			} catch (error) {
+				this._pb.handleConnectionError(error, 'accounts', 'refresh');
+			}
+		}, DEBOUNCE_MS);
 	}
 
 	private toAccountWithBalance(
@@ -256,54 +289,11 @@ class AccountsContext {
 		};
 	}
 
-	private async getLatestAccountBalance(accountId: string) {
-		const res = await this._pb.authedClient
-			.collection('accountBalances')
-			.getList<AccountBalancesResponse>(1, 1, {
-				filter: `account='${accountId}'`,
-				sort: '-asOf,-created,-id',
-				requestKey: null
-			});
-		const item = res.items[0];
-		return { value: item?.value ?? 0, asOf: item?.asOf ?? '' };
-	}
-
-	private async getLatestSecurityBalanceTotals(accountIds: string[]) {
-		const accountIdSet = new SvelteSet(accountIds);
-		const totals = new SvelteMap<string, number>();
-		if (accountIdSet.size === 0) return totals;
-
-		const balances = await this._pb.authedClient
-			.collection('securityBalances')
-			.getFullList<SecurityBalance>({
-				sort: 'account,security,-asOf,-created,-id',
-				requestKey: null
-			});
-		const seen = new SvelteSet<string>();
-		for (const balance of balances) {
-			if (!accountIdSet.has(balance.account)) continue;
-			const key = `${balance.account}:${balance.security}`;
-			if (seen.has(key)) continue;
-			seen.add(key);
-			totals.set(
-				balance.account,
-				(totals.get(balance.account) ?? 0) + this.toNumber(balance.value)
-			);
-		}
-		return totals;
-	}
-
-	private toNumber(value: number | string | null | undefined) {
-		if (value === null || value === undefined || value === '') return 0;
-		const numberValue = typeof value === 'number' ? value : Number(value);
-		return Number.isFinite(numberValue) ? numberValue : 0;
-	}
-
 	dispose() {
-		this._pb.authedClient.collection('accounts').unsubscribe();
-		this._pb.authedClient.collection('accountBalances').unsubscribe();
-		this._pb.authedClient.collection('securityBalances').unsubscribe('*');
-		this._pb.authedClient.collection('accountShares').unsubscribe();
+		if (this.refreshTimer) clearTimeout(this.refreshTimer);
+		this._pb.authedClient.collection('accounts').unsubscribe('*');
+		this._pb.authedClient.collection('accountBalances').unsubscribe('*');
+		this._pb.authedClient.collection('accountShares').unsubscribe('*');
 	}
 }
 

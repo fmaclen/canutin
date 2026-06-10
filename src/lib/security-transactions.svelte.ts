@@ -16,6 +16,8 @@ import {
 	type SecurityTransactionsResponse
 } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
+import { getSecuritiesContext } from './securities.svelte';
+import { toNumber } from './utils';
 
 type SecurityTransactionExpand = {
 	account?: AccountsResponse;
@@ -63,6 +65,7 @@ class SecurityTransactionsContext {
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
 	private _accountsContext: ReturnType<typeof getAccountsContext>;
+	private _securitiesContext: ReturnType<typeof getSecuritiesContext>;
 	private _loadingDelayTimer: ReturnType<typeof setTimeout> | null = null;
 	private _refreshTimer: ReturnType<typeof setTimeout> | null = null;
 	private _activeUserId = '';
@@ -76,6 +79,7 @@ class SecurityTransactionsContext {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._accountsContext = getAccountsContext();
+		this._securitiesContext = getSecuritiesContext();
 		this.syncFromUrl(false);
 		this.init();
 	}
@@ -102,7 +106,10 @@ class SecurityTransactionsContext {
 
 		const securityParam = params.get('security');
 		if (securityParam) {
-			this.securityFilter = securityParam;
+			const securities = this._securitiesContext.securities;
+			if (securities.some((security) => security.id === securityParam)) {
+				this.securityFilter = securityParam;
+			}
 		}
 
 		const typeParam = params.get('type');
@@ -310,10 +317,10 @@ class SecurityTransactionsContext {
 				accountId: transaction.account || null,
 				accountName,
 				accountIsShared: Boolean(account?.isShared),
-				quantity: this.toNumber(transaction.quantity),
-				price: this.toNumber(transaction.price),
-				amount: this.toNumber(transaction.amount),
-				fees: this.toNumber(transaction.fees)
+				quantity: toNumber(transaction.quantity),
+				price: toNumber(transaction.price),
+				amount: toNumber(transaction.amount),
+				fees: toNumber(transaction.fees)
 			};
 		});
 	}
@@ -339,12 +346,6 @@ class SecurityTransactionsContext {
 			if (b.dateValue !== a.dateValue) return b.dateValue - a.dateValue;
 			return a.id.localeCompare(b.id);
 		});
-	}
-
-	private toNumber(value: number | string | null | undefined) {
-		if (value === null || value === undefined || value === '') return null;
-		const numberValue = typeof value === 'number' ? value : Number(value);
-		return Number.isFinite(numberValue) ? numberValue : null;
 	}
 
 	dispose() {

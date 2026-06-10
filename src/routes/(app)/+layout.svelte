@@ -18,6 +18,7 @@
 	const accountsContext = setAccountsContext(pb, balanceTypesContext);
 	const assetsContext = setAssetsContext(pb, balanceTypesContext);
 	const securitiesContext = setSecuritiesContext(pb);
+	accountsContext.connectHoldings(securitiesContext);
 	const importSessionsContext = setImportSessionsContext(pb);
 
 	onDestroy(() => {

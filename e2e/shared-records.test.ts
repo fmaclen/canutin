@@ -363,7 +363,7 @@ test('shared account and asset detail views keep currency formatting for recipie
 	await signIn(page, recipient.email);
 
 	await page.goto(`/accounts/${account.id}`);
-	await expect(page.getByLabel('Balance', { exact: true })).toHaveValue('$1,200.00');
+	await expect(page.getByLabel('Cash balance', { exact: true })).toHaveValue('$1,200.00');
 
 	await page.goto(`/assets/${asset.id}`);
 	await expect(page.getByLabel('Market value', { exact: true })).toHaveValue('-$12,000.00');

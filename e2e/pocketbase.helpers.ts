@@ -8,6 +8,8 @@ import type {
 	BalanceTypesRecord,
 	SecuritiesRecord,
 	SecurityBalancesRecord,
+	SecurityTransactionsRecord,
+	SecurityTransactionsTypeOptions,
 	TransactionLabelsRecord,
 	TransactionsRecord,
 	TypedPocketBase,
@@ -168,6 +170,22 @@ export async function seedSecurityBalance(securityBalanceInput: {
 }) {
 	const pb = await getAdminPB();
 	return await pb.collection('securityBalances').create(securityBalanceInput);
+}
+
+export async function seedSecurityTransaction(securityTransactionInput: {
+	account: SecurityTransactionsRecord['account'];
+	owner: SecurityTransactionsRecord['owner'];
+	security: SecurityTransactionsRecord['security'];
+	date: SecurityTransactionsRecord['date'];
+	type: SecurityTransactionsTypeOptions;
+	description?: SecurityTransactionsRecord['description'];
+	quantity?: number | null;
+	price?: number | null;
+	amount?: number | null;
+	fees?: number | null;
+}) {
+	const pb = await getAdminPB();
+	return await pb.collection('securityTransactions').create(securityTransactionInput);
 }
 
 export async function updateAsset(

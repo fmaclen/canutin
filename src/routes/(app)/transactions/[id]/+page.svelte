@@ -167,8 +167,8 @@
 	}
 </script>
 
-<header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b">
-	<div class="flex items-center gap-2 px-4">
+<header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
+	<div class="flex items-center gap-2">
 		<Sidebar.Trigger class="-ml-1" />
 		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
 		<Breadcrumb.Root>
@@ -189,7 +189,7 @@
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 	</div>
-	<nav class="px-4">
+	<nav class="flex items-center gap-4 px-4">
 		{#if selectedAccount}
 			<RecordLink
 				type="account"

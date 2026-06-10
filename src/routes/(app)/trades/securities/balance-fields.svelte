@@ -20,53 +20,38 @@
 		isFirst?: boolean;
 		disabled?: boolean;
 	} = $props();
-
-	const noAccounts = $derived(accounts.length === 0);
 </script>
 
 <Fieldset {isFirst}>
 	<FormFieldRow>
 		<Label for="security-balance-account" class="justify-start pr-0 md:justify-end">
-			{m.holdings_table_header_account()}
+			{m.securities_table_header_account()}
 		</Label>
-		<div class="space-y-2">
-			<AccountPicker
-				{accounts}
-				bind:value={formData.accountId}
-				id="security-balance-account"
-				placeholder={m.holdings_account_select_placeholder()}
-				disabled={disabled || noAccounts}
-			/>
-			{#if noAccounts}
-				<p class="text-muted-foreground text-sm">
-					{m.holdings_no_security_accounts()}
-				</p>
-			{/if}
-		</div>
-	</FormFieldRow>
-
-	<FormFieldRow>
-		<Label for="security-balance-as-of" class="justify-start pr-0 md:justify-end">
-			{m.holdings_table_header_as_of()}
-		</Label>
-		<Input
-			id="security-balance-as-of"
-			type="date"
-			bind:value={formData.asOf}
-			disabled={disabled || noAccounts}
-			required
+		<AccountPicker
+			{accounts}
+			bind:value={formData.accountId}
+			id="security-balance-account"
+			placeholder={m.securities_account_select_placeholder()}
+			{disabled}
 		/>
 	</FormFieldRow>
 
 	<FormFieldRow>
+		<Label for="security-balance-as-of" class="justify-start pr-0 md:justify-end">
+			{m.securities_table_header_as_of()}
+		</Label>
+		<Input id="security-balance-as-of" type="date" bind:value={formData.asOf} {disabled} required />
+	</FormFieldRow>
+
+	<FormFieldRow>
 		<Label for="security-balance-quantity" class="justify-start pr-0 md:justify-end">
-			{m.holdings_table_header_quantity()}
+			{m.securities_table_header_quantity()}
 		</Label>
 		<CurrencyField
 			id="security-balance-quantity"
 			name="security-balance-quantity"
 			bind:value={formData.quantity}
-			disabled={disabled || noAccounts}
+			{disabled}
 			isCurrency={false}
 			required
 		/>
@@ -74,13 +59,13 @@
 
 	<FormFieldRow>
 		<Label for="security-balance-price" class="justify-start pr-0 md:justify-end">
-			{m.holdings_table_header_price()}
+			{m.securities_table_header_price()}
 		</Label>
 		<CurrencyField
 			id="security-balance-price"
 			name="security-balance-price"
 			bind:value={formData.price}
-			disabled={disabled || noAccounts}
+			{disabled}
 			required
 		/>
 	</FormFieldRow>
@@ -88,30 +73,30 @@
 	<FormFieldRow>
 		<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
 			<Label for="security-balance-value" class="justify-start pr-0 md:justify-end">
-				{m.holdings_table_header_value()}
+				{m.securities_table_header_value()}
 			</Label>
-			<span class="text-muted-foreground text-sm">{m.holdings_text_optional()}</span>
+			<span class="text-muted-foreground text-sm">{m.securities_text_optional()}</span>
 		</div>
 		<CurrencyField
 			id="security-balance-value"
 			name="security-balance-value"
 			bind:value={formData.value}
-			disabled={disabled || noAccounts}
+			{disabled}
 		/>
 	</FormFieldRow>
 
 	<FormFieldRow>
 		<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
 			<Label for="security-balance-cost-basis" class="justify-start pr-0 md:justify-end">
-				{m.holdings_table_header_cost_basis()}
+				{m.securities_table_header_cost_basis()}
 			</Label>
-			<span class="text-muted-foreground text-sm">{m.holdings_text_optional()}</span>
+			<span class="text-muted-foreground text-sm">{m.securities_text_optional()}</span>
 		</div>
 		<CurrencyField
 			id="security-balance-cost-basis"
 			name="security-balance-cost-basis"
 			bind:value={formData.costBasis}
-			disabled={disabled || noAccounts}
+			{disabled}
 		/>
 	</FormFieldRow>
 </Fieldset>

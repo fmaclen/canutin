@@ -3,12 +3,12 @@ import { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 
-import type {
-	AccountsResponse,
-	SecuritiesResponse,
-	SecurityBalancesResponse
-} from './pocketbase.schema';
+import { getAccountsContext } from './accounts.svelte';
+import { getAuthContext } from './auth.svelte';
+import type { SecuritiesResponse, SecurityBalancesResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
+import { projectSignedValue } from './sharing';
+import { toNumber } from './utils';
 
 type SecurityBalance = SecurityBalancesResponse<number, number, number, number>;
 
@@ -46,18 +46,45 @@ export type SecurityAggregate = {
 	gainLoss: number | null;
 };
 
+const DEBOUNCE_MS = 200;
+
 class SecuritiesContext {
 	securities: SecuritiesResponse[] = $state([]);
-	accounts: AccountsResponse[] = $state([]);
-	securityBalances: SecurityBalance[] = $state([]);
 	isLoading: boolean = $state(true);
-	lastBalanceEvent: number = $state(0);
+	holdingsLoaded = false;
 
+	holdingsValueByAccount = $derived.by(() => {
+		const latestValued = new SvelteMap<string, { value: number; balance: SecurityBalance }>();
+		for (const balance of this.securityBalances) {
+			const value = toNumber(balance.value);
+			if (value === null) continue;
+			const key = `${balance.account}:${balance.security}`;
+			const existing = latestValued.get(key);
+			if (!existing || this.compareBalanceRecency(balance, existing.balance) < 0) {
+				latestValued.set(key, { value, balance });
+			}
+		}
+		const totals = new SvelteMap<string, number>();
+		for (const [key, latestBalance] of this.getLatestBalancesByAccountSecurity()) {
+			if (toNumber(latestBalance.quantity) === 0) continue;
+			const valued = latestValued.get(key);
+			if (!valued) continue;
+			totals.set(latestBalance.account, (totals.get(latestBalance.account) ?? 0) + valued.value);
+		}
+		return totals;
+	});
+
+	private securityBalances: SecurityBalance[] = $state([]);
 	private _pb: PocketBaseContext;
+	private _auth: ReturnType<typeof getAuthContext>;
+	private _accounts: ReturnType<typeof getAccountsContext>;
 	private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+	private refreshSequence = 0;
 
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
+		this._auth = getAuthContext();
+		this._accounts = getAccountsContext();
 		this.init();
 	}
 
@@ -108,9 +135,26 @@ class SecuritiesContext {
 		await this.refreshAll();
 	}
 
-	private async init() {
+	private init() {
+		this.realtimeSubscribe();
+		$effect(() => {
+			const userId = this._auth.currentUserId;
+			if (!userId) {
+				this.refreshSequence++;
+				this.securities = [];
+				this.securityBalances = [];
+				this.holdingsLoaded = false;
+				this.isLoading = false;
+				return;
+			}
+			this.isLoading = true;
+			this.holdingsLoaded = false;
+			void this.refreshForCurrentUser();
+		});
+	}
+
+	private async refreshForCurrentUser() {
 		try {
-			this.realtimeSubscribe();
 			await this.refreshAll();
 		} catch (error) {
 			this._pb.handleConnectionError(error, 'securities', 'init');
@@ -120,12 +164,11 @@ class SecuritiesContext {
 	}
 
 	private async refreshAll() {
-		const [securities, accounts, securityBalances] = await Promise.all([
+		const token = ++this.refreshSequence;
+		this.holdingsLoaded = false;
+		const [securities, securityBalances] = await Promise.all([
 			this._pb.authedClient.collection('securities').getFullList<SecuritiesResponse>({
 				sort: 'name',
-				requestKey: null
-			}),
-			this._pb.authedClient.collection('accounts').getFullList<AccountsResponse>({
 				requestKey: null
 			}),
 			this._pb.authedClient.collection('securityBalances').getFullList<SecurityBalance>({
@@ -133,11 +176,11 @@ class SecuritiesContext {
 				requestKey: null
 			})
 		]);
-
+		if (token !== this.refreshSequence) return;
 		this.securities = securities;
-		this.accounts = accounts;
 		this.securityBalances = securityBalances;
-		this.lastBalanceEvent = Date.now();
+		this.holdingsLoaded = true;
+		this._accounts.notifyBalancesChanged();
 	}
 
 	private realtimeSubscribe() {
@@ -151,19 +194,10 @@ class SecuritiesContext {
 			.catch((error) =>
 				this._pb.handleSubscriptionError(error, 'securities', 'subscribe_balances')
 			);
-		this._pb.authedClient
-			.collection('accounts')
-			.subscribe('*', this.onRealtimeEvent.bind(this))
-			.catch((error) =>
-				this._pb.handleSubscriptionError(error, 'securities', 'subscribe_accounts')
-			);
 	}
 
 	private onRealtimeEvent(
-		event:
-			| RecordSubscription<SecuritiesResponse>
-			| RecordSubscription<SecurityBalance>
-			| RecordSubscription<AccountsResponse>
+		event: RecordSubscription<SecuritiesResponse> | RecordSubscription<SecurityBalance>
 	) {
 		if (!event.action) return;
 		if (this.refreshTimer) clearTimeout(this.refreshTimer);
@@ -172,12 +206,14 @@ class SecuritiesContext {
 			this.refreshAll().catch((error) =>
 				this._pb.handleConnectionError(error, 'securities', 'refresh')
 			);
-		}, 200);
+		}, DEBOUNCE_MS);
 	}
 
 	private getEligibleAccountMap() {
-		return new SvelteMap(
-			this.accounts.filter((account) => !account.closed).map((account) => [account.id, account])
+		return new Map(
+			this._accounts.accounts
+				.filter((account) => !account.closed)
+				.map((account) => [account.id, account])
 		);
 	}
 
@@ -195,20 +231,44 @@ class SecuritiesContext {
 
 	private getLatestAccountBalanceRows() {
 		const accounts = this.getEligibleAccountMap();
+		const latestValued = new SvelteMap<string, { value: number; balance: SecurityBalance }>();
+		const latestCosted = new SvelteMap<string, { costBasis: number; balance: SecurityBalance }>();
+		for (const balance of this.securityBalances) {
+			const key = `${balance.account}:${balance.security}`;
+			const value = toNumber(balance.value);
+			if (value !== null) {
+				const existing = latestValued.get(key);
+				if (!existing || this.compareBalanceRecency(balance, existing.balance) < 0) {
+					latestValued.set(key, { value, balance });
+				}
+			}
+
+			const costBasis = toNumber(balance.costBasis);
+			if (costBasis !== null) {
+				const existing = latestCosted.get(key);
+				if (!existing || this.compareBalanceRecency(balance, existing.balance) < 0) {
+					latestCosted.set(key, { costBasis, balance });
+				}
+			}
+		}
+
 		const rows: SecurityAccountBalance[] = [];
-		for (const balance of this.getLatestBalancesByAccountSecurity().values()) {
+		for (const [key, balance] of this.getLatestBalancesByAccountSecurity()) {
 			const account = accounts.get(balance.account);
 			if (!account) continue;
 
-			const value = this.toNumber(balance.value);
-			const costBasis = this.toNumber(balance.costBasis);
+			const rawValue = latestValued.get(key)?.value ?? null;
+			const rawCostBasis = latestCosted.get(key)?.costBasis ?? null;
+			const value = rawValue === null ? null : projectSignedValue(rawValue, account.perspective);
+			const costBasis =
+				rawCostBasis === null ? null : projectSignedValue(rawCostBasis, account.perspective);
 			rows.push({
 				id: balance.id,
 				accountId: account.id,
 				accountName: account.name,
 				securityId: balance.security,
-				quantity: this.toNumber(balance.quantity),
-				price: this.toNumber(balance.price),
+				quantity: toNumber(balance.quantity),
+				price: toNumber(balance.price),
 				value,
 				costBasis,
 				gainLoss: value === null || costBasis === null ? null : value - costBasis,
@@ -219,9 +279,7 @@ class SecuritiesContext {
 	}
 
 	private computeAggregateRows() {
-		const securitiesById = new SvelteMap(
-			this.securities.map((security) => [security.id, security])
-		);
+		const securitiesById = new Map(this.securities.map((security) => [security.id, security]));
 		const balancesBySecurity = new SvelteMap<string, SecurityAccountBalance[]>();
 		for (const row of this.getLatestAccountBalanceRows()) {
 			if (row.quantity === 0) continue;
@@ -281,17 +339,10 @@ class SecuritiesContext {
 		return b.id.localeCompare(a.id);
 	}
 
-	private toNumber(value: number | string | null | undefined) {
-		if (value === null || value === undefined || value === '') return null;
-		const numberValue = typeof value === 'number' ? value : Number(value);
-		return Number.isFinite(numberValue) ? numberValue : null;
-	}
-
 	dispose() {
 		if (this.refreshTimer) clearTimeout(this.refreshTimer);
 		this._pb.authedClient.collection('securities').unsubscribe('*');
 		this._pb.authedClient.collection('securityBalances').unsubscribe('*');
-		this._pb.authedClient.collection('accounts').unsubscribe('*');
 	}
 }
 

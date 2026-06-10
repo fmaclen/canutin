@@ -40,20 +40,20 @@
 	function typeLabel(type: SecurityTransactionTypeFilter) {
 		switch (type) {
 			case 'buy':
-				return m.transactions_security_type_buy();
+				return m.trades_type_buy();
 			case 'sell':
-				return m.transactions_security_type_sell();
+				return m.trades_type_sell();
 			case 'cancel':
-				return m.transactions_security_type_cancel();
+				return m.trades_type_cancel();
 			case 'cash':
-				return m.transactions_security_type_cash();
+				return m.trades_type_cash();
 			case 'fee':
-				return m.transactions_security_type_fee();
+				return m.trades_type_fee();
 			case 'transfer':
-				return m.transactions_security_type_transfer();
+				return m.trades_type_transfer();
 			case 'all':
 			default:
-				return m.transactions_security_filter_type_all();
+				return m.trades_filter_type_all();
 		}
 	}
 </script>
@@ -69,7 +69,7 @@
 		</div>
 		<Input
 			type="text"
-			placeholder={m.transactions_security_search_placeholder()}
+			placeholder={m.trades_search_placeholder()}
 			value={securityTxContext.search}
 			oninput={handleSearchInput}
 			class="bg-background pr-9 pl-9"
@@ -101,7 +101,7 @@
 		onValueChange={(value) => securityTxContext.setSecurityFilter(value || null)}
 	>
 		<Select.Trigger
-			aria-label={m.transactions_security_filter_security_label()}
+			aria-label={m.trades_filter_security_label()}
 			class="bg-background w-full sm:w-fit sm:max-w-64"
 		>
 			{#if selectedSecurity}
@@ -122,11 +122,11 @@
 							event.preventDefault();
 							event.stopPropagation();
 						}}
-						aria-label={m.transactions_security_filter_security_clear()}
+						aria-label={m.trades_filter_security_clear()}
 					/>
 				</div>
 			{:else}
-				{m.transactions_security_filter_security_all()}
+				{m.trades_filter_security_all()}
 			{/if}
 		</Select.Trigger>
 		<Select.Content>
@@ -141,10 +141,7 @@
 		onValueChange={(value) =>
 			securityTxContext.setTypeFilter((value || 'all') as SecurityTransactionTypeFilter)}
 	>
-		<Select.Trigger
-			aria-label={m.transactions_security_filter_type_label()}
-			class="bg-background w-full sm:w-fit"
-		>
+		<Select.Trigger aria-label={m.trades_filter_type_label()} class="bg-background w-full sm:w-fit">
 			{typeLabel(securityTxContext.typeFilter)}
 		</Select.Trigger>
 		<Select.Content>

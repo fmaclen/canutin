@@ -215,7 +215,7 @@
 				<Fieldset>
 					<FormFieldRow>
 						<Label for="value" class="justify-start pr-0 md:justify-end"
-							>{m.accounts_label_balance()}</Label
+							>{m.accounts_label_cash_balance()}</Label
 						>
 						<CurrencyField id="value" name="value" bind:value />
 					</FormFieldRow>

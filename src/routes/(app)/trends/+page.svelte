@@ -18,6 +18,7 @@
 	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { projectSignedValue } from '$lib/sharing';
+	import { toNumber } from '$lib/utils';
 
 	import ChartNetWorth from './growth.svelte';
 	import Performance from './performance.svelte';
@@ -82,9 +83,10 @@
 				.filter((b) => activeAccounts.has(b.account))
 				.map((balance) => {
 					const account = activeAccounts.get(balance.account)!;
+					const value = toNumber(balance.value);
 					return {
 						...balance,
-						value: projectSignedValue(balance.value ?? 0, account.perspective)
+						value: value === null ? null : projectSignedValue(value, account.perspective)
 					};
 				});
 			const assetBalances = assetBalancesAll

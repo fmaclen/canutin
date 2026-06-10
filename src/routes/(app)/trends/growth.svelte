@@ -14,6 +14,7 @@
 		AssetBalancesResponse,
 		AssetsResponse
 	} from '$lib/pocketbase.schema';
+	import { toNumber } from '$lib/utils';
 
 	import {
 		buildPreparedMaps,
@@ -137,8 +138,7 @@
 		for (const [accountId, balances] of accountBalancesByAccountId)
 			accountIndexPointer.set(accountId, latestIndexBeforeOrEqual(balances, datePoints[0], -1));
 		const securityIndexPointer = new SvelteMap<string, number>();
-		for (const [key, balances] of securityBalancesByAccountSecurity)
-			securityIndexPointer.set(key, latestIndexBeforeOrEqual(balances, datePoints[0], -1));
+		const securityLastKnownValue = new SvelteMap<string, number>();
 		const assetIndexPointer = new SvelteMap<string, number>();
 		for (const [assetId, balances] of assetBalancesByAssetId)
 			assetIndexPointer.set(assetId, latestIndexBeforeOrEqual(balances, datePoints[0], -1));
@@ -171,7 +171,12 @@
 				const previousIndex = securityIndexPointer.get(key) ?? -1;
 				const index = latestIndexBeforeOrEqual(balances, datePoint, previousIndex);
 				securityIndexPointer.set(key, index);
-				const value = index >= 0 ? (balances[index].value ?? 0) : 0;
+				for (let i = previousIndex + 1; i <= index; i++) {
+					const known = toNumber(balances[i].value);
+					if (known !== null) securityLastKnownValue.set(key, known);
+				}
+				const value = securityLastKnownValue.get(key);
+				if (value === undefined) continue;
 				const group = meta.balanceGroup as BalanceGroup;
 				if (group === 'CASH') cash += value;
 				else if (group === 'DEBT') debt += value;

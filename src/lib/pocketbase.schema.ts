@@ -248,7 +248,6 @@ export type SecuritiesRecord = {
 	importSession?: RecordIdString
 	name: string
 	normalizedName?: string
-	normalizedSymbol?: string
 	owner: RecordIdString
 	symbol?: string
 	updated: IsoAutoDateString

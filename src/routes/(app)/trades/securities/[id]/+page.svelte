@@ -9,6 +9,7 @@
 	import { getAuthContext } from '$lib/auth.svelte';
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
+	import Link from '$lib/components/link.svelte';
 	import NumberDisplay from '$lib/components/number.svelte';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
@@ -88,7 +89,7 @@
 	$effect(() => {
 		if (!security) {
 			if (!securitiesContext.isLoading && securityId) {
-				error(404, m.holdings_error_not_found());
+				error(404, m.securities_error_not_found());
 			}
 			return;
 		}
@@ -112,7 +113,7 @@
 		if (!securityId) return;
 		const securityName = formData.name.trim();
 		if (!securityName) {
-			toast.error(m.holdings_name_required());
+			toast.error(m.securities_name_required());
 			return;
 		}
 
@@ -122,11 +123,11 @@
 				name: securityName,
 				symbol: formData.symbol.trim()
 			});
-			toast.success(m.holdings_edit_success());
+			toast.success(m.securities_edit_success());
 		} catch (error) {
-			console.error('[holdings:update_security]', error);
+			console.error('[securities:update_security]', error);
 			syncState.justSaved = false;
-			toast.error(m.holdings_edit_failed());
+			toast.error(m.securities_edit_failed());
 		}
 	}
 
@@ -135,7 +136,7 @@
 		const currentOwnerId = ownerId;
 		if (!currentSecurityId || !currentOwnerId || isSavingBalance) return;
 		if (!balanceFormData.accountId) {
-			toast.error(m.holdings_account_required());
+			toast.error(m.securities_account_required());
 			return;
 		}
 
@@ -146,24 +147,26 @@
 				toSecurityBalanceInput(balanceFormData, currentOwnerId)
 			);
 			balanceFormData = createSecurityBalanceFormData();
-			toast.success(m.holdings_balance_updated());
+			toast.success(m.securities_balance_updated());
 		} catch (error) {
-			console.error('[holdings:add_balance]', error);
-			toast.error(m.holdings_balance_failed());
+			console.error('[securities:add_balance]', error);
+			toast.error(m.securities_balance_failed());
 		} finally {
 			isSavingBalance = false;
 		}
 	}
 </script>
 
-<header class="bg-background flex h-16 shrink-0 items-center gap-2 border-b">
-	<div class="flex items-center gap-2 px-4">
+<header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
+	<div class="flex items-center gap-2">
 		<Sidebar.Trigger class="-ml-1" />
 		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
 		<Breadcrumb.Root>
 			<Breadcrumb.List>
 				<Breadcrumb.Item>
-					<Breadcrumb.Link href={resolve('/holdings')}>{m.sidebar_holdings()}</Breadcrumb.Link>
+					<Breadcrumb.Link href={resolve('/trades/securities')}
+						>{m.sidebar_securities()}</Breadcrumb.Link
+					>
 				</Breadcrumb.Item>
 				<Breadcrumb.Separator />
 				<Breadcrumb.Item>
@@ -176,11 +179,18 @@
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 	</div>
+	<nav class="flex items-center gap-4 px-4">
+		{#if security}
+			<Link href={`${resolve('/trades')}?security=${security.id}`} class="text-sm">
+				{m.trades_title()}
+			</Link>
+		{/if}
+	</nav>
 </header>
 
-<Page pageTitle={m.holdings_detail_page_title()}>
+<Page pageTitle={m.securities_edit_page_title()}>
 	<Section>
-		<SectionTitle title={m.holdings_section_details()} />
+		<SectionTitle title={m.securities_section_details()} />
 		{#if securitiesContext.isLoading || !security}
 			<Skeleton class="h-36" />
 		{:else}
@@ -189,7 +199,7 @@
 	</Section>
 
 	<Section>
-		<SectionTitle title={m.holdings_section_balances()} />
+		<SectionTitle title={m.securities_section_balances()} />
 		{#if securitiesContext.isLoading}
 			<div class="bg-background overflow-hidden rounded-sm shadow-md">
 				<Skeleton class="h-64" />
@@ -213,8 +223,8 @@
 
 						<footer class="border-border bg-border border-t p-2">
 							<div class="flex justify-end">
-								<Button type="submit" disabled={isSavingBalance || eligibleAccounts.length === 0}>
-									{m.holdings_button_add_balance()}
+								<Button type="submit" disabled={isSavingBalance}>
+									{m.securities_button_add_balance()}
 								</Button>
 							</div>
 						</footer>
@@ -222,32 +232,32 @@
 				</div>
 			</div>
 			{#if accountBalances.length === 0}
-				<Empty>{m.holdings_detail_empty()}</Empty>
+				<Empty>{m.securities_balances_empty()}</Empty>
 			{:else}
 				<div class="bg-background overflow-hidden rounded-sm shadow-md">
 					<Table.Root>
 						<Table.Header>
 							<Table.Row>
 								<Table.Head class="text-left whitespace-nowrap">
-									{m.holdings_table_header_account()}
+									{m.securities_table_header_account()}
 								</Table.Head>
 								<Table.Head class="text-right whitespace-nowrap">
-									{m.holdings_table_header_quantity()}
+									{m.securities_table_header_quantity()}
 								</Table.Head>
 								<Table.Head class="text-right whitespace-nowrap">
-									{m.holdings_table_header_price()}
+									{m.securities_table_header_price()}
 								</Table.Head>
 								<Table.Head class="text-right whitespace-nowrap">
-									{m.holdings_table_header_value()}
+									{m.securities_table_header_value()}
 								</Table.Head>
 								<Table.Head class="text-right whitespace-nowrap">
-									{m.holdings_table_header_cost_basis()}
+									{m.securities_table_header_cost_basis()}
 								</Table.Head>
 								<Table.Head class="text-right whitespace-nowrap">
-									{m.holdings_table_header_gain_loss()}
+									{m.securities_table_header_gain_loss()}
 								</Table.Head>
 								<Table.Head class="text-right whitespace-nowrap">
-									{m.holdings_table_header_as_of()}
+									{m.securities_table_header_as_of()}
 								</Table.Head>
 							</Table.Row>
 						</Table.Header>
@@ -301,7 +311,7 @@
 						<Table.Footer>
 							<Table.Row class="border-t-2">
 								<Table.Cell class="text-muted-foreground text-xs font-normal">
-									{m.holdings_detail_total_label()}
+									{m.securities_total_label()}
 								</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">
 									<NumberDisplay

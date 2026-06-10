@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -262,9 +263,9 @@ func findOrCreateImportSecurity(app core.App, ownerID string, securityCache map[
 		return strings.TrimSpace(securityID), false, nil
 	}
 
-	normalizedSymbol := normalizeSecuritySymbol(symbol)
+	symbol = normalizeSecuritySymbol(symbol)
 	normalizedName := normalizedSecurityName(name)
-	key := normalizedSymbol
+	key := symbol
 	if key == "" {
 		key = normalizedName
 	}
@@ -276,9 +277,9 @@ func findOrCreateImportSecurity(app core.App, ownerID string, securityCache map[
 
 	securityFilter := "normalizedName = {:normalizedName} && owner = {:owner}"
 	securityParams := map[string]any{"normalizedName": normalizedName, "owner": ownerID}
-	if normalizedSymbol != "" {
-		securityFilter = "normalizedSymbol = {:normalizedSymbol} && owner = {:owner}"
-		securityParams = map[string]any{"normalizedSymbol": normalizedSymbol, "owner": ownerID}
+	if symbol != "" {
+		securityFilter = "symbol = {:symbol} && owner = {:owner}"
+		securityParams = map[string]any{"symbol": symbol, "owner": ownerID}
 	}
 
 	rec, created, err := findOrCreate(app, "securities", securityFilter, securityParams, map[string]any{
@@ -345,6 +346,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			map[string]any{"name": acct.BalanceType, "owner": ownerID},
 		)
 		if err != nil {
+			log.Printf("[import] failed to find or create balanceTypes record (name=%q): %v", acct.BalanceType, err)
 			continue
 		}
 
@@ -367,6 +369,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			"importSession":  session.Id,
 		})
 		if err != nil {
+			log.Printf("[import] failed to find or create accounts record (name=%q): %v", acct.Name, err)
 			continue
 		}
 
@@ -394,6 +397,8 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 				ab.Set("importSession", session.Id)
 				if err := app.Save(ab); err == nil {
 					result.AccountBalances.Created++
+				} else {
+					log.Printf("[import] failed to save accountBalances record (account=%s, asOf=%s): %v", rec.Id, acct.Balance.AsOf, err)
 				}
 			} else {
 				result.AccountBalances.Skipped++
@@ -411,6 +416,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			map[string]any{"name": asset.BalanceType, "owner": ownerID},
 		)
 		if err != nil {
+			log.Printf("[import] failed to find or create balanceTypes record (name=%q): %v", asset.BalanceType, err)
 			continue
 		}
 
@@ -433,6 +439,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			"importSession": session.Id,
 		})
 		if err != nil {
+			log.Printf("[import] failed to find or create assets record (name=%q): %v", asset.Name, err)
 			continue
 		}
 
@@ -463,6 +470,8 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 				asb.Set("importSession", session.Id)
 				if err := app.Save(asb); err == nil {
 					result.AssetBalances.Created++
+				} else {
+					log.Printf("[import] failed to save assetBalances record (asset=%s, asOf=%s): %v", rec.Id, asset.Balance.AsOf, err)
 				}
 			} else {
 				result.AssetBalances.Skipped++
@@ -473,6 +482,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 	for _, security := range payload.Securities {
 		_, created, err := findOrCreateImportSecurity(app, ownerID, securityCache, "", security.Name, security.Symbol, session.Id)
 		if err != nil {
+			log.Printf("[import] failed to find or create securities record (name=%q, symbol=%q): %v", security.Name, security.Symbol, err)
 			result.Securities.Skipped++
 			continue
 		}
@@ -486,6 +496,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 	for _, tx := range payload.Transactions {
 		accountID, err := resolveImportAccount(app, ownerID, acctIndex, "", tx.AccountName)
 		if err != nil {
+			log.Printf("[import] failed to resolve account for transactions record (accountName=%q): %v", tx.AccountName, err)
 			result.Transactions.Skipped++
 			continue
 		}
@@ -532,6 +543,8 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			)
 			if err == nil {
 				labelIDs = append(labelIDs, lblID)
+			} else {
+				log.Printf("[import] failed to find or create transactionLabels record (name=%q): %v", lbl, err)
 			}
 		}
 
@@ -548,17 +561,21 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		txRec.Set("importSession", session.Id)
 		if err := app.Save(txRec); err == nil {
 			result.Transactions.Created++
+		} else {
+			log.Printf("[import] failed to save transactions record (account=%s, date=%s): %v", accountID, tx.Date, err)
 		}
 	}
 
 	for _, balance := range payload.SecurityBalances {
 		accountID, err := resolveImportAccount(app, ownerID, acctIndex, balance.AccountID, balance.AccountName)
 		if err != nil {
+			log.Printf("[import] failed to resolve account for securityBalances record (accountName=%q): %v", balance.AccountName, err)
 			result.SecurityBalances.Skipped++
 			continue
 		}
 		securityID, securityCreated, err := findOrCreateImportSecurity(app, ownerID, securityCache, balance.SecurityID, balance.SecurityName, balance.SecuritySymbol, session.Id)
 		if err != nil {
+			log.Printf("[import] failed to find or create securities record for securityBalances (name=%q, symbol=%q): %v", balance.SecurityName, balance.SecuritySymbol, err)
 			result.SecurityBalances.Skipped++
 			continue
 		}
@@ -600,6 +617,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		if err := app.Save(rec); err == nil {
 			result.SecurityBalances.Created++
 		} else {
+			log.Printf("[import] failed to save securityBalances record (account=%s, security=%s, asOf=%s): %v", accountID, securityID, balance.AsOf, err)
 			result.SecurityBalances.Skipped++
 		}
 	}
@@ -607,11 +625,13 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 	for _, tx := range payload.SecurityTransactions {
 		accountID, err := resolveImportAccount(app, ownerID, acctIndex, tx.AccountID, tx.AccountName)
 		if err != nil {
+			log.Printf("[import] failed to resolve account for securityTransactions record (accountName=%q): %v", tx.AccountName, err)
 			result.SecurityTransactions.Skipped++
 			continue
 		}
 		securityID, securityCreated, err := findOrCreateImportSecurity(app, ownerID, securityCache, tx.SecurityID, tx.SecurityName, tx.SecuritySymbol, session.Id)
 		if err != nil {
+			log.Printf("[import] failed to find or create securities record for securityTransactions (name=%q, symbol=%q): %v", tx.SecurityName, tx.SecuritySymbol, err)
 			result.SecurityTransactions.Skipped++
 			continue
 		}
@@ -675,6 +695,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		if err := app.Save(rec); err == nil {
 			result.SecurityTransactions.Created++
 		} else {
+			log.Printf("[import] failed to save securityTransactions record (account=%s, security=%s, date=%s): %v", accountID, securityID, tx.Date, err)
 			result.SecurityTransactions.Skipped++
 		}
 	}
@@ -689,7 +710,9 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 	session.Set("status", "completed")
 	session.Set("recordsCreated", totalCreated)
 	session.Set("recordsSkipped", totalSkipped)
-	app.Save(session)
+	if err := app.Save(session); err != nil {
+		log.Printf("[import] failed to save importSessions record (session=%s): %v", session.Id, err)
+	}
 
 	return re.JSON(http.StatusOK, result)
 }

@@ -143,16 +143,6 @@ test('duplicate import skips existing records', async ({ page }) => {
 	await expect(page.getByText('olivia-scraper-run-2')).toBeVisible();
 });
 
-test.skip('import creates holding balances for an existing account', async () => {});
-
-test.skip('import skips duplicate holding balances from the same source data', async () => {});
-
-test.skip('import skips duplicate holding transactions from the same source data', async () => {});
-
-test.skip('import records distinct same-day holding transactions when source identity differs', async () => {});
-
-test.skip('import rejects non-number shapes for holding numeric fields', async () => {});
-
 test('externalId dedup takes precedence over field-based dedup', async () => {
 	const user = await seedUser('patricia');
 

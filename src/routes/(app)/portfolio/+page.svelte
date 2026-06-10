@@ -39,50 +39,47 @@
 		<Breadcrumb.Root>
 			<Breadcrumb.List>
 				<Breadcrumb.Item>
-					<Breadcrumb.Page>{m.sidebar_holdings()}</Breadcrumb.Page>
+					<Breadcrumb.Page>{m.sidebar_portfolio()}</Breadcrumb.Page>
 				</Breadcrumb.Item>
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 	</div>
-	<nav class="px-4">
-		<Link href={resolve('/holdings/add')} class="text-sm">{m.holdings_button_add()}</Link>
-	</nav>
 </header>
 
-<Page pageTitle={m.holdings_page_title()}>
+<Page pageTitle={m.portfolio_page_title()}>
 	<Section>
-		<SectionTitle title={m.holdings_section_title()} />
+		<SectionTitle title={m.portfolio_section_holdings()} />
 		{#if securitiesContext.isLoading}
 			<div class="bg-background overflow-hidden rounded-sm shadow-md">
 				<Skeleton class="h-64" />
 			</div>
 		{:else if rows.length === 0}
-			<Empty>{m.holdings_empty()}</Empty>
+			<Empty>{m.portfolio_empty()}</Empty>
 		{:else}
 			<div class="bg-background overflow-hidden rounded-sm shadow-md">
 				<Table.Root>
 					<Table.Header>
 						<Table.Row>
 							<Table.Head class="text-left whitespace-nowrap">
-								{m.holdings_table_header_security()}
+								{m.securities_table_header_security()}
 							</Table.Head>
 							<Table.Head class="text-left whitespace-nowrap">
-								{m.holdings_table_header_symbol()}
+								{m.securities_table_header_symbol()}
 							</Table.Head>
 							<Table.Head class="text-left whitespace-nowrap">
-								{m.holdings_table_header_accounts()}
+								{m.securities_table_header_accounts()}
 							</Table.Head>
 							<Table.Head class="text-right whitespace-nowrap">
-								{m.holdings_table_header_quantity()}
+								{m.securities_table_header_quantity()}
 							</Table.Head>
 							<Table.Head class="text-right whitespace-nowrap">
-								{m.holdings_table_header_value()}
+								{m.securities_table_header_value()}
 							</Table.Head>
 							<Table.Head class="text-right whitespace-nowrap">
-								{m.holdings_table_header_cost_basis()}
+								{m.securities_table_header_cost_basis()}
 							</Table.Head>
 							<Table.Head class="text-right whitespace-nowrap">
-								{m.holdings_table_header_gain_loss()}
+								{m.securities_table_header_gain_loss()}
 							</Table.Head>
 						</Table.Row>
 					</Table.Header>
@@ -91,7 +88,7 @@
 							<Table.Row>
 								<Table.Cell>
 									<Link
-										href={resolve(`/holdings/${row.id}`)}
+										href={resolve(`/trades/securities/${row.id}`)}
 										class="text-foreground/90 text-sm font-medium"
 									>
 										{row.name}

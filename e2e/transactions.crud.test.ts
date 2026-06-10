@@ -14,13 +14,8 @@ import {
 	seedUser
 } from './pocketbase.helpers';
 
-async function selectCashflowActivity(page: Page) {
-	await page.getByLabel('Activity').click();
-	await page.getByRole('option', { name: 'Cashflow' }).click();
-}
-
 function getCashflowPanel(page: Page) {
-	return page.getByRole('tabpanel').filter({
+	return page.locator('body').filter({
 		has: page.getByPlaceholder('Search transactions')
 	});
 }
@@ -70,8 +65,7 @@ test('user can add a new transaction', async ({ page }) => {
 	await waitForAccountFilterOption(page, 'Meridian Checking');
 	await page.getByRole('link', { name: 'Add transaction' }).click();
 	await expect(page).toHaveURL('/transactions/add');
-	await expect(page.getByLabel('Description')).not.toBeVisible();
-	await selectCashflowActivity(page);
+	await expect(page.getByLabel('Description')).toBeVisible();
 
 	await page.getByLabel('Description').fill('Moonbeam Cafe');
 	await page.getByLabel('Amount').fill('-45.50');
@@ -99,7 +93,6 @@ test('user can add a new transaction', async ({ page }) => {
 	await waitForAccountFilterOption(page, 'Apex Credit Card');
 	await page.getByRole('link', { name: 'Add transaction' }).click();
 	await expect(page).toHaveURL('/transactions/add');
-	await selectCashflowActivity(page);
 
 	await page.getByLabel('Description').fill('Credit Card Payment');
 	await page.getByLabel('Amount').fill('-500');
@@ -120,7 +113,7 @@ test('user can add a new transaction', async ({ page }) => {
 	await expect(creditCardRow.getByText('Apex Credit Card')).toBeVisible();
 });
 
-test('user selects activity before transaction fields are shown', async ({ page }) => {
+test('add transaction lists only writable open accounts', async ({ page }) => {
 	const user = await seedUser('nadia');
 	const sharer = await seedUser('oliver');
 
@@ -179,8 +172,6 @@ test('user selects activity before transaction fields are shown', async ({ page 
 
 	await page.getByRole('link', { name: 'Add transaction' }).click();
 	await expect(page).toHaveURL('/transactions/add');
-	await expect(page.getByLabel('Account')).not.toBeVisible();
-	await selectCashflowActivity(page);
 	await expect(page.getByLabel('Account')).toBeVisible();
 	await page.getByLabel('Account').click();
 	await expect(page.getByRole('option', { name: 'Primary Checking' })).toBeVisible();
@@ -507,7 +498,6 @@ test('reuses existing labels instead of creating duplicates', async ({ page }) =
 
 	await waitForAccountFilterOption(page, 'Pinewood Checking');
 	await page.getByRole('link', { name: 'Add transaction' }).click();
-	await selectCashflowActivity(page);
 	await page.getByLabel('Description').fill('Farmers Market');
 	await page.getByLabel('Amount').fill('-75');
 	await page.getByLabel('Date').fill(formatDateForInput(new UTCDate()));

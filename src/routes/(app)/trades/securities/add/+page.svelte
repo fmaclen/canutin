@@ -52,16 +52,16 @@
 		const currentOwnerId = ownerId;
 		if (!currentOwnerId || isSaving) return;
 		if (!securityId) {
-			toast.error('Select a security');
+			toast.error(m.securities_security_required());
 			return;
 		}
 		if (!balanceFormData.accountId) {
-			toast.error(m.holdings_account_required());
+			toast.error(m.securities_account_required());
 			return;
 		}
 		const securityName = name.trim();
 		if (isNewSecurity && !securityName) {
-			toast.error(m.holdings_name_required());
+			toast.error(m.securities_name_required());
 			return;
 		}
 
@@ -79,17 +79,17 @@
 					)
 				: selectedSecurity;
 			if (!security) {
-				toast.error('Select a security');
+				toast.error(m.securities_security_required());
 				return;
 			}
 			if (!isNewSecurity) {
 				await securitiesContext.addSecurityBalance(security.id, balanceInput);
 			}
-			toast.success(m.holdings_add_success());
-			await goto(resolve(`/holdings/${security.id}`));
+			toast.success(m.securities_add_success());
+			await goto(resolve('/trades/securities'));
 		} catch (error) {
-			console.error('[holdings:create_security]', error);
-			toast.error(m.holdings_add_failed());
+			console.error('[securities:create_security]', error);
+			toast.error(m.securities_add_failed());
 		} finally {
 			isSaving = false;
 		}
@@ -103,20 +103,26 @@
 		<Breadcrumb.Root>
 			<Breadcrumb.List>
 				<Breadcrumb.Item>
-					<Breadcrumb.Link href={resolve('/holdings')}>{m.sidebar_holdings()}</Breadcrumb.Link>
+					<Breadcrumb.Link href={resolve('/trades')}>{m.trades_title()}</Breadcrumb.Link>
 				</Breadcrumb.Item>
 				<Breadcrumb.Separator />
 				<Breadcrumb.Item>
-					<Breadcrumb.Page>{m.holdings_add_page_title()}</Breadcrumb.Page>
+					<Breadcrumb.Link href={resolve('/trades/securities')}
+						>{m.sidebar_securities()}</Breadcrumb.Link
+					>
+				</Breadcrumb.Item>
+				<Breadcrumb.Separator />
+				<Breadcrumb.Item>
+					<Breadcrumb.Page>{m.securities_add_page_title()}</Breadcrumb.Page>
 				</Breadcrumb.Item>
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 	</div>
 </header>
 
-<Page pageTitle={m.holdings_add_page_title()}>
+<Page pageTitle={m.securities_add_page_title()}>
 	<Section>
-		<SectionTitle title={m.holdings_section_details()} />
+		<SectionTitle title={m.securities_section_details()} />
 		<div class="bg-muted border-border overflow-hidden rounded border">
 			<form
 				onsubmit={(event) => {
@@ -128,26 +134,28 @@
 				<Fieldset isFirst={true}>
 					<FormFieldRow>
 						<Label for="security" class="justify-start pr-0 md:justify-end">
-							{m.holdings_table_header_security()}
+							{m.securities_table_header_security()}
 						</Label>
 						<Select.Root type="single" bind:value={securityId} disabled={isSaving}>
 							<Select.Trigger id="security" class="bg-background w-full">
 								{#if isNewSecurity}
-									Add new security
+									{m.securities_select_new_label()}
 								{:else if selectedSecurity}
 									{selectedSecurity.name}
 								{:else}
-									<span class="text-muted-foreground">Select security</span>
+									<span class="text-muted-foreground">{m.securities_select_placeholder()}</span>
 								{/if}
 							</Select.Trigger>
 							<Select.Content>
 								<Select.Group>
-									<Select.Label>Create new</Select.Label>
-									<Select.Item value={newSecurityValue}>Add security</Select.Item>
+									<Select.Label>{m.securities_select_group_new()}</Select.Label>
+									<Select.Item value={newSecurityValue}
+										>{m.securities_select_add_option()}</Select.Item
+									>
 								</Select.Group>
 								{#if sortedSecurities.length > 0}
 									<Select.Group>
-										<Select.Label>Existing securities</Select.Label>
+										<Select.Label>{m.securities_select_group_existing()}</Select.Label>
 										{#each sortedSecurities as security (security.id)}
 											<Select.Item value={security.id}>{security.name}</Select.Item>
 										{/each}
@@ -160,7 +168,7 @@
 					{#if isNewSecurity}
 						<FormFieldRow>
 							<Label for="security-name" class="justify-start pr-0 md:justify-end">
-								{m.holdings_label_name()}
+								{m.securities_label_name()}
 							</Label>
 							<Input id="security-name" bind:value={name} disabled={isSaving} required />
 						</FormFieldRow>
@@ -168,9 +176,9 @@
 						<FormFieldRow>
 							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
 								<Label for="security-symbol" class="justify-start pr-0 md:justify-end">
-									{m.holdings_label_symbol()}
+									{m.securities_label_symbol()}
 								</Label>
-								<span class="text-muted-foreground text-sm">{m.holdings_text_optional()}</span>
+								<span class="text-muted-foreground text-sm">{m.securities_text_optional()}</span>
 							</div>
 							<Input id="security-symbol" bind:value={symbol} disabled={isSaving} />
 						</FormFieldRow>
@@ -181,8 +189,8 @@
 
 				<footer class="border-border bg-border border-t p-2">
 					<div class="flex justify-end">
-						<Button type="submit" disabled={isSaving || eligibleAccounts.length === 0}>
-							{m.holdings_button_add()}
+						<Button type="submit" disabled={isSaving}>
+							{m.securities_button_add()}
 						</Button>
 					</div>
 				</footer>

@@ -63,7 +63,7 @@
 			<FormFieldRow>
 				<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
 					<Label for="value" class="justify-start pr-0 md:justify-end"
-						>{m.accounts_label_balance()}</Label
+						>{m.accounts_label_cash_balance()}</Label
 					>
 					{#if formattedAsOf}
 						{@const asOfParts = m.accounts_text_balance_as_of({ date: '\u0000' }).split('\u0000')}

@@ -28,7 +28,7 @@
 		<Fieldset isFirst={true}>
 			<FormFieldRow>
 				<Label for="security-name" class="justify-start pr-0 md:justify-end">
-					{m.holdings_label_name()}
+					{m.securities_label_name()}
 				</Label>
 				<Input id="security-name" bind:value={formData.name} required />
 			</FormFieldRow>
@@ -36,9 +36,9 @@
 			<FormFieldRow>
 				<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
 					<Label for="security-symbol" class="justify-start pr-0 md:justify-end">
-						{m.holdings_label_symbol()}
+						{m.securities_label_symbol()}
 					</Label>
-					<span class="text-muted-foreground text-sm">{m.holdings_text_optional()}</span>
+					<span class="text-muted-foreground text-sm">{m.securities_text_optional()}</span>
 				</div>
 				<Input id="security-symbol" bind:value={formData.symbol} />
 			</FormFieldRow>
@@ -46,7 +46,7 @@
 
 		<footer class="border-border bg-border border-t p-2">
 			<div class="flex justify-end">
-				<Button type="submit">{m.holdings_button_save()}</Button>
+				<Button type="submit">{m.securities_button_save()}</Button>
 			</div>
 		</footer>
 	</form>
