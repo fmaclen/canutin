@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
+	import KeyValue from '$lib/components/key-value.svelte';
 	import Link from '$lib/components/link.svelte';
 	import NumberDisplay from '$lib/components/number.svelte';
 	import Page from '$lib/components/page.svelte';
@@ -19,6 +20,27 @@
 	const securitiesContext = getSecuritiesContext();
 
 	const rows = $derived(securitiesContext.aggregateRows);
+
+	const marketValueTotal = $derived(
+		rows.some((row) => row.value === null)
+			? null
+			: rows.reduce((sum, row) => sum + (row.value ?? 0), 0)
+	);
+	const gainLossTotal = $derived(
+		rows.some((row) => row.gainLoss === null)
+			? null
+			: rows.reduce((sum, row) => sum + (row.gainLoss ?? 0), 0)
+	);
+	const costBasisTotal = $derived(
+		rows.some((row) => row.costBasis === null)
+			? null
+			: rows.reduce((sum, row) => sum + (row.costBasis ?? 0), 0)
+	);
+	const returnPercent = $derived(
+		gainLossTotal === null || costBasisTotal === null || costBasisTotal === 0
+			? null
+			: (gainLossTotal / costBasisTotal) * 100
+	);
 
 	function sentiment(value: number | null) {
 		if (value === null || value === 0) return 'neutral';
@@ -50,6 +72,26 @@
 		{:else if rows.length === 0}
 			<Empty>{m.portfolio_empty()}</Empty>
 		{:else}
+			<div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+				<KeyValue
+					title={m.portfolio_summary_total_gain_loss()}
+					value={gainLossTotal}
+					variant="outline"
+					decimalScale={2}
+				/>
+				<KeyValue
+					title={m.portfolio_summary_average_gain_percent()}
+					value={returnPercent}
+					variant="outline"
+					format="percent"
+				/>
+				<KeyValue
+					title={m.portfolio_summary_total_market_value()}
+					value={marketValueTotal}
+					variant="outline"
+					decimalScale={2}
+				/>
+			</div>
 			<div class="bg-background overflow-hidden rounded-sm shadow-md">
 				<Table.Root>
 					<Table.Header>

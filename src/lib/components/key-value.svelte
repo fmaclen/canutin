@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Currency from '$lib/components/currency.svelte';
+	import Number from '$lib/components/number.svelte';
 
 	type Variant = 'filled' | 'outline' | 'cash' | 'debt' | 'investment' | 'other';
 
@@ -13,7 +14,7 @@
 		title: string;
 		value: number | null;
 		variant?: Variant;
-		format?: 'currency' | 'number';
+		format?: 'currency' | 'number' | 'percent';
 		decimalScale?: number;
 	} = $props();
 
@@ -34,10 +35,14 @@
 >
 	<div class="text-sm font-semibold tracking-tight text-balance">{title}</div>
 	<div class="font-mono text-lg tabular-nums">
-		{#if format === 'number'}
-			{value ?? 0}
+		{#if value === null}
+			<span class="text-muted-foreground">~</span>
+		{:else if format === 'percent'}
+			<Number value={`${value > 0 ? '+' : ''}${value.toFixed(1)}%`} />
+		{:else if format === 'number'}
+			<Number {value} />
 		{:else}
-			<Currency value={value ?? 0} {decimalScale} />
+			<Currency {value} {decimalScale} />
 		{/if}
 	</div>
 </div>
