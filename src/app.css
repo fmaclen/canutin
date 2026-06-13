@@ -174,4 +174,15 @@
 		font-family: var(--font-mono);
 		line-height: 1em;
 	}
+
+	/* NOTE: size-adjust shrinks Decima Mono glyphs, so mono spans sitting on an Inter
+	   baseline render ~0.085em below Inter's optical center; raise them to compensate.
+	   Spans inside a font-mono ancestor already share a mono baseline and need no raise. */
+	span.font-mono {
+		vertical-align: 0.085em;
+	}
+
+	.font-mono span.font-mono {
+		vertical-align: baseline;
+	}
 }

@@ -1,11 +1,17 @@
 <script lang="ts">
+	import { CalendarDate, type DateValue } from '@internationalized/date';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
 	import SearchIcon from '@lucide/svelte/icons/search';
+	import type { DateRange } from 'bits-ui';
+	import { addDays, format, subDays } from 'date-fns';
 
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import AccountPicker from '$lib/components/account-picker.svelte';
 	import ClearButton from '$lib/components/clear-button.svelte';
+	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import * as Popover from '$lib/components/ui/popover/index.js';
+	import { RangeCalendar } from '$lib/components/ui/range-calendar/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
@@ -14,6 +20,7 @@
 		getSecurityTransactionsContext,
 		type SecurityTransactionTypeFilter
 	} from '$lib/security-transactions.svelte';
+	import type { PeriodOption } from '$lib/transactions.svelte';
 
 	const securityTxContext = getSecurityTransactionsContext();
 	const accountsContext = getAccountsContext();
@@ -32,9 +39,86 @@
 			: null
 	);
 
+	let periodPopoverOpen = $state(false);
+
+	function dateToCalendarDate(date: Date) {
+		return new CalendarDate(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+	}
+
+	// Derive calendar value from context's custom range (for URL param initialization)
+	let calendarValue: DateRange | undefined = $derived.by(() => {
+		const range = securityTxContext.customRange;
+		if (range) {
+			const toInclusive = subDays(range.to, 1);
+			return {
+				start: dateToCalendarDate(range.from),
+				end: dateToCalendarDate(toInclusive)
+			};
+		}
+		return undefined;
+	});
+
+	function formatCustomDateRange(from: Date, to: Date, label: string | null) {
+		if (label) return label;
+		const toInclusive = subDays(to, 1);
+		return `${format(from, 'MMM d, yyyy')} – ${format(toInclusive, 'MMM d, yyyy')}`;
+	}
+
 	function handleSearchInput(event: Event) {
 		const target = event.target as HTMLInputElement;
 		securityTxContext.setSearch(target.value);
+	}
+
+	function periodLabel(option: PeriodOption) {
+		switch (option) {
+			case 'this-month':
+				return m.transactions_filter_period_this_month();
+			case 'last-month':
+				return m.transactions_filter_period_last_month();
+			case 'last-3-months':
+				return m.transactions_filter_period_last_3_months();
+			case 'last-6-months':
+				return m.transactions_filter_period_last_6_months();
+			case 'last-12-months':
+				return m.transactions_filter_period_last_12_months();
+			case 'year-to-date':
+				return m.transactions_filter_period_year_to_date();
+			case 'last-year':
+				return m.transactions_filter_period_last_year();
+			case 'lifetime':
+			default:
+				return m.transactions_filter_period_lifetime();
+		}
+	}
+
+	function handlePresetClick(option: PeriodOption) {
+		securityTxContext.setPresetPeriod(option);
+		periodPopoverOpen = false;
+	}
+
+	function isPresetSelected(option: PeriodOption) {
+		return !securityTxContext.isCustomRange && securityTxContext.period === option;
+	}
+
+	function dateValueToDate(dateValue: DateValue) {
+		return new Date(dateValue.year, dateValue.month - 1, dateValue.day);
+	}
+
+	function handleCalendarChange(value: DateRange | undefined) {
+		if (value?.start && value?.end) {
+			const fromDate = dateValueToDate(value.start);
+			const toDate = addDays(dateValueToDate(value.end), 1);
+			securityTxContext.setCustomRange(fromDate, toDate);
+			periodPopoverOpen = false;
+		}
+	}
+
+	function getPeriodTriggerText() {
+		const range = securityTxContext.customRange;
+		if (range) {
+			return formatCustomDateRange(range.from, range.to, range.label);
+		}
+		return periodLabel(securityTxContext.period);
 	}
 </script>
 
@@ -63,6 +147,39 @@
 			</div>
 		{/if}
 	</div>
+	<Popover.Root bind:open={periodPopoverOpen}>
+		<Popover.SelectTrigger
+			aria-label={m.transactions_filter_period_label()}
+			class="bg-background w-full sm:w-fit"
+		>
+			<span class="truncate">{getPeriodTriggerText()}</span>
+		</Popover.SelectTrigger>
+		<Popover.Content class="w-auto p-0" align="start" collisionPadding={32}>
+			<div class="flex">
+				<div class="flex flex-col border-r p-2">
+					{#each securityTxContext.periodOptions as option (option)}
+						<Button
+							variant="ghost"
+							class="data-[selected]:bg-accent data-[selected]:text-accent-foreground justify-start font-normal"
+							data-selected={isPresetSelected(option) ? '' : undefined}
+							onclick={() => handlePresetClick(option)}
+						>
+							{periodLabel(option)}
+						</Button>
+					{/each}
+				</div>
+				<div class="p-2">
+					<RangeCalendar
+						value={calendarValue}
+						onValueChange={handleCalendarChange}
+						numberOfMonths={2}
+						placeholder={calendarValue?.start}
+						disableDaysOutsideMonth
+					/>
+				</div>
+			</div>
+		</Popover.Content>
+	</Popover.Root>
 	<AccountPicker
 		accounts={accountsContext.accounts}
 		value={securityTxContext.accountFilter ?? ''}

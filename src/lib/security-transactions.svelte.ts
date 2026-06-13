@@ -1,3 +1,4 @@
+import { UTCDate } from '@date-fns/utc';
 import { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 import { SvelteURLSearchParams } from 'svelte/reactivity';
@@ -16,7 +17,8 @@ import {
 } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
 import { getSecuritiesContext } from './securities.svelte';
-import { toNumber } from './utils';
+import type { PeriodOption } from './transactions.svelte';
+import { toNumber, toPocketBaseDateString } from './utils';
 
 type SecurityTransactionExpand = {
 	account?: AccountsResponse;
@@ -37,6 +39,7 @@ export type SecurityTransactionRow = {
 	id: string;
 	date: Date;
 	dateValue: number;
+	securityId: string | null;
 	securityName: string;
 	securitySymbol: string | null;
 	type: SecurityTransactionsTypeOptions;
@@ -52,10 +55,12 @@ export type SecurityTransactionRow = {
 };
 
 class SecurityTransactionsContext {
+	period: PeriodOption = $state('last-3-months');
 	search: string = $state('');
 	accountFilter: string | null = $state(null);
 	securityFilter: string | null = $state(null);
 	typeFilter: SecurityTransactionTypeFilter = $state('all');
+	page: number = $state(1);
 	isLoading: boolean = $state(true);
 	rawTransactions: SecurityTransaction[] = $state([]);
 
@@ -63,6 +68,9 @@ class SecurityTransactionsContext {
 	private _auth: ReturnType<typeof getAuthContext>;
 	private _accountsContext: ReturnType<typeof getAccountsContext>;
 	private _securitiesContext: ReturnType<typeof getSecuritiesContext>;
+	private _customFromDate: Date | null = $state(null);
+	private _customToDate: Date | null = $state(null);
+	private _customLabel: string | null = $state(null);
 	private _loadingDelayTimer: ReturnType<typeof setTimeout> | null = null;
 	private _refreshTimer: ReturnType<typeof setTimeout> | null = null;
 	private _activeUserId = '';
@@ -72,7 +80,18 @@ class SecurityTransactionsContext {
 	private static readonly LOADING_DELAY_MS = 150;
 	private static readonly REFRESH_DEBOUNCE_MS = 200;
 
+	readonly periodOptions: PeriodOption[] = [
+		'this-month',
+		'last-month',
+		'last-3-months',
+		'last-6-months',
+		'last-12-months',
+		'year-to-date',
+		'last-year',
+		'lifetime'
+	];
 	readonly typeOptions = Object.values(SecurityTransactionsTypeOptions);
+	readonly pageSize = 50;
 
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
@@ -85,10 +104,36 @@ class SecurityTransactionsContext {
 
 	syncFromUrl(shouldRefresh = true) {
 		const params = this.currentUrl.searchParams;
+		this._customFromDate = null;
+		this._customToDate = null;
+		this._customLabel = null;
+		this.period = 'last-3-months';
 		this.search = '';
 		this.accountFilter = null;
 		this.securityFilter = null;
 		this.typeFilter = 'all';
+
+		const periodFromParam = params.get('periodFrom');
+		const periodToParam = params.get('periodTo');
+		const periodLabelParam = params.get('periodLabel');
+
+		if (periodFromParam && periodToParam) {
+			const fromDate = this.parseDate(periodFromParam);
+			const toDate = this.parseDate(periodToParam);
+
+			if (fromDate && toDate && fromDate < toDate) {
+				this._customFromDate = fromDate;
+				this._customToDate = toDate;
+				this._customLabel = periodLabelParam;
+			}
+		}
+
+		if (this._customFromDate === null) {
+			const periodParam = params.get('period');
+			if (periodParam && this.periodOptions.includes(periodParam as PeriodOption)) {
+				this.period = periodParam as PeriodOption;
+			}
+		}
 
 		const searchParam = params.get('q');
 		if (searchParam) {
@@ -118,19 +163,63 @@ class SecurityTransactionsContext {
 		if (shouldRefresh) this.refreshTransactions();
 	}
 
+	private parseDate(dateString: string) {
+		const parsed = new UTCDate(dateString);
+		if (isNaN(parsed.getTime())) {
+			return null;
+		}
+		return parsed;
+	}
+
 	setSearch(query: string) {
 		this.search = query;
+		this.page = 1;
 		this.syncFiltersToUrl();
+	}
+
+	setPresetPeriod(option: PeriodOption) {
+		this._customFromDate = null;
+		this._customToDate = null;
+		this._customLabel = null;
+		this.period = option;
+
+		const params = new SvelteURLSearchParams(this.currentUrl.searchParams);
+
+		params.delete('periodFrom');
+		params.delete('periodTo');
+		params.delete('periodLabel');
+		params.set('period', option);
+
+		this.updateUrl(params);
+		this.refreshTransactions();
+	}
+
+	setCustomRange(from: Date, to: Date) {
+		this._customFromDate = from;
+		this._customToDate = to;
+		this._customLabel = null;
+
+		const params = new SvelteURLSearchParams(this.currentUrl.searchParams);
+
+		params.delete('period');
+		params.set('periodFrom', toPocketBaseDateString(from).split(' ')[0]);
+		params.set('periodTo', toPocketBaseDateString(to).split(' ')[0]);
+		params.delete('periodLabel');
+
+		this.updateUrl(params);
+		this.refreshTransactions();
 	}
 
 	setAccountFilter(accountId: string | null) {
 		this.accountFilter = accountId;
+		this.page = 1;
 		this.syncFiltersToUrl();
 		this.refreshTransactions();
 	}
 
 	setSecurityFilter(securityId: string | null) {
 		this.securityFilter = securityId;
+		this.page = 1;
 		this.syncFiltersToUrl();
 		this.refreshTransactions();
 	}
@@ -162,6 +251,15 @@ class SecurityTransactionsContext {
 
 		try {
 			const filterParts: string[] = [];
+
+			const { from, to } = this.activeDateRange;
+			if (from) {
+				filterParts.push(`date >= '${toPocketBaseDateString(from)}'`);
+			}
+			if (to) {
+				filterParts.push(`date < '${toPocketBaseDateString(to)}'`);
+			}
+
 			if (this.accountFilter) {
 				filterParts.push(`account = '${this.accountFilter}'`);
 			}
@@ -297,13 +395,81 @@ class SecurityTransactionsContext {
 			params.set('type', this.typeFilter);
 		}
 
+		this.updateUrl(params);
+	}
+
+	private updateUrl(params: SvelteURLSearchParams) {
 		const currentUrl = this.currentUrl;
 		const search = params.toString();
-		const href = `${currentUrl.origin}${currentUrl.pathname}${search ? `?${search}` : ''}`;
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const newUrl = new URL(currentUrl.href);
+		newUrl.search = search;
 
-		if (href !== currentUrl.href) {
+		if (newUrl.href !== currentUrl.href) {
 			// eslint-disable-next-line svelte/no-navigation-without-resolve -- URL is rebuilt from the current browser URL and dynamic filters.
-			replaceState(href, {});
+			replaceState(newUrl.href, {});
+		}
+	}
+
+	get isCustomRange() {
+		return this._customFromDate !== null && this._customToDate !== null;
+	}
+
+	get customRange(): { from: Date; to: Date; label: string | null } | null {
+		if (this._customFromDate && this._customToDate) {
+			return { from: this._customFromDate, to: this._customToDate, label: this._customLabel };
+		}
+		return null;
+	}
+
+	private get activeDateRange() {
+		if (this._customFromDate !== null || this._customToDate !== null) {
+			return { from: this._customFromDate, to: this._customToDate };
+		}
+		return this.getPeriodRange(this.period);
+	}
+
+	private getPeriodRange(option: PeriodOption) {
+		const now = new UTCDate();
+		const currentYear = now.getUTCFullYear();
+		const currentMonth = now.getUTCMonth();
+		const startOfThisMonth = new UTCDate(currentYear, currentMonth, 1, 0, 0, 0, 0);
+
+		switch (option) {
+			case 'this-month': {
+				const adjusted = new Date(startOfThisMonth.getTime() - 1);
+				return { from: adjusted, to: null } as const;
+			}
+			case 'last-month': {
+				const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+				const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+				const startOfLastMonth = new UTCDate(lastMonthYear, lastMonth, 1, 0, 0, 0, 0);
+				return { from: startOfLastMonth, to: startOfThisMonth } as const;
+			}
+			case 'last-3-months': {
+				const threeMonthsAgo = new UTCDate(currentYear, currentMonth - 2, 1, 0, 0, 0, 0);
+				return { from: threeMonthsAgo, to: null } as const;
+			}
+			case 'last-6-months': {
+				const sixMonthsAgo = new UTCDate(currentYear, currentMonth - 5, 1, 0, 0, 0, 0);
+				return { from: sixMonthsAgo, to: null } as const;
+			}
+			case 'last-12-months': {
+				const twelveMonthsAgo = new UTCDate(currentYear, currentMonth - 11, 1, 0, 0, 0, 0);
+				return { from: twelveMonthsAgo, to: null } as const;
+			}
+			case 'year-to-date': {
+				const startOfYearUtc = new UTCDate(currentYear, 0, 1, 0, 0, 0, 0);
+				return { from: startOfYearUtc, to: null } as const;
+			}
+			case 'last-year': {
+				const startOfLastYear = new UTCDate(currentYear - 1, 0, 1, 0, 0, 0, 0);
+				const startOfThisYear = new UTCDate(currentYear, 0, 1, 0, 0, 0, 0);
+				return { from: startOfLastYear, to: startOfThisYear } as const;
+			}
+			case 'lifetime':
+			default:
+				return { from: null, to: null } as const;
 		}
 	}
 
@@ -320,6 +486,7 @@ class SecurityTransactionsContext {
 				id: transaction.id,
 				date,
 				dateValue,
+				securityId: transaction.security || null,
 				securityName: expandedSecurity?.name ?? '',
 				securitySymbol: expandedSecurity?.symbol || null,
 				type: transaction.type,
@@ -337,26 +504,46 @@ class SecurityTransactionsContext {
 	}
 
 	get filteredRows() {
+		const { from, to } = this.activeDateRange;
+		const fromTime = from?.getTime() ?? null;
+		const toTime = to?.getTime() ?? null;
 		const query = this.search.trim().toLocaleLowerCase();
-		const rows = query
-			? this.allRows.filter((row) =>
-					[
-						row.securityName,
-						row.securitySymbol,
-						row.type,
-						row.subtype,
-						row.description,
-						row.accountName
-					]
-						.filter((value): value is string => Boolean(value))
-						.some((value) => value.toLocaleLowerCase().includes(query))
-				)
-			: this.allRows;
+
+		const rows = this.allRows.filter((row) => {
+			const time = row.dateValue;
+			if (fromTime !== null && time < fromTime) return false;
+			if (toTime !== null && time >= toTime) return false;
+			if (this.accountFilter && row.accountId !== this.accountFilter) return false;
+			if (this.securityFilter && row.securityId !== this.securityFilter) return false;
+			if (this.typeFilter !== 'all' && row.type !== this.typeFilter) return false;
+			if (!query) return true;
+			return [
+				row.securityName,
+				row.securitySymbol,
+				row.type,
+				row.subtype,
+				row.description,
+				row.accountName
+			]
+				.filter((value): value is string => Boolean(value))
+				.some((value) => value.toLocaleLowerCase().includes(query));
+		});
 
 		return rows.sort((a, b) => {
 			if (b.dateValue !== a.dateValue) return b.dateValue - a.dateValue;
 			return a.id.localeCompare(b.id);
 		});
+	}
+
+	get totalPages() {
+		const total = this.filteredRows.length;
+		if (total === 0) return 1;
+		return Math.ceil(total / this.pageSize);
+	}
+
+	get paginatedRows() {
+		const start = (this.page - 1) * this.pageSize;
+		return this.filteredRows.slice(start, start + this.pageSize);
 	}
 
 	dispose() {

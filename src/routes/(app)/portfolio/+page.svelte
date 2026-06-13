@@ -67,18 +67,25 @@
 								{m.securities_table_header_quantity()}
 							</Table.Head>
 							<Table.Head class="text-right whitespace-nowrap">
-								{m.securities_table_header_value()}
-							</Table.Head>
-							<Table.Head class="text-right whitespace-nowrap">
 								{m.securities_table_header_cost_basis()}
 							</Table.Head>
 							<Table.Head class="text-right whitespace-nowrap">
 								{m.securities_table_header_gain_loss()}
 							</Table.Head>
+							<Table.Head class="text-right whitespace-nowrap">
+								{m.securities_table_header_gain_loss_percent()}
+							</Table.Head>
+							<Table.Head class="text-right whitespace-nowrap">
+								{m.securities_table_header_value()}
+							</Table.Head>
 						</Table.Row>
 					</Table.Header>
 					<Table.Body>
 						{#each rows as row (row.id)}
+							{@const gainLossPercent =
+								row.gainLoss !== null && row.costBasis !== null && row.costBasis !== 0
+									? (row.gainLoss / row.costBasis) * 100
+									: null}
 							<Table.Row>
 								<Table.Cell>
 									<Link
@@ -112,13 +119,6 @@
 									{/if}
 								</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">
-									{#if row.value === null}
-										<span class="text-muted-foreground">~</span>
-									{:else}
-										<Currency value={row.value} decimalScale={2} />
-									{/if}
-								</Table.Cell>
-								<Table.Cell class="text-right tabular-nums">
 									{#if row.costBasis === null}
 										<span class="text-muted-foreground">~</span>
 									{:else}
@@ -134,6 +134,27 @@
 											decimalScale={2}
 											sentiment={sentiment(row.gainLoss)}
 										/>
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									{#if gainLossPercent === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<NumberDisplay
+											value={`${gainLossPercent > 0 ? '+' : ''}${gainLossPercent.toFixed(1)}%`}
+											sentiment={gainLossPercent > 0
+												? 'positive'
+												: gainLossPercent < 0
+													? 'negative'
+													: 'neutral'}
+										/>
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									{#if row.value === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<Currency value={row.value} decimalScale={2} sentiment={sentiment(row.value)} />
 									{/if}
 								</Table.Cell>
 							</Table.Row>

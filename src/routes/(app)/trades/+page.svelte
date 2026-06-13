@@ -39,6 +39,23 @@
 		hasSyncedSecurityFilters = true;
 		securityTxContext.syncFromUrl();
 	});
+
+	// Keep page within valid bounds
+	$effect(() => {
+		if (securityTxContext.page > securityTxContext.totalPages) {
+			securityTxContext.page = securityTxContext.totalPages;
+		}
+		if (securityTxContext.page < 1) securityTxContext.page = 1;
+	});
+
+	// Reset pagination whenever the active filters change
+	$effect(() => {
+		void securityTxContext.period;
+		void securityTxContext.accountFilter;
+		void securityTxContext.securityFilter;
+		void securityTxContext.typeFilter;
+		securityTxContext.page = 1;
+	});
 </script>
 
 <header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">

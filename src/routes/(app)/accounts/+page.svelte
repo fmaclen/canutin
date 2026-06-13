@@ -7,6 +7,7 @@
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
+	import KeyValue from '$lib/components/key-value.svelte';
 	import Link from '$lib/components/link.svelte';
 	import Page from '$lib/components/page.svelte';
 	import RecordLink from '$lib/components/record-link.svelte';
@@ -254,8 +255,23 @@
 				</nav>
 
 				{#each filters as option (option.key)}
-					<Tabs.Content value={option.key}>
+					<Tabs.Content value={option.key} class="flex flex-col space-y-2">
 						{@const rowsForOption = rowsByFilter.get(option.key) ?? []}
+						{@const total = totalsByFilter.get(option.key) ?? 0}
+						<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+							<KeyValue
+								title={m.sidebar_accounts()}
+								value={rowsForOption.length}
+								variant="outline"
+								format="number"
+							/>
+							<KeyValue
+								title={m.accounts_aggregate_total_label()}
+								value={total}
+								variant="outline"
+								decimalScale={2}
+							/>
+						</div>
 						{#if rowsForOption.length === 0}
 							<Empty>
 								{option.empty}
@@ -405,21 +421,6 @@
 											</Table.Row>
 										{/each}
 									</Table.Body>
-									<Table.Footer>
-										<Table.Row class="border-t-2">
-											<Table.Cell colspan={6} class="text-muted-foreground text-xs font-normal">
-												{m.accounts_aggregate_total_label()}
-											</Table.Cell>
-											<Table.Cell class="text-foreground text-right tabular-nums">
-												{@const total = totalsByFilter.get(option.key) ?? 0}
-												<Currency
-													value={total}
-													decimalScale={2}
-													sentiment={total > 0 ? 'positive' : total < 0 ? 'negative' : 'neutral'}
-												/>
-											</Table.Cell>
-										</Table.Row>
-									</Table.Footer>
 								</Table.Root>
 							</div>
 						{/if}

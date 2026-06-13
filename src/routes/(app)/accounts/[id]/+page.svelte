@@ -13,7 +13,9 @@
 	import Currency from '$lib/components/currency.svelte';
 	import Fieldset from '$lib/components/fieldset.svelte';
 	import FormFieldRow from '$lib/components/form-field-row.svelte';
+	import KeyValue from '$lib/components/key-value.svelte';
 	import Link from '$lib/components/link.svelte';
+	import NumberDisplay from '$lib/components/number.svelte';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
@@ -34,6 +36,7 @@
 	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
+	import { formatSecurityQuantity } from '$lib/security-transaction-display';
 	import { sanitizeFromParam } from '$lib/utils';
 
 	import BalanceForm from './balance-form.svelte';
@@ -62,11 +65,6 @@
 				)
 			: []
 	);
-	const positionsValue = $derived(
-		positionsBalances.every((balance) => balance.value !== null)
-			? positionsBalances.reduce((sum, balance) => sum + (balance.value ?? 0), 0)
-			: null
-	);
 	const positionsRows = $derived(
 		positionsBalances
 			.map((balance) => ({
@@ -77,6 +75,20 @@
 				a.securityName.localeCompare(b.securityName, undefined, { sensitivity: 'base' })
 			)
 	);
+	const positionsMarketValue = $derived(
+		positionsRows.reduce((sum, row) => sum + (row.value ?? 0), 0)
+	);
+	const dateFormatter = new Intl.DateTimeFormat(undefined, {
+		year: 'numeric',
+		month: 'short',
+		day: 'numeric',
+		timeZone: 'UTC'
+	});
+
+	function sentiment(value: number | null) {
+		if (value === null || value === 0) return 'neutral';
+		return value > 0 ? 'positive' : 'negative';
+	}
 
 	let formData = $state({
 		name: '',
@@ -409,66 +421,136 @@
 				onSubmit={handleUpdateBalance}
 				disabled={!canWrite}
 			/>
-			{#if positionsBalances.length > 0}
-				<p class="text-muted-foreground text-sm">{m.accounts_text_cash_balance_only()}</p>
-				<div class="bg-background overflow-hidden rounded-sm shadow-md">
-					<Table.Root>
-						<Table.Body>
+		{/if}
+	</Section>
+
+	{#if !isLoading && account && positionsRows.length > 0}
+		<Section>
+			<SectionTitle title={m.portfolio_section_positions()} />
+			<div
+				role="region"
+				aria-label={m.portfolio_section_positions()}
+				class="grid grid-cols-1 gap-2 sm:grid-cols-2"
+			>
+				<KeyValue
+					title={m.portfolio_section_positions()}
+					value={positionsRows.length}
+					variant="outline"
+					format="number"
+				/>
+				<KeyValue
+					title={m.securities_table_header_value()}
+					value={positionsMarketValue}
+					variant="outline"
+					decimalScale={2}
+				/>
+			</div>
+			<div class="bg-background overflow-hidden rounded-sm shadow-md">
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							<Table.Head class="text-left whitespace-nowrap">
+								{m.securities_table_header_as_of()}
+							</Table.Head>
+							<Table.Head class="text-left whitespace-nowrap">
+								{m.securities_table_header_security()}
+							</Table.Head>
+							<Table.Head class="text-right whitespace-nowrap">
+								{m.securities_table_header_quantity()}
+							</Table.Head>
+							<Table.Head class="text-right whitespace-nowrap">
+								{m.securities_table_header_price()}
+							</Table.Head>
+							<Table.Head class="text-right whitespace-nowrap">
+								{m.securities_table_header_cost_basis()}
+							</Table.Head>
+							<Table.Head class="text-right whitespace-nowrap">
+								{m.securities_table_header_gain_loss()}
+							</Table.Head>
+							<Table.Head class="text-right whitespace-nowrap">
+								{m.securities_table_header_gain_loss_percent()}
+							</Table.Head>
+							<Table.Head class="text-right whitespace-nowrap">
+								{m.securities_table_header_value()}
+							</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each positionsRows as row (row.id)}
+							{@const gainLossPercent =
+								row.gainLoss !== null && row.costBasis !== null && row.costBasis !== 0
+									? (row.gainLoss / row.costBasis) * 100
+									: 0}
 							<Table.Row>
-								<Table.Cell class="text-foreground/90 text-sm">
-									{m.accounts_label_cash_balance()}
+								<Table.Cell
+									class="text-muted-foreground font-mono whitespace-nowrap uppercase tabular-nums"
+								>
+									{dateFormatter.format(new Date(row.asOf))}
+								</Table.Cell>
+								<Table.Cell>
+									<Link
+										href={resolve(`/trades/securities/${row.securityId}`)}
+										class="text-foreground/90 text-sm font-medium"
+									>
+										{row.securityName}
+									</Link>
 								</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">
-									<Currency value={account.cashBalance} decimalScale={2} sentiment="neutral" />
-								</Table.Cell>
-							</Table.Row>
-							{#each positionsRows as row (row.id)}
-								<Table.Row>
-									<Table.Cell class="pl-6">
-										<Link
-											href={resolve(`/trades/securities/${row.securityId}`)}
-											class="text-foreground/80 text-sm"
-										>
-											{row.securityName}
-										</Link>
-									</Table.Cell>
-									<Table.Cell class="text-right tabular-nums">
-										{#if row.value === null}
-											<span class="text-muted-foreground">~</span>
-										{:else}
-											<Currency value={row.value} decimalScale={2} sentiment="neutral" />
-										{/if}
-									</Table.Cell>
-								</Table.Row>
-							{/each}
-							<Table.Row>
-								<Table.Cell class="text-foreground/90 text-sm">
-									{m.accounts_label_portfolio_value()}
-								</Table.Cell>
-								<Table.Cell class="text-right tabular-nums">
-									{#if positionsValue === null}
+									{#if row.quantity === null}
 										<span class="text-muted-foreground">~</span>
 									{:else}
-										<Currency value={positionsValue} decimalScale={2} sentiment="neutral" />
+										<NumberDisplay value={formatSecurityQuantity(row.quantity)} />
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									{#if row.price === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<Currency value={row.price} decimalScale={2} />
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									{#if row.costBasis === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<Currency value={row.costBasis} decimalScale={2} />
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									{#if row.gainLoss === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<Currency
+											value={row.gainLoss}
+											decimalScale={2}
+											sentiment={sentiment(row.gainLoss)}
+										/>
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									<NumberDisplay
+										value={`${gainLossPercent > 0 ? '+' : ''}${gainLossPercent.toFixed(1)}%`}
+										sentiment={gainLossPercent > 0
+											? 'positive'
+											: gainLossPercent < 0
+												? 'negative'
+												: 'neutral'}
+									/>
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									{#if row.value === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<Currency value={row.value} decimalScale={2} sentiment={sentiment(row.value)} />
 									{/if}
 								</Table.Cell>
 							</Table.Row>
-						</Table.Body>
-						<Table.Footer>
-							<Table.Row class="border-t-2">
-								<Table.Cell class="text-muted-foreground text-xs font-normal">
-									{m.accounts_label_total_balance()}
-								</Table.Cell>
-								<Table.Cell class="text-right tabular-nums">
-									<Currency value={account.balance} decimalScale={2} sentiment="neutral" />
-								</Table.Cell>
-							</Table.Row>
-						</Table.Footer>
-					</Table.Root>
-				</div>
-			{/if}
-		{/if}
-	</Section>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			</div>
+		</Section>
+	{/if}
 
 	<Section>
 		<SectionTitle title={m.accounts_section_details()} />
