@@ -44,7 +44,7 @@ test('balance sheet → account → save balance redirects back to /balance-shee
 		new RegExp(`/accounts/${account.id}\\?from=(%2Fbalance-sheet|/balance-sheet)`)
 	);
 
-	await page.getByLabel('Cash balance', { exact: true }).fill('1500');
+	await page.getByLabel('Balance', { exact: true }).fill('1500');
 	await page.getByRole('button', { name: 'Update' }).click();
 
 	await expect(page.getByText('Balance updated')).toBeVisible();

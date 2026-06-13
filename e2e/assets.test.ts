@@ -75,7 +75,7 @@ test('assets table reflects filters and aggregate totals', async ({ page }) => {
 	await expect(excludedCells.nth(8)).toContainText('$2,000.00');
 	await expect(excludedRow.getByText('Excluded')).toBeVisible();
 
-	const aggregateRow = page.getByRole('row', { name: 'Assets aggregate total' });
+	const aggregateRow = page.getByRole('region', { name: 'Assets aggregate total' });
 	await expect(aggregateRow).toContainText('$5,000.00');
 	await expect(aggregateRow).not.toContainText('$2,000.00');
 	await expect(page.getByRole('row', { name: 'Legacy Stock' })).not.toBeVisible();

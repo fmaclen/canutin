@@ -93,20 +93,18 @@ test('portfolio and trades flow covers security creation, balances, filters, and
 	await page.getByLabel('As of').fill(formatDateForInput(new UTCDate()));
 	await page.getByLabel('Quantity').fill('5');
 	await page.getByLabel('Price').fill('210');
-	await page.getByLabel('Value').fill('1050');
+	await page.getByRole('textbox', { name: 'Market value' }).fill('1050');
 	await page.getByLabel('Cost basis').fill('900');
 	await page.getByRole('button', { name: 'Add balance' }).click();
 	await expect(page.getByRole('row', { name: /Roth Portfolio/ })).toContainText('$1,050.00');
-	await expect(page.getByRole('row', { name: /Total/ })).toContainText('$3,050.00');
+	await expect(page.getByRole('region', { name: 'Market value' })).toContainText('$3,050.00');
 
 	await page.goto(`/accounts/${brokerageAccount.id}`);
-	await expect(page.getByText('Cash balance only')).toBeVisible();
-	await expect(page.getByRole('row', { name: /Cash balance/ })).toContainText('$1,000.00');
+	await expect(page.getByLabel('Balance', { exact: true })).toHaveValue('$1,000.00');
 	await expect(page.getByRole('row', { name: /Vanguard Total Stock Market ETF/ })).toContainText(
 		'$2,000.00'
 	);
-	await expect(page.getByRole('row', { name: /Portfolio value/ })).toContainText('$2,000.00');
-	await expect(page.getByRole('row', { name: /Total balance/ })).toContainText('$3,000.00');
+	await expect(page.getByRole('region', { name: 'Market value' })).toContainText('$2,000.00');
 	await page.getByRole('main').getByRole('link', { name: 'Trades' }).click();
 	await expect(page).toHaveURL(`/trades?account=${brokerageAccount.id}`);
 	await expect(page.getByRole('button', { name: 'Account', exact: true })).toContainText(
@@ -180,12 +178,12 @@ test('portfolio unknown values render as unknown and do not inflate account tota
 	await goToPageViaSidebar(page, 'Portfolio');
 	const row = page.getByRole('row', { name: /Private Fund/ });
 	await expect(row).toContainText('PFND');
-	await expect(row.locator('td').nth(4)).toHaveText('~');
+	await expect(row.locator('td').last()).toHaveText('~');
 
 	await page.goto(`/accounts/${account.id}`);
-	await expect(page.getByRole('row', { name: /Cash balance/ })).toContainText('$750.00');
-	await expect(page.getByRole('row', { name: /Portfolio value/ })).toContainText('~');
-	await expect(page.getByRole('row', { name: /Total balance/ })).toContainText('$750.00');
+	await expect(page.getByLabel('Balance', { exact: true })).toHaveValue('$750.00');
+	const positionRow = page.getByRole('row', { name: /Private Fund/ });
+	await expect(positionRow.locator('td').last()).toHaveText('~');
 });
 
 test('portfolio hides sold-out positions while preserving activity history', async ({ page }) => {
@@ -238,6 +236,8 @@ test('portfolio hides sold-out positions while preserving activity history', asy
 	await expect(page.getByRole('row', { name: /Round Trip Stock/ })).toBeVisible();
 
 	await page.goto('/trades');
+	await page.getByRole('button', { name: 'Period' }).click();
+	await page.getByRole('button', { name: 'Lifetime' }).click();
 	await expect(page.getByRole('row', { name: /Exit Round Trip Stock/ })).toBeVisible();
 });
 
