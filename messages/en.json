@@ -83,6 +83,7 @@
 	"accounts_label_category": "Category",
 	"accounts_label_balance_group": "Balance group",
 	"accounts_label_balance": "Balance",
+	"accounts_label_cash": "Cash",
 	"accounts_label_marked_as": "Marked as",
 	"accounts_label_exclude_from_net_worth": "Exclude from net worth",
 	"accounts_label_closed": "Closed",

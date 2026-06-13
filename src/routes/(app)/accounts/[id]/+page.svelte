@@ -410,20 +410,6 @@
 		</Section>
 	{/if}
 
-	<Section>
-		<SectionTitle title={m.accounts_section_balance()} />
-		{#if isLoading || !account}
-			<Skeleton class="h-48" />
-		{:else}
-			<BalanceForm
-				{formData}
-				balanceAsOf={account?.balanceAsOf ?? ''}
-				onSubmit={handleUpdateBalance}
-				disabled={!canWrite}
-			/>
-		{/if}
-	</Section>
-
 	{#if !isLoading && account && positionsRows.length > 0}
 		<Section>
 			<SectionTitle title={m.portfolio_section_positions()} />
@@ -551,6 +537,21 @@
 			</div>
 		</Section>
 	{/if}
+
+	<Section>
+		<SectionTitle title={m.accounts_section_balance()} />
+		{#if isLoading || !account}
+			<Skeleton class="h-48" />
+		{:else}
+			<BalanceForm
+				{formData}
+				balanceAsOf={account?.balanceAsOf ?? ''}
+				onSubmit={handleUpdateBalance}
+				disabled={!canWrite}
+				hasPositions={positionsRows.length > 0}
+			/>
+		{/if}
+	</Section>
 
 	<Section>
 		<SectionTitle title={m.accounts_section_details()} />

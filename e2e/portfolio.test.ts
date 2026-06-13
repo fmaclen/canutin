@@ -100,7 +100,7 @@ test('portfolio and trades flow covers security creation, balances, filters, and
 	await expect(page.getByRole('region', { name: 'Market value' })).toContainText('$3,050.00');
 
 	await page.goto(`/accounts/${brokerageAccount.id}`);
-	await expect(page.getByLabel('Balance', { exact: true })).toHaveValue('$1,000.00');
+	await expect(page.getByLabel('Cash', { exact: true })).toHaveValue('$1,000.00');
 	await expect(page.getByRole('row', { name: /Vanguard Total Stock Market ETF/ })).toContainText(
 		'$2,000.00'
 	);
@@ -181,7 +181,7 @@ test('portfolio unknown values render as unknown and do not inflate account tota
 	await expect(row.locator('td').last()).toHaveText('~');
 
 	await page.goto(`/accounts/${account.id}`);
-	await expect(page.getByLabel('Balance', { exact: true })).toHaveValue('$750.00');
+	await expect(page.getByLabel('Cash', { exact: true })).toHaveValue('$750.00');
 	const positionRow = page.getByRole('row', { name: /Private Fund/ });
 	await expect(positionRow.locator('td').last()).toHaveText('~');
 });
