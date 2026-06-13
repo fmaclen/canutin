@@ -266,7 +266,7 @@
 								format="number"
 							/>
 							<KeyValue
-								title={m.accounts_aggregate_total_label()}
+								title={m.summary_net_balance()}
 								value={total}
 								variant="outline"
 								decimalScale={2}

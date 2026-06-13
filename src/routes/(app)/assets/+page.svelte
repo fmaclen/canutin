@@ -248,7 +248,7 @@
 								format="number"
 							/>
 							<KeyValue
-								title={m.assets_aggregate_total_label()}
+								title={m.summary_net_market_value()}
 								value={total}
 								variant="outline"
 								decimalScale={2}

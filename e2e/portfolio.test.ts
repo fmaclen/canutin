@@ -97,14 +97,14 @@ test('portfolio and trades flow covers security creation, balances, filters, and
 	await page.getByLabel('Cost basis').fill('900');
 	await page.getByRole('button', { name: 'Add balance' }).click();
 	await expect(page.getByRole('row', { name: /Roth Portfolio/ })).toContainText('$1,050.00');
-	await expect(page.getByRole('region', { name: 'Market value' })).toContainText('$3,050.00');
+	await expect(page.getByRole('region', { name: 'Net market value' })).toContainText('$3,050.00');
 
 	await page.goto(`/accounts/${brokerageAccount.id}`);
 	await expect(page.getByLabel('Cash', { exact: true })).toHaveValue('$1,000.00');
 	await expect(page.getByRole('row', { name: /Vanguard Total Stock Market ETF/ })).toContainText(
 		'$2,000.00'
 	);
-	await expect(page.getByRole('region', { name: 'Market value' })).toContainText('$2,000.00');
+	await expect(page.getByRole('region', { name: 'Net market value' })).toContainText('$2,000.00');
 	await page.getByRole('main').getByRole('link', { name: 'Trades' }).click();
 	await expect(page).toHaveURL(`/trades?account=${brokerageAccount.id}`);
 	await expect(page.getByRole('button', { name: 'Account', exact: true })).toContainText(

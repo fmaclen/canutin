@@ -74,19 +74,19 @@
 		{:else}
 			<div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
 				<KeyValue
-					title={m.portfolio_summary_total_gain_loss()}
+					title={m.summary_net_gain_loss()}
 					value={gainLossTotal}
 					variant="outline"
 					decimalScale={2}
 				/>
 				<KeyValue
-					title={m.portfolio_summary_average_gain_percent()}
+					title={m.summary_net_gain_percent()}
 					value={returnPercent}
 					variant="outline"
 					format="percent"
 				/>
 				<KeyValue
-					title={m.portfolio_summary_total_market_value()}
+					title={m.summary_net_market_value()}
 					value={marketValueTotal}
 					variant="outline"
 					decimalScale={2}

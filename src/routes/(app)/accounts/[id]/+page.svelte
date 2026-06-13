@@ -425,7 +425,7 @@
 					format="number"
 				/>
 				<KeyValue
-					title={m.securities_table_header_value()}
+					title={m.summary_net_market_value()}
 					value={positionsMarketValue}
 					variant="outline"
 					decimalScale={2}

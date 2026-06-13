@@ -98,7 +98,7 @@ test('accounts table reflects filters, transactions, and aggregate totals', asyn
 	await expect(excludedRow.getByText('Excluded')).toBeVisible();
 	await expect(excludedCells.nth(5)).toHaveText('~');
 
-	const aggregateRow = page.getByRole('region', { name: 'Accounts aggregate total' });
+	const aggregateRow = page.getByRole('region', { name: 'Net balance' });
 	await expect(aggregateRow).toContainText('$2,500.00');
 	await expect(aggregateRow).not.toContainText('$1,000.00');
 
