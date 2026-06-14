@@ -389,34 +389,31 @@ test('transactions and portfolio add forms show empty prerequisites with no acco
 	await page.getByRole('link', { name: 'Add transaction' }).click();
 	await page.getByLabel('Account').click();
 	const transactionAccountPicker = page.getByRole('listbox');
-	await expect(transactionAccountPicker.getByText('No accounts yet')).toBeVisible();
-	await expect(transactionAccountPicker.getByRole('link', { name: 'Add account' })).toHaveAttribute(
-		'href',
-		'/accounts/add'
-	);
+	await expect(
+		transactionAccountPicker.getByRole('option', { name: 'There are no accounts' })
+	).toBeVisible();
+	await expect(transactionAccountPicker.getByRole('link', { name: 'Add account' })).toHaveCount(0);
 
 	await page.goto('/trades/add');
 	await page.getByLabel('Account').click();
 	const tradeAccountPicker = page.getByRole('listbox');
-	await expect(tradeAccountPicker.getByText('No accounts yet')).toBeVisible();
-	await expect(tradeAccountPicker.getByRole('link', { name: 'Add account' })).toHaveAttribute(
-		'href',
-		'/accounts/add'
-	);
+	await expect(
+		tradeAccountPicker.getByRole('option', { name: 'There are no accounts' })
+	).toBeVisible();
+	await expect(tradeAccountPicker.getByRole('link', { name: 'Add account' })).toHaveCount(0);
 	await page.keyboard.press('Escape');
 	await page.getByLabel('Security').click();
-	await expect(page.getByRole('option', { name: 'No securities yet' })).toBeVisible();
+	await expect(page.getByRole('option', { name: 'There are no securities' })).toBeVisible();
 
 	await page.goto('/trades/securities/add');
 	await page.getByLabel('Security').click();
 	await page.getByRole('option', { name: 'Add security' }).click();
 	await page.getByLabel('Account').click();
 	const balanceAccountPicker = page.getByRole('listbox');
-	await expect(balanceAccountPicker.getByText('No accounts yet')).toBeVisible();
-	await expect(balanceAccountPicker.getByRole('link', { name: 'Add account' })).toHaveAttribute(
-		'href',
-		'/accounts/add'
-	);
+	await expect(
+		balanceAccountPicker.getByRole('option', { name: 'There are no accounts' })
+	).toBeVisible();
+	await expect(balanceAccountPicker.getByRole('link', { name: 'Add account' })).toHaveCount(0);
 });
 
 test('trades and securities empty prerequisites stay consistent', async ({ page }) => {
@@ -435,7 +432,7 @@ test('trades and securities empty prerequisites stay consistent', async ({ page 
 
 	await page.getByRole('link', { name: 'Add trade' }).click();
 	await page.getByLabel('Security').click();
-	await expect(page.getByRole('option', { name: 'No securities yet' })).toBeVisible();
+	await expect(page.getByRole('option', { name: 'There are no securities' })).toBeVisible();
 
 	await goToPageViaSidebar(page, 'Securities');
 	await expect(page.getByText('No securities yet')).toBeVisible();
