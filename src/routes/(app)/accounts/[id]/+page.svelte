@@ -36,6 +36,11 @@
 	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
+	import {
+		compareByValueDescThenName,
+		gainLossPercentOrNull,
+		sumOrUnknown
+	} from '$lib/security-balance-values';
 	import { formatSecurityQuantity } from '$lib/security-transaction-display';
 	import { sanitizeFromParam } from '$lib/utils';
 
@@ -71,18 +76,14 @@
 				...balance,
 				securityName: securitiesContext.getSecurity(balance.securityId)?.name ?? ''
 			}))
-			.sort((a, b) => {
-				if (a.value === null && b.value === null)
-					return a.securityName.localeCompare(b.securityName, undefined, { sensitivity: 'base' });
-				if (a.value === null) return 1;
-				if (b.value === null) return -1;
-				if (b.value !== a.value) return b.value - a.value;
-				return a.securityName.localeCompare(b.securityName, undefined, { sensitivity: 'base' });
-			})
+			.sort(
+				compareByValueDescThenName(
+					(row) => row.value,
+					(row) => row.securityName
+				)
+			)
 	);
-	const positionsMarketValue = $derived(
-		positionsRows.reduce((sum, row) => sum + (row.value ?? 0), 0)
-	);
+	const positionsMarketValue = $derived(sumOrUnknown(positionsRows.map((row) => row.value)));
 	const dateFormatter = new Intl.DateTimeFormat(undefined, {
 		year: 'numeric',
 		month: 'short',
@@ -421,14 +422,8 @@
 			<div
 				role="region"
 				aria-label={m.portfolio_section_positions()}
-				class="grid grid-cols-1 gap-2 sm:grid-cols-2"
+				class="grid grid-cols-1 gap-2"
 			>
-				<KeyValue
-					title={m.portfolio_section_positions()}
-					value={positionsRows.length}
-					variant="outline"
-					format="number"
-				/>
 				<KeyValue
 					title={m.summary_net_market_value()}
 					value={positionsMarketValue}
@@ -468,10 +463,7 @@
 					</Table.Header>
 					<Table.Body>
 						{#each positionsRows as row (row.id)}
-							{@const gainLossPercent =
-								row.gainLoss !== null && row.costBasis !== null && row.costBasis !== 0
-									? (row.gainLoss / row.costBasis) * 100
-									: 0}
+							{@const gainLossPercent = gainLossPercentOrNull(row.gainLoss, row.costBasis)}
 							<Table.Row>
 								<Table.Cell
 									class="text-muted-foreground font-mono whitespace-nowrap uppercase tabular-nums"
@@ -519,14 +511,18 @@
 									{/if}
 								</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">
-									<NumberDisplay
-										value={`${gainLossPercent > 0 ? '+' : ''}${gainLossPercent.toFixed(1)}%`}
-										sentiment={gainLossPercent > 0
-											? 'positive'
-											: gainLossPercent < 0
-												? 'negative'
-												: 'neutral'}
-									/>
+									{#if gainLossPercent === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<NumberDisplay
+											value={`${gainLossPercent > 0 ? '+' : ''}${gainLossPercent.toFixed(1)}%`}
+											sentiment={gainLossPercent > 0
+												? 'positive'
+												: gainLossPercent < 0
+													? 'negative'
+													: 'neutral'}
+										/>
+									{/if}
 								</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">
 									{#if row.value === null}

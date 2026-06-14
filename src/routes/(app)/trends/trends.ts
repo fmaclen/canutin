@@ -16,8 +16,6 @@ export type TrendSecurityBalance = Pick<
 	'id' | 'account' | 'security' | 'value' | 'quantity' | 'asOf'
 >;
 
-export type TrendAccount = AccountsResponse & { closed?: string };
-export type TrendAsset = AssetsResponse & { sold?: string };
 export type TrendSecurityValueState = {
 	index: number;
 	lastKnownValue: number | null;
@@ -80,8 +78,8 @@ export function computeRangeForPeriod(
 }
 
 export function buildPreparedMaps(
-	accounts: TrendAccount[],
-	assets: TrendAsset[],
+	accounts: AccountsResponse[],
+	assets: AssetsResponse[],
 	accountBalances: AccountBalancesResponse[],
 	securityBalances: TrendSecurityBalance[],
 	assetBalances: AssetBalancesResponse[]

@@ -7,8 +7,9 @@ import { getAuthContext } from './auth.svelte';
 import type { SecuritiesResponse, SecurityBalancesResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
 import {
-	compareSecurityBalanceRecency,
-	resolveSecurityBalanceValues
+	compareByValueDescThenName,
+	resolveSecurityBalanceValues,
+	sumOrUnknown
 } from './security-balance-values';
 import { projectSignedValue } from './sharing';
 import { toNumber } from './utils';
@@ -57,15 +58,22 @@ class SecuritiesContext {
 	positionsLoaded = false;
 
 	positionsValueByAccount = $derived.by(() => {
-		const totals = new SvelteMap<string, number>();
+		const eligibleAccountIds = new Set(
+			this._accounts.accountRecords
+				.filter((account) => !account.closed)
+				.map((account) => account.id)
+		);
+		const valuesByAccount = new SvelteMap<string, Array<number | null>>();
 		for (const resolved of resolveSecurityBalanceValues(this.securityBalances).values()) {
-			if (resolved.value === null) continue;
-			totals.set(
-				resolved.balance.account,
-				(totals.get(resolved.balance.account) ?? 0) + resolved.value
-			);
+			const accountId = resolved.balance.account;
+			if (!eligibleAccountIds.has(accountId)) continue;
+			const values = valuesByAccount.get(accountId) ?? [];
+			values.push(resolved.value);
+			valuesByAccount.set(accountId, values);
 		}
-		return totals;
+		return new Map(
+			[...valuesByAccount].map(([accountId, values]) => [accountId, sumOrUnknown(values)])
+		);
 	});
 
 	private securityBalances: SecurityBalance[] = $state([]);
@@ -93,18 +101,12 @@ class SecuritiesContext {
 	getAccountBalances(securityId: string) {
 		return this.getLatestAccountBalanceRows()
 			.filter((row) => row.securityId === securityId)
-			.sort((a, b) => {
-				if (a.value === null && b.value === null)
-					return a.accountName.localeCompare(b.accountName, undefined, { sensitivity: 'base' });
-				if (a.value === null) return 1;
-				if (b.value === null) return -1;
-				if (b.value !== a.value) return b.value - a.value;
-				return a.accountName.localeCompare(b.accountName, undefined, { sensitivity: 'base' });
-			});
-	}
-
-	getSummary(securityId: string) {
-		return this.summarizeBalances(this.getAccountBalances(securityId));
+			.sort(
+				compareByValueDescThenName(
+					(row) => row.value,
+					(row) => row.accountName
+				)
+			);
 	}
 
 	async updateSecurity(id: string, data: { name: string; symbol: string }) {
@@ -155,18 +157,26 @@ class SecuritiesContext {
 	}
 
 	private async refreshForCurrentUser() {
+		const userId = this._auth.currentUserId;
+		const token = ++this.refreshSequence;
 		try {
-			await this.refreshAll();
+			await this.refreshAll(userId, token);
 		} catch (error) {
+			if (userId !== this._auth.currentUserId || token !== this.refreshSequence) return;
 			this._pb.handleConnectionError(error, 'securities', 'init');
+			this.resolvePositionsLoaded();
 		} finally {
-			this.isLoading = false;
+			if (userId === this._auth.currentUserId && token === this.refreshSequence)
+				this.isLoading = false;
 		}
 	}
 
-	private async refreshAll() {
-		const token = ++this.refreshSequence;
-		this.positionsLoaded = false;
+	private resolvePositionsLoaded() {
+		this.positionsLoaded = true;
+		this._accounts.notifyBalancesChanged();
+	}
+
+	private async refreshAll(userId = this._auth.currentUserId, token = ++this.refreshSequence) {
 		const [securities, securityBalances] = await Promise.all([
 			this._pb.authedClient.collection('securities').getFullList<SecuritiesResponse>({
 				sort: 'name',
@@ -177,11 +187,10 @@ class SecuritiesContext {
 				requestKey: null
 			})
 		]);
-		if (token !== this.refreshSequence) return;
+		if (userId !== this._auth.currentUserId || token !== this.refreshSequence) return;
 		this.securities = securities;
 		this.securityBalances = securityBalances;
-		this.positionsLoaded = true;
-		this._accounts.notifyBalancesChanged();
+		this.resolvePositionsLoaded();
 	}
 
 	private realtimeSubscribe() {
@@ -204,34 +213,22 @@ class SecuritiesContext {
 		if (this.refreshTimer) clearTimeout(this.refreshTimer);
 		this.refreshTimer = setTimeout(() => {
 			this.refreshTimer = null;
-			this.refreshAll().catch((error) =>
-				this._pb.handleConnectionError(error, 'securities', 'refresh')
-			);
+			const userId = this._auth.currentUserId;
+			const token = ++this.refreshSequence;
+			this.refreshAll(userId, token).catch((error) => {
+				if (userId !== this._auth.currentUserId || token !== this.refreshSequence) return;
+				this._pb.handleConnectionError(error, 'securities', 'refresh');
+				this.resolvePositionsLoaded();
+			});
 		}, DEBOUNCE_MS);
 	}
 
-	private getEligibleAccountMap() {
-		return new Map(
+	private getLatestAccountBalanceRows() {
+		const accounts = new Map(
 			this._accounts.accounts
 				.filter((account) => !account.closed)
 				.map((account) => [account.id, account])
 		);
-	}
-
-	private getLatestBalancesByAccountSecurity() {
-		const latestBalances = new SvelteMap<string, SecurityBalance>();
-		for (const balance of this.securityBalances) {
-			const key = `${balance.account}:${balance.security}`;
-			const existing = latestBalances.get(key);
-			if (!existing || compareSecurityBalanceRecency(balance, existing) < 0) {
-				latestBalances.set(key, balance);
-			}
-		}
-		return latestBalances;
-	}
-
-	private getLatestAccountBalanceRows() {
-		const accounts = this.getEligibleAccountMap();
 		const resolvedValues = resolveSecurityBalanceValues(this.securityBalances);
 
 		const rows: SecurityAccountBalance[] = [];
@@ -240,11 +237,8 @@ class SecuritiesContext {
 			const account = accounts.get(balance.account);
 			if (!account) continue;
 
-			const rawValue = resolved.value;
-			const rawCostBasis = resolved.costBasis;
-			const value = rawValue === null ? null : projectSignedValue(rawValue, account.perspective);
-			const costBasis =
-				rawCostBasis === null ? null : projectSignedValue(rawCostBasis, account.perspective);
+			const value = projectSignedValue(resolved.value, account.perspective);
+			const costBasis = projectSignedValue(resolved.costBasis, account.perspective);
 			rows.push({
 				id: balance.id,
 				accountId: account.id,
@@ -287,35 +281,24 @@ class SecuritiesContext {
 			});
 		}
 
-		return aggregates.sort((a, b) => {
-			if (a.value === null && b.value === null)
-				return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-			if (a.value === null) return 1;
-			if (b.value === null) return -1;
-			if (b.value !== a.value) return b.value - a.value;
-			return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-		});
+		return aggregates.sort(
+			compareByValueDescThenName(
+				(aggregate) => aggregate.value,
+				(aggregate) => aggregate.name
+			)
+		);
 	}
 
 	private summarizeBalances(balances: SecurityAccountBalance[]) {
-		const quantitiesComplete = balances.every((balance) => balance.quantity !== null);
-		const valuesComplete = balances.every((balance) => balance.value !== null);
-		const costsComplete = balances.every((balance) => balance.costBasis !== null);
-		const quantity = quantitiesComplete
-			? balances.reduce((sum, balance) => sum + (balance.quantity ?? 0), 0)
-			: null;
-		const value = valuesComplete
-			? balances.reduce((sum, balance) => sum + (balance.value ?? 0), 0)
-			: null;
-		const costBasis = costsComplete
-			? balances.reduce((sum, balance) => sum + (balance.costBasis ?? 0), 0)
-			: null;
+		const quantity = sumOrUnknown(balances.map((balance) => balance.quantity));
+		const value = sumOrUnknown(balances.map((balance) => balance.value));
+		const costBasis = sumOrUnknown(balances.map((balance) => balance.costBasis));
 
 		return {
 			quantity,
 			value,
 			costBasis,
-			gainLoss: value === null || !valuesComplete || costBasis === null ? null : value - costBasis
+			gainLoss: value === null || costBasis === null ? null : value - costBasis
 		};
 	}
 

@@ -4,11 +4,19 @@ import type {
 } from './pocketbase.schema';
 
 export function projectSignedValue(
+	value: number,
+	perspective: AccountSharesPerspectiveOptions | AssetSharesPerspectiveOptions
+): number;
+export function projectSignedValue(
 	value: number | null | undefined,
 	perspective: AccountSharesPerspectiveOptions | AssetSharesPerspectiveOptions
-) {
-	const normalized = value ?? 0;
-	return perspective === 'INVERSE' ? -normalized : normalized;
+): number | null;
+export function projectSignedValue(
+	value: number | null | undefined,
+	perspective: AccountSharesPerspectiveOptions | AssetSharesPerspectiveOptions
+): number | null {
+	if (value === null || value === undefined) return null;
+	return perspective === 'INVERSE' ? -value : value;
 }
 
 export function participantExcluded(
@@ -25,8 +33,8 @@ export function projectAssetFinancials(
 	marketValue: number | null | undefined,
 	perspective: AssetSharesPerspectiveOptions
 ) {
-	const projectedBookValue = projectSignedValue(bookValue, perspective);
-	const projectedMarketValue = projectSignedValue(marketValue, perspective);
+	const projectedBookValue = projectSignedValue(bookValue ?? 0, perspective);
+	const projectedMarketValue = projectSignedValue(marketValue ?? 0, perspective);
 	const gain = projectedMarketValue - projectedBookValue;
 
 	let gainPercent = 0;

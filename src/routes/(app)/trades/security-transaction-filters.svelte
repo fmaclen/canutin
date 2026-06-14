@@ -239,10 +239,12 @@
 			securityTxContext.setTypeFilter((value || 'all') as SecurityTransactionTypeFilter)}
 	>
 		<Select.Trigger aria-label={m.trades_filter_type_label()} class="bg-background w-full sm:w-fit">
-			{securityTransactionTypeLabel(securityTxContext.typeFilter)}
+			{securityTxContext.typeFilter === 'all'
+				? m.trades_filter_type_all()
+				: securityTransactionTypeLabel(securityTxContext.typeFilter)}
 		</Select.Trigger>
 		<Select.Content>
-			<Select.Item value="all">{securityTransactionTypeLabel('all')}</Select.Item>
+			<Select.Item value="all">{m.trades_filter_type_all()}</Select.Item>
 			{#each securityTxContext.typeOptions as type (type)}
 				<Select.Item value={type}>{securityTransactionTypeLabel(type)}</Select.Item>
 			{/each}

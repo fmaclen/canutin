@@ -11,6 +11,7 @@ import {
 	seedAccount,
 	seedAccountBalance,
 	seedSecurity,
+	seedSecurityBalance,
 	seedSecurityTransaction,
 	seedUser
 } from './pocketbase.helpers';
@@ -115,4 +116,79 @@ test('user can edit and delete a trade from the trades list', async ({ page }) =
 	await expect(page.getByText('Trade deleted')).toBeVisible();
 	await expect(page).toHaveURL('/trades');
 	await expect(page.getByText('Cobalt add-on purchase')).not.toBeVisible();
+});
+
+test('creating, editing, and deleting trades never changes a position market value', async ({
+	page
+}) => {
+	const user = await seedUser('uma');
+	const account = await seedAccount({
+		name: 'Granite Brokerage',
+		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+		owner: user.id,
+		balanceType: 'Brokerage'
+	});
+	const security = await seedSecurity({ name: 'Basalt Index Fund', symbol: 'BIF', owner: user.id });
+	await seedSecurityBalance({
+		account: account.id,
+		owner: user.id,
+		security: security.id,
+		asOf: new UTCDate().toISOString(),
+		quantity: 20,
+		price: 175,
+		value: 3500,
+		costBasis: 3000
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+
+	// The position market value is a manually-entered balance; trades defer to auto-calc and
+	// must never mutate it. Capture it first, then assert it survives every trade mutation.
+	await page.goto(`/trades/securities/${security.id}`);
+	const marketValue = page.getByRole('region', { name: 'Net market value' });
+	await expect(marketValue).toContainText('$3,500.00');
+
+	await goToPageViaSidebar(page, 'Trades');
+	await page.getByRole('link', { name: 'Add trade' }).click();
+	await expect(page).toHaveURL('/trades/add');
+	await page.getByLabel('Account').click();
+	await page.getByRole('option', { name: 'Granite Brokerage' }).click();
+	await page.getByLabel('Date').fill(formatDateForInput(new UTCDate()));
+	await page.getByLabel('Security').click();
+	await page.getByRole('option', { name: 'Basalt Index Fund' }).click();
+	await page.getByLabel('Description').fill('Basalt accumulation buy');
+	await page.getByLabel('Quantity').fill('5');
+	await page.getByLabel('Price').fill('180');
+	await page.getByLabel('Amount').fill('900');
+	await page.getByRole('button', { name: 'Add' }).click();
+	await expect(page.getByText('Trade added')).toBeVisible();
+	await expect(page).toHaveURL('/trades');
+
+	await page.goto(`/trades/securities/${security.id}`);
+	await expect(marketValue).toContainText('$3,500.00');
+
+	await goToPageViaSidebar(page, 'Trades');
+	await page.getByRole('link', { name: 'Basalt accumulation buy' }).click();
+	await page.getByLabel('Quantity').fill('8');
+	await page.getByLabel('Price').fill('190');
+	await page.getByLabel('Amount').fill('1520');
+	await page.getByRole('button', { name: 'Save' }).click();
+	await expect(page.getByText('Trade updated')).toBeVisible();
+	await expect(page).toHaveURL('/trades');
+
+	await page.goto(`/trades/securities/${security.id}`);
+	await expect(marketValue).toContainText('$3,500.00');
+
+	await goToPageViaSidebar(page, 'Trades');
+	await page.getByRole('link', { name: 'Basalt accumulation buy' }).click();
+	await page.getByRole('button', { name: 'Delete' }).first().click();
+	const deleteDialog = page.getByRole('alertdialog');
+	await expect(deleteDialog).toBeVisible();
+	await deleteDialog.getByRole('button', { name: 'Continue' }).click();
+	await expect(page.getByText('Trade deleted')).toBeVisible();
+	await expect(page).toHaveURL('/trades');
+
+	await page.goto(`/trades/securities/${security.id}`);
+	await expect(marketValue).toContainText('$3,500.00');
 });

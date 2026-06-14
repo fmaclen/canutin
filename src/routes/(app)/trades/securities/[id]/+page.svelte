@@ -21,6 +21,7 @@
 	import * as Table from '$lib/components/ui/table/index';
 	import { m } from '$lib/paraglide/messages';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
+	import { gainLossPercentOrNull, sumOrUnknown } from '$lib/security-balance-values';
 	import { formatSecurityQuantity } from '$lib/security-transaction-display';
 
 	import BalanceFields from '../balance-fields.svelte';
@@ -37,9 +38,7 @@
 	const accountBalances = $derived(
 		securityId ? securitiesContext.getAccountBalances(securityId) : []
 	);
-	const balancesMarketValue = $derived(
-		accountBalances.reduce((sum, row) => sum + (row.value ?? 0), 0)
-	);
+	const balancesMarketValue = $derived(sumOrUnknown(accountBalances.map((row) => row.value)));
 
 	let formData = $state({
 		name: '',
@@ -245,10 +244,7 @@
 						</Table.Header>
 						<Table.Body>
 							{#each accountBalances as row (row.id)}
-								{@const gainLossPercent =
-									row.gainLoss !== null && row.costBasis !== null && row.costBasis !== 0
-										? (row.gainLoss / row.costBasis) * 100
-										: 0}
+								{@const gainLossPercent = gainLossPercentOrNull(row.gainLoss, row.costBasis)}
 								<Table.Row>
 									<Table.Cell
 										class="text-muted-foreground font-mono whitespace-nowrap uppercase tabular-nums"
@@ -296,14 +292,18 @@
 										{/if}
 									</Table.Cell>
 									<Table.Cell class="text-right tabular-nums">
-										<NumberDisplay
-											value={`${gainLossPercent > 0 ? '+' : ''}${gainLossPercent.toFixed(1)}%`}
-											sentiment={gainLossPercent > 0
-												? 'positive'
-												: gainLossPercent < 0
-													? 'negative'
-													: 'neutral'}
-										/>
+										{#if gainLossPercent === null}
+											<span class="text-muted-foreground">~</span>
+										{:else}
+											<NumberDisplay
+												value={`${gainLossPercent > 0 ? '+' : ''}${gainLossPercent.toFixed(1)}%`}
+												sentiment={gainLossPercent > 0
+													? 'positive'
+													: gainLossPercent < 0
+														? 'negative'
+														: 'neutral'}
+											/>
+										{/if}
 									</Table.Cell>
 									<Table.Cell class="text-right tabular-nums">
 										{#if row.value === null}

@@ -11,6 +11,7 @@
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { m } from '$lib/paraglide/messages';
+	import { sumOrUnknown } from '$lib/security-balance-values';
 
 	type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
 
@@ -40,32 +41,18 @@
 	}
 
 	const grouped = $derived.by(() => {
-		const groups: Record<
-			BalanceGroup,
-			{
-				total: number;
-				types: Array<{
-					id: string;
-					name: string;
-					total: number;
-					items: Array<{
-						id: string;
-						name: string;
-						balance: number;
-						excluded: boolean;
-						type: 'account' | 'asset';
-						isShared: boolean;
-					}>;
-				}>;
-			}
-		> = {
-			CASH: { total: 0, types: [] },
-			DEBT: { total: 0, types: [] },
-			INVESTMENT: { total: 0, types: [] },
-			OTHER: { total: 0, types: [] }
+		type Item = {
+			id: string;
+			name: string;
+			balance: number | null;
+			excluded: boolean;
+			type: 'account' | 'asset';
+			isShared: boolean;
 		};
+		type BalanceType = { id: string; name: string; total: number | null; items: Item[] };
+		type Group = { total: number | null; types: BalanceType[] };
 
-		const typeMaps: Record<BalanceGroup, Map<string, (typeof groups)['CASH']['types'][number]>> = {
+		const typeMaps: Record<BalanceGroup, Map<string, BalanceType>> = {
 			CASH: new Map(),
 			DEBT: new Map(),
 			INVESTMENT: new Map(),
@@ -79,7 +66,7 @@
 				!trimmed || trimmed === '(Unknown)' ? `id:${typeId}` : `name:${trimmed.toLowerCase()}`;
 			let entry = map.get(key);
 			if (!entry) {
-				entry = { id: key, name, total: 0, items: [] };
+				entry = { id: key, name, total: null, items: [] };
 				map.set(key, entry);
 			}
 			return entry;
@@ -87,46 +74,53 @@
 
 		for (const a of accountsContext.accounts) {
 			if (a.closed) continue;
-			const group = a.balanceGroup as BalanceGroup;
-			if (!a.participantExcluded) groups[group].total += a.balance ?? 0;
-			const balanceType = upsert(group, a.balanceType, accountsContext.getTypeName(a.balanceType));
-			if (!a.participantExcluded) balanceType.total += a.balance ?? 0;
-			balanceType.items = [
-				...balanceType.items,
-				{
-					id: a.id,
-					name: a.name,
-					balance: a.balance ?? 0,
-					excluded: a.participantExcluded,
-					type: 'account',
-					isShared: a.isShared
-				}
-			];
+			const balanceType = upsert(
+				a.balanceGroup as BalanceGroup,
+				a.balanceType,
+				accountsContext.getTypeName(a.balanceType)
+			);
+			balanceType.items.push({
+				id: a.id,
+				name: a.name,
+				balance: a.balance,
+				excluded: a.participantExcluded,
+				type: 'account',
+				isShared: a.isShared
+			});
 		}
 
 		for (const a of assetsContext.assets) {
 			if (a.sold) continue;
-			const group = a.balanceGroup as BalanceGroup;
-			if (!a.participantExcluded) groups[group].total += a.marketValue ?? 0;
-			const balanceType = upsert(group, a.balanceType, assetsContext.getTypeName(a.balanceType));
-			if (!a.participantExcluded) balanceType.total += a.marketValue ?? 0;
-			balanceType.items = [
-				...balanceType.items,
-				{
-					id: a.id,
-					name: a.name,
-					balance: a.marketValue ?? 0,
-					excluded: a.participantExcluded,
-					type: 'asset',
-					isShared: a.isShared
-				}
-			];
+			const balanceType = upsert(
+				a.balanceGroup as BalanceGroup,
+				a.balanceType,
+				assetsContext.getTypeName(a.balanceType)
+			);
+			balanceType.items.push({
+				id: a.id,
+				name: a.name,
+				balance: a.marketValue ?? 0,
+				excluded: a.participantExcluded,
+				type: 'asset',
+				isShared: a.isShared
+			});
 		}
 
+		const groups: Record<BalanceGroup, Group> = {
+			CASH: { total: null, types: [] },
+			DEBT: { total: null, types: [] },
+			INVESTMENT: { total: null, types: [] },
+			OTHER: { total: null, types: [] }
+		};
 		for (const g of Object.keys(typeMaps) as BalanceGroup[]) {
-			groups[g].types = Array.from(typeMaps[g].values()).sort(
-				(a, b) => Math.abs(b.total) - Math.abs(a.total)
-			);
+			const types = Array.from(typeMaps[g].values());
+			for (const balanceType of types) {
+				balanceType.total = sumOrUnknown(
+					balanceType.items.filter((item) => !item.excluded).map((item) => item.balance)
+				);
+			}
+			groups[g].types = types.sort((a, b) => Math.abs(b.total ?? 0) - Math.abs(a.total ?? 0));
+			groups[g].total = sumOrUnknown(types.map((balanceType) => balanceType.total));
 		}
 
 		return groups;
@@ -167,7 +161,11 @@
 							<div class="flex items-center justify-between border-b px-4 py-3.5">
 								<div class="text-sm font-medium">{balanceType.name}</div>
 								<div class="font-mono tabular-nums">
-									<Currency value={balanceType.total} />
+									{#if balanceType.total === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<Currency value={balanceType.total} />
+									{/if}
 								</div>
 							</div>
 							<ul>
@@ -187,7 +185,11 @@
 											class={'font-mono tabular-nums ' +
 												(item.excluded ? 'text-muted-foreground' : '')}
 										>
-											<Currency value={item.balance} />
+											{#if item.balance === null}
+												<span class="text-muted-foreground">~</span>
+											{:else}
+												<Currency value={item.balance} />
+											{/if}
 										</span>
 									</li>
 								{/each}

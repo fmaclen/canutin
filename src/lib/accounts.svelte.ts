@@ -12,10 +12,11 @@ import {
 	type AccountsResponse
 } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
+import { sumOrUnknown } from './security-balance-values';
 import { participantExcluded, projectSignedValue } from './sharing';
 
 export type AccountWithBalance = AccountsResponse & {
-	balance: number;
+	balance: number | null;
 	cashBalance: number;
 	balanceAsOf: string;
 	isOwner: boolean;
@@ -28,7 +29,7 @@ export type AccountWithBalance = AccountsResponse & {
 };
 
 type PositionsSource = {
-	positionsValueByAccount: ReadonlyMap<string, number>;
+	positionsValueByAccount: ReadonlyMap<string, number | null>;
 	positionsLoaded: boolean;
 };
 
@@ -36,15 +37,15 @@ const DEBOUNCE_MS = 200;
 
 class AccountsContext {
 	accounts: AccountWithBalance[] = $derived.by(() =>
-		this.rawAccounts.map(({ record, cashBalance, balanceAsOf }) =>
-			this.toAccountWithBalance(
-				record,
-				cashBalance,
-				this.positionsSource?.positionsValueByAccount.get(record.id) ?? 0,
-				balanceAsOf
-			)
-		)
+		this.rawAccounts.map(({ record, cashBalance, balanceAsOf }) => {
+			const positions = this.positionsSource?.positionsValueByAccount;
+			const positionsValue = positions && positions.has(record.id) ? positions.get(record.id)! : 0;
+			return this.toAccountWithBalance(record, cashBalance, positionsValue, balanceAsOf);
+		})
 	);
+	get accountRecords(): AccountsResponse[] {
+		return this.rawAccounts.map(({ record }) => record);
+	}
 	shares: AccountSharesResponse[] = $state([]);
 	lastBalanceEvent: number = $state(0);
 	isLoading: boolean = $state(true);
@@ -271,7 +272,7 @@ class AccountsContext {
 	private toAccountWithBalance(
 		account: AccountsResponse,
 		rawCashBalance: number,
-		rawSecurityBalance: number,
+		rawSecurityBalance: number | null,
 		balanceAsOf: string
 	): AccountWithBalance {
 		const incomingShare = this.getIncomingShare(account.id);
@@ -285,9 +286,10 @@ class AccountsContext {
 		const grantedShares = this.getGrantedShares(account.id);
 		const isShared = !isOwner || grantedShares.length > 0;
 
+		const rawBalance = sumOrUnknown([rawCashBalance, rawSecurityBalance]);
 		return {
 			...account,
-			balance: projectSignedValue(rawCashBalance + rawSecurityBalance, perspective),
+			balance: projectSignedValue(rawBalance, perspective),
 			cashBalance: projectSignedValue(rawCashBalance, perspective),
 			balanceAsOf,
 			isOwner,

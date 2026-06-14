@@ -270,6 +270,14 @@ class SecurityTransactionsContext {
 				filterParts.push(`type = '${this.typeFilter}'`);
 			}
 
+			const searchQuery = this.search.trim();
+			if (searchQuery) {
+				const escaped = searchQuery.replace(/'/g, "''");
+				filterParts.push(
+					`(description ~ '${escaped}' || subtype ~ '${escaped}' || type ~ '${escaped}' || security.name ~ '${escaped}' || security.symbol ~ '${escaped}' || account.name ~ '${escaped}')`
+				);
+			}
+
 			const filter = filterParts.length > 0 ? filterParts.join(' && ') : undefined;
 			const transactions = await this._pb.authedClient
 				.collection('securityTransactions')

@@ -62,7 +62,7 @@ test('portfolio and trades flow covers security creation, balances, filters, and
 	await page.getByLabel('As of').fill(formatDateForInput(new UTCDate()));
 	await page.getByLabel('Quantity').fill('10');
 	await page.getByLabel('Price').fill('200');
-	await page.getByLabel('Value').fill('2000');
+	await page.getByLabel('Market value', { exact: true }).fill('2000');
 	await page.getByLabel('Cost basis').fill('1500');
 	await page.getByRole('button', { name: 'Add security' }).click();
 	await expect(page.getByText('Security added')).toBeVisible();
@@ -93,7 +93,7 @@ test('portfolio and trades flow covers security creation, balances, filters, and
 	await page.getByLabel('As of').fill(formatDateForInput(new UTCDate()));
 	await page.getByLabel('Quantity').fill('5');
 	await page.getByLabel('Price').fill('210');
-	await page.getByRole('textbox', { name: 'Market value' }).fill('1050');
+	await page.getByLabel('Market value', { exact: true }).fill('1050');
 	await page.getByLabel('Cost basis').fill('900');
 	await page.getByRole('button', { name: 'Add balance' }).click();
 	await expect(page.getByRole('row', { name: /Roth Portfolio/ })).toContainText('$1,050.00');
@@ -182,8 +182,23 @@ test('portfolio unknown values render as unknown and do not inflate account tota
 
 	await page.goto(`/accounts/${account.id}`);
 	await expect(page.getByLabel('Cash', { exact: true })).toHaveValue('$750.00');
-	const positionRow = page.getByRole('row', { name: /Private Fund/ });
+	await expect(page.getByRole('region', { name: 'Net market value' })).toHaveText(/~/);
+	const positionRow = page.getByRole('table').getByRole('row', { name: /Private Fund/ });
+	// Gain/loss % cell (index 6) and Value cell (last) both stay unknown — never coerced to 0.
+	await expect(positionRow.locator('td').nth(6)).toHaveText('~');
 	await expect(positionRow.locator('td').last()).toHaveText('~');
+
+	await page.goto(`/trades/securities/${security.id}`);
+	await expect(page.getByRole('region', { name: 'Net market value' })).toHaveText(/~/);
+
+	await page.goto('/accounts');
+	const accountRow = page.getByRole('row', { name: /Unknown Value Brokerage/ });
+	await expect(accountRow.locator('td').last()).toHaveText('~');
+	await expect(page.getByRole('region', { name: 'Net balance' })).toHaveText(/~/);
+
+	await page.goto('/big-picture');
+	await expect(page.getByRole('region', { name: 'Net worth' })).toHaveText(/~/);
+	await expect(page.getByRole('region', { name: 'Investments' })).toHaveText(/~/);
 });
 
 test('portfolio tables sort positions by market value descending with unknown values last', async ({
@@ -213,18 +228,15 @@ test('portfolio tables sort positions by market value descending with unknown va
 	const charlie = await seedSecurity({ name: 'Charlie Holdings', symbol: 'CHR', owner: user.id });
 	const delta = await seedSecurity({ name: 'Delta Holdings', symbol: 'DLT', owner: user.id });
 	const asOf = new Date().toISOString();
+	// Seed values so the value-descending order contradicts the alphabetical order on every
+	// table, so the assertions can only pass under value-desc with nulls last:
+	// - Portfolio aggregate: Alpha 4500, Charlie 4000, Bravo 3500, Delta unknown — Charlie
+	//   (later name) outranks Bravo, and the unknown Delta sorts last.
+	// - Main account positions: Bravo 3500 outranks Alpha 1500 (later name, higher value).
+	// - Alpha security detail: Third 3000 outranks Main 1500 (later account name, higher value).
+	// - Delta security detail: Third 100 known, Second unknown — the unknown account sorts last.
 	await seedSecurityBalance({
 		account: mainAccount.id,
-		owner: user.id,
-		security: alpha.id,
-		asOf,
-		quantity: 10,
-		price: 300,
-		value: 3000,
-		costBasis: 2500
-	});
-	await seedSecurityBalance({
-		account: secondAccount.id,
 		owner: user.id,
 		security: alpha.id,
 		asOf,
@@ -234,27 +246,37 @@ test('portfolio tables sort positions by market value descending with unknown va
 		costBasis: 1200
 	});
 	await seedSecurityBalance({
+		account: thirdAccount.id,
+		owner: user.id,
+		security: alpha.id,
+		asOf,
+		quantity: 10,
+		price: 300,
+		value: 3000,
+		costBasis: 2500
+	});
+	await seedSecurityBalance({
 		account: mainAccount.id,
 		owner: user.id,
 		security: bravo.id,
 		asOf,
-		quantity: 4,
+		quantity: 14,
 		price: 250,
-		value: 1000,
-		costBasis: 800
+		value: 3500,
+		costBasis: 3000
 	});
 	await seedSecurityBalance({
 		account: secondAccount.id,
 		owner: user.id,
 		security: charlie.id,
 		asOf,
-		quantity: 8,
+		quantity: 16,
 		price: 250,
-		value: 2000,
-		costBasis: 1700
+		value: 4000,
+		costBasis: 3400
 	});
 	await seedSecurityBalance({
-		account: thirdAccount.id,
+		account: secondAccount.id,
 		owner: user.id,
 		security: delta.id,
 		asOf,
@@ -262,6 +284,16 @@ test('portfolio tables sort positions by market value descending with unknown va
 		price: null,
 		value: null,
 		costBasis: 600
+	});
+	await seedSecurityBalance({
+		account: thirdAccount.id,
+		owner: user.id,
+		security: delta.id,
+		asOf,
+		quantity: 2,
+		price: 50,
+		value: 100,
+		costBasis: 80
 	});
 
 	await page.goto('/');
@@ -276,13 +308,19 @@ test('portfolio tables sort positions by market value descending with unknown va
 
 	await page.goto(`/accounts/${mainAccount.id}`);
 	const accountPositionRows = page.getByRole('table').getByRole('row');
-	await expect(accountPositionRows.nth(1)).toContainText('Alpha Holdings');
-	await expect(accountPositionRows.nth(2)).toContainText('Bravo Holdings');
+	await expect(accountPositionRows.nth(1)).toContainText('Bravo Holdings');
+	await expect(accountPositionRows.nth(2)).toContainText('Alpha Holdings');
 
 	await page.goto(`/trades/securities/${alpha.id}`);
-	const balanceRows = page.getByRole('row');
-	await expect(balanceRows.nth(1)).toContainText('Main Brokerage');
-	await expect(balanceRows.nth(2)).toContainText('Second Brokerage');
+	const alphaBalanceRows = page.getByRole('table').getByRole('row');
+	await expect(alphaBalanceRows.nth(1)).toContainText('Third Brokerage');
+	await expect(alphaBalanceRows.nth(2)).toContainText('Main Brokerage');
+
+	await page.goto(`/trades/securities/${delta.id}`);
+	const deltaBalanceRows = page.getByRole('table').getByRole('row');
+	await expect(deltaBalanceRows.nth(1)).toContainText('Third Brokerage');
+	await expect(deltaBalanceRows.nth(2)).toContainText('Second Brokerage');
+	await expect(deltaBalanceRows.nth(2).locator('td').last()).toHaveText('~');
 });
 
 test('portfolio hides sold-out positions while preserving activity history', async ({ page }) => {
@@ -350,11 +388,22 @@ test('transactions and portfolio add forms show empty prerequisites with no acco
 	await goToPageViaSidebar(page, 'Transactions');
 	await page.getByRole('link', { name: 'Add transaction' }).click();
 	await page.getByLabel('Account').click();
-	await expect(page.getByRole('option', { name: 'No accounts yet' })).toBeVisible();
+	const transactionAccountPicker = page.getByRole('listbox');
+	await expect(transactionAccountPicker.getByText('No accounts yet')).toBeVisible();
+	await expect(transactionAccountPicker.getByRole('link', { name: 'Add account' })).toHaveAttribute(
+		'href',
+		'/accounts/add'
+	);
 
 	await page.goto('/trades/add');
 	await page.getByLabel('Account').click();
-	await expect(page.getByRole('option', { name: 'No accounts yet' })).toBeVisible();
+	const tradeAccountPicker = page.getByRole('listbox');
+	await expect(tradeAccountPicker.getByText('No accounts yet')).toBeVisible();
+	await expect(tradeAccountPicker.getByRole('link', { name: 'Add account' })).toHaveAttribute(
+		'href',
+		'/accounts/add'
+	);
+	await page.keyboard.press('Escape');
 	await page.getByLabel('Security').click();
 	await expect(page.getByRole('option', { name: 'No securities yet' })).toBeVisible();
 
@@ -362,7 +411,12 @@ test('transactions and portfolio add forms show empty prerequisites with no acco
 	await page.getByLabel('Security').click();
 	await page.getByRole('option', { name: 'Add security' }).click();
 	await page.getByLabel('Account').click();
-	await expect(page.getByRole('option', { name: 'No accounts yet' })).toBeVisible();
+	const balanceAccountPicker = page.getByRole('listbox');
+	await expect(balanceAccountPicker.getByText('No accounts yet')).toBeVisible();
+	await expect(balanceAccountPicker.getByRole('link', { name: 'Add account' })).toHaveAttribute(
+		'href',
+		'/accounts/add'
+	);
 });
 
 test('trades and securities empty prerequisites stay consistent', async ({ page }) => {
@@ -394,7 +448,7 @@ test('trades and securities empty prerequisites stay consistent', async ({ page 
 	await page.getByLabel('As of').fill(formatDateForInput(new UTCDate()));
 	await page.getByLabel('Quantity').fill('1');
 	await page.getByLabel('Price').fill('25');
-	await page.getByLabel('Value').fill('25');
+	await page.getByLabel('Market value', { exact: true }).fill('25');
 	await page.getByRole('button', { name: 'Add security' }).click();
 	await expect(page.getByRole('row', { name: /Empty Flow Fund/ })).toBeVisible();
 

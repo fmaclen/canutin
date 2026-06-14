@@ -84,16 +84,17 @@ func main() {
 		return e.Next()
 	})
 
-	validateSecurityWriteRequest := func(e *core.RecordRequestEvent) error {
+	// NOTE: guard only blocks creating new activity on a closed account. Editing or deleting an
+	// already-recorded balance/transaction is allowed, matching plain transactions, which have no
+	// closed-account write guard.
+	app.OnRecordCreateRequest("securityBalances", "securityTransactions").BindFunc(func(e *core.RecordRequestEvent) error {
 		if e.Auth == nil || !e.Auth.IsSuperuser() {
 			if err := validateAccountOpen(e.App, e.Record.GetString("account"), e.Auth); err != nil {
 				return err
 			}
 		}
 		return e.Next()
-	}
-	app.OnRecordCreateRequest("securityBalances", "securityTransactions").BindFunc(validateSecurityWriteRequest)
-	app.OnRecordUpdateRequest("securityBalances", "securityTransactions").BindFunc(validateSecurityWriteRequest)
+	})
 
 	app.OnRecordValidate("securities").BindFunc(func(e *core.RecordEvent) error {
 		normalizeSecurityRecord(e.Record)

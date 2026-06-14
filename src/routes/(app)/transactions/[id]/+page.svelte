@@ -1,5 +1,4 @@
 <script lang="ts">
-	import UsersIcon from '@lucide/svelte/icons/users';
 	import { toast } from 'svelte-sonner';
 
 	import { goto } from '$app/navigation';
@@ -16,6 +15,7 @@
 	import RecordLink from '$lib/components/record-link.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
+	import SharedRecordReadonlyBanner from '$lib/components/shared-record-readonly-banner.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -205,19 +205,7 @@
 <Page pageTitle={m.transactions_edit_page_title()}>
 	{#if !isLoading && transaction && !canWrite}
 		<Section>
-			<div class="bg-muted border-border overflow-hidden rounded border">
-				<div class="flex items-center justify-between p-4">
-					<div>
-						<p class="flex items-center gap-2 text-sm">
-							<UsersIcon class="text-muted-foreground size-3.5" aria-hidden="true" />
-							This shared transaction is read-only
-						</p>
-						<p class="text-muted-foreground text-sm">
-							Owned by the account's sharer and cannot be edited
-						</p>
-					</div>
-				</div>
-			</div>
+			<SharedRecordReadonlyBanner title={m.transactions_readonly_title()} />
 		</Section>
 	{/if}
 	<Section>

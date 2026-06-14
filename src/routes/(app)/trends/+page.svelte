@@ -11,7 +11,9 @@
 	import { m } from '$lib/paraglide/messages';
 	import type {
 		AccountBalancesResponse,
+		AccountsResponse,
 		AssetBalancesResponse,
+		AssetsResponse,
 		SecurityBalancesResponse
 	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
@@ -20,15 +22,14 @@
 
 	import ChartNetWorth from './growth.svelte';
 	import Performance from './performance.svelte';
-	import type { TrendAccount, TrendAsset } from './trends';
 
 	const pb = getPocketBaseContext();
 	const accountsCtx = getAccountsContext();
 	const assetsCtx = getAssetsContext();
 
 	let period: '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | 'max' = $state('1y');
-	let rawAccounts: TrendAccount[] = $state([]);
-	let rawAssets: TrendAsset[] = $state([]);
+	let rawAccounts: AccountsResponse[] = $state([]);
+	let rawAssets: AssetsResponse[] = $state([]);
 	let rawAccountBalances: AccountBalancesResponse[] = $state([]);
 	let rawSecurityBalances: Pick<
 		SecurityBalancesResponse<number, number, number, number>,

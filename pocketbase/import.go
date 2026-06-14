@@ -257,25 +257,33 @@ func resolveImportAccount(app core.App, ownerID string, acctIndex map[string]str
 	return found.Id, nil
 }
 
-func findOrCreateImportSecurity(app core.App, ownerID string, securityCache map[string]string, securityID string, name string, symbol string, sessionID string) (string, bool, error) {
-	if strings.TrimSpace(securityID) != "" {
-		return strings.TrimSpace(securityID), false, nil
-	}
-
+// NOTE: counts is the single place securities are tallied for the import summary, so that
+// securities referenced by balances/transactions are counted the same as explicitly-listed
+// ones. A securityCache hit means the security was already tallied on a prior reference, so it
+// is not counted again.
+func findOrCreateImportSecurity(app core.App, ownerID string, securityCache map[string]string, securityID string, name string, symbol string, sessionID string, counts *importCounts) (string, error) {
 	symbol = normalizeSecuritySymbol(symbol)
-	normalizedName := securityNameKey(name)
-	key := symbol
+	key := strings.TrimSpace(securityID)
 	if key == "" {
-		key = normalizedName
+		key = symbol
+		if key == "" {
+			key = securityNameKey(name)
+		}
 	}
 	key += "::" + ownerID
 
 	if id, ok := securityCache[key]; ok {
-		return id, false, nil
+		return id, nil
+	}
+
+	if id := strings.TrimSpace(securityID); id != "" {
+		securityCache[key] = id
+		counts.Existing++
+		return id, nil
 	}
 
 	securityFilter := "normalizedName = {:normalizedName} && owner = {:owner}"
-	securityParams := map[string]any{"normalizedName": normalizedName, "owner": ownerID}
+	securityParams := map[string]any{"normalizedName": securityNameKey(name), "owner": ownerID}
 	if symbol != "" {
 		securityFilter = "symbol = {:symbol} && owner = {:owner}"
 		securityParams = map[string]any{"symbol": symbol, "owner": ownerID}
@@ -288,11 +296,16 @@ func findOrCreateImportSecurity(app core.App, ownerID string, securityCache map[
 		"importSession": sessionID,
 	})
 	if err != nil {
-		return "", false, err
+		return "", err
 	}
 
 	securityCache[key] = rec.Id
-	return rec.Id, created, nil
+	if created {
+		counts.Created++
+	} else {
+		counts.Existing++
+	}
+	return rec.Id, nil
 }
 
 func handleImport(app core.App, re *core.RequestEvent) error {
@@ -479,16 +492,10 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 	}
 
 	for _, security := range payload.Securities {
-		_, created, err := findOrCreateImportSecurity(app, ownerID, securityCache, "", security.Name, security.Symbol, session.Id)
-		if err != nil {
+		if _, err := findOrCreateImportSecurity(app, ownerID, securityCache, "", security.Name, security.Symbol, session.Id, &result.Securities); err != nil {
 			log.Printf("[import] failed to find or create securities record (name=%q, symbol=%q): %v", security.Name, security.Symbol, err)
 			result.Securities.Skipped++
 			continue
-		}
-		if created {
-			result.Securities.Created++
-		} else {
-			result.Securities.Existing++
 		}
 	}
 
@@ -571,13 +578,10 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			log.Printf("[import] failed to resolve account for securityBalances record (accountName=%q): %v", balance.AccountName, err)
 			continue
 		}
-		securityID, securityCreated, err := findOrCreateImportSecurity(app, ownerID, securityCache, balance.SecurityID, balance.SecurityName, balance.SecuritySymbol, session.Id)
+		securityID, err := findOrCreateImportSecurity(app, ownerID, securityCache, balance.SecurityID, balance.SecurityName, balance.SecuritySymbol, session.Id, &result.Securities)
 		if err != nil {
 			log.Printf("[import] failed to find or create securities record for securityBalances (name=%q, symbol=%q): %v", balance.SecurityName, balance.SecuritySymbol, err)
 			continue
-		}
-		if securityCreated {
-			result.Securities.Created++
 		}
 
 		if hasMatchingSecurityImportRecord(app, "securityBalances",
@@ -624,13 +628,10 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			log.Printf("[import] failed to resolve account for securityTransactions record (accountName=%q): %v", tx.AccountName, err)
 			continue
 		}
-		securityID, securityCreated, err := findOrCreateImportSecurity(app, ownerID, securityCache, tx.SecurityID, tx.SecurityName, tx.SecuritySymbol, session.Id)
+		securityID, err := findOrCreateImportSecurity(app, ownerID, securityCache, tx.SecurityID, tx.SecurityName, tx.SecuritySymbol, session.Id, &result.Securities)
 		if err != nil {
 			log.Printf("[import] failed to find or create securities record for securityTransactions (name=%q, symbol=%q): %v", tx.SecurityName, tx.SecuritySymbol, err)
 			continue
-		}
-		if securityCreated {
-			result.Securities.Created++
 		}
 
 		if tx.ExternalID != "" {

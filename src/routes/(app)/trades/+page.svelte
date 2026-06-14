@@ -16,6 +16,7 @@
 
 	import SecurityTransactionFilters from './security-transaction-filters.svelte';
 	import SecurityTransactionTable from './security-transaction-table.svelte';
+	import TradeSummary from './trade-summary.svelte';
 
 	const securityTxContext = getSecurityTransactionsContext();
 	const accountsContext = getAccountsContext();
@@ -84,6 +85,7 @@
 		<SectionTitle title={m.trades_title()} />
 		<div class="flex flex-col space-y-2">
 			<SecurityTransactionFilters />
+			<TradeSummary />
 			{#if securityTxContext.isLoading && securityTxContext.rawTransactions.length === 0}
 				<Skeleton class="min-h-32" />
 			{:else}

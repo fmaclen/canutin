@@ -142,11 +142,8 @@ func validateSecurityRecordIntegrity(app core.App, record *core.Record) error {
 	securityID := record.GetString("security")
 
 	account, err := app.FindRecordById("accounts", accountID)
-	if err != nil {
-		return apis.NewBadRequestError("Account not found", nil)
-	}
-	if account.GetString("owner") != ownerID {
-		return apis.NewForbiddenError("Account owner must match record owner", nil)
+	if err != nil || account.GetString("owner") != ownerID {
+		return apis.NewNotFoundError("Account not found", nil)
 	}
 
 	security, err := app.FindRecordById("securities", securityID)

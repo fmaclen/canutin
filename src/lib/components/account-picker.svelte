@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { SvelteMap } from 'svelte/reactivity';
 
+	import { resolve } from '$app/paths';
 	import { BALANCE_GROUP_ORDER, getBalanceGroupMeta } from '$lib/account-utils';
 	import ClearButton from '$lib/components/clear-button.svelte';
+	import Link from '$lib/components/link.svelte';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import { AccountsBalanceGroupOptions } from '$lib/pocketbase.schema';
@@ -88,7 +90,10 @@
 	</Select.Trigger>
 	<Select.Content>
 		{#if accounts.length === 0}
-			<Select.Item value="__empty_accounts__" disabled>{m.account_picker_empty()}</Select.Item>
+			<div class="text-muted-foreground flex flex-col items-start gap-1 px-2 py-1.5 text-sm">
+				<span>{m.account_picker_empty()}</span>
+				<Link href={resolve('/accounts/add')}>{m.accounts_add_page_title()}</Link>
+			</div>
 		{:else}
 			{#each BALANCE_GROUP_ORDER as group (group)}
 				{@const accountsInGroup = accountsByGroup.get(group) ?? []}

@@ -24,6 +24,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import type { TransactionsResponse } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+	import { sumOrUnknown } from '$lib/security-balance-values';
 	import {
 		createSortComparator,
 		getSortFromUrl,
@@ -52,7 +53,7 @@
 		id: string;
 		name: string;
 		institution: string | null;
-		balance: number;
+		balance: number | null;
 		typeName: string;
 		balanceGroup: BalanceGroup;
 		autoCalculated: boolean;
@@ -119,7 +120,7 @@
 			id: account.id,
 			name: account.name,
 			institution: account.institution ?? null,
-			balance: account.balance ?? 0,
+			balance: account.balance,
 			typeName: accountsContext.getTypeName(account.balanceType),
 			balanceGroup: account.balanceGroup as BalanceGroup,
 			autoCalculated: Boolean(account.autoCalculated),
@@ -148,12 +149,11 @@
 	});
 
 	const totalsByFilter = $derived.by(() => {
-		const totals = new SvelteMap<FilterOption, number>();
+		const totals = new SvelteMap<FilterOption, number | null>();
 		for (const option of filters) {
 			const rows = rowsByFilter.get(option.key) ?? [];
-			const total = rows.reduce(
-				(sum, row) => sum + (option.key === 'open' && row.participantExcluded ? 0 : row.balance),
-				0
+			const total = sumOrUnknown(
+				rows.map((row) => (option.key === 'open' && row.participantExcluded ? 0 : row.balance))
 			);
 			totals.set(option.key, total);
 		}
@@ -189,7 +189,7 @@
 
 	function balanceSentiment(row: AccountRow) {
 		if (row.closed || row.participantExcluded) return 'neutral';
-		if (row.balance === 0) return 'neutral';
+		if (row.balance === null || row.balance === 0) return 'neutral';
 		return row.balance > 0 ? 'positive' : 'negative';
 	}
 
@@ -257,7 +257,7 @@
 				{#each filters as option (option.key)}
 					<Tabs.Content value={option.key} class="flex flex-col space-y-2">
 						{@const rowsForOption = rowsByFilter.get(option.key) ?? []}
-						{@const total = totalsByFilter.get(option.key) ?? 0}
+						{@const total = totalsByFilter.get(option.key) ?? null}
 						<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
 							<KeyValue
 								title={m.sidebar_accounts()}
@@ -391,7 +391,9 @@
 													{/if}
 												</Table.Cell>
 												<Table.Cell class="text-right tabular-nums">
-													{#if row.participantExcluded || row.closed}
+													{#if row.balance === null}
+														<span class="text-muted-foreground">~</span>
+													{:else if row.participantExcluded || row.closed}
 														<Tooltip.Root>
 															<Tooltip.Trigger
 																class="border-border inline-block border-b border-dashed hover:border-current"

@@ -14,14 +14,8 @@ import {
 	seedUser
 } from './pocketbase.helpers';
 
-function getCashflowPanel(page: Page) {
-	return page.locator('body').filter({
-		has: page.getByPlaceholder('Search transactions')
-	});
-}
-
 async function waitForAccountFilterOption(page: Page, accountName: string) {
-	await getCashflowPanel(page).getByLabel('Account').click();
+	await page.getByLabel('Account').click();
 	await expect(page.getByRole('option', { name: accountName })).toBeVisible();
 	await page.keyboard.press('Escape');
 }
@@ -410,7 +404,6 @@ test('transactions list updates in real-time when new transaction is added', asy
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Transactions');
-	const cashflowPanel = getCashflowPanel(page);
 
 	await page.getByLabel('Period').click();
 	await Promise.all([
@@ -422,7 +415,7 @@ test('transactions list updates in real-time when new transaction is added', asy
 	]);
 	await expect(page.getByLabel('Period')).toContainText('Last year');
 
-	await cashflowPanel.getByLabel('Type').click();
+	await page.getByLabel('Type').click();
 	await Promise.all([
 		page.waitForResponse(
 			(response) =>
@@ -430,7 +423,7 @@ test('transactions list updates in real-time when new transaction is added', asy
 		),
 		page.getByRole('option', { name: 'Debits only' }).click()
 	]);
-	await expect(cashflowPanel.getByLabel('Type')).toContainText('Debits only');
+	await expect(page.getByLabel('Type')).toContainText('Debits only');
 	await expect(seededTransactionRow).toHaveCount(0);
 
 	await seedTransaction({
