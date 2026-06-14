@@ -82,6 +82,8 @@ class SecuritiesContext {
 	private _accounts: ReturnType<typeof getAccountsContext>;
 	private refreshTimer: ReturnType<typeof setTimeout> | null = null;
 	private refreshSequence = 0;
+	private _activeUserId = '';
+	private _isSubscribed = false;
 
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
@@ -137,9 +139,11 @@ class SecuritiesContext {
 	}
 
 	private init() {
-		this.realtimeSubscribe();
 		$effect(() => {
 			const userId = this._auth.currentUserId;
+			if (userId === this._activeUserId) return;
+			this.unsubscribeRealtime();
+			this._activeUserId = userId;
 			if (!userId) {
 				this.refreshSequence++;
 				if (this.refreshTimer) clearTimeout(this.refreshTimer);
@@ -152,6 +156,7 @@ class SecuritiesContext {
 			}
 			this.isLoading = true;
 			this.positionsLoaded = false;
+			this.realtimeSubscribe(userId);
 			void this.refreshForCurrentUser();
 		});
 	}
@@ -193,22 +198,44 @@ class SecuritiesContext {
 		this.resolvePositionsLoaded();
 	}
 
-	private realtimeSubscribe() {
+	private realtimeSubscribe(userId = this._activeUserId) {
+		if (this._isSubscribed || !userId || userId !== this._activeUserId) return;
+
 		this._pb.authedClient
 			.collection('securities')
-			.subscribe('*', this.onRealtimeEvent.bind(this))
-			.catch((error) => this._pb.handleSubscriptionError(error, 'securities', 'subscribe'));
+			.subscribe<SecuritiesResponse>('*', (event) => this.onRealtimeEvent(event, userId))
+			.catch((error) => {
+				if (userId === this._activeUserId) {
+					this._pb.handleSubscriptionError(error, 'securities', 'subscribe');
+				} else {
+					console.error('[securitiesStore] Stale subscription failed:', error);
+				}
+			});
 		this._pb.authedClient
 			.collection('securityBalances')
-			.subscribe('*', this.onRealtimeEvent.bind(this))
-			.catch((error) =>
-				this._pb.handleSubscriptionError(error, 'securities', 'subscribe_balances')
-			);
+			.subscribe<SecurityBalance>('*', (event) => this.onRealtimeEvent(event, userId))
+			.catch((error) => {
+				if (userId === this._activeUserId) {
+					this._pb.handleSubscriptionError(error, 'securities', 'subscribe_balances');
+				} else {
+					console.error('[securitiesStore] Stale subscription failed:', error);
+				}
+			});
+		this._isSubscribed = true;
+	}
+
+	private unsubscribeRealtime() {
+		if (!this._isSubscribed) return;
+		this._isSubscribed = false;
+		this._pb.authedClient.collection('securities').unsubscribe('*');
+		this._pb.authedClient.collection('securityBalances').unsubscribe('*');
 	}
 
 	private onRealtimeEvent(
-		event: RecordSubscription<SecuritiesResponse> | RecordSubscription<SecurityBalance>
+		event: RecordSubscription<SecuritiesResponse> | RecordSubscription<SecurityBalance>,
+		userId: string
 	) {
+		if (!userId || userId !== this._activeUserId) return;
 		if (!event.action) return;
 		if (this.refreshTimer) clearTimeout(this.refreshTimer);
 		this.refreshTimer = setTimeout(() => {
@@ -304,8 +331,7 @@ class SecuritiesContext {
 
 	dispose() {
 		if (this.refreshTimer) clearTimeout(this.refreshTimer);
-		this._pb.authedClient.collection('securities').unsubscribe('*');
-		this._pb.authedClient.collection('securityBalances').unsubscribe('*');
+		this.unsubscribeRealtime();
 	}
 }
 

@@ -59,6 +59,8 @@ class AccountsContext {
 	private balanceTypesContext: ReturnType<typeof setBalanceTypesContext>;
 	private refreshTimer: ReturnType<typeof setTimeout> | null = null;
 	private refreshSequence = 0;
+	private _activeUserId = '';
+	private _isSubscribed = false;
 
 	constructor(
 		pb: PocketBaseContext,
@@ -136,9 +138,11 @@ class AccountsContext {
 	}
 
 	private init() {
-		this.realtimeSubscribe();
 		$effect(() => {
 			const userId = this.currentUserId;
+			if (userId === this._activeUserId) return;
+			this.unsubscribeRealtime();
+			this._activeUserId = userId;
 			if (!userId) {
 				this.refreshSequence++;
 				if (this.refreshTimer) clearTimeout(this.refreshTimer);
@@ -153,6 +157,7 @@ class AccountsContext {
 			this.isLoading = true;
 			this.accountsLoaded = false;
 			this.lastBalanceEvent = 0;
+			this.realtimeSubscribe(userId);
 			void this.refreshForCurrentUser();
 		});
 	}
@@ -213,31 +218,61 @@ class AccountsContext {
 		this.accountsLoaded = true;
 	}
 
-	private realtimeSubscribe() {
+	private realtimeSubscribe(userId = this._activeUserId) {
+		if (this._isSubscribed || !userId || userId !== this._activeUserId) return;
+
 		this._pb.authedClient
 			.collection('accounts')
-			.subscribe('*', this.onCollectionEvent.bind(this))
-			.catch((error) => this._pb.handleSubscriptionError(error, 'accounts', 'subscribe_accounts'));
+			.subscribe<AccountsResponse>('*', (event) => this.onCollectionEvent(event, userId))
+			.catch((error) => {
+				if (userId === this._activeUserId) {
+					this._pb.handleSubscriptionError(error, 'accounts', 'subscribe_accounts');
+				} else {
+					console.error('[accountsStore] Stale subscription failed:', error);
+				}
+			});
 		this._pb.authedClient
 			.collection('accountBalances')
-			.subscribe('*', this.onCollectionEvent.bind(this))
-			.catch((error) => this._pb.handleSubscriptionError(error, 'accounts', 'subscribe_balances'));
+			.subscribe<AccountBalancesResponse>('*', (event) => this.onCollectionEvent(event, userId))
+			.catch((error) => {
+				if (userId === this._activeUserId) {
+					this._pb.handleSubscriptionError(error, 'accounts', 'subscribe_balances');
+				} else {
+					console.error('[accountsStore] Stale subscription failed:', error);
+				}
+			});
 		this._pb.authedClient
 			.collection('accountShares')
-			.subscribe('*', this.onAccountShareEvent.bind(this))
-			.catch((error) => this._pb.handleSubscriptionError(error, 'accounts', 'subscribe_shares'));
+			.subscribe<AccountSharesResponse>('*', (event) => this.onAccountShareEvent(event, userId))
+			.catch((error) => {
+				if (userId === this._activeUserId) {
+					this._pb.handleSubscriptionError(error, 'accounts', 'subscribe_shares');
+				} else {
+					console.error('[accountsStore] Stale subscription failed:', error);
+				}
+			});
+		this._isSubscribed = true;
+	}
+
+	private unsubscribeRealtime() {
+		if (!this._isSubscribed) return;
+		this._isSubscribed = false;
+		this._pb.authedClient.collection('accounts').unsubscribe('*');
+		this._pb.authedClient.collection('accountBalances').unsubscribe('*');
+		this._pb.authedClient.collection('accountShares').unsubscribe('*');
 	}
 
 	private onCollectionEvent(
-		e: RecordSubscription<AccountsResponse> | RecordSubscription<AccountBalancesResponse>
+		e: RecordSubscription<AccountsResponse> | RecordSubscription<AccountBalancesResponse>,
+		userId: string
 	) {
+		if (!userId || userId !== this._activeUserId) return;
 		if (!e.action) return;
 		this.scheduleRefresh();
 	}
 
-	private onAccountShareEvent(e: RecordSubscription<AccountSharesResponse>) {
-		const userId = this.currentUserId;
-		if (!userId) return;
+	private onAccountShareEvent(e: RecordSubscription<AccountSharesResponse>, userId: string) {
+		if (!userId || userId !== this._activeUserId) return;
 		const isRelevantShare = e.record.grantedBy === userId || e.record.recipient === userId;
 		if (e.action === 'create') {
 			if (isRelevantShare) this.shares = [...this.shares, e.record];
@@ -308,9 +343,7 @@ class AccountsContext {
 
 	dispose() {
 		if (this.refreshTimer) clearTimeout(this.refreshTimer);
-		this._pb.authedClient.collection('accounts').unsubscribe('*');
-		this._pb.authedClient.collection('accountBalances').unsubscribe('*');
-		this._pb.authedClient.collection('accountShares').unsubscribe('*');
+		this.unsubscribeRealtime();
 	}
 }
 
