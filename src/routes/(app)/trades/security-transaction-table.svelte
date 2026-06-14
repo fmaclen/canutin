@@ -128,10 +128,10 @@
 							{/if}
 						</Table.Cell>
 						<Table.Cell>
-							<div class="flex flex-col">
+							<div class="flex space-x-1.5">
 								<span class="text-sm">{securityTransactionTypeLabel(row.type)}</span>
 								{#if row.subtype}
-									<span class="text-muted-foreground text-xs">{row.subtype}</span>
+									<span class="text-muted-foreground text-sm">{row.subtype}</span>
 								{/if}
 							</div>
 						</Table.Cell>
