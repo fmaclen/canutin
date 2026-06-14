@@ -68,7 +68,7 @@
 				variant="outline"
 				size="sm"
 				class="flex w-full text-center"
-				disabled={auth.isLoading}
+				disabled={auth.isSubmitting}
 				onclick={() => handleAutoLogin(user.email)}
 			>
 				{user.email}

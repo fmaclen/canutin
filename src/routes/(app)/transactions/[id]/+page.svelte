@@ -1,17 +1,12 @@
 <script lang="ts">
-	import UsersIcon from '@lucide/svelte/icons/users';
 	import { toast } from 'svelte-sonner';
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import {
-		BALANCE_GROUP_ORDER,
-		getBalanceGroupMeta,
-		groupAccountsByBalanceGroup
-	} from '$lib/account-utils';
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAuthContext } from '$lib/auth.svelte';
+	import AccountPicker from '$lib/components/account-picker.svelte';
 	import CheckboxLabel from '$lib/components/checkbox-label.svelte';
 	import CurrencyField from '$lib/components/currency-field.svelte';
 	import Fieldset from '$lib/components/fieldset.svelte';
@@ -20,18 +15,18 @@
 	import RecordLink from '$lib/components/record-link.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
+	import SharedRecordReadonlyBanner from '$lib/components/shared-record-readonly-banner.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import * as Select from '$lib/components/ui/select/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { m } from '$lib/paraglide/messages';
-	import { AccountsBalanceGroupOptions, type TransactionsResponse } from '$lib/pocketbase.schema';
+	import type { TransactionsResponse } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { sanitizeFromParam } from '$lib/utils';
 
@@ -43,9 +38,6 @@
 	const ownerId = $derived(auth.currentUser?.record?.id);
 	const openAccounts = $derived(accountsContext.accounts.filter((a) => !a.closed));
 	const editableAccounts = $derived(openAccounts.filter((a) => a.canWrite));
-
-	const groupMeta = getBalanceGroupMeta();
-	const accountsByGroup = $derived(groupAccountsByBalanceGroup(editableAccounts));
 
 	let transaction = $state<TransactionsResponse | null>(null);
 	let isLoading = $state(true);
@@ -175,8 +167,8 @@
 	}
 </script>
 
-<header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b">
-	<div class="flex items-center gap-2 px-4">
+<header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
+	<div class="flex items-center gap-2">
 		<Sidebar.Trigger class="-ml-1" />
 		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
 		<Breadcrumb.Root>
@@ -197,7 +189,7 @@
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 	</div>
-	<nav class="px-4">
+	<nav class="flex items-center gap-4 px-4">
 		{#if selectedAccount}
 			<RecordLink
 				type="account"
@@ -213,19 +205,7 @@
 <Page pageTitle={m.transactions_edit_page_title()}>
 	{#if !isLoading && transaction && !canWrite}
 		<Section>
-			<div class="bg-muted border-border overflow-hidden rounded border">
-				<div class="flex items-center justify-between p-4">
-					<div>
-						<p class="flex items-center gap-2 text-sm">
-							<UsersIcon class="text-muted-foreground size-3.5" aria-hidden="true" />
-							This shared transaction is read-only
-						</p>
-						<p class="text-muted-foreground text-sm">
-							Owned by the account's sharer and cannot be edited
-						</p>
-					</div>
-				</div>
-			</div>
+			<SharedRecordReadonlyBanner title={m.transactions_readonly_title()} />
 		</Section>
 	{/if}
 	<Section>
@@ -279,42 +259,14 @@
 							<Label for="account" class="justify-start pr-0 md:justify-end"
 								>{m.transactions_label_account()}</Label
 							>
-							<Select.Root type="single" bind:value={formData.accountId} disabled={!canWrite}>
-								<Select.Trigger id="account" class="bg-background w-full pl-3">
-									{#if selectedAccount}
-										<div class="flex items-center gap-2">
-											<div
-												class="size-2 rounded-full {groupMeta[
-													selectedAccount.balanceGroup as AccountsBalanceGroupOptions
-												].color}"
-											></div>
-											{selectedAccount.name}
-										</div>
-									{:else}
-										<span class="text-muted-foreground"
-											>{m.transactions_account_select_placeholder()}</span
-										>
-									{/if}
-								</Select.Trigger>
-								<Select.Content>
-									{#each BALANCE_GROUP_ORDER as group (group)}
-										{@const accountsInGroup = accountsByGroup.get(group) ?? []}
-										{#if accountsInGroup.length > 0}
-											<Select.Group>
-												<Select.Label>
-													<div class="flex items-center gap-2">
-														<div class="size-2 rounded-full {groupMeta[group].color}"></div>
-														{groupMeta[group].label}
-													</div>
-												</Select.Label>
-												{#each accountsInGroup as account (account.id)}
-													<Select.Item value={account.id}>{account.name}</Select.Item>
-												{/each}
-											</Select.Group>
-										{/if}
-									{/each}
-								</Select.Content>
-							</Select.Root>
+							<AccountPicker
+								accounts={editableAccounts}
+								bind:value={formData.accountId}
+								selectedAccount={selectedAccount ?? null}
+								id="account"
+								disabled={!canWrite}
+								placeholder={m.transactions_account_select_placeholder()}
+							/>
 						</FormFieldRow>
 
 						<FormFieldRow>

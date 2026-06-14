@@ -10,9 +10,12 @@
 	import { getAuthContext } from '$lib/auth.svelte';
 	import { getBalanceTypesContext } from '$lib/balance-types.svelte';
 	import CheckboxLabel from '$lib/components/checkbox-label.svelte';
+	import Currency from '$lib/components/currency.svelte';
 	import Fieldset from '$lib/components/fieldset.svelte';
 	import FormFieldRow from '$lib/components/form-field-row.svelte';
+	import KeyValue from '$lib/components/key-value.svelte';
 	import Link from '$lib/components/link.svelte';
+	import NumberDisplay from '$lib/components/number.svelte';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
@@ -25,12 +28,20 @@
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+	import * as Table from '$lib/components/ui/table/index';
 	import { m } from '$lib/paraglide/messages';
 	import {
 		AccountsBalanceGroupOptions,
 		AccountSharesPerspectiveOptions
 	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+	import { getSecuritiesContext } from '$lib/securities.svelte';
+	import {
+		compareByValueDescThenName,
+		formatSecurityQuantity,
+		gainLossPercentOrNull,
+		sumOrUnknown
+	} from '$lib/security-balance-values';
 	import { sanitizeFromParam } from '$lib/utils';
 
 	import BalanceForm from './balance-form.svelte';
@@ -40,6 +51,7 @@
 	const auth = getAuthContext();
 	const accountsContext = getAccountsContext();
 	const balanceTypesContext = getBalanceTypesContext();
+	const securitiesContext = getSecuritiesContext();
 
 	const accountId = $derived(page.params.id);
 	const ownerId = $derived(auth.currentUser?.record?.id);
@@ -49,6 +61,40 @@
 	const canWrite = $derived(Boolean(account?.canWrite));
 	const incomingShare = $derived(account ? accountsContext.getIncomingShare(account.id) : null);
 	const grantedShares = $derived(account ? accountsContext.getGrantedShares(account.id) : []);
+	const positionsBalances = $derived(
+		account
+			? securitiesContext.securities.flatMap((security) =>
+					securitiesContext
+						.getAccountBalances(security.id)
+						.filter((balance) => balance.accountId === account.id && balance.quantity !== 0)
+				)
+			: []
+	);
+	const positionsRows = $derived(
+		positionsBalances
+			.map((balance) => ({
+				...balance,
+				securityName: securitiesContext.getSecurity(balance.securityId)?.name ?? ''
+			}))
+			.sort(
+				compareByValueDescThenName(
+					(row) => row.value,
+					(row) => row.securityName
+				)
+			)
+	);
+	const positionsMarketValue = $derived(sumOrUnknown(positionsRows.map((row) => row.value)));
+	const dateFormatter = new Intl.DateTimeFormat(undefined, {
+		year: 'numeric',
+		month: 'short',
+		day: 'numeric',
+		timeZone: 'UTC'
+	});
+
+	function sentiment(value: number | null) {
+		if (value === null || value === 0) return 'neutral';
+		return value > 0 ? 'positive' : 'negative';
+	}
 
 	let formData = $state({
 		name: '',
@@ -73,7 +119,7 @@
 	);
 	let includeInNetWorth = $derived(incomingShare?.includeInNetWorth ?? true);
 
-	function isDirty(): boolean {
+	function isDirty() {
 		if (!syncState.lastSyncedData) return false;
 
 		return (
@@ -87,7 +133,7 @@
 		);
 	}
 
-	function getAccountVersion(accountData: typeof account): string {
+	function getAccountVersion(accountData: typeof account) {
 		if (!accountData) return '';
 		return `${accountData.updated || accountData.created}_${accountData.name}_${accountData.balanceGroup}_${accountData.institution}_${accountData.notes}_${accountData.excluded}_${accountData.closed}`;
 	}
@@ -109,7 +155,7 @@
 		await balanceTypesContext.ensureLoaded(accountData.balanceType);
 		newFormData.accountTypeName = balanceTypesContext.getName(accountData.balanceType);
 
-		newFormData.value = accountData.balance.toString();
+		newFormData.value = accountData.cashBalance.toString();
 
 		formData = newFormData;
 		syncState.lastSyncedData = { ...newFormData };
@@ -301,14 +347,14 @@
 	}
 </script>
 
-<header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b">
-	<div class="flex items-center gap-2 px-4">
+<header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
+	<div class="flex items-center gap-2">
 		<Sidebar.Trigger class="-ml-1" />
 		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
 		<Breadcrumb.Root>
 			<Breadcrumb.List>
 				<Breadcrumb.Item>
-					<Breadcrumb.Link href="/accounts">{m.sidebar_accounts()}</Breadcrumb.Link>
+					<Breadcrumb.Link href={resolve('/accounts')}>{m.sidebar_accounts()}</Breadcrumb.Link>
 				</Breadcrumb.Item>
 				<Breadcrumb.Separator />
 				<Breadcrumb.Item>
@@ -321,9 +367,14 @@
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 	</div>
-	<nav class="px-4">
+	<nav class="flex items-center gap-4 px-4">
 		{#if account}
-			<Link href={`/transactions?account=${account.id}`} class="text-sm">Transactions</Link>
+			<Link href={`${resolve('/transactions')}?account=${account.id}`} class="text-sm">
+				{m.sidebar_transactions()}
+			</Link>
+			<Link href={`${resolve('/trades')}?account=${account.id}`} class="text-sm">
+				{m.trades_title()}
+			</Link>
 		{/if}
 	</nav>
 </header>
@@ -365,6 +416,129 @@
 		</Section>
 	{/if}
 
+	{#if !isLoading && account && positionsRows.length > 0}
+		<Section>
+			<SectionTitle title={m.portfolio_section_positions()} />
+			<div
+				role="region"
+				aria-label={m.portfolio_section_positions()}
+				class="grid grid-cols-1 gap-2"
+			>
+				<KeyValue
+					title={m.summary_net_market_value()}
+					value={positionsMarketValue}
+					variant="outline"
+					decimalScale={2}
+				/>
+			</div>
+			<div class="bg-background overflow-hidden rounded-sm shadow-md">
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							<Table.Head class="text-left whitespace-nowrap">
+								{m.securities_table_header_as_of()}
+							</Table.Head>
+							<Table.Head class="text-left whitespace-nowrap">
+								{m.securities_table_header_security()}
+							</Table.Head>
+							<Table.Head class="text-right whitespace-nowrap">
+								{m.securities_table_header_quantity()}
+							</Table.Head>
+							<Table.Head class="text-right whitespace-nowrap">
+								{m.securities_table_header_price()}
+							</Table.Head>
+							<Table.Head class="text-right whitespace-nowrap">
+								{m.securities_table_header_cost_basis()}
+							</Table.Head>
+							<Table.Head class="text-right whitespace-nowrap">
+								{m.securities_table_header_gain_loss()}
+							</Table.Head>
+							<Table.Head class="text-right whitespace-nowrap">
+								{m.securities_table_header_gain_loss_percent()}
+							</Table.Head>
+							<Table.Head class="text-right whitespace-nowrap">
+								{m.securities_table_header_value()}
+							</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each positionsRows as row (row.id)}
+							{@const gainLossPercent = gainLossPercentOrNull(row.gainLoss, row.costBasis)}
+							<Table.Row>
+								<Table.Cell
+									class="text-muted-foreground font-mono whitespace-nowrap uppercase tabular-nums"
+								>
+									{dateFormatter.format(new Date(row.asOf))}
+								</Table.Cell>
+								<Table.Cell>
+									<Link
+										href={resolve(`/trades/securities/${row.securityId}`)}
+										class="text-foreground/90 text-sm font-medium"
+									>
+										{row.securityName}
+									</Link>
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									{#if row.quantity === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<NumberDisplay value={formatSecurityQuantity(row.quantity)} />
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									{#if row.price === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<Currency value={row.price} decimalScale={2} />
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									{#if row.costBasis === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<Currency value={row.costBasis} decimalScale={2} />
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									{#if row.gainLoss === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<Currency
+											value={row.gainLoss}
+											decimalScale={2}
+											sentiment={sentiment(row.gainLoss)}
+										/>
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									{#if gainLossPercent === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<NumberDisplay
+											value={`${gainLossPercent > 0 ? '+' : ''}${gainLossPercent.toFixed(1)}%`}
+											sentiment={gainLossPercent > 0
+												? 'positive'
+												: gainLossPercent < 0
+													? 'negative'
+													: 'neutral'}
+										/>
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									{#if row.value === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<Currency value={row.value} decimalScale={2} sentiment={sentiment(row.value)} />
+									{/if}
+								</Table.Cell>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			</div>
+		</Section>
+	{/if}
+
 	<Section>
 		<SectionTitle title={m.accounts_section_balance()} />
 		{#if isLoading || !account}
@@ -375,6 +549,7 @@
 				balanceAsOf={account?.balanceAsOf ?? ''}
 				onSubmit={handleUpdateBalance}
 				disabled={!canWrite}
+				hasPositions={positionsRows.length > 0}
 			/>
 		{/if}
 	</Section>
@@ -389,7 +564,7 @@
 	</Section>
 
 	<Section>
-		<SectionTitle title="Sharing" />
+		<SectionTitle title={m.accounts_section_sharing()} />
 		{#if isLoading || !account}
 			<Skeleton class="h-40" />
 		{:else if canWrite}

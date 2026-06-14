@@ -3,13 +3,9 @@
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import {
-		BALANCE_GROUP_ORDER,
-		getBalanceGroupMeta,
-		groupAccountsByBalanceGroup
-	} from '$lib/account-utils';
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAuthContext } from '$lib/auth.svelte';
+	import AccountPicker from '$lib/components/account-picker.svelte';
 	import CheckboxLabel from '$lib/components/checkbox-label.svelte';
 	import CurrencyField from '$lib/components/currency-field.svelte';
 	import Fieldset from '$lib/components/fieldset.svelte';
@@ -21,12 +17,10 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import * as Select from '$lib/components/ui/select/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { m } from '$lib/paraglide/messages';
-	import { AccountsBalanceGroupOptions } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 
 	const pb = getPocketBaseContext();
@@ -35,11 +29,6 @@
 
 	const ownerId = $derived(auth.currentUser?.record?.id);
 	const openAccounts = $derived(accountsContext.accounts.filter((a) => !a.closed && a.canWrite));
-
-	const groupMeta = getBalanceGroupMeta();
-	const accountsByGroup = $derived(groupAccountsByBalanceGroup(openAccounts));
-
-	const selectedAccount = $derived(openAccounts.find((a) => a.id === accountId));
 
 	let description = $state('');
 	let amount = $state('');
@@ -51,7 +40,11 @@
 
 	async function handleSubmit() {
 		const currentOwnerId = ownerId;
-		if (!currentOwnerId || !accountId) return;
+		if (!currentOwnerId) return;
+		if (!accountId) {
+			toast.error(m.account_required());
+			return;
+		}
 
 		try {
 			const labelIds: string[] = [];
@@ -97,7 +90,9 @@
 		<Breadcrumb.Root>
 			<Breadcrumb.List>
 				<Breadcrumb.Item>
-					<Breadcrumb.Link href="/transactions">{m.sidebar_transactions()}</Breadcrumb.Link>
+					<Breadcrumb.Link href={resolve('/transactions')}
+						>{m.sidebar_transactions()}</Breadcrumb.Link
+					>
 				</Breadcrumb.Item>
 				<Breadcrumb.Separator />
 				<Breadcrumb.Item>
@@ -111,83 +106,54 @@
 <Page pageTitle={m.transactions_add_page_title()}>
 	<Section>
 		<SectionTitle title={m.transactions_section_details()} />
+
 		<div class="bg-muted border-border overflow-hidden rounded border">
 			<form
-				onsubmit={(e) => {
-					e.preventDefault();
+				onsubmit={(event) => {
+					event.preventDefault();
 					handleSubmit();
 				}}
 				class="space-y-0"
 			>
 				<Fieldset isFirst={true}>
 					<FormFieldRow>
-						<Label for="description" class="justify-start pr-0 md:justify-end"
-							>{m.transactions_label_description()}</Label
-						>
-						<Input id="description" bind:value={description} />
+						<Label for="account" class="justify-start pr-0 md:justify-end">
+							{m.transactions_label_account()}
+						</Label>
+						<AccountPicker
+							accounts={openAccounts}
+							bind:value={accountId}
+							id="account"
+							placeholder={m.transactions_account_select_placeholder()}
+						/>
 					</FormFieldRow>
 
 					<FormFieldRow>
-						<Label for="amount" class="justify-start pr-0 md:justify-end"
-							>{m.transactions_label_amount()}</Label
-						>
-						<CurrencyField id="amount" name="amount" bind:value={amount} required />
-					</FormFieldRow>
-
-					<FormFieldRow>
-						<Label for="date" class="justify-start pr-0 md:justify-end"
-							>{m.transactions_label_date()}</Label
-						>
+						<Label for="date" class="justify-start pr-0 md:justify-end">
+							{m.transactions_label_date()}
+						</Label>
 						<Input id="date" type="date" bind:value={date} required />
 					</FormFieldRow>
 
 					<FormFieldRow>
-						<Label for="account" class="justify-start pr-0 md:justify-end"
-							>{m.transactions_label_account()}</Label
-						>
-						<Select.Root type="single" bind:value={accountId}>
-							<Select.Trigger id="account" class="bg-background w-full pl-3">
-								{#if selectedAccount}
-									<div class="flex items-center gap-2">
-										<div
-											class="size-2 rounded-full {groupMeta[
-												selectedAccount.balanceGroup as AccountsBalanceGroupOptions
-											].color}"
-										></div>
-										{selectedAccount.name}
-									</div>
-								{:else}
-									<span class="text-muted-foreground"
-										>{m.transactions_account_select_placeholder()}</span
-									>
-								{/if}
-							</Select.Trigger>
-							<Select.Content>
-								{#each BALANCE_GROUP_ORDER as group (group)}
-									{@const accountsInGroup = accountsByGroup.get(group) ?? []}
-									{#if accountsInGroup.length > 0}
-										<Select.Group>
-											<Select.Label>
-												<div class="flex items-center gap-2">
-													<div class="size-2 rounded-full {groupMeta[group].color}"></div>
-													{groupMeta[group].label}
-												</div>
-											</Select.Label>
-											{#each accountsInGroup as account (account.id)}
-												<Select.Item value={account.id}>{account.name}</Select.Item>
-											{/each}
-										</Select.Group>
-									{/if}
-								{/each}
-							</Select.Content>
-						</Select.Root>
+						<Label for="description" class="justify-start pr-0 md:justify-end">
+							{m.transactions_label_description()}
+						</Label>
+						<Input id="description" bind:value={description} />
+					</FormFieldRow>
+
+					<FormFieldRow>
+						<Label for="amount" class="justify-start pr-0 md:justify-end">
+							{m.transactions_label_amount()}
+						</Label>
+						<CurrencyField id="amount" name="amount" bind:value={amount} required />
 					</FormFieldRow>
 
 					<FormFieldRow>
 						<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-							<Label for="labels" class="justify-start pr-0 md:justify-end"
-								>{m.transactions_label_labels()}</Label
-							>
+							<Label for="labels" class="justify-start pr-0 md:justify-end">
+								{m.transactions_label_labels()}
+							</Label>
 							<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
 						</div>
 						<Input
@@ -199,9 +165,9 @@
 
 					<FormFieldRow itemsAlignment="items-start">
 						<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1 md:pt-2">
-							<Label for="notes" class="justify-start pr-0 md:justify-end"
-								>{m.transactions_label_notes()}</Label
-							>
+							<Label for="notes" class="justify-start pr-0 md:justify-end">
+								{m.transactions_label_notes()}
+							</Label>
 							<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
 						</div>
 						<Textarea id="notes" bind:value={notes} class="bg-background" />
@@ -210,8 +176,9 @@
 
 				<Fieldset>
 					<FormFieldRow>
-						<Label class="justify-start pr-0 md:justify-end">{m.transactions_label_mark_as()}</Label
-						>
+						<Label class="justify-start pr-0 md:justify-end">
+							{m.transactions_label_mark_as()}
+						</Label>
 						<CheckboxLabel
 							id="excluded"
 							bind:checked={excluded}

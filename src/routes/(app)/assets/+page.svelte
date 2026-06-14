@@ -2,10 +2,12 @@
 	import { SvelteMap } from 'svelte/reactivity';
 
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { getAssetsContext } from '$lib/assets.svelte';
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
+	import KeyValue from '$lib/components/key-value.svelte';
 	import Link from '$lib/components/link.svelte';
 	import Number from '$lib/components/number.svelte';
 	import Page from '$lib/components/page.svelte';
@@ -100,7 +102,7 @@
 
 	const defaultSort: SortState<AssetSortColumn> = { column: 'marketValue', direction: 'desc' };
 	const sortState = $derived.by(() => {
-		const urlSort = getSortFromUrl($page.url);
+		const urlSort = getSortFromUrl(page.url);
 		if (
 			urlSort.column &&
 			urlSort.direction &&
@@ -113,7 +115,7 @@
 
 	function handleSort(column: string) {
 		const newState = toggleSort(sortState, column as AssetSortColumn);
-		const newUrl = setSortInUrl($page.url, newState);
+		const newUrl = setSortInUrl(page.url, newState);
 		// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic URL computed at runtime
 		goto(newUrl, { replaceState: true, keepFocus: true });
 	}
@@ -212,12 +214,12 @@
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 	</div>
-	<nav class="px-4">
-		<Link href="/assets/add" class="text-sm">Add asset</Link>
+	<nav class="flex items-center gap-4 px-4">
+		<Link href={resolve('/assets/add')} class="text-sm">{m.assets_add_page_title()}</Link>
 	</nav>
 </header>
 
-<Page pageTitle="Assets">
+<Page pageTitle={m.assets_section_title()}>
 	<Section>
 		{#if !isLoaded}
 			<div class="bg-background overflow-hidden rounded-sm shadow-md">
@@ -235,8 +237,23 @@
 				</nav>
 
 				{#each filters as option (option.key)}
-					<Tabs.Content value={option.key}>
+					<Tabs.Content value={option.key} class="flex flex-col space-y-2">
 						{@const rowsForOption = rowsByFilter.get(option.key) ?? []}
+						{@const total = totalsByFilter.get(option.key) ?? 0}
+						<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+							<KeyValue
+								title={m.sidebar_assets()}
+								value={rowsForOption.length}
+								variant="outline"
+								format="number"
+							/>
+							<KeyValue
+								title={m.summary_net_market_value()}
+								value={total}
+								variant="outline"
+								decimalScale={2}
+							/>
+						</div>
 						{#if rowsForOption.length === 0}
 							<Empty>
 								{option.empty}
@@ -419,24 +436,6 @@
 											</Table.Row>
 										{/each}
 									</Table.Body>
-									<Table.Footer>
-										<Table.Row class="border-t-2">
-											<Table.Cell colspan={5} class="text-muted-foreground text-xs font-normal">
-												{m.assets_aggregate_total_label()}
-											</Table.Cell>
-											<Table.Cell></Table.Cell>
-											<Table.Cell></Table.Cell>
-											<Table.Cell></Table.Cell>
-											<Table.Cell class="text-foreground text-right tabular-nums">
-												{@const total = totalsByFilter.get(option.key) ?? 0}
-												<Currency
-													value={total}
-													decimalScale={2}
-													sentiment={total > 0 ? 'positive' : total < 0 ? 'negative' : 'neutral'}
-												/>
-											</Table.Cell>
-										</Table.Row>
-									</Table.Footer>
 								</Table.Root>
 							</div>
 						{/if}

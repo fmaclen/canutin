@@ -1021,8 +1021,9 @@ test('transactions can be filtered by account', async ({ page }) => {
 	await page.getByLabel('Account', { exact: true }).click();
 
 	// Dropdown should show accounts grouped by balance type with colored indicators
-	await expect(page.getByText('Cash')).toBeVisible();
-	await expect(page.getByText('Debt')).toBeVisible();
+	const accountListbox = page.getByRole('listbox');
+	await expect(accountListbox.getByText('Cash', { exact: true })).toBeVisible();
+	await expect(accountListbox.getByText('Debt', { exact: true })).toBeVisible();
 	await expect(page.getByRole('option', { name: 'Everyday Checking' })).toBeVisible();
 	await expect(page.getByRole('option', { name: 'Rewards Credit Card' })).toBeVisible();
 

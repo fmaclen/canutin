@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { UTCDate } from '@date-fns/utc';
 	import { endOfDay, startOfYear, subDays, subMonths, subYears } from 'date-fns';
 
 	import { formatCurrency } from '$lib/components/currency';
@@ -13,17 +14,25 @@
 		AssetsResponse
 	} from '$lib/pocketbase.schema';
 
-	import { buildPreparedMaps, type BalanceGroup } from './trends';
+	import {
+		advanceTrendSecurityValue,
+		buildPreparedMaps,
+		type BalanceGroup,
+		type TrendSecurityBalance,
+		type TrendSecurityValueState
+	} from './trends';
 
 	let {
 		rawAccounts = $bindable(),
 		rawAssets = $bindable(),
 		rawAccountBalances = $bindable(),
+		rawSecurityBalances = $bindable(),
 		rawAssetBalances = $bindable()
 	}: {
 		rawAccounts: AccountsResponse[];
 		rawAssets: AssetsResponse[];
 		rawAccountBalances: AccountBalancesResponse[];
+		rawSecurityBalances: TrendSecurityBalance[];
 		rawAssetBalances: AssetBalancesResponse[];
 	} = $props();
 
@@ -67,11 +76,23 @@
 	}
 
 	const prepared = $derived.by(() =>
-		buildPreparedMaps(rawAccounts, rawAssets, rawAccountBalances, rawAssetBalances)
+		buildPreparedMaps(
+			rawAccounts,
+			rawAssets,
+			rawAccountBalances,
+			rawSecurityBalances,
+			rawAssetBalances
+		)
 	);
 
 	function computeTotals(anchorDates: Date[]) {
-		const { accountBalancesByAccountId, assetBalancesByAssetId, accountById, assetById } = prepared;
+		const {
+			accountBalancesByAccountId,
+			securityBalancesByAccountSecurity,
+			assetBalancesByAssetId,
+			accountById,
+			assetById
+		} = prepared;
 		const ascendingDates = [...anchorDates].sort((a, b) => a.getTime() - b.getTime());
 		const indexByTime = new Map(
 			ascendingDates.map((date, index) => [date.getTime(), index] as const)
@@ -92,7 +113,34 @@
 				const datePoint = ascendingDates[dateIndex];
 				while (pointer + 1 < balances.length && new Date(balances[pointer + 1].asOf) <= datePoint)
 					pointer++;
-				const value = pointer >= 0 ? (balances[pointer].value ?? 0) : 0;
+				const value =
+					meta.closed && datePoint >= new Date(meta.closed)
+						? 0
+						: pointer >= 0
+							? (balances[pointer].value ?? 0)
+							: 0;
+				const group = meta.balanceGroup as BalanceGroup;
+				if (group === 'CASH') totalsAscending[dateIndex].cash += value;
+				else if (group === 'DEBT') totalsAscending[dateIndex].debt += value;
+				else if (group === 'INVESTMENT') totalsAscending[dateIndex].investment += value;
+				else totalsAscending[dateIndex].other += value;
+				totalsAscending[dateIndex].net += value;
+			}
+		}
+		for (const balances of securityBalancesByAccountSecurity.values()) {
+			const accountId = balances[0]?.account;
+			const meta = accountId ? accountById.get(accountId) : null;
+			if (!meta) continue;
+			const securityValueState = {
+				index: -1,
+				lastKnownValue: null,
+				soldOut: false
+			} satisfies TrendSecurityValueState;
+			for (let dateIndex = 0; dateIndex < ascendingDates.length; dateIndex++) {
+				const datePoint = ascendingDates[dateIndex];
+				if (meta.closed && datePoint >= new Date(meta.closed)) continue;
+				const value = advanceTrendSecurityValue(balances, datePoint, securityValueState);
+				if (value === null) continue;
 				const group = meta.balanceGroup as BalanceGroup;
 				if (group === 'CASH') totalsAscending[dateIndex].cash += value;
 				else if (group === 'DEBT') totalsAscending[dateIndex].debt += value;
@@ -109,7 +157,12 @@
 				const datePoint = ascendingDates[dateIndex];
 				while (pointer + 1 < balances.length && new Date(balances[pointer + 1].asOf) <= datePoint)
 					pointer++;
-				const value = pointer >= 0 ? (balances[pointer].marketValue ?? 0) : 0;
+				const value =
+					meta.sold && datePoint >= new Date(meta.sold)
+						? 0
+						: pointer >= 0
+							? (balances[pointer].marketValue ?? 0)
+							: 0;
 				const group = meta.balanceGroup as BalanceGroup;
 				if (group === 'CASH') totalsAscending[dateIndex].cash += value;
 				else if (group === 'DEBT') totalsAscending[dateIndex].debt += value;
@@ -140,6 +193,10 @@
 			const d = new Date(b.asOf);
 			if (!earliest || d < earliest) earliest = d;
 		}
+		for (const b of rawSecurityBalances) {
+			const d = new Date(b.asOf);
+			if (!earliest || d < earliest) earliest = d;
+		}
 		for (const b of rawAssetBalances) {
 			const d = new Date(b.asOf);
 			if (!earliest || d < earliest) earliest = d;
@@ -147,8 +204,8 @@
 
 		const anchorDates = periods.map((periodDef) => {
 			if (periodDef.offset.max) return earliest ? new Date(earliest) : now;
-			if (periodDef.offset.ytd) return endOfDay(startOfYear(new Date()));
-			const anchorDate = subtractFromDate(new Date(), periodDef.offset);
+			if (periodDef.offset.ytd) return endOfDay(startOfYear(new UTCDate()));
+			const anchorDate = subtractFromDate(new UTCDate(), periodDef.offset);
 			return endOfDay(anchorDate);
 		});
 		const totals = computeTotals([...anchorDates, now]);
@@ -156,6 +213,7 @@
 
 		const allTimes = [
 			...rawAccountBalances.map((balance) => new Date(balance.asOf).getTime()),
+			...rawSecurityBalances.map((balance) => new Date(balance.asOf).getTime()),
 			...rawAssetBalances.map((balance) => new Date(balance.asOf).getTime())
 		];
 		const uniqueAscendingTimes = Array.from(new Set(allTimes)).sort((a, b) => a - b);

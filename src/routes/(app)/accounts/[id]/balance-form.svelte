@@ -13,9 +13,16 @@
 		balanceAsOf?: string;
 		onSubmit: () => void;
 		disabled?: boolean;
+		hasPositions?: boolean;
 	}
 
-	let { formData, balanceAsOf = '', onSubmit, disabled = false }: Props = $props();
+	let {
+		formData,
+		balanceAsOf = '',
+		onSubmit,
+		disabled = false,
+		hasPositions = false
+	}: Props = $props();
 
 	const parsedAsOf = $derived.by(() => {
 		if (!balanceAsOf) return null;
@@ -63,7 +70,7 @@
 			<FormFieldRow>
 				<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
 					<Label for="value" class="justify-start pr-0 md:justify-end"
-						>{m.accounts_label_balance()}</Label
+						>{hasPositions ? m.accounts_label_cash() : m.accounts_label_balance()}</Label
 					>
 					{#if formattedAsOf}
 						{@const asOfParts = m.accounts_text_balance_as_of({ date: '\u0000' }).split('\u0000')}

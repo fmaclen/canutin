@@ -3,13 +3,9 @@
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import {
-		BALANCE_GROUP_ORDER,
-		getBalanceGroupMeta,
-		groupAccountsByBalanceGroup
-	} from '$lib/account-utils';
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAuthContext } from '$lib/auth.svelte';
+	import AccountPicker from '$lib/components/account-picker.svelte';
 	import CheckboxLabel from '$lib/components/checkbox-label.svelte';
 	import CurrencyField from '$lib/components/currency-field.svelte';
 	import Fieldset from '$lib/components/fieldset.svelte';
@@ -22,11 +18,9 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import * as Select from '$lib/components/ui/select/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { m } from '$lib/paraglide/messages';
-	import { AccountsBalanceGroupOptions } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { getTransactionsContext, type TransactionRow } from '$lib/transactions.svelte';
 
@@ -39,9 +33,6 @@
 	const openAccounts = $derived(accountsContext.accounts.filter((a) => !a.closed));
 	const selectedTransactions = $derived(txContext.selectedTransactions);
 	const selectedCount = $derived(txContext.selectedCount);
-
-	const groupMeta = getBalanceGroupMeta();
-	const accountsByGroup = $derived(groupAccountsByBalanceGroup(openAccounts));
 
 	$effect(() => {
 		if (selectedCount === 0) {
@@ -68,8 +59,6 @@
 	const commonLabels = $derived(getCommonValue((tx) => tx.labels.join(', ')));
 	const commonAmount = $derived(getCommonValue((tx) => tx.value));
 	const commonExcluded = $derived(getCommonValue((tx) => tx.excluded));
-
-	const selectedAccount = $derived(openAccounts.find((a) => a.id === formData.accountId));
 
 	let editAccount = $state(false);
 	let editDescription = $state(false);
@@ -346,46 +335,15 @@
 								>{m.transactions_label_account()}</Label
 							>
 							<div class="flex gap-2">
-								<Select.Root type="single" bind:value={formData.accountId} disabled={!editAccount}>
-									<Select.Trigger id="account" class="bg-background w-full pl-3">
-										{#if selectedAccount}
-											<div class="flex items-center gap-2">
-												<div
-													class="size-2 rounded-full {groupMeta[
-														selectedAccount.balanceGroup as AccountsBalanceGroupOptions
-													].color}"
-												></div>
-												{selectedAccount.name}
-											</div>
-										{:else if commonAccountId === null}
-											<span class="text-muted-foreground"
-												>{m.transactions_batch_multiple_accounts()}</span
-											>
-										{:else}
-											<span class="text-muted-foreground"
-												>{m.transactions_account_select_placeholder()}</span
-											>
-										{/if}
-									</Select.Trigger>
-									<Select.Content>
-										{#each BALANCE_GROUP_ORDER as group (group)}
-											{@const accountsInGroup = accountsByGroup.get(group) ?? []}
-											{#if accountsInGroup.length > 0}
-												<Select.Group>
-													<Select.Label>
-														<div class="flex items-center gap-2">
-															<div class="size-2 rounded-full {groupMeta[group].color}"></div>
-															{groupMeta[group].label}
-														</div>
-													</Select.Label>
-													{#each accountsInGroup as account (account.id)}
-														<Select.Item value={account.id}>{account.name}</Select.Item>
-													{/each}
-												</Select.Group>
-											{/if}
-										{/each}
-									</Select.Content>
-								</Select.Root>
+								<AccountPicker
+									accounts={openAccounts}
+									bind:value={formData.accountId}
+									id="account"
+									disabled={!editAccount}
+									placeholder={commonAccountId === null
+										? m.transactions_batch_multiple_accounts()
+										: m.transactions_account_select_placeholder()}
+								/>
 								<CheckboxLabel
 									bind:checked={editAccount}
 									label={m.transactions_batch_edit_label()}

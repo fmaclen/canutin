@@ -63,6 +63,10 @@ func main() {
 			return handleRevert(e.App, re)
 		}).Bind(apis.RequireAuth())
 
+		e.Router.POST("/api/canutin/securities/with-initial-balance", createSecurityWithInitialBalanceHandler(e.App)).Bind(
+			apis.RequireAuth("users"),
+		)
+
 		e.Router.POST("/api/shares/accounts", createAccountShareHandler(e.App)).Bind(
 			apis.RequireAuth("users"),
 		)
@@ -75,6 +79,49 @@ func main() {
 
 	app.OnRecordUpdateRequest("accountShares", "assetShares").BindFunc(func(e *core.RecordRequestEvent) error {
 		if err := validateShareUpdateRequest(e); err != nil {
+			return err
+		}
+		return e.Next()
+	})
+
+	// NOTE: blocks creating or editing a balance/transaction on a closed account. Request-bound
+	// (not a model hook) so imports can still restore closed-account history.
+	validateSecurityWriteRequest := func(e *core.RecordRequestEvent) error {
+		if e.Auth == nil || !e.Auth.IsSuperuser() {
+			if err := validateAccountOpen(e.App, e.Record.GetString("account"), e.Auth); err != nil {
+				return err
+			}
+		}
+		return e.Next()
+	}
+	app.OnRecordCreateRequest("securityBalances", "securityTransactions").BindFunc(validateSecurityWriteRequest)
+	app.OnRecordUpdateRequest("securityBalances", "securityTransactions").BindFunc(validateSecurityWriteRequest)
+
+	app.OnRecordValidate("securities").BindFunc(func(e *core.RecordEvent) error {
+		normalizeSecurityRecord(e.Record)
+		if err := validateSecurityOwnerImmutable(e.Record); err != nil {
+			return err
+		}
+		return e.Next()
+	})
+
+	app.OnRecordValidate("securityBalances").BindFunc(func(e *core.RecordEvent) error {
+		normalizeSecurityDatedRecord(e.Record, "asOf")
+		if err := validateSecurityOwnerImmutable(e.Record); err != nil {
+			return err
+		}
+		if err := validateSecurityRecordIntegrity(e.App, e.Record); err != nil {
+			return err
+		}
+		return e.Next()
+	})
+
+	app.OnRecordValidate("securityTransactions").BindFunc(func(e *core.RecordEvent) error {
+		normalizeSecurityDatedRecord(e.Record, "date")
+		if err := validateSecurityOwnerImmutable(e.Record); err != nil {
+			return err
+		}
+		if err := validateSecurityRecordIntegrity(e.App, e.Record); err != nil {
 			return err
 		}
 		return e.Next()

@@ -2,10 +2,12 @@
 	import { SvelteMap } from 'svelte/reactivity';
 
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
+	import KeyValue from '$lib/components/key-value.svelte';
 	import Link from '$lib/components/link.svelte';
 	import Page from '$lib/components/page.svelte';
 	import RecordLink from '$lib/components/record-link.svelte';
@@ -22,6 +24,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import type { TransactionsResponse } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+	import { sumOrUnknown } from '$lib/security-balance-values';
 	import {
 		createSortComparator,
 		getSortFromUrl,
@@ -50,7 +53,7 @@
 		id: string;
 		name: string;
 		institution: string | null;
-		balance: number;
+		balance: number | null;
 		typeName: string;
 		balanceGroup: BalanceGroup;
 		autoCalculated: boolean;
@@ -94,7 +97,7 @@
 
 	const defaultSort: SortState<AccountSortColumn> = { column: 'balance', direction: 'desc' };
 	const sortState = $derived.by(() => {
-		const urlSort = getSortFromUrl($page.url);
+		const urlSort = getSortFromUrl(page.url);
 		if (
 			urlSort.column &&
 			urlSort.direction &&
@@ -107,7 +110,7 @@
 
 	function handleSort(column: string) {
 		const newState = toggleSort(sortState, column as AccountSortColumn);
-		const newUrl = setSortInUrl($page.url, newState);
+		const newUrl = setSortInUrl(page.url, newState);
 		// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic URL computed at runtime
 		goto(newUrl, { replaceState: true, keepFocus: true });
 	}
@@ -117,7 +120,7 @@
 			id: account.id,
 			name: account.name,
 			institution: account.institution ?? null,
-			balance: account.balance ?? 0,
+			balance: account.balance,
 			typeName: accountsContext.getTypeName(account.balanceType),
 			balanceGroup: account.balanceGroup as BalanceGroup,
 			autoCalculated: Boolean(account.autoCalculated),
@@ -146,12 +149,11 @@
 	});
 
 	const totalsByFilter = $derived.by(() => {
-		const totals = new SvelteMap<FilterOption, number>();
+		const totals = new SvelteMap<FilterOption, number | null>();
 		for (const option of filters) {
 			const rows = rowsByFilter.get(option.key) ?? [];
-			const total = rows.reduce(
-				(sum, row) => sum + (option.key === 'open' && row.participantExcluded ? 0 : row.balance),
-				0
+			const total = sumOrUnknown(
+				rows.map((row) => (option.key === 'open' && row.participantExcluded ? 0 : row.balance))
 			);
 			totals.set(option.key, total);
 		}
@@ -187,7 +189,7 @@
 
 	function balanceSentiment(row: AccountRow) {
 		if (row.closed || row.participantExcluded) return 'neutral';
-		if (row.balance === 0) return 'neutral';
+		if (row.balance === null || row.balance === 0) return 'neutral';
 		return row.balance > 0 ? 'positive' : 'negative';
 	}
 
@@ -230,12 +232,12 @@
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 	</div>
-	<nav class="px-4">
-		<Link href="/accounts/add" class="text-sm">Add account</Link>
+	<nav class="flex items-center gap-4 px-4">
+		<Link href={resolve('/accounts/add')} class="text-sm">{m.accounts_add_page_title()}</Link>
 	</nav>
 </header>
 
-<Page pageTitle="Accounts">
+<Page pageTitle={m.sidebar_accounts()}>
 	<Section>
 		{#if !isLoaded}
 			<div class="bg-background overflow-hidden rounded-sm shadow-md">
@@ -253,8 +255,23 @@
 				</nav>
 
 				{#each filters as option (option.key)}
-					<Tabs.Content value={option.key}>
+					<Tabs.Content value={option.key} class="flex flex-col space-y-2">
 						{@const rowsForOption = rowsByFilter.get(option.key) ?? []}
+						{@const total = totalsByFilter.get(option.key) ?? null}
+						<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+							<KeyValue
+								title={m.sidebar_accounts()}
+								value={rowsForOption.length}
+								variant="outline"
+								format="number"
+							/>
+							<KeyValue
+								title={m.summary_net_balance()}
+								value={total}
+								variant="outline"
+								decimalScale={2}
+							/>
+						</div>
 						{#if rowsForOption.length === 0}
 							<Empty>
 								{option.empty}
@@ -374,7 +391,9 @@
 													{/if}
 												</Table.Cell>
 												<Table.Cell class="text-right tabular-nums">
-													{#if row.participantExcluded || row.closed}
+													{#if row.balance === null}
+														<span class="text-muted-foreground">~</span>
+													{:else if row.participantExcluded || row.closed}
 														<Tooltip.Root>
 															<Tooltip.Trigger
 																class="border-border inline-block border-b border-dashed hover:border-current"
@@ -404,21 +423,6 @@
 											</Table.Row>
 										{/each}
 									</Table.Body>
-									<Table.Footer>
-										<Table.Row class="border-t-2">
-											<Table.Cell colspan={6} class="text-muted-foreground text-xs font-normal">
-												{m.accounts_aggregate_total_label()}
-											</Table.Cell>
-											<Table.Cell class="text-foreground text-right tabular-nums">
-												{@const total = totalsByFilter.get(option.key) ?? 0}
-												<Currency
-													value={total}
-													decimalScale={2}
-													sentiment={total > 0 ? 'positive' : total < 0 ? 'negative' : 'neutral'}
-												/>
-											</Table.Cell>
-										</Table.Row>
-									</Table.Footer>
 								</Table.Root>
 							</div>
 						{/if}

@@ -3,19 +3,38 @@
 	import { getAssetsContext } from '$lib/assets.svelte';
 	import Currency from '$lib/components/currency.svelte';
 	import KeyValue from '$lib/components/key-value.svelte';
+	import { sumOrUnknown } from '$lib/security-balance-values';
 
 	const accountsContext = getAccountsContext();
 	const assetsContext = getAssetsContext();
 
-	type Groups = { CASH: number; DEBT: number; INVESTMENT: number; OTHER: number };
+	type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
 	const totals = $derived.by(() => {
-		const g: Groups = { CASH: 0, DEBT: 0, INVESTMENT: 0, OTHER: 0 };
+		const valuesByGroup: Record<BalanceGroup, Array<number | null>> = {
+			CASH: [],
+			DEBT: [],
+			INVESTMENT: [],
+			OTHER: []
+		};
 		for (const a of accountsContext.accounts)
-			if (!a.participantExcluded && !a.closed) g[a.balanceGroup] += a.balance ?? 0;
+			if (!a.participantExcluded && !a.closed)
+				valuesByGroup[a.balanceGroup as BalanceGroup].push(a.balance);
 		for (const a of assetsContext.assets)
-			if (!a.participantExcluded && !a.sold) g[a.balanceGroup] += a.marketValue ?? 0;
-		const netWorth = g.CASH + g.INVESTMENT + g.OTHER + g.DEBT;
-		return { totalsByGroup: g, netWorth } as const;
+			if (!a.participantExcluded && !a.sold)
+				valuesByGroup[a.balanceGroup as BalanceGroup].push(a.marketValue ?? 0);
+		const totalsByGroup = {
+			CASH: sumOrUnknown(valuesByGroup.CASH),
+			DEBT: sumOrUnknown(valuesByGroup.DEBT),
+			INVESTMENT: sumOrUnknown(valuesByGroup.INVESTMENT),
+			OTHER: sumOrUnknown(valuesByGroup.OTHER)
+		};
+		const netWorth = sumOrUnknown([
+			...valuesByGroup.CASH,
+			...valuesByGroup.DEBT,
+			...valuesByGroup.INVESTMENT,
+			...valuesByGroup.OTHER
+		]);
+		return { totalsByGroup, netWorth } as const;
 	});
 </script>
 
@@ -27,7 +46,11 @@
 	>
 		<div class="text-sm leading-none font-semibold tracking-tight">Net worth</div>
 		<div class="translate-y-1.5 text-4xl">
-			<Currency value={totals.netWorth} />
+			{#if totals.netWorth === null}
+				<span class="text-white/70">~</span>
+			{:else}
+				<Currency value={totals.netWorth} />
+			{/if}
 		</div>
 	</div>
 	<KeyValue title="Cash" value={totals.totalsByGroup.CASH} variant="cash" />

@@ -1,5 +1,6 @@
+import { UTCDate } from '@date-fns/utc';
 import { expect, test } from '@playwright/test';
-import { setHours, startOfYear, subDays, subMonths, subYears } from 'date-fns';
+import { startOfDay, startOfYear, subDays, subMonths, subYears } from 'date-fns';
 
 import {
 	AccountsBalanceGroupOptions,
@@ -34,29 +35,35 @@ test('trends performance table', async ({ page }) => {
 		balanceType: 'Credit card'
 	});
 
-	const now = new Date();
+	// Mirror the app's UTC day-boundary math: the trends code computes "now" with
+	// `startOfDay(new UTCDate())` and derives every window edge from it. Deriving the
+	// seed dates the same way keeps the seed instants on the exact UTC midnights the
+	// growth chart iterates over, so balance selection is identical regardless of the
+	// runner/browser timezone (desktop vs mobile) or time of day.
+	const now = startOfDay(new UTCDate());
+
 	const oneWeek = subDays(now, 7);
 	const oneMonth = subMonths(now, 1);
 	const sixMonths = subMonths(now, 6);
 	const oneYear = subYears(now, 1);
-	const twoYears = subYears(now, 2);
-	const fiveYears = subYears(now, 5);
 	const earliest = subYears(now, 6);
-	const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-	const twoYearsStart = new Date(
-		Date.UTC(twoYears.getUTCFullYear(), twoYears.getUTCMonth(), twoYears.getUTCDate())
-	);
+	const todayStart = now;
+	const twoYearsStart = subYears(now, 2);
+
+	// Window-start balances sit a few days BEFORE the computed 2Y/5Y window starts so
+	// they are unambiguously the latest balance at-or-before the window's first
+	// datepoint. Seeding exactly on the window edge lets tiny instant differences flip
+	// which balance gets selected at the boundary.
+	const beforeTwoYears = subDays(subYears(now, 2), 3);
+	const beforeFiveYears = subDays(subYears(now, 5), 3);
 
 	// YTD balance should be on Jan 1st to match the app's YTD anchor calculation.
-	// The app uses `endOfDay(startOfYear(new Date()))` for YTD, so a balance at
-	// Jan 1st 12:00 will be found. This avoids collision with the 1W balance
-	// which falls in December when running in the first week of January.
 	const ytd = startOfYear(now);
 
 	const baselineCash: Array<[Date, number]> = [
 		[earliest, 1000],
-		[fiveYears, 2000],
-		[twoYearsStart, 2600],
+		[beforeFiveYears, 2000],
+		[beforeTwoYears, 2600],
 		[oneYear, 3000],
 		[ytd, 4000],
 		[sixMonths, 5000],
@@ -69,15 +76,15 @@ test('trends performance table', async ({ page }) => {
 		await seedAccountBalance({
 			account: cashAccount.id,
 			owner: user.id,
-			asOf: setHours(date, 12).toISOString(),
+			asOf: date.toISOString(),
 			value
 		});
 	}
 
 	const baselineDebt: Array<[Date, number]> = [
 		[earliest, -1000],
-		[fiveYears, -2000],
-		[twoYearsStart, -2100],
+		[beforeFiveYears, -2000],
+		[beforeTwoYears, -2100],
 		[oneYear, -2500],
 		[ytd, -3000],
 		[sixMonths, -3500],
@@ -90,10 +97,17 @@ test('trends performance table', async ({ page }) => {
 		await seedAccountBalance({
 			account: debtAccount.id,
 			owner: user.id,
-			asOf: setHours(date, 12).toISOString(),
+			asOf: date.toISOString(),
 			value
 		});
 	}
+
+	// The closed account and sold asset are zeroed at-or-after this instant. A
+	// deterministic mid-window past date (about a month ago, at UTC midnight) keeps
+	// them present at every historical datepoint (including the 2Y/5Y/earliest window
+	// starts) and zeroed by the final datepoint (today's UTC midnight), since the
+	// close/sell instant is now strictly before today's datepoint.
+	const closeSell = subMonths(now, 1);
 
 	const excludedInvestmentAccount = await seedAccount({
 		name: 'Excluded Invest',
@@ -107,39 +121,39 @@ test('trends performance table', async ({ page }) => {
 		balanceGroup: AccountsBalanceGroupOptions.OTHER,
 		owner: user.id,
 		balanceType: 'Other',
-		closed: now.toISOString()
+		closed: closeSell.toISOString()
 	});
 	for (const [date, value] of [
 		[earliest, 10_000],
-		[fiveYears, 20_000],
+		[beforeFiveYears, 20_000],
 		[oneYear, 30_000],
 		[ytd, 40_000],
 		[sixMonths, 50_000],
 		[oneMonth, 60_000],
 		[oneWeek, 70_000],
-		[now, 80_000]
+		[todayStart, 80_000]
 	] as Array<[Date, number]>) {
 		await seedAccountBalance({
 			account: excludedInvestmentAccount.id,
 			owner: user.id,
-			asOf: setHours(date, 12).toISOString(),
+			asOf: date.toISOString(),
 			value
 		});
 	}
 	for (const [date, value] of [
 		[earliest, 5_000],
-		[fiveYears, 4_000],
+		[beforeFiveYears, 4_000],
 		[oneYear, 3_000],
 		[ytd, 2_000],
 		[sixMonths, 1_000],
 		[oneMonth, 500],
 		[oneWeek, 250],
-		[now, 100]
+		[todayStart, 100]
 	] as Array<[Date, number]>) {
 		await seedAccountBalance({
 			account: closedOtherAccount.id,
 			owner: user.id,
-			asOf: setHours(date, 12).toISOString(),
+			asOf: date.toISOString(),
 			value
 		});
 	}
@@ -150,7 +164,7 @@ test('trends performance table', async ({ page }) => {
 		balanceType: 'Stock',
 		owner: user.id,
 		type: AssetsTypeOptions.WHOLE,
-		sold: now.toISOString()
+		sold: closeSell.toISOString()
 	});
 	const excludedDebtAsset = await seedAsset({
 		name: 'Excluded Debt Asset',
@@ -162,35 +176,35 @@ test('trends performance table', async ({ page }) => {
 	});
 	for (const [date, marketValue] of [
 		[earliest, 12_000],
-		[fiveYears, 18_000],
+		[beforeFiveYears, 18_000],
 		[oneYear, 24_000],
 		[ytd, 30_000],
 		[sixMonths, 36_000],
 		[oneMonth, 42_000],
 		[oneWeek, 48_000],
-		[now, 54_000]
+		[todayStart, 54_000]
 	] as Array<[Date, number]>) {
 		await seedAssetBalance({
 			asset: soldAsset.id,
 			owner: user.id,
-			asOf: setHours(date, 12).toISOString(),
+			asOf: date.toISOString(),
 			marketValue
 		});
 	}
 	for (const [date, marketValue] of [
 		[earliest, -2_000],
-		[fiveYears, -4_000],
+		[beforeFiveYears, -4_000],
 		[oneYear, -3_500],
 		[ytd, -3_000],
 		[sixMonths, -2_500],
 		[oneMonth, -2_200],
 		[oneWeek, -2_100],
-		[now, -2_000]
+		[todayStart, -2_000]
 	] as Array<[Date, number]>) {
 		await seedAssetBalance({
 			asset: excludedDebtAsset.id,
 			owner: user.id,
-			asOf: setHours(date, 12).toISOString(),
+			asOf: date.toISOString(),
 			marketValue
 		});
 	}
@@ -203,7 +217,7 @@ test('trends performance table', async ({ page }) => {
 		'data-growth-start',
 		twoYearsStart.toISOString().slice(0, 10)
 	);
-	await expect(growthChart).toHaveAttribute('data-growth-start-net', '500');
+	await expect(growthChart).toHaveAttribute('data-growth-start-net', '22500');
 	await expect(growthChart).toHaveAttribute('data-growth-end-net', '5000');
 
 	// Table columns: Group | 1W | 1M | 6M | YTD | 1Y | 2Y | 5Y | MAX | Allocation
@@ -222,10 +236,12 @@ test('trends performance table', async ({ page }) => {
 		await expect(cell.getByRole('button').or(cell.getByText('~'))).toBeVisible();
 	}
 
-	// Stable periods: exact values
-	await expect(netCells.nth(6).getByRole('button', { name: '+900%' })).toBeVisible(); // 2Y
-	await expect(netCells.nth(7)).toContainText('~'); // 5Y - no data (net was 0)
-	await expect(netCells.nth(8).getByRole('button', { name: '+900%' })).toBeVisible(); // MAX
+	// Stable periods: exact values. Closed accounts and sold assets contribute their
+	// last-known value to historical datepoints (zeroed only at/after their close/sell
+	// date), so the net at every prior anchor includes Closed Other and Sold Asset.
+	await expect(netCells.nth(6).getByRole('button', { name: '-77.8%' })).toBeVisible(); // 2Y
+	await expect(netCells.nth(7).getByRole('button', { name: '-77.3%' })).toBeVisible(); // 5Y
+	await expect(netCells.nth(8).getByRole('button', { name: '-70.6%' })).toBeVisible(); // MAX
 
 	const cashRow = page.getByRole('row', { name: /^Cash/ });
 	const cashCells = cashRow.getByRole('cell');

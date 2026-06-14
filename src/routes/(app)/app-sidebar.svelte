@@ -1,9 +1,5 @@
-<script lang="ts" module>
-	// (module script intentionally left empty)
-</script>
-
 <script lang="ts">
-	import ArrowLeftRightIcon from '@lucide/svelte/icons/arrow-left-right';
+	import ChartCandlestickIcon from '@lucide/svelte/icons/chart-candlestick';
 	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
 	import LandmarkIcon from '@lucide/svelte/icons/landmark';
 	import LayoutListIcon from '@lucide/svelte/icons/layout-list';
@@ -12,6 +8,7 @@
 	import type { ComponentProps } from 'svelte';
 
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import CanutinIcon from '$lib/components/canutin-icon.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { m } from '$lib/paraglide/messages.js';
@@ -24,38 +21,36 @@
 	const insights = $derived([
 		{
 			name: m.sidebar_big_picture(),
-			url: resolve('/big-picture'),
+			url: '/big-picture',
 			icon: PresentationIcon
 		},
 		{
 			name: m.sidebar_balance_sheet(),
-			url: resolve('/balance-sheet'),
+			url: '/balance-sheet',
 			icon: LayoutListIcon
 		},
 		{
+			name: m.portfolio_page_title(),
+			url: '/portfolio',
+			icon: ChartCandlestickIcon
+		},
+		{
 			name: m.sidebar_trends(),
-			url: resolve('/trends'),
+			url: '/trends',
 			icon: ChartLineIcon
 		}
-	]);
+	] as const);
 
-	const dataSources = $derived([
-		{
-			name: m.sidebar_assets(),
-			url: resolve('/assets'),
-			icon: LandmarkIcon
-		},
-		{
-			name: m.sidebar_accounts(),
-			url: resolve('/accounts'),
-			icon: WalletCardsIcon
-		},
-		{
-			name: m.sidebar_transactions(),
-			url: resolve('/transactions'),
-			icon: ArrowLeftRightIcon
-		}
-	]);
+	function isActive(path: '/assets') {
+		const currentPath = page.url.pathname;
+		return currentPath === resolve(path);
+	}
+
+	function isPrefixActive(path: '/accounts' | '/transactions' | '/trades') {
+		const resolvedPath = resolve(path);
+		const currentPath = page.url.pathname;
+		return currentPath === resolvedPath || currentPath.startsWith(`${resolvedPath}/`);
+	}
 </script>
 
 <Sidebar.Root bind:ref variant="sidebar" {...restProps}>
@@ -81,7 +76,52 @@
 	</Sidebar.Header>
 	<Sidebar.Content>
 		<NavGroup links={insights} />
-		<NavGroup links={dataSources} />
+		<Sidebar.Group
+			class="border-t pt-6 pb-0 group-data-[collapsible=icon]:hidden first:border-t-0 first:pt-4"
+		>
+			<Sidebar.Menu>
+				<Sidebar.MenuItem>
+					<Sidebar.MenuButton isActive={isPrefixActive('/accounts')}>
+						{#snippet child({ props })}
+							<a href={resolve('/accounts')} {...props}>
+								<WalletCardsIcon />
+								<span>{m.sidebar_accounts()}</span>
+							</a>
+						{/snippet}
+					</Sidebar.MenuButton>
+					<Sidebar.MenuSub class="mx-5">
+						<Sidebar.MenuSubItem>
+							<Sidebar.MenuSubButton
+								class="text-muted-foreground hover:text-foreground"
+								href={resolve('/transactions')}
+								isActive={isPrefixActive('/transactions')}
+							>
+								<span>{m.sidebar_transactions()}</span>
+							</Sidebar.MenuSubButton>
+						</Sidebar.MenuSubItem>
+						<Sidebar.MenuSubItem>
+							<Sidebar.MenuSubButton
+								class="text-muted-foreground hover:text-foreground"
+								href={resolve('/trades')}
+								isActive={isPrefixActive('/trades')}
+							>
+								<span>{m.trades_title()}</span>
+							</Sidebar.MenuSubButton>
+						</Sidebar.MenuSubItem>
+					</Sidebar.MenuSub>
+				</Sidebar.MenuItem>
+				<Sidebar.MenuItem>
+					<Sidebar.MenuButton isActive={isActive('/assets')}>
+						{#snippet child({ props })}
+							<a href={resolve('/assets')} {...props}>
+								<LandmarkIcon />
+								<span>{m.sidebar_assets()}</span>
+							</a>
+						{/snippet}
+					</Sidebar.MenuButton>
+				</Sidebar.MenuItem>
+			</Sidebar.Menu>
+		</Sidebar.Group>
 	</Sidebar.Content>
 	<Sidebar.Footer>
 		<NavUser />

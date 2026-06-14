@@ -42,7 +42,7 @@
 	async function handleSubmit(event: Event) {
 		event.preventDefault();
 
-		if (auth.isLoading) return;
+		if (auth.isSubmitting) return;
 		if (mode === 'signup') {
 			const result = await auth.signup(email, password, passwordConfirm);
 			if (result.success) {
@@ -89,7 +89,7 @@
 				<p class="text-sm text-red-600">{auth.error}</p>
 			{/if}
 
-			<Button type="submit" class="w-full" disabled={auth.isLoading}>{primaryText}</Button>
+			<Button type="submit" class="w-full" disabled={auth.isSubmitting}>{primaryText}</Button>
 
 			{#if demo.isEnabled && mode === 'login'}
 				<Button href="/demo" variant="outline" class="w-full">{m.demo_try_as_guest()}</Button>

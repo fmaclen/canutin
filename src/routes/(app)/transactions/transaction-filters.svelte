@@ -5,12 +5,8 @@
 	import type { DateRange } from 'bits-ui';
 	import { addDays, format, subDays } from 'date-fns';
 
-	import {
-		BALANCE_GROUP_ORDER,
-		getBalanceGroupMeta,
-		groupAccountsByBalanceGroup
-	} from '$lib/account-utils';
 	import { getAccountsContext } from '$lib/accounts.svelte';
+	import AccountPicker from '$lib/components/account-picker.svelte';
 	import ClearButton from '$lib/components/clear-button.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -18,7 +14,6 @@
 	import { RangeCalendar } from '$lib/components/ui/range-calendar/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { m } from '$lib/paraglide/messages';
-	import { AccountsBalanceGroupOptions } from '$lib/pocketbase.schema';
 	import {
 		getTransactionsContext,
 		type KindFilter,
@@ -28,8 +23,6 @@
 	const txContext = getTransactionsContext();
 	const accountsContext = getAccountsContext();
 
-	const groupMeta = getBalanceGroupMeta();
-	let accountsByGroup = $derived(groupAccountsByBalanceGroup(accountsContext.accounts));
 	let selectedAccount = $derived(
 		txContext.accountFilter
 			? accountsContext.accounts.find((a) => a.id === txContext.accountFilter)
@@ -214,64 +207,18 @@
 			{/each}
 		</Select.Content>
 	</Select.Root>
-	<Select.Root
-		type="single"
+	<AccountPicker
+		accounts={accountsContext.accounts}
 		value={txContext.accountFilter ?? ''}
-		onValueChange={(v) => txContext.setAccountFilter(v || null)}
-	>
-		<Select.Trigger
-			aria-label={m.transactions_filter_account_label()}
-			class="bg-background w-full sm:w-fit sm:max-w-64"
-		>
-			{#if selectedAccount}
-				<div class="flex w-full items-center gap-2">
-					<div
-						class="size-2 shrink-0 rounded-full {groupMeta[
-							selectedAccount.balanceGroup as AccountsBalanceGroupOptions
-						].color}"
-					></div>
-					<span class="max-w-40 truncate">{selectedAccount.name}</span>
-					<ClearButton
-						class="ml-auto"
-						onclick={(e) => {
-							e.preventDefault();
-							e.stopPropagation();
-							txContext.setAccountFilter(null);
-						}}
-						onpointerdown={(e) => {
-							e.preventDefault();
-							e.stopPropagation();
-						}}
-						onpointerup={(e) => {
-							e.preventDefault();
-							e.stopPropagation();
-						}}
-						aria-label={m.transactions_filter_account_clear()}
-					/>
-				</div>
-			{:else}
-				{m.transactions_filter_account_all()}
-			{/if}
-		</Select.Trigger>
-		<Select.Content>
-			{#each BALANCE_GROUP_ORDER as group (group)}
-				{@const accountsInGroup = accountsByGroup.get(group) ?? []}
-				{#if accountsInGroup.length > 0}
-					<Select.Group>
-						<Select.Label>
-							<div class="flex items-center gap-2">
-								<div class="size-2 rounded-full {groupMeta[group].color}"></div>
-								{groupMeta[group].label}
-							</div>
-						</Select.Label>
-						{#each accountsInGroup as account (account.id)}
-							<Select.Item value={account.id}>{account.name}</Select.Item>
-						{/each}
-					</Select.Group>
-				{/if}
-			{/each}
-		</Select.Content>
-	</Select.Root>
+		{selectedAccount}
+		onValueChange={(value) => txContext.setAccountFilter(value || null)}
+		onClear={() => txContext.setAccountFilter(null)}
+		clearLabel={m.transactions_filter_account_clear()}
+		ariaLabel={m.transactions_filter_account_label()}
+		triggerClass="sm:w-fit sm:max-w-64"
+		selectedNameClass="max-w-40 truncate"
+		placeholder={m.transactions_filter_account_all()}
+	/>
 	<Select.Root
 		type="single"
 		value={txContext.labelFilter ?? ''}

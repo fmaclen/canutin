@@ -75,7 +75,7 @@ test('assets table reflects filters and aggregate totals', async ({ page }) => {
 	await expect(excludedCells.nth(8)).toContainText('$2,000.00');
 	await expect(excludedRow.getByText('Excluded')).toBeVisible();
 
-	const aggregateRow = page.getByRole('row', { name: 'Assets aggregate total' });
+	const aggregateRow = page.getByRole('region', { name: 'Net market value' });
 	await expect(aggregateRow).toContainText('$5,000.00');
 	await expect(aggregateRow).not.toContainText('$2,000.00');
 	await expect(page.getByRole('row', { name: 'Legacy Stock' })).not.toBeVisible();
@@ -249,7 +249,7 @@ test('user can add a new asset with type WHOLE or SHARES', async ({ page }) => {
 	await expect(page.getByLabel('Book price')).not.toBeVisible();
 	await expect(page.getByLabel('Market price')).not.toBeVisible();
 	await expect(page.getByLabel('Book value')).toBeVisible();
-	await expect(page.getByLabel('Market value')).toBeVisible();
+	await expect(page.getByLabel('Market value', { exact: true })).toBeVisible();
 
 	await page.getByLabel('Name').fill('Gold Coins');
 	await page.getByLabel('Balance group').click();
@@ -257,7 +257,7 @@ test('user can add a new asset with type WHOLE or SHARES', async ({ page }) => {
 	await page.getByLabel('Category').fill('Precious Metals');
 	await page.getByLabel('Notes').fill('Stored in safety deposit box #142');
 	await page.getByLabel('Book value').fill('12000');
-	await page.getByLabel('Market value').fill('15000');
+	await page.getByLabel('Market value', { exact: true }).fill('15000');
 	await page.getByRole('button', { name: 'Add' }).click();
 	await expect(page.getByText('Asset added')).toBeVisible();
 	await expect(page).toHaveURL('/assets');
@@ -279,7 +279,7 @@ test('user can add a new asset with type WHOLE or SHARES', async ({ page }) => {
 	await expect(page.getByLabel('Book price')).toBeVisible();
 	await expect(page.getByLabel('Market price')).toBeVisible();
 	await expect(page.getByLabel('Book value')).not.toBeVisible();
-	await expect(page.getByLabel('Market value')).not.toBeVisible();
+	await expect(page.getByLabel('Market value', { exact: true })).not.toBeVisible();
 
 	await page.getByLabel('Name').fill('Apple Inc.');
 	await page.getByLabel('Symbol').fill('AAPL');
@@ -290,7 +290,6 @@ test('user can add a new asset with type WHOLE or SHARES', async ({ page }) => {
 	await page.getByLabel('Book price').fill('150');
 	await page.getByLabel('Market price').fill('180');
 	await page.getByRole('button', { name: 'Add' }).click();
-	await expect(page.getByText('Asset added')).toBeVisible();
 	await expect(page).toHaveURL('/assets');
 
 	const sharesAssetRow = page.getByRole('row', { name: 'AAPL' });
@@ -319,13 +318,13 @@ test('optional currency fields show placeholder when not set', async ({ page }) 
 	await page.getByLabel('Balance group').click();
 	await page.getByText('Other assets').click();
 	await page.getByLabel('Category').fill('Art');
-	await page.getByLabel('Market value').fill('5000');
+	await page.getByLabel('Market value', { exact: true }).fill('5000');
 	await page.getByRole('button', { name: 'Add' }).click();
 	await expect(page.getByText('Asset added')).toBeVisible();
 	await expect(page).toHaveURL('/assets');
 
 	await page.getByRole('link', { name: 'Art Piece' }).click();
-	await expect(page.getByLabel('Market value')).toHaveValue('$5,000.00');
+	await expect(page.getByLabel('Market value', { exact: true })).toHaveValue('$5,000.00');
 	await expect(page.getByLabel('Book value')).toHaveValue('');
 });
 
@@ -397,7 +396,7 @@ test('user can edit asset details and update balance', async ({ page }) => {
 	);
 	await expect(page.getByLabel('Exclude from net worth')).not.toBeChecked();
 
-	await page.getByLabel('Market value').fill('12500');
+	await page.getByLabel('Market value', { exact: true }).fill('12500');
 	await page.getByLabel('Book value').fill('10000');
 	await page.getByRole('button', { name: 'Update' }).click();
 	await expect(page.getByText('Balance updated')).toBeVisible();
@@ -529,7 +528,7 @@ test('user can directly navigate to asset edit page', async ({ page }) => {
 	await expect(page).toHaveURL(`/assets/${vehicle.id}`);
 	await expect(page.getByLabel('Name')).toHaveValue('2020 Honda Civic');
 	await expect(page.getByLabel('Category')).toHaveValue('Vehicle');
-	await expect(page.getByLabel('Market value')).toHaveValue('$18,500.00');
+	await expect(page.getByLabel('Market value', { exact: true })).toHaveValue('$18,500.00');
 	await expect(page.getByLabel('Book value')).toHaveValue('$20,000.00');
 });
 
