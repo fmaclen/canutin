@@ -377,31 +377,42 @@ test('import rejects empty payload', async () => {
 	expect(response.status).toBe(400);
 });
 
-test('import rejects security and cryptocurrency balance types in assets payload', async () => {
+test('import accepts security and cryptocurrency balance types in assets payload', async () => {
 	const user = await seedUser('xavier');
-	const rejectedAssets = [
+	const importedAssets = [
 		{
 			name: 'Xavier Security',
 			balanceGroup: 'INVESTMENT',
-			balanceType: 'Security'
+			balanceType: 'Security',
+			balance: { marketValue: 1000, bookValue: 900, asOf: '2025-10-01T00:00:00.000Z' }
 		},
 		{
 			name: 'Xavier Crypto',
 			balanceGroup: 'INVESTMENT',
-			balanceType: 'Cryptocurrency'
+			balanceType: 'Cryptocurrency',
+			balance: { marketValue: 2000, bookValue: 1500, asOf: '2025-10-01T00:00:00.000Z' }
 		}
 	];
 
-	for (const asset of rejectedAssets) {
-		const response = await pbSend(
-			IMPORT_PATH,
-			{ sessionLabel: `reject-${asset.name}`, assets: [asset] },
-			user.email
-		);
-		const body = await response.json();
-		expect(response.status).toBe(400);
-		expect(body.error).toContain(
-			'import securities and cryptocurrency through securities and securityBalances instead'
-		);
-	}
+	const response = await pbSend(
+		IMPORT_PATH,
+		{ sessionLabel: 'xavier-security-assets', assets: importedAssets },
+		user.email
+	);
+	const result = await response.json();
+	expect(response.status).toBe(200);
+	expect(result.assets.created).toBe(2);
+	expect(result.assetBalances.created).toBe(2);
+	expect(result.securities.created).toBe(0);
+
+	const pb = await getUserPB(user.email);
+	const assets = await pb.collection('assets').getFullList({
+		filter: `owner = "${user.id}"`
+	});
+	expect(assets.map((asset) => asset.name).sort()).toEqual(['Xavier Crypto', 'Xavier Security']);
+
+	const securities = await pb.collection('securities').getFullList({
+		filter: `owner = "${user.id}"`
+	});
+	expect(securities.length).toBe(0);
 });

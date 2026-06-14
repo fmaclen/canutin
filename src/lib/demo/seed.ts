@@ -24,10 +24,8 @@ import {
 	generateVehicleBalances,
 	generateWalletBalances,
 	type AccountBalanceDefinition,
-	type AssetBalanceDefinition,
-	type SecurityBalanceDefinition
+	type AssetBalanceDefinition
 } from './seed-data/balances';
-import { ALL_SECURITIES } from './seed-data/securities';
 import {
 	generateCheckingTransactions,
 	generateCreditCardTransactions,
@@ -166,27 +164,6 @@ async function createAssetBalances(
 	);
 }
 
-async function createSecurityBalances(
-	pb: TypedPocketBase,
-	balances: SecurityBalanceDefinition[],
-	securityId: string,
-	accountId: string,
-	owner: string
-) {
-	await runInBatches(balances, (balance) =>
-		pb.collection('securityBalances').create({
-			security: securityId,
-			account: accountId,
-			owner,
-			asOf: balance.asOf,
-			quantity: balance.quantity,
-			price: balance.price,
-			costBasis: balance.costBasis,
-			value: balance.value
-		})
-	);
-}
-
 const AUTO_CALCULATED_ACCOUNTS = [ACCOUNT_CHECKING, ACCOUNT_SAVINGS, ACCOUNT_CREDIT_CARD];
 
 async function waitForAutoCalculatedBalances(pb: TypedPocketBase, accountIds: string[]) {
@@ -258,16 +235,6 @@ export async function seedDemoData(pb: TypedPocketBase, userId: string) {
 		assetIds[asset.name] = created.id;
 	}
 
-	const securityIds: IdMap = {};
-	for (const security of ALL_SECURITIES) {
-		const created = await pb.collection('securities').create({
-			name: security.name,
-			symbol: security.symbol,
-			owner: userId
-		});
-		securityIds[security.name] = created.id;
-	}
-
 	// Create transactions for auto-calculated accounts (sequentially to reduce load)
 	await createTransactions(
 		pb,
@@ -317,36 +284,6 @@ export async function seedDemoData(pb: TypedPocketBase, userId: string) {
 		userId
 	);
 
-	// Create security balances (sequentially)
-	await createSecurityBalances(
-		pb,
-		generateSpyBalances(referenceDate),
-		securityIds['SPDR S&P 500 ETF Trust'],
-		accountIds[ACCOUNT_ROTH_IRA.name],
-		userId
-	);
-	await createSecurityBalances(
-		pb,
-		generateGamestopBalances(referenceDate),
-		securityIds['GameStop'],
-		accountIds[ACCOUNT_401K.name],
-		userId
-	);
-	await createSecurityBalances(
-		pb,
-		generateBitcoinBalances(referenceDate),
-		securityIds['Bitcoin'],
-		accountIds[ACCOUNT_ROTH_IRA.name],
-		userId
-	);
-	await createSecurityBalances(
-		pb,
-		generateEthereumBalances(referenceDate),
-		securityIds['Ethereum'],
-		accountIds[ACCOUNT_ROTH_IRA.name],
-		userId
-	);
-
 	// Create asset balances (sequentially)
 	await createAssetBalances(
 		pb,
@@ -358,6 +295,30 @@ export async function seedDemoData(pb: TypedPocketBase, userId: string) {
 		pb,
 		generateVehicleBalances(referenceDate),
 		assetIds['1998 Fiat Multipla'],
+		userId
+	);
+	await createAssetBalances(
+		pb,
+		generateSpyBalances(referenceDate),
+		assetIds['SPDR S&P 500 ETF Trust'],
+		userId
+	);
+	await createAssetBalances(
+		pb,
+		generateGamestopBalances(referenceDate),
+		assetIds['GameStop'],
+		userId
+	);
+	await createAssetBalances(
+		pb,
+		generateBitcoinBalances(referenceDate),
+		assetIds['Bitcoin'],
+		userId
+	);
+	await createAssetBalances(
+		pb,
+		generateEthereumBalances(referenceDate),
+		assetIds['Ethereum'],
 		userId
 	);
 

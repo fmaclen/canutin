@@ -317,12 +317,6 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 	if len(payload.Accounts) == 0 && len(payload.Assets) == 0 && len(payload.Securities) == 0 && len(payload.Transactions) == 0 && len(payload.SecurityBalances) == 0 && len(payload.SecurityTransactions) == 0 {
 		return re.JSON(http.StatusBadRequest, map[string]string{"error": "At least one import collection is required"})
 	}
-	for _, asset := range payload.Assets {
-		balanceType := strings.TrimSpace(asset.BalanceType)
-		if strings.EqualFold(balanceType, "Security") || strings.EqualFold(balanceType, "Cryptocurrency") {
-			return re.JSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("Assets import does not accept %s assets; import securities and cryptocurrency through securities and securityBalances instead (asset: %s)", balanceType, asset.Name)})
-		}
-	}
 
 	ownerID := auth.Id
 	result := importResult{}
