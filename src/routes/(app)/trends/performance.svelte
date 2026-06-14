@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { UTCDate } from '@date-fns/utc';
 	import { endOfDay, startOfYear, subDays, subMonths, subYears } from 'date-fns';
 
 	import { formatCurrency } from '$lib/components/currency';
@@ -203,8 +204,8 @@
 
 		const anchorDates = periods.map((periodDef) => {
 			if (periodDef.offset.max) return earliest ? new Date(earliest) : now;
-			if (periodDef.offset.ytd) return endOfDay(startOfYear(new Date()));
-			const anchorDate = subtractFromDate(new Date(), periodDef.offset);
+			if (periodDef.offset.ytd) return endOfDay(startOfYear(new UTCDate()));
+			const anchorDate = subtractFromDate(new UTCDate(), periodDef.offset);
 			return endOfDay(anchorDate);
 		});
 		const totals = computeTotals([...anchorDates, now]);

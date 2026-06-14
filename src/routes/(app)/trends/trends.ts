@@ -1,3 +1,4 @@
+import { UTCDate } from '@date-fns/utc';
 import { endOfDay, startOfDay, startOfYear, subMonths, subYears } from 'date-fns';
 
 import type {
@@ -27,7 +28,7 @@ export function latestIndexBeforeOrEqual<T extends { asOf: string }>(
 	targetDate: Date,
 	startIndex = -1
 ) {
-	const cutoffDate = endOfDay(targetDate);
+	const cutoffDate = endOfDay(new UTCDate(targetDate.getTime()));
 	let index = startIndex;
 	while (index + 1 < entries.length && new Date(entries[index + 1].asOf) <= cutoffDate) index++;
 	return index;
@@ -60,7 +61,7 @@ export function computeRangeForPeriod(
 	rawSecurityBalances: TrendSecurityBalance[],
 	rawAssetBalances: AssetBalancesResponse[]
 ) {
-	const now = startOfDay(new Date());
+	const now = startOfDay(new UTCDate());
 	if (period === '3m') return { start: subMonths(now, 3), end: now };
 	if (period === '6m') return { start: subMonths(now, 6), end: now };
 	if (period === 'ytd') return { start: startOfYear(now), end: now };
@@ -73,7 +74,7 @@ export function computeRangeForPeriod(
 		rawSecurityBalances,
 		rawAssetBalances
 	);
-	const start = earliest ? startOfDay(earliest) : subYears(now, 1);
+	const start = earliest ? startOfDay(new UTCDate(earliest.getTime())) : subYears(now, 1);
 	return { start, end: now };
 }
 
