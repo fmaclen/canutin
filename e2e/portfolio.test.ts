@@ -172,6 +172,21 @@ test('portfolio unknown values render as unknown and do not inflate account tota
 		value: null,
 		costBasis: 300
 	});
+	const worthlessSecurity = await seedSecurity({
+		name: 'Worthless Fund',
+		symbol: 'WRTH',
+		owner: user.id
+	});
+	await seedSecurityBalance({
+		account: account.id,
+		owner: user.id,
+		security: worthlessSecurity.id,
+		asOf: new Date().toISOString(),
+		quantity: 4,
+		price: 0,
+		value: 0,
+		costBasis: 0
+	});
 
 	await page.goto('/');
 	await signIn(page, user.email);
@@ -179,6 +194,10 @@ test('portfolio unknown values render as unknown and do not inflate account tota
 	const row = page.getByRole('row', { name: /Private Fund/ });
 	await expect(row).toContainText('PFND');
 	await expect(row.locator('td').last()).toHaveText('~');
+
+	const knownZeroRow = page.getByRole('row', { name: /Worthless Fund/ });
+	await expect(knownZeroRow).toContainText('WRTH');
+	await expect(knownZeroRow.locator('td').last()).toHaveText('$0.00');
 
 	await page.goto(`/accounts/${account.id}`);
 	await expect(page.getByLabel('Cash', { exact: true })).toHaveValue('$750.00');
@@ -376,6 +395,57 @@ test('portfolio hides sold-out positions while preserving activity history', asy
 	await page.getByRole('button', { name: 'Period' }).click();
 	await page.getByRole('button', { name: 'Lifetime' }).click();
 	await expect(page.getByRole('row', { name: /Exit Round Trip Stock/ })).toBeVisible();
+});
+
+test('portfolio carries a re-buy after a sell-out forward as unknown', async ({ page }) => {
+	const user = await seedUser('wren');
+	const account = await seedAccount({
+		name: 'Rebuy Brokerage',
+		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+		owner: user.id,
+		balanceType: 'Brokerage'
+	});
+	const security = await seedSecurity({ name: 'Rebought Stock', symbol: 'RBT', owner: user.id });
+	await seedSecurityBalance({
+		account: account.id,
+		owner: user.id,
+		security: security.id,
+		asOf: '2026-01-01 00:00:00.000Z',
+		quantity: 5,
+		price: 10,
+		value: 50,
+		costBasis: 50
+	});
+	await seedSecurityBalance({
+		account: account.id,
+		owner: user.id,
+		security: security.id,
+		asOf: '2026-02-01 00:00:00.000Z',
+		quantity: 0,
+		price: null,
+		value: 0,
+		costBasis: 0
+	});
+	await seedSecurityBalance({
+		account: account.id,
+		owner: user.id,
+		security: security.id,
+		asOf: '2026-03-01 00:00:00.000Z',
+		quantity: 7,
+		price: null,
+		value: null,
+		costBasis: null
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Portfolio');
+	const row = page.getByRole('row', { name: /Rebought Stock/ });
+	await expect(row).toContainText('RBT');
+	await expect(row.locator('td').last()).toHaveText('~');
+
+	await page.goto(`/trades/securities/${security.id}`);
+	await expect(page.getByRole('region', { name: 'Net market value' })).toHaveText(/~/);
 });
 
 test('transactions and portfolio add forms show empty prerequisites with no accounts', async ({
