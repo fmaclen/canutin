@@ -186,6 +186,105 @@ test('portfolio unknown values render as unknown and do not inflate account tota
 	await expect(positionRow.locator('td').last()).toHaveText('~');
 });
 
+test('portfolio tables sort positions by market value descending with unknown values last', async ({
+	page
+}) => {
+	const user = await seedUser('silas');
+	const mainAccount = await seedAccount({
+		name: 'Main Brokerage',
+		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+		owner: user.id,
+		balanceType: 'Brokerage'
+	});
+	const secondAccount = await seedAccount({
+		name: 'Second Brokerage',
+		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+		owner: user.id,
+		balanceType: 'Brokerage'
+	});
+	const thirdAccount = await seedAccount({
+		name: 'Third Brokerage',
+		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+		owner: user.id,
+		balanceType: 'Brokerage'
+	});
+	const alpha = await seedSecurity({ name: 'Alpha Holdings', symbol: 'ALP', owner: user.id });
+	const bravo = await seedSecurity({ name: 'Bravo Holdings', symbol: 'BRV', owner: user.id });
+	const charlie = await seedSecurity({ name: 'Charlie Holdings', symbol: 'CHR', owner: user.id });
+	const delta = await seedSecurity({ name: 'Delta Holdings', symbol: 'DLT', owner: user.id });
+	const asOf = new Date().toISOString();
+	await seedSecurityBalance({
+		account: mainAccount.id,
+		owner: user.id,
+		security: alpha.id,
+		asOf,
+		quantity: 10,
+		price: 300,
+		value: 3000,
+		costBasis: 2500
+	});
+	await seedSecurityBalance({
+		account: secondAccount.id,
+		owner: user.id,
+		security: alpha.id,
+		asOf,
+		quantity: 5,
+		price: 300,
+		value: 1500,
+		costBasis: 1200
+	});
+	await seedSecurityBalance({
+		account: mainAccount.id,
+		owner: user.id,
+		security: bravo.id,
+		asOf,
+		quantity: 4,
+		price: 250,
+		value: 1000,
+		costBasis: 800
+	});
+	await seedSecurityBalance({
+		account: secondAccount.id,
+		owner: user.id,
+		security: charlie.id,
+		asOf,
+		quantity: 8,
+		price: 250,
+		value: 2000,
+		costBasis: 1700
+	});
+	await seedSecurityBalance({
+		account: thirdAccount.id,
+		owner: user.id,
+		security: delta.id,
+		asOf,
+		quantity: 6,
+		price: null,
+		value: null,
+		costBasis: 600
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Portfolio');
+	const portfolioRows = page.getByRole('row');
+	await expect(portfolioRows.nth(1)).toContainText('Alpha Holdings');
+	await expect(portfolioRows.nth(2)).toContainText('Charlie Holdings');
+	await expect(portfolioRows.nth(3)).toContainText('Bravo Holdings');
+	await expect(portfolioRows.nth(4)).toContainText('Delta Holdings');
+	await expect(portfolioRows.nth(4).locator('td').last()).toHaveText('~');
+
+	await page.goto(`/accounts/${mainAccount.id}`);
+	const accountPositionRows = page.getByRole('table').getByRole('row');
+	await expect(accountPositionRows.nth(1)).toContainText('Alpha Holdings');
+	await expect(accountPositionRows.nth(2)).toContainText('Bravo Holdings');
+
+	await page.goto(`/trades/securities/${alpha.id}`);
+	const balanceRows = page.getByRole('row');
+	await expect(balanceRows.nth(1)).toContainText('Main Brokerage');
+	await expect(balanceRows.nth(2)).toContainText('Second Brokerage');
+});
+
 test('portfolio hides sold-out positions while preserving activity history', async ({ page }) => {
 	const user = await seedUser('zane');
 	const account = await seedAccount({

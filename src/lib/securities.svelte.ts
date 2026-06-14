@@ -93,9 +93,14 @@ class SecuritiesContext {
 	getAccountBalances(securityId: string) {
 		return this.getLatestAccountBalanceRows()
 			.filter((row) => row.securityId === securityId)
-			.sort((a, b) =>
-				a.accountName.localeCompare(b.accountName, undefined, { sensitivity: 'base' })
-			);
+			.sort((a, b) => {
+				if (a.value === null && b.value === null)
+					return a.accountName.localeCompare(b.accountName, undefined, { sensitivity: 'base' });
+				if (a.value === null) return 1;
+				if (b.value === null) return -1;
+				if (b.value !== a.value) return b.value - a.value;
+				return a.accountName.localeCompare(b.accountName, undefined, { sensitivity: 'base' });
+			});
 	}
 
 	getSummary(securityId: string) {
@@ -282,9 +287,14 @@ class SecuritiesContext {
 			});
 		}
 
-		return aggregates.sort((a, b) =>
-			a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
-		);
+		return aggregates.sort((a, b) => {
+			if (a.value === null && b.value === null)
+				return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+			if (a.value === null) return 1;
+			if (b.value === null) return -1;
+			if (b.value !== a.value) return b.value - a.value;
+			return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+		});
 	}
 
 	private summarizeBalances(balances: SecurityAccountBalance[]) {

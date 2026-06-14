@@ -71,9 +71,14 @@
 				...balance,
 				securityName: securitiesContext.getSecurity(balance.securityId)?.name ?? ''
 			}))
-			.sort((a, b) =>
-				a.securityName.localeCompare(b.securityName, undefined, { sensitivity: 'base' })
-			)
+			.sort((a, b) => {
+				if (a.value === null && b.value === null)
+					return a.securityName.localeCompare(b.securityName, undefined, { sensitivity: 'base' });
+				if (a.value === null) return 1;
+				if (b.value === null) return -1;
+				if (b.value !== a.value) return b.value - a.value;
+				return a.securityName.localeCompare(b.securityName, undefined, { sensitivity: 'base' });
+			})
 	);
 	const positionsMarketValue = $derived(
 		positionsRows.reduce((sum, row) => sum + (row.value ?? 0), 0)
