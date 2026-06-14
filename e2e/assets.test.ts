@@ -269,6 +269,7 @@ test('user can add a new asset with type WHOLE or SHARES', async ({ page }) => {
 	await expect(wholeCells.nth(0)).toContainText('Gold Coins');
 	await expect(wholeCells.nth(5)).toContainText('$12,000.00');
 	await expect(wholeCells.nth(8)).toContainText('$15,000.00');
+	await expect(page.getByText('Asset added')).not.toBeVisible();
 
 	await page.getByRole('link', { name: 'Add asset' }).click();
 	await expect(page).toHaveURL('/assets/add');
