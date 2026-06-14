@@ -1,15 +1,7 @@
 import { m } from '$lib/paraglide/messages';
 import { SecurityTransactionsTypeOptions } from '$lib/pocketbase.schema';
 
-const quantityFormatter = new Intl.NumberFormat('en-US', {
-	maximumFractionDigits: 8
-});
-
-export function formatSecurityQuantity(value: number) {
-	return quantityFormatter.format(value);
-}
-
-export function securityTransactionTypeLabel(type: SecurityTransactionsTypeOptions) {
+export function tradeTypeLabel(type: SecurityTransactionsTypeOptions) {
 	switch (type) {
 		case SecurityTransactionsTypeOptions.buy:
 			return m.trades_type_buy();

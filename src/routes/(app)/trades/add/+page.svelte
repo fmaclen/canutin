@@ -24,7 +24,7 @@
 	import { SecurityTransactionsTypeOptions } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
-	import { securityTransactionTypeLabel } from '$lib/security-transaction-display';
+	import { tradeTypeLabel } from '$lib/trade-display';
 	import { toNumber } from '$lib/utils';
 
 	const pb = getPocketBaseContext();
@@ -184,11 +184,11 @@
 						</Label>
 						<Select.Root type="single" bind:value={type} disabled={isSaving}>
 							<Select.Trigger id="type" class="bg-background w-full">
-								{securityTransactionTypeLabel(type)}
+								{tradeTypeLabel(type)}
 							</Select.Trigger>
 							<Select.Content>
 								{#each typeOptions as option (option)}
-									<Select.Item value={option}>{securityTransactionTypeLabel(option)}</Select.Item>
+									<Select.Item value={option}>{tradeTypeLabel(option)}</Select.Item>
 								{/each}
 							</Select.Content>
 						</Select.Root>

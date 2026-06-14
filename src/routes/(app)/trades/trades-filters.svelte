@@ -15,26 +15,23 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
-	import { securityTransactionTypeLabel } from '$lib/security-transaction-display';
-	import {
-		getSecurityTransactionsContext,
-		type SecurityTransactionTypeFilter
-	} from '$lib/security-transactions.svelte';
+	import { tradeTypeLabel } from '$lib/trade-display';
+	import { getTradesContext, type TradeTypeFilter } from '$lib/trades.svelte';
 	import type { PeriodOption } from '$lib/transactions.svelte';
 
-	const securityTxContext = getSecurityTransactionsContext();
+	const tradesContext = getTradesContext();
 	const accountsContext = getAccountsContext();
 	const securitiesContext = getSecuritiesContext();
 
 	const selectedAccount = $derived(
-		securityTxContext.accountFilter
-			? accountsContext.accounts.find((account) => account.id === securityTxContext.accountFilter)
+		tradesContext.accountFilter
+			? accountsContext.accounts.find((account) => account.id === tradesContext.accountFilter)
 			: null
 	);
 	const selectedSecurity = $derived(
-		securityTxContext.securityFilter
+		tradesContext.securityFilter
 			? securitiesContext.securities.find(
-					(security) => security.id === securityTxContext.securityFilter
+					(security) => security.id === tradesContext.securityFilter
 				)
 			: null
 	);
@@ -47,7 +44,7 @@
 
 	// Derive calendar value from context's custom range (for URL param initialization)
 	let calendarValue: DateRange | undefined = $derived.by(() => {
-		const range = securityTxContext.customRange;
+		const range = tradesContext.customRange;
 		if (range) {
 			const toInclusive = subDays(range.to, 1);
 			return {
@@ -66,7 +63,7 @@
 
 	function handleSearchInput(event: Event) {
 		const target = event.target as HTMLInputElement;
-		securityTxContext.setSearch(target.value);
+		tradesContext.setSearch(target.value);
 	}
 
 	function periodLabel(option: PeriodOption) {
@@ -92,12 +89,12 @@
 	}
 
 	function handlePresetClick(option: PeriodOption) {
-		securityTxContext.setPresetPeriod(option);
+		tradesContext.setPresetPeriod(option);
 		periodPopoverOpen = false;
 	}
 
 	function isPresetSelected(option: PeriodOption) {
-		return !securityTxContext.isCustomRange && securityTxContext.period === option;
+		return !tradesContext.isCustomRange && tradesContext.period === option;
 	}
 
 	function dateValueToDate(dateValue: DateValue) {
@@ -108,24 +105,24 @@
 		if (value?.start && value?.end) {
 			const fromDate = dateValueToDate(value.start);
 			const toDate = addDays(dateValueToDate(value.end), 1);
-			securityTxContext.setCustomRange(fromDate, toDate);
+			tradesContext.setCustomRange(fromDate, toDate);
 			periodPopoverOpen = false;
 		}
 	}
 
 	function getPeriodTriggerText() {
-		const range = securityTxContext.customRange;
+		const range = tradesContext.customRange;
 		if (range) {
 			return formatCustomDateRange(range.from, range.to, range.label);
 		}
-		return periodLabel(securityTxContext.period);
+		return periodLabel(tradesContext.period);
 	}
 </script>
 
 <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
 	<div class="relative flex-1">
 		<div class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 -translate-y-1/2">
-			{#if securityTxContext.isLoading}
+			{#if tradesContext.isLoading}
 				<LoaderCircleIcon class="size-4 animate-spin" />
 			{:else}
 				<SearchIcon class="size-4" />
@@ -134,14 +131,14 @@
 		<Input
 			type="text"
 			placeholder={m.trades_search_placeholder()}
-			value={securityTxContext.search}
+			value={tradesContext.search}
 			oninput={handleSearchInput}
 			class="bg-background pr-9 pl-9"
 		/>
-		{#if securityTxContext.search}
+		{#if tradesContext.search}
 			<div class="absolute top-1/2 right-3 -translate-y-1/2">
 				<ClearButton
-					onclick={() => securityTxContext.setSearch('')}
+					onclick={() => tradesContext.setSearch('')}
 					aria-label={m.transactions_clear_search()}
 				/>
 			</div>
@@ -157,7 +154,7 @@
 		<Popover.Content class="w-auto p-0" align="start" collisionPadding={32}>
 			<div class="flex">
 				<div class="flex flex-col border-r p-2">
-					{#each securityTxContext.periodOptions as option (option)}
+					{#each tradesContext.periodOptions as option (option)}
 						<Button
 							variant="ghost"
 							class="data-[selected]:bg-accent data-[selected]:text-accent-foreground justify-start font-normal"
@@ -182,10 +179,10 @@
 	</Popover.Root>
 	<AccountPicker
 		accounts={accountsContext.accounts}
-		value={securityTxContext.accountFilter ?? ''}
+		value={tradesContext.accountFilter ?? ''}
 		{selectedAccount}
-		onValueChange={(value) => securityTxContext.setAccountFilter(value || null)}
-		onClear={() => securityTxContext.setAccountFilter(null)}
+		onValueChange={(value) => tradesContext.setAccountFilter(value || null)}
+		onClear={() => tradesContext.setAccountFilter(null)}
 		clearLabel={m.transactions_filter_account_clear()}
 		ariaLabel={m.transactions_filter_account_label()}
 		triggerClass="sm:w-fit sm:max-w-64"
@@ -194,8 +191,8 @@
 	/>
 	<Select.Root
 		type="single"
-		value={securityTxContext.securityFilter ?? ''}
-		onValueChange={(value) => securityTxContext.setSecurityFilter(value || null)}
+		value={tradesContext.securityFilter ?? ''}
+		onValueChange={(value) => tradesContext.setSecurityFilter(value || null)}
 	>
 		<Select.Trigger
 			aria-label={m.trades_filter_security_label()}
@@ -209,7 +206,7 @@
 						onclick={(event) => {
 							event.preventDefault();
 							event.stopPropagation();
-							securityTxContext.setSecurityFilter(null);
+							tradesContext.setSecurityFilter(null);
 						}}
 						onpointerdown={(event) => {
 							event.preventDefault();
@@ -234,19 +231,18 @@
 	</Select.Root>
 	<Select.Root
 		type="single"
-		value={securityTxContext.typeFilter}
-		onValueChange={(value) =>
-			securityTxContext.setTypeFilter((value || 'all') as SecurityTransactionTypeFilter)}
+		value={tradesContext.typeFilter}
+		onValueChange={(value) => tradesContext.setTypeFilter((value || 'all') as TradeTypeFilter)}
 	>
 		<Select.Trigger aria-label={m.trades_filter_type_label()} class="bg-background w-full sm:w-fit">
-			{securityTxContext.typeFilter === 'all'
+			{tradesContext.typeFilter === 'all'
 				? m.trades_filter_type_all()
-				: securityTransactionTypeLabel(securityTxContext.typeFilter)}
+				: tradeTypeLabel(tradesContext.typeFilter)}
 		</Select.Trigger>
 		<Select.Content>
 			<Select.Item value="all">{m.trades_filter_type_all()}</Select.Item>
-			{#each securityTxContext.typeOptions as type (type)}
-				<Select.Item value={type}>{securityTransactionTypeLabel(type)}</Select.Item>
+			{#each tradesContext.typeOptions as type (type)}
+				<Select.Item value={type}>{tradeTypeLabel(type)}</Select.Item>
 			{/each}
 		</Select.Content>
 	</Select.Root>

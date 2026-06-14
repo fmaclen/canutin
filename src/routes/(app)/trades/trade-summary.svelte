@@ -1,12 +1,12 @@
 <script lang="ts">
 	import KeyValue from '$lib/components/key-value.svelte';
 	import { m } from '$lib/paraglide/messages';
-	import { getSecurityTransactionsContext } from '$lib/security-transactions.svelte';
+	import { getTradesContext } from '$lib/trades.svelte';
 
-	const securityTxContext = getSecurityTransactionsContext();
+	const tradesContext = getTradesContext();
 
 	const netAmount = $derived(
-		securityTxContext.filteredRows.reduce((total, row) => total + (row.amount ?? 0), 0)
+		tradesContext.filteredRows.reduce((total, row) => total + (row.amount ?? 0), 0)
 	);
 </script>
 
@@ -17,7 +17,7 @@
 >
 	<KeyValue
 		title={m.trades_summary_count_label()}
-		value={securityTxContext.filteredRows.length}
+		value={tradesContext.filteredRows.length}
 		variant="outline"
 		format="number"
 	/>

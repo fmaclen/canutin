@@ -20,22 +20,16 @@ import { getSecuritiesContext } from './securities.svelte';
 import type { PeriodOption } from './transactions.svelte';
 import { toNumber, toPocketBaseDateString } from './utils';
 
-type SecurityTransactionExpand = {
+type TradeExpand = {
 	account?: AccountsResponse;
 	security?: SecuritiesResponse;
 };
 
-type SecurityTransaction = SecurityTransactionsResponse<
-	number,
-	number,
-	number,
-	number,
-	SecurityTransactionExpand
->;
+type Trade = SecurityTransactionsResponse<number, number, number, number, TradeExpand>;
 
-export type SecurityTransactionTypeFilter = 'all' | SecurityTransactionsTypeOptions;
+export type TradeTypeFilter = 'all' | SecurityTransactionsTypeOptions;
 
-export type SecurityTransactionRow = {
+export type TradeRow = {
 	id: string;
 	date: Date;
 	dateValue: number;
@@ -54,15 +48,15 @@ export type SecurityTransactionRow = {
 	fees: number | null;
 };
 
-class SecurityTransactionsContext {
+class TradesContext {
 	period: PeriodOption = $state('last-3-months');
 	search: string = $state('');
 	accountFilter: string | null = $state(null);
 	securityFilter: string | null = $state(null);
-	typeFilter: SecurityTransactionTypeFilter = $state('all');
+	typeFilter: TradeTypeFilter = $state('all');
 	page: number = $state(1);
 	isLoading: boolean = $state(true);
-	rawTransactions: SecurityTransaction[] = $state([]);
+	rawTransactions: Trade[] = $state([]);
 
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
@@ -224,7 +218,7 @@ class SecurityTransactionsContext {
 		this.refreshTransactions();
 	}
 
-	setTypeFilter(type: SecurityTransactionTypeFilter) {
+	setTypeFilter(type: TradeTypeFilter) {
 		this.typeFilter = type;
 		this.syncFiltersToUrl();
 		this.refreshTransactions();
@@ -247,7 +241,7 @@ class SecurityTransactionsContext {
 		this._loadingDelayTimer = setTimeout(() => {
 			if (userId !== this._activeUserId || refreshId !== this._refreshSequence) return;
 			this.isLoading = true;
-		}, SecurityTransactionsContext.LOADING_DELAY_MS);
+		}, TradesContext.LOADING_DELAY_MS);
 
 		try {
 			const filterParts: string[] = [];
@@ -281,7 +275,7 @@ class SecurityTransactionsContext {
 			const filter = filterParts.length > 0 ? filterParts.join(' && ') : undefined;
 			const transactions = await this._pb.authedClient
 				.collection('securityTransactions')
-				.getFullList<SecurityTransaction>({
+				.getFullList<Trade>({
 					sort: '-date,-created,-id',
 					expand: 'account,security',
 					batch: 200,
@@ -340,12 +334,12 @@ class SecurityTransactionsContext {
 
 		this._pb.authedClient
 			.collection('securityTransactions')
-			.subscribe<SecurityTransaction>('*', (event) => this.onTransactionEvent(event, userId))
+			.subscribe<Trade>('*', (event) => this.onTradeEvent(event, userId))
 			.catch((error) => {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'securityTransactions', 'subscribe_transactions');
 				} else {
-					console.error('[securityTransactionsStore] Stale subscription failed:', error);
+					console.error('[tradesStore] Stale subscription failed:', error);
 				}
 			});
 		this._isSubscribed = true;
@@ -357,7 +351,7 @@ class SecurityTransactionsContext {
 		this._pb.authedClient.collection('securityTransactions').unsubscribe('*');
 	}
 
-	private onTransactionEvent(event: RecordSubscription<SecurityTransaction>, userId: string) {
+	private onTradeEvent(event: RecordSubscription<Trade>, userId: string) {
 		if (!userId || userId !== this._activeUserId) return;
 
 		if (!event.action) return;
@@ -368,7 +362,7 @@ class SecurityTransactionsContext {
 			this.refreshTransactions(userId).catch((error) =>
 				this._pb.handleConnectionError(error, 'securityTransactions', 'realtime_refresh')
 			);
-		}, SecurityTransactionsContext.REFRESH_DEBOUNCE_MS);
+		}, TradesContext.REFRESH_DEBOUNCE_MS);
 	}
 
 	private get currentUrl() {
@@ -561,14 +555,12 @@ class SecurityTransactionsContext {
 	}
 }
 
-const CONTEXT_KEY_SECURITY_TRANSACTIONS = 'securityTransactions';
+const CONTEXT_KEY_TRADES = 'trades';
 
-export function setSecurityTransactionsContext(pb: PocketBaseContext) {
-	return setContext(CONTEXT_KEY_SECURITY_TRANSACTIONS, new SecurityTransactionsContext(pb));
+export function setTradesContext(pb: PocketBaseContext) {
+	return setContext(CONTEXT_KEY_TRADES, new TradesContext(pb));
 }
 
-export function getSecurityTransactionsContext() {
-	return getContext<ReturnType<typeof setSecurityTransactionsContext>>(
-		CONTEXT_KEY_SECURITY_TRANSACTIONS
-	);
+export function getTradesContext() {
+	return getContext<ReturnType<typeof setTradesContext>>(CONTEXT_KEY_TRADES);
 }

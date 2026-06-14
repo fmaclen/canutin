@@ -12,13 +12,13 @@
 	import { Skeleton } from '$lib/components/ui/skeleton/index';
 	import { m } from '$lib/paraglide/messages';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
-	import { getSecurityTransactionsContext } from '$lib/security-transactions.svelte';
+	import { getTradesContext } from '$lib/trades.svelte';
 
-	import SecurityTransactionFilters from './security-transaction-filters.svelte';
-	import SecurityTransactionTable from './security-transaction-table.svelte';
 	import TradeSummary from './trade-summary.svelte';
+	import TradesFilters from './trades-filters.svelte';
+	import TradesTable from './trades-table.svelte';
 
-	const securityTxContext = getSecurityTransactionsContext();
+	const tradesContext = getTradesContext();
 	const accountsContext = getAccountsContext();
 	const securitiesContext = getSecuritiesContext();
 	let hasSyncedAccountFilters = $state(false);
@@ -26,36 +26,36 @@
 
 	afterNavigate(({ to }) => {
 		if (to?.url.pathname !== resolve('/trades')) return;
-		securityTxContext.syncFromUrl();
+		tradesContext.syncFromUrl();
 	});
 
 	$effect(() => {
 		if (hasSyncedAccountFilters || accountsContext.accounts.length === 0) return;
 		hasSyncedAccountFilters = true;
-		securityTxContext.syncFromUrl();
+		tradesContext.syncFromUrl();
 	});
 
 	$effect(() => {
 		if (hasSyncedSecurityFilters || securitiesContext.securities.length === 0) return;
 		hasSyncedSecurityFilters = true;
-		securityTxContext.syncFromUrl();
+		tradesContext.syncFromUrl();
 	});
 
 	// Keep page within valid bounds
 	$effect(() => {
-		if (securityTxContext.page > securityTxContext.totalPages) {
-			securityTxContext.page = securityTxContext.totalPages;
+		if (tradesContext.page > tradesContext.totalPages) {
+			tradesContext.page = tradesContext.totalPages;
 		}
-		if (securityTxContext.page < 1) securityTxContext.page = 1;
+		if (tradesContext.page < 1) tradesContext.page = 1;
 	});
 
 	// Reset pagination whenever the active filters change
 	$effect(() => {
-		void securityTxContext.period;
-		void securityTxContext.accountFilter;
-		void securityTxContext.securityFilter;
-		void securityTxContext.typeFilter;
-		securityTxContext.page = 1;
+		void tradesContext.period;
+		void tradesContext.accountFilter;
+		void tradesContext.securityFilter;
+		void tradesContext.typeFilter;
+		tradesContext.page = 1;
 	});
 </script>
 
@@ -84,12 +84,12 @@
 	<Section>
 		<SectionTitle title={m.trades_title()} />
 		<div class="flex flex-col space-y-2">
-			<SecurityTransactionFilters />
+			<TradesFilters />
 			<TradeSummary />
-			{#if securityTxContext.isLoading && securityTxContext.rawTransactions.length === 0}
+			{#if tradesContext.isLoading && tradesContext.rawTransactions.length === 0}
 				<Skeleton class="min-h-32" />
 			{:else}
-				<SecurityTransactionTable />
+				<TradesTable />
 			{/if}
 		</div>
 	</Section>

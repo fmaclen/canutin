@@ -15,7 +15,7 @@
 	import * as Table from '$lib/components/ui/table/index';
 	import { m } from '$lib/paraglide/messages';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
-	import { formatSecurityQuantity } from '$lib/security-transaction-display';
+	import { formatSecurityQuantity } from '$lib/security-balance-values';
 
 	const securitiesContext = getSecuritiesContext();
 

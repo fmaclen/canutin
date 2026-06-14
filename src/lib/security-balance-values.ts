@@ -2,6 +2,14 @@ import { compareDesc } from 'date-fns';
 
 import { toNumber } from './utils';
 
+const quantityFormatter = new Intl.NumberFormat('en-US', {
+	maximumFractionDigits: 8
+});
+
+export function formatSecurityQuantity(value: number) {
+	return quantityFormatter.format(value);
+}
+
 export type SecurityBalanceValueInput = {
 	id: string;
 	account: string;

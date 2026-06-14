@@ -21,8 +21,11 @@
 	import * as Table from '$lib/components/ui/table/index';
 	import { m } from '$lib/paraglide/messages';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
-	import { gainLossPercentOrNull, sumOrUnknown } from '$lib/security-balance-values';
-	import { formatSecurityQuantity } from '$lib/security-transaction-display';
+	import {
+		formatSecurityQuantity,
+		gainLossPercentOrNull,
+		sumOrUnknown
+	} from '$lib/security-balance-values';
 
 	import BalanceFields from '../balance-fields.svelte';
 	import { createSecurityBalanceFormData, toSecurityBalanceInput } from '../balance-form';

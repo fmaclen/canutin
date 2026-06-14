@@ -33,7 +33,7 @@
 	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
-	import { securityTransactionTypeLabel } from '$lib/security-transaction-display';
+	import { tradeTypeLabel } from '$lib/trade-display';
 	import { sanitizeFromParam, toNumber } from '$lib/utils';
 
 	type TradeResponse = SecurityTransactionsResponse<
@@ -317,11 +317,11 @@
 							</Label>
 							<Select.Root type="single" bind:value={formData.type} disabled={!canWrite}>
 								<Select.Trigger id="type" class="bg-background w-full">
-									{securityTransactionTypeLabel(formData.type)}
+									{tradeTypeLabel(formData.type)}
 								</Select.Trigger>
 								<Select.Content>
 									{#each typeOptions as option (option)}
-										<Select.Item value={option}>{securityTransactionTypeLabel(option)}</Select.Item>
+										<Select.Item value={option}>{tradeTypeLabel(option)}</Select.Item>
 									{/each}
 								</Select.Content>
 							</Select.Root>

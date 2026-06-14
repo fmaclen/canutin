@@ -2,13 +2,13 @@
 	import { onDestroy } from 'svelte';
 
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
-	import { setSecurityTransactionsContext } from '$lib/security-transactions.svelte';
+	import { setTradesContext } from '$lib/trades.svelte';
 
 	const pb = getPocketBaseContext();
-	const securityTxContext = setSecurityTransactionsContext(pb);
+	const tradesContext = setTradesContext(pb);
 
 	onDestroy(() => {
-		securityTxContext.dispose();
+		tradesContext.dispose();
 	});
 
 	let { children } = $props();

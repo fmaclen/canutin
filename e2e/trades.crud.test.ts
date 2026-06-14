@@ -12,7 +12,7 @@ import {
 	seedAccountBalance,
 	seedSecurity,
 	seedSecurityBalance,
-	seedSecurityTransaction,
+	seedTrade,
 	seedUser
 } from './pocketbase.helpers';
 
@@ -51,7 +51,7 @@ test('user can edit and delete a trade from the trades list', async ({ page }) =
 	});
 
 	const tradeDate = setHours(subDays(new UTCDate(), 4), 12);
-	const trade = await seedSecurityTransaction({
+	const trade = await seedTrade({
 		account: brokerageAccount.id,
 		owner: user.id,
 		security: security.id,

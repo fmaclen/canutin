@@ -9,13 +9,11 @@
 	import * as Pagination from '$lib/components/ui/pagination/index';
 	import * as Table from '$lib/components/ui/table/index';
 	import { m } from '$lib/paraglide/messages';
-	import {
-		formatSecurityQuantity,
-		securityTransactionTypeLabel
-	} from '$lib/security-transaction-display';
-	import { getSecurityTransactionsContext } from '$lib/security-transactions.svelte';
+	import { formatSecurityQuantity } from '$lib/security-balance-values';
+	import { tradeTypeLabel } from '$lib/trade-display';
+	import { getTradesContext } from '$lib/trades.svelte';
 
-	const securityTxContext = getSecurityTransactionsContext();
+	const tradesContext = getTradesContext();
 
 	async function openTrade(event: MouseEvent, id: string) {
 		event.preventDefault();
@@ -40,7 +38,7 @@
 	}
 </script>
 
-{#if securityTxContext.filteredRows.length === 0}
+{#if tradesContext.filteredRows.length === 0}
 	<Empty>
 		{m.trades_table_empty()}
 	</Empty>
@@ -82,7 +80,7 @@
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
-				{#each securityTxContext.paginatedRows as row (row.id)}
+				{#each tradesContext.paginatedRows as row (row.id)}
 					<Table.Row>
 						<Table.Cell
 							class="text-muted-foreground font-mono whitespace-nowrap uppercase tabular-nums"
@@ -129,7 +127,7 @@
 						</Table.Cell>
 						<Table.Cell>
 							<div class="flex space-x-1.5">
-								<span class="text-sm">{securityTransactionTypeLabel(row.type)}</span>
+								<span class="text-sm">{tradeTypeLabel(row.type)}</span>
 								{#if row.subtype}
 									<span class="text-muted-foreground text-sm">{row.subtype}</span>
 								{/if}
@@ -184,14 +182,14 @@
 					</Table.Row>
 				{/each}
 			</Table.Body>
-			{#if securityTxContext.totalPages > 1}
+			{#if tradesContext.totalPages > 1}
 				<Table.Footer>
 					<Table.Row class="border-t">
 						<Table.Cell colspan={10} class="bg-background px-0 py-3 whitespace-normal">
 							<Pagination.Root
-								count={securityTxContext.filteredRows.length}
-								perPage={securityTxContext.pageSize}
-								bind:page={securityTxContext.page}
+								count={tradesContext.filteredRows.length}
+								perPage={tradesContext.pageSize}
+								bind:page={tradesContext.page}
 							>
 								{#snippet children({ pages, currentPage })}
 									<Pagination.Content

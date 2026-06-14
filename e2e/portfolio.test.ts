@@ -12,7 +12,7 @@ import {
 	seedAccountBalance,
 	seedSecurity,
 	seedSecurityBalance,
-	seedSecurityTransaction,
+	seedTrade,
 	seedUser
 } from './pocketbase.helpers';
 
@@ -352,7 +352,7 @@ test('portfolio hides sold-out positions while preserving activity history', asy
 		value: 0,
 		costBasis: 0
 	});
-	await seedSecurityTransaction({
+	await seedTrade({
 		account: account.id,
 		owner: user.id,
 		security: security.id,

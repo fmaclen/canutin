@@ -38,10 +38,10 @@
 	import { getSecuritiesContext } from '$lib/securities.svelte';
 	import {
 		compareByValueDescThenName,
+		formatSecurityQuantity,
 		gainLossPercentOrNull,
 		sumOrUnknown
 	} from '$lib/security-balance-values';
-	import { formatSecurityQuantity } from '$lib/security-transaction-display';
 	import { sanitizeFromParam } from '$lib/utils';
 
 	import BalanceForm from './balance-form.svelte';

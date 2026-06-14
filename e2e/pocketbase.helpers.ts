@@ -172,7 +172,7 @@ export async function seedSecurityBalance(securityBalanceInput: {
 	return await pb.collection('securityBalances').create(securityBalanceInput);
 }
 
-export async function seedSecurityTransaction(securityTransactionInput: {
+export async function seedTrade(tradeInput: {
 	account: SecurityTransactionsRecord['account'];
 	owner: SecurityTransactionsRecord['owner'];
 	security: SecurityTransactionsRecord['security'];
@@ -185,7 +185,7 @@ export async function seedSecurityTransaction(securityTransactionInput: {
 	fees?: number | null;
 }) {
 	const pb = await getAdminPB();
-	return await pb.collection('securityTransactions').create(securityTransactionInput);
+	return await pb.collection('securityTransactions').create(tradeInput);
 }
 
 export async function updateAsset(
