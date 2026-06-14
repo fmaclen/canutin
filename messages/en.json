@@ -361,6 +361,7 @@
 	"trades_add_success": "Trade added",
 	"trades_add_failed": "Couldn't add trade",
 	"trades_security_required": "Select a security",
+	"trades_description_required": "Enter a description",
 	"trades_securities_loading": "Loading securities",
 	"trades_securities_empty": "There are no securities",
 	"trades_edit_page_title": "Edit trade",

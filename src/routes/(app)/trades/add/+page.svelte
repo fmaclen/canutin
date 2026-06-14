@@ -64,6 +64,10 @@
 			toast.error(m.trades_security_required());
 			return;
 		}
+		if (!description.trim()) {
+			toast.error(m.trades_description_required());
+			return;
+		}
 
 		try {
 			isSaving = true;
@@ -74,7 +78,7 @@
 				date: new Date(date + 'T12:00:00Z').toISOString(),
 				type,
 				subtype: subtype.trim() || undefined,
-				description: description.trim() || undefined,
+				description: description.trim(),
 				quantity: toNumber(quantity),
 				price: toNumber(price),
 				amount: toNumber(amount),
@@ -179,6 +183,13 @@
 					</FormFieldRow>
 
 					<FormFieldRow>
+						<Label for="description" class="justify-start pr-0 md:justify-end">
+							{m.transactions_label_description()}
+						</Label>
+						<Input id="description" bind:value={description} disabled={isSaving} required />
+					</FormFieldRow>
+
+					<FormFieldRow>
 						<Label for="type" class="justify-start pr-0 md:justify-end">
 							{m.trades_label_type()}
 						</Label>
@@ -202,16 +213,6 @@
 							<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
 						</div>
 						<Input id="subtype" bind:value={subtype} disabled={isSaving} />
-					</FormFieldRow>
-
-					<FormFieldRow>
-						<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-							<Label for="description" class="justify-start pr-0 md:justify-end">
-								{m.transactions_label_description()}
-							</Label>
-							<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
-						</div>
-						<Input id="description" bind:value={description} disabled={isSaving} />
 					</FormFieldRow>
 				</Fieldset>
 

@@ -361,6 +361,7 @@
 	"trades_add_success": "Operación agregada",
 	"trades_add_failed": "No se pudo agregar la operación",
 	"trades_security_required": "Selecciona un título",
+	"trades_description_required": "Ingresa una descripción",
 	"trades_securities_loading": "Cargando títulos",
 	"trades_securities_empty": "No hay títulos",
 	"trades_edit_page_title": "Editar operación",

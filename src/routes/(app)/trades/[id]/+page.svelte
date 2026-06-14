@@ -150,6 +150,10 @@
 			toast.error(m.trades_security_required());
 			return;
 		}
+		if (!formData.description.trim()) {
+			toast.error(m.trades_description_required());
+			return;
+		}
 
 		try {
 			await pb.authedClient.collection('securityTransactions').update(currentTradeId, {
@@ -158,7 +162,7 @@
 				date: new Date(formData.date + 'T12:00:00Z').toISOString(),
 				type: formData.type,
 				subtype: formData.subtype.trim() || undefined,
-				description: formData.description.trim() || undefined,
+				description: formData.description.trim(),
 				quantity: toNumber(formData.quantity),
 				price: toNumber(formData.price),
 				amount: toNumber(formData.amount),
@@ -312,6 +316,18 @@
 						</FormFieldRow>
 
 						<FormFieldRow>
+							<Label for="description" class="justify-start pr-0 md:justify-end">
+								{m.transactions_label_description()}
+							</Label>
+							<Input
+								id="description"
+								bind:value={formData.description}
+								required
+								disabled={!canWrite}
+							/>
+						</FormFieldRow>
+
+						<FormFieldRow>
 							<Label for="type" class="justify-start pr-0 md:justify-end">
 								{m.trades_label_type()}
 							</Label>
@@ -335,16 +351,6 @@
 								<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
 							</div>
 							<Input id="subtype" bind:value={formData.subtype} disabled={!canWrite} />
-						</FormFieldRow>
-
-						<FormFieldRow>
-							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-								<Label for="description" class="justify-start pr-0 md:justify-end">
-									{m.transactions_label_description()}
-								</Label>
-								<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
-							</div>
-							<Input id="description" bind:value={formData.description} disabled={!canWrite} />
 						</FormFieldRow>
 					</Fieldset>
 
