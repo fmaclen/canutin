@@ -25,11 +25,7 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { m } from '$lib/paraglide/messages';
-	import {
-		AssetsBalanceGroupOptions,
-		AssetSharesPerspectiveOptions,
-		AssetsTypeOptions
-	} from '$lib/pocketbase.schema';
+	import { AssetsBalanceGroupOptions, AssetSharesPerspectiveOptions } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { sanitizeFromParam } from '$lib/utils';
 
@@ -53,17 +49,12 @@
 	let formData = $state({
 		name: '',
 		balanceGroup: '' as AssetsBalanceGroupOptions | '',
-		assetTypeName: '',
-		symbol: '',
+		balanceTypeName: '',
 		notes: '',
 		excluded: false,
 		sold: false,
-		type: '' as AssetsTypeOptions | '',
 		bookValue: '',
-		marketValue: '',
-		quantity: '',
-		bookPrice: '',
-		marketPrice: ''
+		marketValue: ''
 	});
 
 	let syncState = $state({
@@ -78,32 +69,24 @@
 	);
 	let includeInNetWorth = $derived(incomingShare?.includeInNetWorth ?? true);
 
-	const isWhole = $derived(formData.type === AssetsTypeOptions.WHOLE);
-	const isShares = $derived(formData.type === AssetsTypeOptions.SHARES);
-
 	function isDirty(): boolean {
 		if (!syncState.lastSyncedData) return false;
 
 		return (
 			formData.name !== syncState.lastSyncedData.name ||
 			formData.balanceGroup !== syncState.lastSyncedData.balanceGroup ||
-			formData.assetTypeName !== syncState.lastSyncedData.assetTypeName ||
-			formData.symbol !== syncState.lastSyncedData.symbol ||
+			formData.balanceTypeName !== syncState.lastSyncedData.balanceTypeName ||
 			formData.notes !== syncState.lastSyncedData.notes ||
 			formData.excluded !== syncState.lastSyncedData.excluded ||
 			formData.sold !== syncState.lastSyncedData.sold ||
-			formData.type !== syncState.lastSyncedData.type ||
 			formData.bookValue !== syncState.lastSyncedData.bookValue ||
-			formData.marketValue !== syncState.lastSyncedData.marketValue ||
-			formData.quantity !== syncState.lastSyncedData.quantity ||
-			formData.bookPrice !== syncState.lastSyncedData.bookPrice ||
-			formData.marketPrice !== syncState.lastSyncedData.marketPrice
+			formData.marketValue !== syncState.lastSyncedData.marketValue
 		);
 	}
 
 	function getAssetVersion(assetData: typeof asset): string {
 		if (!assetData) return '';
-		return `${assetData.updated || assetData.created}_${assetData.name}_${assetData.balanceGroup}_${assetData.symbol}_${assetData.notes}_${assetData.excluded}_${assetData.sold}_${assetData.marketValue}_${assetData.bookValue}_${assetData.quantity}_${assetData.bookPrice}_${assetData.marketPrice}`;
+		return `${assetData.updated || assetData.created}_${assetData.name}_${assetData.balanceGroup}_${assetData.notes}_${assetData.excluded}_${assetData.sold}_${assetData.marketValue}_${assetData.bookValue}`;
 	}
 
 	function toFieldValue(value: number | null | undefined) {
@@ -116,25 +99,16 @@
 		const newFormData = {
 			name: assetData.name,
 			balanceGroup: assetData.balanceGroup,
-			assetTypeName: '',
-			symbol: assetData.symbol ?? '',
+			balanceTypeName: '',
 			notes: assetData.notes ?? '',
 			excluded: Boolean(assetData.excluded),
 			sold: Boolean(assetData.sold),
-			type: assetData.type ?? '',
-			bookValue:
-				assetData.type === AssetsTypeOptions.WHOLE ? toFieldValue(assetData.bookValue) : '',
-			marketValue:
-				assetData.type === AssetsTypeOptions.WHOLE ? toFieldValue(assetData.marketValue) : '',
-			quantity: assetData.type === AssetsTypeOptions.SHARES ? toFieldValue(assetData.quantity) : '',
-			bookPrice:
-				assetData.type === AssetsTypeOptions.SHARES ? toFieldValue(assetData.bookPrice) : '',
-			marketPrice:
-				assetData.type === AssetsTypeOptions.SHARES ? toFieldValue(assetData.marketPrice) : ''
+			bookValue: toFieldValue(assetData.bookValue),
+			marketValue: toFieldValue(assetData.marketValue)
 		};
 
 		await balanceTypesContext.ensureLoaded(assetData.balanceType);
-		newFormData.assetTypeName = balanceTypesContext.getName(assetData.balanceType);
+		newFormData.balanceTypeName = balanceTypesContext.getName(assetData.balanceType);
 
 		formData = newFormData;
 		syncState.lastSyncedData = { ...newFormData };
@@ -194,26 +168,8 @@
 				asOf: new Date().toISOString()
 			};
 
-			let calculatedBookValue: number | undefined;
-			let calculatedMarketValue: number | undefined;
-
-			if (isWhole) {
-				calculatedBookValue = formData.bookValue ? parseFloat(formData.bookValue) : undefined;
-				calculatedMarketValue = formData.marketValue ? parseFloat(formData.marketValue) : undefined;
-				balanceData.bookValue = calculatedBookValue;
-				balanceData.marketValue = calculatedMarketValue;
-			} else if (isShares) {
-				const qty = formData.quantity ? parseFloat(formData.quantity) : undefined;
-				const bp = formData.bookPrice ? parseFloat(formData.bookPrice) : undefined;
-				const mp = formData.marketPrice ? parseFloat(formData.marketPrice) : undefined;
-				balanceData.quantity = qty;
-				balanceData.bookPrice = bp;
-				balanceData.marketPrice = mp;
-				calculatedBookValue = qty !== undefined && bp !== undefined ? qty * bp : undefined;
-				calculatedMarketValue = qty !== undefined && mp !== undefined ? qty * mp : undefined;
-				balanceData.bookValue = calculatedBookValue;
-				balanceData.marketValue = calculatedMarketValue;
-			}
+			balanceData.bookValue = formData.bookValue ? parseFloat(formData.bookValue) : undefined;
+			balanceData.marketValue = formData.marketValue ? parseFloat(formData.marketValue) : undefined;
 
 			syncState.justSaved = true;
 
@@ -242,7 +198,7 @@
 
 		try {
 			const balanceTypeId = await balanceTypesContext.getOrCreate(
-				formData.assetTypeName,
+				formData.balanceTypeName,
 				currentOwnerId
 			);
 
@@ -250,7 +206,6 @@
 				name: formData.name.trim(),
 				balanceGroup: formData.balanceGroup as AssetsBalanceGroupOptions,
 				balanceType: balanceTypeId,
-				symbol: formData.symbol.trim() || undefined,
 				notes: formData.notes.trim() || undefined,
 				excluded: formData.excluded ? new Date().toISOString() : null,
 				sold: formData.sold ? new Date().toISOString() : null
@@ -261,7 +216,7 @@
 			await pb.authedClient.collection('assets').update(currentAssetId, assetData);
 
 			await balanceTypesContext.ensureLoaded(balanceTypeId);
-			formData.assetTypeName = balanceTypesContext.getName(balanceTypeId);
+			formData.balanceTypeName = balanceTypesContext.getName(balanceTypeId);
 
 			syncState.lastSyncedData = { ...formData };
 
@@ -411,8 +366,6 @@
 		{:else}
 			<BalanceForm
 				{formData}
-				{isWhole}
-				{isShares}
 				balanceAsOf={asset?.balanceAsOf ?? ''}
 				onSubmit={handleUpdateBalance}
 				disabled={!canWrite}
@@ -425,13 +378,7 @@
 		{#if isLoading || !asset}
 			<Skeleton class="h-96" />
 		{:else}
-			<DetailsForm
-				{formData}
-				{isWhole}
-				{isShares}
-				onSubmit={handleUpdateDetails}
-				disabled={!canWrite}
-			/>
+			<DetailsForm {formData} onSubmit={handleUpdateDetails} disabled={!canWrite} />
 		{/if}
 	</Section>
 

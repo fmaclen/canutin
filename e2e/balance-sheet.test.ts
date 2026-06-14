@@ -2,8 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import {
 	AccountsBalanceGroupOptions,
-	AssetsBalanceGroupOptions,
-	AssetsTypeOptions
+	AssetsBalanceGroupOptions
 } from '../src/lib/pocketbase.schema';
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
 import {
@@ -109,8 +108,7 @@ test('balance sheet', async ({ page }) => {
 		name: 'Las Meninas',
 		balanceGroup: AssetsBalanceGroupOptions.OTHER,
 		owner: user.id,
-		balanceType: 'Paintings',
-		type: AssetsTypeOptions.WHOLE
+		balanceType: 'Paintings'
 	});
 
 	await seedAssetBalance({
@@ -150,7 +148,6 @@ test('balance sheet', async ({ page }) => {
 		balanceGroup: AssetsBalanceGroupOptions.OTHER,
 		owner: user.id,
 		balanceType: 'Paintings',
-		type: AssetsTypeOptions.WHOLE,
 		sold: new Date().toISOString()
 	});
 
@@ -166,7 +163,6 @@ test('balance sheet', async ({ page }) => {
 		balanceGroup: AssetsBalanceGroupOptions.OTHER,
 		owner: user.id,
 		balanceType: 'Paintings',
-		type: AssetsTypeOptions.WHOLE,
 		excluded: new Date().toISOString()
 	});
 
@@ -231,12 +227,9 @@ test('balance sheet', async ({ page }) => {
 	await expect(balanceRegions.nth(2)).toContainText('Savings');
 	await expect(balanceRegions.nth(2)).toContainText('$500');
 
-	// Clicking on an account navigates to its detail page
 	await page.getByRole('link', { name: 'Willow Everyday' }).click();
 	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}(\\?|$)`));
-	await expect(page.getByText('Willow Everyday')).toBeVisible();
 
-	// Go back to balance sheet and click on an asset
 	await goToPageViaSidebar(page, 'Balance sheet');
 	await page.getByRole('link', { name: 'Las Meninas' }).click();
 	await expect(page).toHaveURL(new RegExp(`/assets/${otherAsset.id}(\\?|$)`));

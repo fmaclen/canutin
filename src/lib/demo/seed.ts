@@ -11,7 +11,7 @@ import {
 	ALL_ACCOUNTS,
 	type AccountDefinition
 } from './seed-data/accounts';
-import { ALL_ASSETS, type AssetDefinition } from './seed-data/assets';
+import { ALL_ASSETS } from './seed-data/assets';
 import {
 	generate401kBalances,
 	generateAutoLoanBalances,
@@ -24,8 +24,10 @@ import {
 	generateVehicleBalances,
 	generateWalletBalances,
 	type AccountBalanceDefinition,
-	type AssetBalanceDefinition
+	type AssetBalanceDefinition,
+	type SecurityBalanceDefinition
 } from './seed-data/balances';
+import { ALL_SECURITIES } from './seed-data/securities';
 import {
 	generateCheckingTransactions,
 	generateCreditCardTransactions,
@@ -112,24 +114,6 @@ async function createAccount(
 	return created.id;
 }
 
-async function createAsset(
-	pb: TypedPocketBase,
-	asset: AssetDefinition,
-	owner: string,
-	balanceTypeCache: IdMap
-) {
-	const created = await pb.collection('assets').create({
-		name: asset.name,
-		balanceGroup: asset.balanceGroup,
-		balanceType: balanceTypeCache[asset.balanceType],
-		type: asset.type,
-		symbol: asset.symbol,
-		owner
-	});
-
-	return created.id;
-}
-
 async function createTransactions(
 	pb: TypedPocketBase,
 	transactions: TransactionDefinition[],
@@ -177,9 +161,28 @@ async function createAssetBalances(
 			asset: assetId,
 			owner,
 			asOf: balance.asOf,
-			quantity: balance.quantity,
-			bookValue: balance.bookValue,
 			marketValue: balance.marketValue
+		})
+	);
+}
+
+async function createSecurityBalances(
+	pb: TypedPocketBase,
+	balances: SecurityBalanceDefinition[],
+	securityId: string,
+	accountId: string,
+	owner: string
+) {
+	await runInBatches(balances, (balance) =>
+		pb.collection('securityBalances').create({
+			security: securityId,
+			account: accountId,
+			owner,
+			asOf: balance.asOf,
+			quantity: balance.quantity,
+			price: balance.price,
+			costBasis: balance.costBasis,
+			value: balance.value
 		})
 	);
 }
@@ -246,7 +249,23 @@ export async function seedDemoData(pb: TypedPocketBase, userId: string) {
 	// Create all assets
 	const assetIds: IdMap = {};
 	for (const asset of ALL_ASSETS) {
-		assetIds[asset.name] = await createAsset(pb, asset, userId, balanceTypeCache);
+		const created = await pb.collection('assets').create({
+			name: asset.name,
+			balanceGroup: asset.balanceGroup,
+			balanceType: balanceTypeCache[asset.balanceType],
+			owner: userId
+		});
+		assetIds[asset.name] = created.id;
+	}
+
+	const securityIds: IdMap = {};
+	for (const security of ALL_SECURITIES) {
+		const created = await pb.collection('securities').create({
+			name: security.name,
+			symbol: security.symbol,
+			owner: userId
+		});
+		securityIds[security.name] = created.id;
 	}
 
 	// Create transactions for auto-calculated accounts (sequentially to reduce load)
@@ -298,31 +317,37 @@ export async function seedDemoData(pb: TypedPocketBase, userId: string) {
 		userId
 	);
 
-	// Create asset balances (sequentially)
-	await createAssetBalances(
+	// Create security balances (sequentially)
+	await createSecurityBalances(
 		pb,
 		generateSpyBalances(referenceDate),
-		assetIds['SPDR S&P 500 ETF Trust'],
+		securityIds['SPDR S&P 500 ETF Trust'],
+		accountIds[ACCOUNT_ROTH_IRA.name],
 		userId
 	);
-	await createAssetBalances(
+	await createSecurityBalances(
 		pb,
 		generateGamestopBalances(referenceDate),
-		assetIds['GameStop'],
+		securityIds['GameStop'],
+		accountIds[ACCOUNT_401K.name],
 		userId
 	);
-	await createAssetBalances(
+	await createSecurityBalances(
 		pb,
 		generateBitcoinBalances(referenceDate),
-		assetIds['Bitcoin'],
+		securityIds['Bitcoin'],
+		accountIds[ACCOUNT_ROTH_IRA.name],
 		userId
 	);
-	await createAssetBalances(
+	await createSecurityBalances(
 		pb,
 		generateEthereumBalances(referenceDate),
-		assetIds['Ethereum'],
+		securityIds['Ethereum'],
+		accountIds[ACCOUNT_ROTH_IRA.name],
 		userId
 	);
+
+	// Create asset balances (sequentially)
 	await createAssetBalances(
 		pb,
 		generateCollectibleBalances(referenceDate),

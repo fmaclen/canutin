@@ -2,8 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import {
 	AccountsBalanceGroupOptions,
-	AssetsBalanceGroupOptions,
-	AssetsTypeOptions
+	AssetsBalanceGroupOptions
 } from '../src/lib/pocketbase.schema';
 import { signIn } from './playwright.helpers';
 import {
@@ -96,8 +95,7 @@ test('big picture summary', async ({ page }) => {
 		name: 'Decorative Sculpture',
 		balanceGroup: AssetsBalanceGroupOptions.OTHER,
 		owner: user.id,
-		balanceType: 'Other asset',
-		type: AssetsTypeOptions.WHOLE
+		balanceType: 'Other asset'
 	});
 
 	await seedAssetBalance({
@@ -133,7 +131,6 @@ test('big picture summary', async ({ page }) => {
 		balanceGroup: AssetsBalanceGroupOptions.CASH,
 		owner: user.id,
 		balanceType: 'Other asset',
-		type: AssetsTypeOptions.WHOLE,
 		sold: new Date().toISOString()
 	});
 
@@ -149,7 +146,6 @@ test('big picture summary', async ({ page }) => {
 		balanceGroup: AssetsBalanceGroupOptions.CASH,
 		owner: user.id,
 		balanceType: 'Other asset',
-		type: AssetsTypeOptions.WHOLE,
 		excluded: new Date().toISOString()
 	});
 

@@ -291,7 +291,9 @@ async function main() {
 	// Load old reference tables
 	type Ref = { id: number; name: string };
 	const accountTypes = db.query('SELECT id, name FROM AccountType ORDER BY id').all() as Ref[];
-	const assetTypes = db.query('SELECT id, name FROM AssetType ORDER BY id').all() as Ref[];
+	const legacyAssetCategories = db
+		.query('SELECT id, name FROM AssetType ORDER BY id')
+		.all() as Ref[];
 	const txGroups = db
 		.query('SELECT id, name FROM TransactionCategoryGroup ORDER BY id')
 		.all() as Ref[];
@@ -300,11 +302,13 @@ async function main() {
 		.all() as Array<Ref & { transactionCategoryId: number }>;
 
 	log(
-		`Found: ${accountTypes.length} AccountType, ${assetTypes.length} AssetType, ${txGroups.length} Tx Groups, ${txCategories.length} Tx Categories`
+		`Found: ${accountTypes.length} AccountType, ${legacyAssetCategories.length} legacy asset categories, ${txGroups.length} Tx Groups, ${txCategories.length} Tx Categories`
 	);
 
 	const accountTypeNameById = new Map<number, string>(accountTypes.map((r) => [r.id, r.name]));
-	const assetTypeNameById = new Map<number, string>(assetTypes.map((r) => [r.id, r.name]));
+	const assetCategoryNameById = new Map<number, string>(
+		legacyAssetCategories.map((r) => [r.id, r.name])
+	);
 	const txGroupNameById = new Map<number, string>(txGroups.map((r) => [r.id, r.name]));
 	const txCatNameById = new Map<number, string>(txCategories.map((r) => [r.id, r.name]));
 	const txCatGroupIdByCatId = new Map<number, number>(
@@ -334,15 +338,14 @@ async function main() {
 		name: string;
 		balanceGroup: number;
 		isSold: number;
-		symbol?: string | null;
-		assetTypeId: number | null;
+		assetCategoryId: number | null;
 		isExcludedFromNetWorth: number;
 		createdAt?: string;
 		updatedAt?: string;
 	};
 	const assets = db
 		.query(
-			'SELECT id,name,balanceGroup,isSold,symbol,assetTypeId,isExcludedFromNetWorth,createdAt,updatedAt FROM Asset ORDER BY id'
+			'SELECT id,name,balanceGroup,isSold,assetTypeId AS assetCategoryId,isExcludedFromNetWorth,createdAt,updatedAt FROM Asset ORDER BY id'
 		)
 		.all() as AssetRow[];
 
@@ -362,7 +365,6 @@ async function main() {
 	type AstBalRow = {
 		id: number;
 		value: number;
-		quantity?: number | null;
 		cost?: number | null;
 		assetId: number;
 		createdAt?: string;
@@ -370,7 +372,7 @@ async function main() {
 	};
 	const assetBalances = db
 		.query(
-			'SELECT id,value,quantity,cost,assetId,createdAt,updatedAt FROM AssetBalanceStatement ORDER BY createdAt, id'
+			'SELECT id,value,cost,assetId,createdAt,updatedAt FROM AssetBalanceStatement ORDER BY createdAt, id'
 		)
 		.all() as AstBalRow[];
 
@@ -444,16 +446,13 @@ async function main() {
 	}
 
 	for (const a of assets) {
-		const typeName = a.assetTypeId ? assetTypeNameById.get(a.assetTypeId) : undefined;
-		// Assets with Security or Cryptocurrency types are SHARES, others are WHOLE
-		const assetType =
-			typeName && ['Security', 'Cryptocurrency'].includes(typeName) ? 'SHARES' : 'WHOLE';
+		const categoryName = a.assetCategoryId
+			? assetCategoryNameById.get(a.assetCategoryId)
+			: undefined;
 
 		const data: Record<string, unknown> = {
 			name: a.name,
-			symbol: a.symbol ?? undefined,
 			balanceGroup: mapBalanceGroup(a.balanceGroup),
-			type: assetType,
 			// If sold, prefer updatedAt then createdAt; fallback to now for determinism
 			sold: a.isSold
 				? (normalizeDateOr(a.updatedAt, a.createdAt) ?? toISODate(new Date().toISOString()))
@@ -461,7 +460,7 @@ async function main() {
 			excluded: a.isExcludedFromNetWorth ? toISODate(a.updatedAt) : undefined,
 			owner: ownerId
 		};
-		if (typeName) data.balanceType = await upsertBalanceType(typeName);
+		if (categoryName) data.balanceType = await upsertBalanceType(categoryName);
 
 		try {
 			const created = await pb.collection('assets').create(data);
@@ -496,7 +495,6 @@ async function main() {
 		const balData = {
 			asset: pbAssetId,
 			marketValue: s.value,
-			quantity: s.quantity || undefined,
 			bookValue: s.cost || undefined,
 			asOf: toISODate(s.createdAt),
 			owner: ownerId

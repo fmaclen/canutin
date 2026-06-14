@@ -25,17 +25,12 @@ function importPayload(sessionLabel: string) {
 		],
 		assets: [
 			{
-				name: 'SPDR S&P 500',
-				symbol: 'SPY',
+				name: 'Nathan Rental Property',
 				balanceGroup: 'INVESTMENT',
-				balanceType: 'ETF',
-				type: 'SHARES',
+				balanceType: 'Property',
 				balance: {
-					quantity: 10,
-					marketPrice: 550,
-					bookPrice: 450,
-					marketValue: 5500,
-					bookValue: 4500,
+					marketValue: 275000,
+					bookValue: 250000,
 					asOf: '2025-06-15T00:00:00.000Z'
 				}
 			}
@@ -380,4 +375,33 @@ test('import rejects empty payload', async () => {
 	const user = await seedUser('rachel');
 	const response = await pbSend(IMPORT_PATH, { sessionLabel: 'empty-import' }, user.email);
 	expect(response.status).toBe(400);
+});
+
+test('import rejects security and cryptocurrency balance types in assets payload', async () => {
+	const user = await seedUser('xavier');
+	const rejectedAssets = [
+		{
+			name: 'Xavier Security',
+			balanceGroup: 'INVESTMENT',
+			balanceType: 'Security'
+		},
+		{
+			name: 'Xavier Crypto',
+			balanceGroup: 'INVESTMENT',
+			balanceType: 'Cryptocurrency'
+		}
+	];
+
+	for (const asset of rejectedAssets) {
+		const response = await pbSend(
+			IMPORT_PATH,
+			{ sessionLabel: `reject-${asset.name}`, assets: [asset] },
+			user.email
+		);
+		const body = await response.json();
+		expect(response.status).toBe(400);
+		expect(body.error).toContain(
+			'import securities and cryptocurrency through securities and securityBalances instead'
+		);
+	}
 });

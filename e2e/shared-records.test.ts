@@ -2,8 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import {
 	AccountsBalanceGroupOptions,
-	AssetsBalanceGroupOptions,
-	AssetsTypeOptions
+	AssetsBalanceGroupOptions
 } from '../src/lib/pocketbase.schema';
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
 import {
@@ -99,8 +98,7 @@ test('shared inverse asset mirrors value fields while allowing recipient-only ne
 		name: 'Intercompany receivable',
 		balanceGroup: AssetsBalanceGroupOptions.OTHER,
 		owner: owner.id,
-		balanceType: 'Receivable',
-		type: AssetsTypeOptions.WHOLE
+		balanceType: 'Receivable'
 	});
 
 	await seedAssetBalance({
@@ -130,8 +128,8 @@ test('shared inverse asset mirrors value fields while allowing recipient-only ne
 	const assetRow = page.getByRole('row', { name: /Intercompany receivable/ });
 	await expect(assetRow).toBeVisible();
 	const assetCells = assetRow.locator('td');
-	await expect(assetCells.nth(5)).toContainText('-$9,000.00');
-	await expect(assetCells.nth(8)).toContainText('-$12,000.00');
+	await expect(assetCells.nth(4)).toContainText('-$9,000.00');
+	await expect(assetCells.nth(7)).toContainText('-$12,000.00');
 
 	await page.goto(`/assets/${receivableAsset.id}`);
 	await expect(page.getByLabel('Include in net worth')).toBeChecked();
@@ -231,8 +229,7 @@ test('sharer cannot mutate an existing asset share after creation', async () => 
 		name: 'Immutable asset share',
 		balanceGroup: AssetsBalanceGroupOptions.OTHER,
 		owner: owner.id,
-		balanceType: 'Collectible',
-		type: AssetsTypeOptions.WHOLE
+		balanceType: 'Collectible'
 	});
 
 	const share = await seedAssetShare({
@@ -323,8 +320,7 @@ test('shared account and asset detail views keep currency formatting for recipie
 		name: 'Formatted receivable',
 		balanceGroup: AssetsBalanceGroupOptions.OTHER,
 		owner: owner.id,
-		balanceType: 'Receivable',
-		type: AssetsTypeOptions.WHOLE
+		balanceType: 'Receivable'
 	});
 
 	await seedAccountBalance({
@@ -507,8 +503,7 @@ test('recipient can leave a shared asset via UI', async ({ page }) => {
 		name: 'Leavable brokerage',
 		balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
 		owner: owner.id,
-		balanceType: 'Brokerage',
-		type: AssetsTypeOptions.WHOLE
+		balanceType: 'Brokerage'
 	});
 	await seedAssetBalance({
 		asset: asset.id,
@@ -575,8 +570,7 @@ test('recipient can delete their own asset share via API', async () => {
 		name: 'Recipient-delete asset',
 		balanceGroup: AssetsBalanceGroupOptions.OTHER,
 		owner: owner.id,
-		balanceType: 'Collectible',
-		type: AssetsTypeOptions.WHOLE
+		balanceType: 'Collectible'
 	});
 	const share = await seedAssetShare({
 		asset: asset.id,
@@ -699,8 +693,7 @@ test('asset share API rejects self-share and unknown recipient', async () => {
 		name: 'API test asset',
 		balanceGroup: AssetsBalanceGroupOptions.OTHER,
 		owner: owner.id,
-		balanceType: 'Collectible',
-		type: AssetsTypeOptions.WHOLE
+		balanceType: 'Collectible'
 	});
 
 	// Self-share

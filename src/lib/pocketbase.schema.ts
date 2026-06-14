@@ -160,15 +160,12 @@ export type AccountsRecord = {
 export type AssetBalancesRecord = {
 	asOf: IsoDateString
 	asset: RecordIdString
-	bookPrice?: number
 	bookValue?: number
 	created: IsoAutoDateString
 	id: string
 	importSession?: RecordIdString
-	marketPrice?: number
 	marketValue?: number
 	owner: RecordIdString
-	quantity?: number
 	updated: IsoAutoDateString
 }
 
@@ -197,11 +194,6 @@ export enum AssetsBalanceGroupOptions {
 	"INVESTMENT" = "INVESTMENT",
 	"OTHER" = "OTHER",
 }
-
-export enum AssetsTypeOptions {
-	"WHOLE" = "WHOLE",
-	"SHARES" = "SHARES",
-}
 export type AssetsRecord = {
 	balanceGroup: AssetsBalanceGroupOptions
 	balanceType: RecordIdString
@@ -213,8 +205,6 @@ export type AssetsRecord = {
 	notes?: string
 	owner: RecordIdString
 	sold?: IsoDateString
-	symbol?: string
-	type: AssetsTypeOptions
 	updated: IsoAutoDateString
 }
 

@@ -17,9 +17,6 @@ type AssetBalanceData = {
 	bookValue: number;
 	gain: number;
 	gainPercent: number;
-	quantity?: number;
-	bookPrice?: number;
-	marketPrice?: number;
 	balanceAsOf: string;
 };
 
@@ -28,9 +25,6 @@ const DEFAULT_BALANCE_DATA: AssetBalanceData = {
 	bookValue: 0,
 	gain: 0,
 	gainPercent: 0,
-	quantity: undefined,
-	bookPrice: undefined,
-	marketPrice: undefined,
 	balanceAsOf: ''
 };
 
@@ -226,18 +220,12 @@ class AssetsContext {
 	}
 
 	private computeBalanceData(
-		balance: Pick<
-			AssetBalancesResponse,
-			'asOf' | 'bookPrice' | 'bookValue' | 'marketPrice' | 'marketValue' | 'quantity'
-		>,
+		balance: Pick<AssetBalancesResponse, 'asOf' | 'bookValue' | 'marketValue'>,
 		perspective: AssetSharesPerspectiveOptions
 	): AssetBalanceData {
 		const projected = projectAssetFinancials(balance.bookValue, balance.marketValue, perspective);
 		return {
 			...projected,
-			quantity: balance.quantity,
-			bookPrice: balance.bookPrice,
-			marketPrice: balance.marketPrice,
 			balanceAsOf: balance.asOf
 		};
 	}
@@ -253,9 +241,6 @@ class AssetsContext {
 			gain: rawMarketValue - rawBookValue,
 			gainPercent:
 				rawBookValue !== 0 ? ((rawMarketValue - rawBookValue) / Math.abs(rawBookValue)) * 100 : 0,
-			quantity: asset.quantity,
-			bookPrice: asset.bookPrice,
-			marketPrice: asset.marketPrice,
 			balanceAsOf: asset.balanceAsOf
 		};
 	}
@@ -281,10 +266,7 @@ class AssetsContext {
 				{
 					asOf: rawBalanceData.balanceAsOf,
 					bookValue: rawBalanceData.bookValue,
-					marketValue: rawBalanceData.marketValue,
-					quantity: rawBalanceData.quantity ?? 0,
-					bookPrice: rawBalanceData.bookPrice ?? 0,
-					marketPrice: rawBalanceData.marketPrice ?? 0
+					marketValue: rawBalanceData.marketValue
 				},
 				perspective
 			),
@@ -313,10 +295,7 @@ class AssetsContext {
 								{
 									asOf: balanceData.balanceAsOf,
 									bookValue: balanceData.bookValue,
-									marketValue: balanceData.marketValue,
-									quantity: balanceData.quantity ?? 0,
-									bookPrice: balanceData.bookPrice ?? 0,
-									marketPrice: balanceData.marketPrice ?? 0
+									marketValue: balanceData.marketValue
 								},
 								x.perspective
 							)
@@ -348,9 +327,6 @@ class AssetsContext {
 							Math.abs(balance.bookValue ?? 0)) *
 						100
 					: 0,
-			quantity: balance.quantity,
-			bookPrice: balance.bookPrice,
-			marketPrice: balance.marketPrice,
 			balanceAsOf: balance.asOf
 		};
 	}

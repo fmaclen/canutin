@@ -21,7 +21,7 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { m } from '$lib/paraglide/messages';
-	import { AssetsBalanceGroupOptions, AssetsTypeOptions } from '$lib/pocketbase.schema';
+	import { AssetsBalanceGroupOptions } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 
 	const pb = getPocketBaseContext();
@@ -31,41 +31,26 @@
 	const ownerId = $derived(auth.currentUser?.record?.id);
 
 	let name = $state('');
-	let type = $state<AssetsTypeOptions | ''>('');
 	let balanceGroup: AssetsBalanceGroupOptions | '' = $state('');
-	let assetTypeName = $state('');
-	let symbol = $state('');
+	let balanceTypeName = $state('');
 	let notes = $state('');
 	let excluded = $state(false);
 	let sold = $state(false);
-
-	// WHOLE fields
 	let bookValue = $state('');
 	let marketValue = $state('');
-
-	// SHARES fields
-	let quantity = $state('');
-	let bookPrice = $state('');
-	let marketPrice = $state('');
-
-	const isWhole = $derived(type === AssetsTypeOptions.WHOLE);
-	const isShares = $derived(type === AssetsTypeOptions.SHARES);
 
 	async function handleSubmit() {
 		const currentOwnerId = ownerId;
 		if (!currentOwnerId) return;
 
 		try {
-			const balanceTypeId = await balanceTypesContext.getOrCreate(assetTypeName, currentOwnerId);
+			const balanceTypeId = await balanceTypesContext.getOrCreate(balanceTypeName, currentOwnerId);
 
-			// Create asset
 			const assetData: Record<string, unknown> = {
 				name: name.trim(),
-				type: type || undefined,
-				balanceGroup: balanceGroup as AssetsBalanceGroupOptions,
+				balanceGroup: balanceGroup || undefined,
 				balanceType: balanceTypeId,
 				owner: currentOwnerId,
-				symbol: symbol.trim() || undefined,
 				notes: notes.trim() || undefined,
 				excluded: excluded ? new Date().toISOString() : undefined,
 				sold: sold ? new Date().toISOString() : undefined
@@ -73,33 +58,20 @@
 
 			const asset = await pb.authedClient.collection('assets').create(assetData);
 
-			// Create asset balance
 			const balanceData: Record<string, unknown> = {
 				asset: asset.id,
 				owner: currentOwnerId,
-				asOf: new Date().toISOString()
+				asOf: new Date().toISOString(),
+				bookValue: bookValue ? parseFloat(bookValue) : undefined,
+				marketValue: marketValue ? parseFloat(marketValue) : undefined
 			};
-
-			if (isWhole) {
-				balanceData.bookValue = bookValue ? parseFloat(bookValue) : undefined;
-				balanceData.marketValue = marketValue ? parseFloat(marketValue) : undefined;
-			} else if (isShares) {
-				const qty = quantity ? parseFloat(quantity) : 0;
-				const bp = bookPrice ? parseFloat(bookPrice) : 0;
-				const mp = marketPrice ? parseFloat(marketPrice) : 0;
-				balanceData.quantity = qty || undefined;
-				balanceData.bookPrice = bp || undefined;
-				balanceData.marketPrice = mp || undefined;
-				balanceData.bookValue = qty && bp ? qty * bp : undefined;
-				balanceData.marketValue = qty && mp ? qty * mp : undefined;
-			}
 
 			await pb.authedClient.collection('assetBalances').create(balanceData);
 
 			toast.success(m.assets_add_success());
 			await goto(resolve('/assets'));
 		} catch (error) {
-			console.error('Failed to create asset:', error);
+			console.error('[addAsset] Failed to create asset:', error);
 			toast.error(m.assets_add_failed());
 		}
 	}
@@ -149,7 +121,7 @@
 						<Input
 							id="category"
 							name="category"
-							bind:value={assetTypeName}
+							bind:value={balanceTypeName}
 							placeholder={m.assets_category_placeholder()}
 							required
 						/>
@@ -230,96 +202,21 @@
 
 				<Fieldset>
 					<FormFieldRow>
-						<Label id="type-label" for="type" class="justify-start pr-0 md:justify-end"
-							>{m.assets_label_type()}</Label
+						<Label for="market-value" class="justify-start pr-0 md:justify-end"
+							>{m.assets_label_market_value()}</Label
 						>
-						<Select.Root type="single" bind:value={type}>
-							<Select.Trigger
-								id="type"
-								name="type"
-								aria-labelledby="type-label"
-								class="bg-background w-full"
-							>
-								{#if type}
-									{#if type === AssetsTypeOptions.WHOLE}
-										{m.assets_type_whole_label()}
-									{:else if type === AssetsTypeOptions.SHARES}
-										{m.assets_type_shares_label()}
-									{/if}
-								{:else}
-									<span class="text-muted-foreground">{m.assets_type_select_placeholder()}</span>
-								{/if}
-							</Select.Trigger>
-							<Select.Content>
-								<Select.Item value={AssetsTypeOptions.WHOLE}>
-									{m.assets_type_whole_label()}
-								</Select.Item>
-								<Select.Item value={AssetsTypeOptions.SHARES}>
-									{m.assets_type_shares_label()}
-								</Select.Item>
-							</Select.Content>
-						</Select.Root>
+						<CurrencyField id="market-value" name="market-value" bind:value={marketValue} />
 					</FormFieldRow>
 
-					{#if isShares}
-						<FormFieldRow>
-							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-								<Label for="symbol" class="justify-start pr-0 md:justify-end"
-									>{m.assets_label_symbol()}</Label
-								>
-								<span class="text-muted-foreground text-sm">{m.assets_text_optional()}</span>
-							</div>
-							<Input id="symbol" bind:value={symbol} />
-						</FormFieldRow>
-					{/if}
-
-					{#if isWhole}
-						<FormFieldRow>
-							<Label for="market-value" class="justify-start pr-0 md:justify-end"
-								>{m.assets_label_market_value()}</Label
+					<FormFieldRow>
+						<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+							<Label for="book-value" class="justify-start pr-0 md:justify-end"
+								>{m.assets_label_book_value()}</Label
 							>
-							<CurrencyField id="market-value" name="market-value" bind:value={marketValue} />
-						</FormFieldRow>
-
-						<FormFieldRow>
-							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-								<Label for="book-value" class="justify-start pr-0 md:justify-end"
-									>{m.assets_label_book_value()}</Label
-								>
-								<span class="text-muted-foreground text-sm">{m.assets_text_optional()}</span>
-							</div>
-							<CurrencyField id="book-value" name="book-value" bind:value={bookValue} />
-						</FormFieldRow>
-					{:else if isShares}
-						<FormFieldRow>
-							<Label for="quantity" class="justify-start pr-0 md:justify-end"
-								>{m.assets_label_quantity()}</Label
-							>
-							<CurrencyField
-								id="quantity"
-								name="quantity"
-								bind:value={quantity}
-								isCurrency={false}
-							/>
-						</FormFieldRow>
-
-						<FormFieldRow>
-							<Label for="market-price" class="justify-start pr-0 md:justify-end"
-								>{m.assets_label_market_price()}</Label
-							>
-							<CurrencyField id="market-price" name="market-price" bind:value={marketPrice} />
-						</FormFieldRow>
-
-						<FormFieldRow>
-							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-								<Label for="book-price" class="justify-start pr-0 md:justify-end"
-									>{m.assets_label_book_price()}</Label
-								>
-								<span class="text-muted-foreground text-sm">{m.assets_text_optional()}</span>
-							</div>
-							<CurrencyField id="book-price" name="book-price" bind:value={bookPrice} />
-						</FormFieldRow>
-					{/if}
+							<span class="text-muted-foreground text-sm">{m.assets_text_optional()}</span>
+						</div>
+						<CurrencyField id="book-value" name="book-value" bind:value={bookValue} />
+					</FormFieldRow>
 				</Fieldset>
 
 				<Fieldset>
