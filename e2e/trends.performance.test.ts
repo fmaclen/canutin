@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { setHours, startOfYear, subDays, subMonths, subYears } from 'date-fns';
+import { endOfDay, setHours, startOfYear, subDays, subMonths, subYears } from 'date-fns';
 
 import {
 	AccountsBalanceGroupOptions,
@@ -43,9 +43,7 @@ test('trends performance table', async ({ page }) => {
 	const fiveYears = subYears(now, 5);
 	const earliest = subYears(now, 6);
 	const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-	const twoYearsStart = new Date(
-		Date.UTC(twoYears.getUTCFullYear(), twoYears.getUTCMonth(), twoYears.getUTCDate())
-	);
+	const twoYearsStart = endOfDay(twoYears);
 
 	// YTD balance should be on Jan 1st to match the app's YTD anchor calculation.
 	// The app uses `endOfDay(startOfYear(new Date()))` for YTD, so a balance at
