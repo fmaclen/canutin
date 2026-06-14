@@ -183,20 +183,6 @@ migrate((app) => {
         "type": "text"
       },
       {
-        "autogeneratePattern": "",
-        "hidden": false,
-        "id": "text2809179246",
-        "max": 0,
-        "min": 0,
-        "name": "externalId",
-        "pattern": "",
-        "presentable": false,
-        "primaryKey": false,
-        "required": false,
-        "system": false,
-        "type": "text"
-      },
-      {
         "cascadeDelete": false,
         "collectionId": "pbc_3847291056",
         "hidden": false,
@@ -233,7 +219,6 @@ migrate((app) => {
     "id": "pbc_2175204147",
     "indexes": [
       "CREATE INDEX idx_securityTransactions_importSession ON securityTransactions (importSession, owner)",
-      "CREATE INDEX idx_securityTransactions_externalId ON securityTransactions (account, externalId, owner) WHERE externalId != ''",
       "CREATE INDEX idx_securityTransactions_lookup ON securityTransactions (account, security, date)"
     ],
     "listRule": "owner = @request.auth.id || account.accountShares_via_account.recipient ?= @request.auth.id",

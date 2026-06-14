@@ -104,7 +104,6 @@ type importSecurityTransaction struct {
 	Amount         *float64 `json:"amount"`
 	Fees           *float64 `json:"fees"`
 	Notes          string   `json:"notes"`
-	ExternalID     string   `json:"externalId"`
 }
 
 type importCounts struct {
@@ -285,8 +284,8 @@ func findOrCreateImportSecurity(app core.App, ownerID string, securityCache map[
 	securityFilter := "normalizedName = {:normalizedName} && owner = {:owner}"
 	securityParams := map[string]any{"normalizedName": securityNameKey(name), "owner": ownerID}
 	if symbol != "" {
-		securityFilter = "symbol = {:symbol} && owner = {:owner}"
-		securityParams = map[string]any{"symbol": symbol, "owner": ownerID}
+		securityFilter = "(symbol = {:symbol} || normalizedName = {:normalizedName}) && owner = {:owner}"
+		securityParams = map[string]any{"symbol": symbol, "normalizedName": securityNameKey(name), "owner": ownerID}
 	}
 
 	rec, created, err := findOrCreate(app, "securities", securityFilter, securityParams, map[string]any{
@@ -634,40 +633,29 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			continue
 		}
 
-		if tx.ExternalID != "" {
-			_, err := app.FindFirstRecordByFilter("securityTransactions",
-				"account = {:account} && externalId = {:eid} && owner = {:owner}",
-				map[string]any{"account": accountID, "eid": tx.ExternalID, "owner": ownerID},
-			)
-			if err == nil {
-				result.SecurityTransactions.Skipped++
-				continue
-			}
-		} else {
-			txLabel := normalizeDescription(tx.Description)
-			if strings.TrimSpace(tx.Name) != "" {
-				txLabel = normalizeDescription(tx.Name)
-			}
-			if hasMatchingSecurityImportRecord(app, "securityTransactions",
-				"account = {:account} && security = {:security} && date = {:date} && type = {:type} && owner = {:owner}",
-				map[string]any{
-					"account":  accountID,
-					"security": securityID,
-					"date":     datePart(tx.Date) + " 00:00:00.000Z",
-					"type":     tx.Type,
-					"owner":    ownerID,
-				},
-				txLabel,
-				[]optionalImportNumber{
-					{field: "quantity", value: tx.Quantity},
-					{field: "price", value: tx.Price},
-					{field: "amount", value: tx.Amount},
-					{field: "fees", value: tx.Fees},
-				},
-			) {
-				result.SecurityTransactions.Skipped++
-				continue
-			}
+		txLabel := normalizeDescription(tx.Description)
+		if strings.TrimSpace(tx.Name) != "" {
+			txLabel = normalizeDescription(tx.Name)
+		}
+		if hasMatchingSecurityImportRecord(app, "securityTransactions",
+			"account = {:account} && security = {:security} && date = {:date} && type = {:type} && owner = {:owner}",
+			map[string]any{
+				"account":  accountID,
+				"security": securityID,
+				"date":     datePart(tx.Date) + " 00:00:00.000Z",
+				"type":     tx.Type,
+				"owner":    ownerID,
+			},
+			txLabel,
+			[]optionalImportNumber{
+				{field: "quantity", value: tx.Quantity},
+				{field: "price", value: tx.Price},
+				{field: "amount", value: tx.Amount},
+				{field: "fees", value: tx.Fees},
+			},
+		) {
+			result.SecurityTransactions.Skipped++
+			continue
 		}
 
 		coll, _ := app.FindCollectionByNameOrId("securityTransactions")
@@ -680,7 +668,6 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		rec.Set("name", tx.Name)
 		rec.Set("description", tx.Description)
 		rec.Set("notes", tx.Notes)
-		rec.Set("externalId", tx.ExternalID)
 		rec.Set("owner", ownerID)
 		rec.Set("importSession", session.Id)
 		setOptionalNumber(rec, "quantity", tx.Quantity)

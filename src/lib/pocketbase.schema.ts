@@ -281,8 +281,7 @@ export type SecurityTransactionsRecord<Tamount = unknown, Tfees = unknown, Tpric
 	amount?: null | Tamount
 	created: IsoAutoDateString
 	date: IsoDateString
-	description?: string
-	externalId?: string
+	description: string
 	fees?: null | Tfees
 	id: string
 	importSession?: RecordIdString
