@@ -1,7 +1,7 @@
 import { UTCDate } from '@date-fns/utc';
 import { addMonths, format, startOfMonth, startOfYear } from 'date-fns';
 import { type RecordSubscription } from 'pocketbase';
-import { getContext, setContext } from 'svelte';
+import { getContext, setContext, untrack } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 
 import { getAccountsContext, type AccountWithBalance } from './accounts.svelte';
@@ -57,6 +57,7 @@ class CashflowContext {
 	private _transactionsById = new SvelteMap<string, TransactionsResponse>();
 	private _activeWindow: CashflowWindow | null = null;
 	private _hasTransactionSnapshot = false;
+	private _watchedAccountsKey: string | null = null;
 
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
@@ -67,10 +68,41 @@ class CashflowContext {
 	private init() {
 		this.realtimeSubscribe();
 		$effect(() => {
-			void this.recomputeAll(this._accountsContext.accounts).catch((error) => {
+			const accounts = this._accountsContext.accounts;
+			const watchedAccountsKey = this.getWatchedAccountsKey(accounts);
+			const activeWindow = this._activeWindow;
+			const cashflowWindow = this.getCashflowWindow();
+
+			if (watchedAccountsKey === this._watchedAccountsKey) {
+				if (!activeWindow) {
+					if (this._recomputeAllInFlight > 0) return;
+				} else if (
+					activeWindow.earliestKey === cashflowWindow.earliestKey &&
+					activeWindow.startNextMonthKey === cashflowWindow.startNextMonthKey &&
+					this._hasTransactionSnapshot
+				) {
+					untrack(() => {
+						if (this._recomputeAllInFlight === 0) {
+							this.recomputeFromTransactionMap(accounts, activeWindow);
+						}
+					});
+					return;
+				}
+			}
+
+			this._watchedAccountsKey = watchedAccountsKey;
+			void this.recomputeAll(accounts).catch((error) => {
+				if (this._watchedAccountsKey === watchedAccountsKey) this._watchedAccountsKey = null;
 				this._pb.handleConnectionError(error, 'cashflow', 'init');
 			});
 		});
+	}
+
+	private getWatchedAccountsKey(accounts: AccountWithBalance[]) {
+		return accounts
+			.map((account) => `${account.id}:${account.perspective}`)
+			.sort()
+			.join('|');
 	}
 
 	private realtimeSubscribe() {
@@ -175,6 +207,7 @@ class CashflowContext {
 			);
 			this._activeWindow = cashflowWindow;
 			this._hasTransactionSnapshot = true;
+			this._watchedAccountsKey = this.getWatchedAccountsKey(accounts);
 			this.recomputeFromTransactionMap(accounts, cashflowWindow);
 		} finally {
 			this._recomputeAllInFlight--;

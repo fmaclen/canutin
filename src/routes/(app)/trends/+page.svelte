@@ -112,9 +112,9 @@
 		return ids.map((id) => `${field}='${quoteFilterValue(id)}'`).join(' || ');
 	}
 
-	function historyFilter(idsFilter: string, start: Date | null) {
+	function historyFilter(idsFilter: string, start: Date) {
 		if (!idsFilter) return '';
-		return start ? `(${idsFilter}) && asOf>='${start.toISOString()}'` : idsFilter;
+		return `(${idsFilter}) && asOf>='${start.toISOString()}'`;
 	}
 
 	type TrendBalanceRecord = { asOf: string; created: string; id: string };
@@ -136,15 +136,6 @@
 		if (a.asOf !== b.asOf) return a.asOf.localeCompare(b.asOf);
 		if (a.created !== b.created) return a.created.localeCompare(b.created);
 		return a.id.localeCompare(b.id);
-	}
-
-	function computeHistoryStart() {
-		if (period === 'max') return null;
-		const periodStart = computeBoundedHistoryStart(period);
-		const performanceStart = computeBoundedHistoryStart('5y');
-		if (!periodStart) return performanceStart;
-		if (!performanceStart) return periodStart;
-		return periodStart < performanceStart ? periodStart : performanceStart;
 	}
 
 	function trimBalances<T extends TrendBalanceRecord>(
@@ -323,7 +314,8 @@
 
 	async function refreshBalances() {
 		const sequence = ++refreshSequence;
-		const start = computeHistoryStart();
+		const start = computeBoundedHistoryStart('5y');
+		if (!start) return;
 		const accountIds = Array.from(includedAccounts.keys());
 		const assetIds = Array.from(includedAssets.keys());
 		const accountFilter = filterByIds('account', accountIds);
@@ -335,26 +327,17 @@
 				accountBalancesRange,
 				securityBalancesRangeRaw,
 				assetBalancesRange,
-				fullHistoryRanges
+				accountBalancesFullHistory,
+				securityBalancesFullHistoryRaw,
+				assetBalancesFullHistory
 			] = await Promise.all([
 				listAccountBalances(accountHistoryFilter),
 				listSecurityBalances(accountHistoryFilter),
 				listAssetBalances(assetHistoryFilter),
-				start
-					? Promise.all([
-							listAccountBalances(accountFilter),
-							listSecurityBalances(accountFilter),
-							listAssetBalances(assetFilter)
-						])
-					: Promise.resolve(null)
+				listAccountBalances(accountFilter),
+				listSecurityBalances(accountFilter),
+				listAssetBalances(assetFilter)
 			]);
-			let accountBalancesFullHistory = accountBalancesRange;
-			let securityBalancesFullHistoryRaw = securityBalancesRangeRaw;
-			let assetBalancesFullHistory = assetBalancesRange;
-			if (fullHistoryRanges) {
-				[accountBalancesFullHistory, securityBalancesFullHistoryRaw, assetBalancesFullHistory] =
-					fullHistoryRanges;
-			}
 
 			const securityBalancesRange = securityBalancesRangeRaw
 				.map(projectSecurityBalance)
@@ -362,13 +345,12 @@
 			const securityBalancesFullHistory = securityBalancesFullHistoryRaw
 				.map(projectSecurityBalance)
 				.filter(isDefined);
-			const [accountBalancesPrevious, securityBalancesPrevious, assetBalancesPrevious] = start
-				? await Promise.all([
-						previousAccountBalances(accountIds, start),
-						previousSecurityBalances(accountFilter, start),
-						previousAssetBalances(assetIds, start)
-					])
-				: [[], [], []];
+			const [accountBalancesPrevious, securityBalancesPrevious, assetBalancesPrevious] =
+				await Promise.all([
+					previousAccountBalances(accountIds, start),
+					previousSecurityBalances(accountFilter, start),
+					previousAssetBalances(assetIds, start)
+				]);
 
 			if (sequence !== refreshSequence) return;
 
@@ -633,12 +615,14 @@
 
 			<ChartNetWorth
 				bind:period
-				{prepared}
+				prepared={period === 'max' ? fullHistoryPrepared : prepared}
 				{rawAccounts}
 				{rawAssets}
-				{rawAccountBalances}
-				{rawSecurityBalances}
-				{rawAssetBalances}
+				rawAccountBalances={period === 'max' ? rawFullHistoryAccountBalances : rawAccountBalances}
+				rawSecurityBalances={period === 'max'
+					? rawFullHistorySecurityBalances
+					: rawSecurityBalances}
+				rawAssetBalances={period === 'max' ? rawFullHistoryAssetBalances : rawAssetBalances}
 			/>
 		</Section>
 	</Tabs.Root>

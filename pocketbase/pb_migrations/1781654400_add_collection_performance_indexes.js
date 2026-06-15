@@ -7,7 +7,8 @@ migrate((app) => {
     "indexes": [
       "CREATE INDEX idx_transactions_importSession ON transactions (importSession, owner)",
       "CREATE INDEX idx_transactions_externalId ON transactions (account, externalId, owner) WHERE externalId != ''",
-      "CREATE INDEX idx_transactions_account_date ON transactions (account, date)"
+      "CREATE INDEX idx_transactions_account_date ON transactions (account, date)",
+      "CREATE INDEX idx_transactions_excluded_date ON transactions (excluded, date)"
     ]
   }, transactions)
 

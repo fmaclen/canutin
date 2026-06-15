@@ -106,7 +106,7 @@
 		return Math.max(48, Math.ceil(maxW) + 16);
 	});
 
-	async function recomputeSeries() {
+	function recomputeSeries() {
 		if (!rawAccounts.length && !rawAssets.length) return;
 		const { start, end } = computeRangeForPeriod(
 			period,
@@ -211,7 +211,7 @@
 		series = rows;
 	}
 
-	$effect(() => void recomputeSeries());
+	$effect(() => recomputeSeries());
 </script>
 
 {#if series.length}

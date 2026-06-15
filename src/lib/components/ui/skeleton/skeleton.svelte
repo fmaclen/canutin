@@ -17,7 +17,7 @@
 <div
 	bind:this={ref}
 	data-slot="skeleton"
-	class={cn('bg-border relative overflow-hidden rounded', className)}
+	class={cn('bg-border relative animate-pulse overflow-hidden rounded', className)}
 	{...restProps}
 >
 	{#if showSpinner}
