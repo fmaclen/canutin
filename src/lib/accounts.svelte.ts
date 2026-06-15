@@ -370,7 +370,7 @@ class AccountsContext {
 		}
 	}
 
-	private async refreshAccount(accountId: string, userId: string) {
+	async refreshAccount(accountId: string, userId: string) {
 		if (!userId || userId !== this.currentUserId) return false;
 		try {
 			const account = await this._pb.authedClient
@@ -397,10 +397,16 @@ class AccountsContext {
 	}
 
 	private async refreshAccountBalance(accountId: string, userId: string) {
+		const balanceBeforeRefresh = this.latestCashByAccount.get(accountId);
 		const balance = await this.getLatestAccountBalance(accountId);
 		if (userId !== this.currentUserId) return false;
 		if (balance) this.latestCashByAccount.set(accountId, balance);
-		else this.latestCashByAccount.delete(accountId);
+		else if (
+			balanceBeforeRefresh &&
+			this.latestCashByAccount.get(accountId)?.id === balanceBeforeRefresh.id
+		) {
+			this.latestCashByAccount.delete(accountId);
+		}
 		return true;
 	}
 
