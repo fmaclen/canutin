@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { RecordSubscription } from 'pocketbase';
+	import { untrack } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 
 	import { getAccountsContext } from '$lib/accounts.svelte';
@@ -566,8 +567,10 @@
 	});
 
 	$effect(() => {
-		void doRefresh().then(() => {
-			bootstrapped = true;
+		untrack(() => {
+			void doRefresh().then(() => {
+				bootstrapped = true;
+			});
 		});
 	});
 
