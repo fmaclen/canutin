@@ -31,6 +31,7 @@
 	"sidebar_data_sources": "Fuentes de datos",
 	"sidebar_big_picture": "Panorama",
 	"sidebar_balance_sheet": "Balances",
+	"balance_sheet_group_empty": "No hay cuentas ni activos para este grupo de balance",
 	"sidebar_trends": "Tendencias",
 	"sidebar_assets": "Activos",
 	"portfolio_page_title": "Portafolio",

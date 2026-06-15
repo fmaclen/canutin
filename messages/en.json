@@ -31,6 +31,7 @@
 	"sidebar_data_sources": "Data sources",
 	"sidebar_big_picture": "The big picture",
 	"sidebar_balance_sheet": "Balance sheet",
+	"balance_sheet_group_empty": "No accounts or assets for this balance group",
 	"sidebar_trends": "Trends",
 	"sidebar_assets": "Assets",
 	"portfolio_page_title": "Portfolio",

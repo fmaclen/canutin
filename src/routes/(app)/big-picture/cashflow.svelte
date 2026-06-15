@@ -248,5 +248,5 @@
 		</Tooltip.Provider>
 	</div>
 {:else if cashflow.isLoading}
-	<Skeleton class="h-[calc(50vh+2rem)] max-h-[22rem] min-h-72" />
+	<Skeleton class="h-[calc(50vh+2rem)] max-h-[22rem] min-h-72" showSpinner />
 {/if}

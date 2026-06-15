@@ -43,7 +43,7 @@
 		<SectionTitle title={m.securities_title()} />
 		{#if securitiesContext.isLoading}
 			<div class="bg-background overflow-hidden rounded-sm shadow-md">
-				<Skeleton class="h-64" />
+				<Skeleton class="h-64" showSpinner />
 			</div>
 		{:else if securitiesContext.securities.length === 0}
 			<Empty>{m.securities_empty()}</Empty>

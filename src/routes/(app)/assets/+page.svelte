@@ -219,7 +219,7 @@
 	<Section>
 		{#if !isLoaded}
 			<div class="bg-background overflow-hidden rounded-sm shadow-md">
-				<Skeleton class="h-64" />
+				<Skeleton class="h-64" showSpinner />
 			</div>
 		{:else}
 			<Tabs.Root bind:value={filter}>

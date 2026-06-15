@@ -158,7 +158,7 @@
 					{#if isLoading}
 						<Skeleton class="min-h-32" />
 					{:else if grouped[balanceGroup].types.length === 0}
-						<Empty>No accounts or assets for this balance group</Empty>
+						<Empty>{m.balance_sheet_group_empty()}</Empty>
 					{:else}
 						{#each grouped[balanceGroup].types as balanceType (balanceType.id)}
 							<div

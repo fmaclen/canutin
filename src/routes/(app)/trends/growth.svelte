@@ -269,5 +269,5 @@
 		</Chart.Container>
 	</div>
 {:else}
-	<Skeleton class="h-96" />
+	<Skeleton class="h-96" showSpinner />
 {/if}

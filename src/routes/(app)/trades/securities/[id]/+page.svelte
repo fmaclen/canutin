@@ -194,7 +194,7 @@
 			<SectionTitle title={m.securities_section_balances()} />
 			{#if securitiesContext.isLoading}
 				<div class="bg-background overflow-hidden rounded-sm shadow-md">
-					<Skeleton class="h-64" />
+					<Skeleton class="h-64" showSpinner />
 				</div>
 			{:else}
 				<div

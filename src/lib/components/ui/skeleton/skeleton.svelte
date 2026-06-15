@@ -7,8 +7,11 @@
 	let {
 		ref = $bindable(null),
 		class: className,
+		showSpinner = false,
 		...restProps
-	}: WithoutChildren<WithElementRef<HTMLAttributes<HTMLDivElement>>> = $props();
+	}: WithoutChildren<WithElementRef<HTMLAttributes<HTMLDivElement>>> & {
+		showSpinner?: boolean;
+	} = $props();
 </script>
 
 <div
@@ -17,8 +20,10 @@
 	class={cn('bg-border relative overflow-hidden rounded', className)}
 	{...restProps}
 >
-	<LoaderCircleIcon
-		aria-hidden="true"
-		class="text-muted-foreground/70 absolute top-1/2 left-1/2 size-4 -translate-x-1/2 -translate-y-1/2 animate-spin"
-	/>
+	{#if showSpinner}
+		<LoaderCircleIcon
+			aria-hidden="true"
+			class="text-muted-foreground/70 absolute top-1/2 left-1/2 size-4 -translate-x-1/2 -translate-y-1/2 animate-spin"
+		/>
+	{/if}
 </div>

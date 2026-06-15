@@ -557,5 +557,5 @@
 		</div>
 	</div>
 {:else}
-	<Skeleton class="h-64" />
+	<Skeleton class="h-64" showSpinner />
 {/if}
