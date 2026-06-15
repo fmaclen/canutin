@@ -11,7 +11,7 @@
 	import * as Table from '$lib/components/ui/table/index';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { m } from '$lib/paraglide/messages';
-	import { getTransactionsContext, type TransactionSortColumn } from '$lib/transactions.svelte';
+	import { getTransactionsContext } from '$lib/transactions.svelte';
 
 	const txContext = getTransactionsContext();
 
@@ -22,7 +22,7 @@
 	}
 
 	function handleSort(column: string) {
-		txContext.setSort(column as TransactionSortColumn);
+		txContext.setSort(column);
 	}
 
 	const dateFormatter = new Intl.DateTimeFormat(undefined, {
@@ -43,7 +43,7 @@
 	}
 </script>
 
-{#if txContext.filteredRows.length === 0}
+{#if txContext.totalItems === 0}
 	<Empty>
 		{m.transactions_table_empty()}
 	</Empty>
@@ -205,9 +205,10 @@
 					<Table.Row class="border-t">
 						<Table.Cell colspan={6} class="bg-background px-0 py-3 whitespace-normal">
 							<Pagination.Root
-								count={txContext.filteredRows.length}
+								count={txContext.totalItems}
 								perPage={txContext.pageSize}
-								bind:page={txContext.page}
+								page={txContext.page}
+								onPageChange={(page) => txContext.setPage(page)}
 							>
 								{#snippet children({ pages, currentPage })}
 									<Pagination.Content

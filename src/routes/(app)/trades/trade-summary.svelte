@@ -17,7 +17,7 @@
 >
 	<KeyValue
 		title={m.trades_summary_count_label()}
-		value={tradesContext.filteredRows.length}
+		value={tradesContext.totalItems}
 		variant="outline"
 		format="number"
 	/>

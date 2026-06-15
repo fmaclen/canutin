@@ -41,15 +41,13 @@
 		tradesContext.syncFromUrl();
 	});
 
-	// Keep page within valid bounds
 	$effect(() => {
 		if (tradesContext.page > tradesContext.totalPages) {
-			tradesContext.page = tradesContext.totalPages;
+			tradesContext.setPage(tradesContext.totalPages);
 		}
-		if (tradesContext.page < 1) tradesContext.page = 1;
+		if (tradesContext.page < 1) tradesContext.setPage(1);
 	});
 
-	// Reset pagination whenever the active filters change
 	$effect(() => {
 		void tradesContext.period;
 		void tradesContext.accountFilter;

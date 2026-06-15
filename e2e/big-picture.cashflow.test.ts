@@ -2,9 +2,13 @@ import { UTCDate } from '@date-fns/utc';
 import { expect, test } from '@playwright/test';
 import { addMonths, endOfMonth, format, setHours, startOfMonth, subHours } from 'date-fns';
 
-import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
+import {
+	AccountsBalanceGroupOptions,
+	AccountSharesAccessRoleOptions,
+	AccountSharesPerspectiveOptions
+} from '../src/lib/pocketbase.schema';
 import { signIn } from './playwright.helpers';
-import { seedAccount, seedTransaction, seedUser } from './pocketbase.helpers';
+import { seedAccount, seedAccountShare, seedTransaction, seedUser } from './pocketbase.helpers';
 
 type PeriodSeed = {
 	monthsAgo: number;
@@ -204,12 +208,12 @@ test.describe('big picture cashflow chart', () => {
 test('clicking cashflow chart bar navigates to transactions filtered by that month', async ({
 	page
 }) => {
-	const user = await seedUser('morgan');
+	const elena = await seedUser('elena');
 
 	const account = await seedAccount({
 		name: 'Cashflow Link Test Account',
 		balanceGroup: AccountsBalanceGroupOptions.CASH,
-		owner: user.id,
+		owner: elena.id,
 		balanceType: 'Checking',
 		autoCalculated: new Date().toISOString()
 	});
@@ -221,7 +225,7 @@ test('clicking cashflow chart bar navigates to transactions filtered by that mon
 
 	await seedTransaction({
 		account: account.id,
-		owner: user.id,
+		owner: elena.id,
 		date: new UTCDate(
 			targetMonth.getUTCFullYear(),
 			targetMonth.getUTCMonth(),
@@ -236,7 +240,7 @@ test('clicking cashflow chart bar navigates to transactions filtered by that mon
 	});
 	await seedTransaction({
 		account: account.id,
-		owner: user.id,
+		owner: elena.id,
 		date: new UTCDate(
 			targetMonth.getUTCFullYear(),
 			targetMonth.getUTCMonth(),
@@ -253,14 +257,14 @@ test('clicking cashflow chart bar navigates to transactions filtered by that mon
 	// Seed a transaction in the current month (should NOT be visible after filtering)
 	await seedTransaction({
 		account: account.id,
-		owner: user.id,
+		owner: elena.id,
 		date: new UTCDate(now.getUTCFullYear(), now.getUTCMonth(), 5, 12, 0, 0, 0).toISOString(),
 		description: 'Current Month Transaction',
 		value: 200
 	});
 
 	await page.goto('/');
-	await signIn(page, user.email);
+	await signIn(page, elena.email);
 
 	// Click on the target month's bar in the cashflow chart
 	// The bar has aria-label "{periodLabel}: {surplus}" format
@@ -294,4 +298,50 @@ test('clicking cashflow chart bar navigates to transactions filtered by that mon
 	await expect(page.getByText('Target Month Income')).toBeVisible();
 	await expect(page.getByText('Target Month Expense')).toBeVisible();
 	await expect(page.getByText('Current Month Transaction')).toBeVisible();
+});
+
+test('recipient sees inverse shared account cashflow in projected income and expense buckets', async ({
+	page
+}) => {
+	const marisol = await seedUser('marisol');
+	const quentin = await seedUser('quentin');
+
+	const sharedAccount = await seedAccount({
+		name: 'Shared reimbursement ledger',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: marisol.id,
+		balanceType: 'Shared cashflow',
+		autoCalculated: new Date().toISOString()
+	});
+
+	await seedTransaction({
+		account: sharedAccount.id,
+		owner: marisol.id,
+		date: isoFirstOfMonth(0),
+		description: 'Recipient-side income',
+		value: -1200
+	});
+	await seedTransaction({
+		account: sharedAccount.id,
+		owner: marisol.id,
+		date: isoFirstOfMonth(0),
+		description: 'Recipient-side expense',
+		value: 600
+	});
+	await seedAccountShare({
+		account: sharedAccount.id,
+		recipient: quentin.id,
+		recipientEmail: quentin.email,
+		grantedBy: marisol.id,
+		accessRole: AccountSharesAccessRoleOptions.VIEWER,
+		perspective: AccountSharesPerspectiveOptions.INVERSE,
+		includeInNetWorth: true
+	});
+
+	await page.goto('/');
+	await signIn(page, quentin.email);
+
+	await expect(page.getByRole('region', { name: 'Income per month' })).toContainText('$200');
+	await expect(page.getByRole('region', { name: 'Expenses per month' })).toContainText('$100');
+	await expect(page.getByRole('region', { name: 'Surplus per month' })).toContainText('$100');
 });

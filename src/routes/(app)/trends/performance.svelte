@@ -16,19 +16,23 @@
 
 	import {
 		advanceTrendSecurityValue,
-		buildPreparedMaps,
 		type BalanceGroup,
+		type PreparedTrendMaps,
 		type TrendSecurityBalance,
 		type TrendSecurityValueState
 	} from './trends';
 
 	let {
+		prepared = $bindable(),
+		historyStart = $bindable(),
 		rawAccounts = $bindable(),
 		rawAssets = $bindable(),
 		rawAccountBalances = $bindable(),
 		rawSecurityBalances = $bindable(),
 		rawAssetBalances = $bindable()
 	}: {
+		prepared: PreparedTrendMaps;
+		historyStart: Date | null;
 		rawAccounts: AccountsResponse[];
 		rawAssets: AssetsResponse[];
 		rawAccountBalances: AccountBalancesResponse[];
@@ -74,16 +78,6 @@
 		const previousAbs = Math.abs(previousValue);
 		return (currentAbs - previousAbs) / previousAbs;
 	}
-
-	const prepared = $derived.by(() =>
-		buildPreparedMaps(
-			rawAccounts,
-			rawAssets,
-			rawAccountBalances,
-			rawSecurityBalances,
-			rawAssetBalances
-		)
-	);
 
 	function computeTotals(anchorDates: Date[]) {
 		const {
@@ -202,7 +196,8 @@
 			if (!earliest || d < earliest) earliest = d;
 		}
 
-		const anchorDates = periods.map((periodDef) => {
+		const visiblePeriods = historyStart ? periods.filter((periodDef) => !periodDef.offset.max) : periods;
+		const anchorDates = visiblePeriods.map((periodDef) => {
 			if (periodDef.offset.max) return earliest ? new Date(earliest) : now;
 			if (periodDef.offset.ytd) return endOfDay(startOfYear(new UTCDate()));
 			const anchorDate = subtractFromDate(new UTCDate(), periodDef.offset);
@@ -235,7 +230,7 @@
 				break;
 		}
 
-		const columns = periods.map((periodDef, columnIndex) => {
+		const columns = visiblePeriods.map((periodDef, columnIndex) => {
 			const previousTotals = totals[columnIndex];
 
 			return {

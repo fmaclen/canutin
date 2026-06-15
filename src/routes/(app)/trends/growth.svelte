@@ -17,17 +17,18 @@
 
 	import {
 		advanceTrendSecurityValue,
-		buildPreparedMaps,
 		computeRangeForPeriod,
 		latestIndexBeforeOrEqual,
 		type BalanceGroup,
 		type PeriodKey,
+		type PreparedTrendMaps,
 		type TrendSecurityBalance,
 		type TrendSecurityValueState
 	} from './trends';
 
 	let {
 		period = $bindable(),
+		prepared = $bindable(),
 		rawAccounts = $bindable(),
 		rawAssets = $bindable(),
 		rawAccountBalances = $bindable(),
@@ -35,6 +36,7 @@
 		rawAssetBalances = $bindable()
 	}: {
 		period: PeriodKey;
+		prepared: PreparedTrendMaps;
 		rawAccounts: AccountsResponse[];
 		rawAssets: AssetsResponse[];
 		rawAccountBalances: AccountBalancesResponse[];
@@ -127,13 +129,7 @@
 			assetBalancesByAssetId,
 			accountById,
 			assetById
-		} = buildPreparedMaps(
-			rawAccounts,
-			rawAssets,
-			rawAccountBalances,
-			rawSecurityBalances,
-			rawAssetBalances
-		);
+		} = prepared;
 
 		const accountIndexPointer = new SvelteMap<string, number>();
 		for (const [accountId, balances] of accountBalancesByAccountId)

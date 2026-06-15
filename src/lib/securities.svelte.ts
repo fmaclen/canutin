@@ -9,6 +9,7 @@ import type { PocketBaseContext } from './pocketbase.svelte';
 import {
 	compareByValueDescThenName,
 	resolveSecurityBalanceValues,
+	type SecurityBalanceResolvedValue,
 	sumOrUnknown
 } from './security-balance-values';
 import { projectSignedValue } from './sharing';
@@ -64,7 +65,7 @@ class SecuritiesContext {
 				.map((account) => account.id)
 		);
 		const valuesByAccount = new SvelteMap<string, Array<number | null>>();
-		for (const resolved of resolveSecurityBalanceValues(this.securityBalances).values()) {
+		for (const resolved of this.currentPositions.values()) {
 			const accountId = resolved.balance.account;
 			if (!eligibleAccountIds.has(accountId)) continue;
 			const values = valuesByAccount.get(accountId) ?? [];
@@ -76,11 +77,11 @@ class SecuritiesContext {
 		);
 	});
 
-	private securityBalances: SecurityBalance[] = $state([]);
+	private currentPositions = new SvelteMap<string, SecurityBalanceResolvedValue>();
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
 	private _accounts: ReturnType<typeof getAccountsContext>;
-	private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+	private positionRefreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
 	private refreshSequence = 0;
 	private _activeUserId = '';
 	private _isSubscribed = false;
@@ -126,7 +127,17 @@ class SecuritiesContext {
 				balance: balanceData
 			}
 		);
-		await this.refreshAll();
+		this.upsertSecurity(security);
+		if (
+			await this.refreshPosition(
+				balanceData.account,
+				security.id,
+				this._auth.currentUserId,
+				this.refreshSequence
+			)
+		) {
+			this._accounts.notifyBalancesChanged();
+		}
 		return security;
 	}
 
@@ -135,7 +146,16 @@ class SecuritiesContext {
 			...balanceData,
 			security: securityId
 		});
-		await this.refreshAll();
+		if (
+			await this.refreshPosition(
+				balanceData.account,
+				securityId,
+				this._auth.currentUserId,
+				this.refreshSequence
+			)
+		) {
+			this._accounts.notifyBalancesChanged();
+		}
 	}
 
 	private init() {
@@ -146,10 +166,9 @@ class SecuritiesContext {
 			this._activeUserId = userId;
 			if (!userId) {
 				this.refreshSequence++;
-				if (this.refreshTimer) clearTimeout(this.refreshTimer);
-				this.refreshTimer = null;
+				this.clearPositionRefreshTimers();
 				this.securities = [];
-				this.securityBalances = [];
+				this.currentPositions.clear();
 				this.positionsLoaded = false;
 				this.isLoading = false;
 				return;
@@ -194,7 +213,10 @@ class SecuritiesContext {
 		]);
 		if (userId !== this._auth.currentUserId || token !== this.refreshSequence) return;
 		this.securities = securities;
-		this.securityBalances = securityBalances;
+		this.currentPositions.clear();
+		for (const [key, position] of resolveSecurityBalanceValues(securityBalances)) {
+			this.currentPositions.set(key, position);
+		}
 		this.resolvePositionsLoaded();
 	}
 
@@ -203,7 +225,7 @@ class SecuritiesContext {
 
 		this._pb.authedClient
 			.collection('securities')
-			.subscribe<SecuritiesResponse>('*', (event) => this.onRealtimeEvent(event, userId))
+			.subscribe<SecuritiesResponse>('*', (event) => this.onSecurityEvent(event, userId))
 			.catch((error) => {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'securities', 'subscribe');
@@ -213,7 +235,7 @@ class SecuritiesContext {
 			});
 		this._pb.authedClient
 			.collection('securityBalances')
-			.subscribe<SecurityBalance>('*', (event) => this.onRealtimeEvent(event, userId))
+			.subscribe<SecurityBalance>('*', (event) => this.onSecurityBalanceEvent(event, userId))
 			.catch((error) => {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'securities', 'subscribe_balances');
@@ -231,23 +253,99 @@ class SecuritiesContext {
 		this._pb.authedClient.collection('securityBalances').unsubscribe('*');
 	}
 
-	private onRealtimeEvent(
-		event: RecordSubscription<SecuritiesResponse> | RecordSubscription<SecurityBalance>,
-		userId: string
-	) {
+	private onSecurityEvent(event: RecordSubscription<SecuritiesResponse>, userId: string) {
 		if (!userId || userId !== this._activeUserId) return;
 		if (!event.action) return;
-		if (this.refreshTimer) clearTimeout(this.refreshTimer);
-		this.refreshTimer = setTimeout(() => {
-			this.refreshTimer = null;
-			const userId = this._auth.currentUserId;
-			const token = ++this.refreshSequence;
-			this.refreshAll(userId, token).catch((error) => {
-				if (userId !== this._auth.currentUserId || token !== this.refreshSequence) return;
-				this._pb.handleConnectionError(error, 'securities', 'refresh');
-				this.resolvePositionsLoaded();
-			});
-		}, DEBOUNCE_MS);
+		if (event.action === 'delete') {
+			this.securities = this.securities.filter((security) => security.id !== event.record.id);
+			for (const [key, position] of this.currentPositions) {
+				if (position.balance.security === event.record.id) this.currentPositions.delete(key);
+			}
+			if (this.positionsLoaded) this._accounts.notifyBalancesChanged();
+			return;
+		}
+
+		this.upsertSecurity(event.record);
+	}
+
+	private onSecurityBalanceEvent(event: RecordSubscription<SecurityBalance>, userId: string) {
+		if (!userId || userId !== this._activeUserId) return;
+		if (!event.action) return;
+
+		const key = this.positionKey(event.record.account, event.record.security);
+		if (event.action === 'update') {
+			for (const [currentKey, position] of this.currentPositions) {
+				if (position.balance.id === event.record.id && currentKey !== key) {
+					const [accountId, securityId] = currentKey.split(':');
+					if (accountId && securityId) this.schedulePositionRefresh(accountId, securityId, userId);
+				}
+			}
+		}
+
+		this.schedulePositionRefresh(event.record.account, event.record.security, userId);
+	}
+
+	private schedulePositionRefresh(accountId: string, securityId: string, userId: string) {
+		const key = this.positionKey(accountId, securityId);
+		const existing = this.positionRefreshTimers.get(key);
+		if (existing) clearTimeout(existing);
+
+		this.positionRefreshTimers.set(
+			key,
+			setTimeout(() => {
+				this.positionRefreshTimers.delete(key);
+				const token = this.refreshSequence;
+				void this.refreshPosition(accountId, securityId, userId, token)
+					.then((refreshed) => {
+						if (refreshed && this.positionsLoaded) this._accounts.notifyBalancesChanged();
+					})
+					.catch((error) => {
+						if (userId !== this._auth.currentUserId || token !== this.refreshSequence) return;
+						this._pb.handleConnectionError(error, 'securities', 'position_refresh');
+					});
+			}, DEBOUNCE_MS)
+		);
+	}
+
+	private async refreshPosition(
+		accountId: string,
+		securityId: string,
+		userId: string,
+		token: number
+	) {
+		if (!userId || userId !== this._auth.currentUserId || token !== this.refreshSequence)
+			return false;
+		const balances = await this._pb.authedClient.collection('securityBalances').getFullList<SecurityBalance>({
+			filter: `account='${accountId}' && security='${securityId}'`,
+			sort: '-asOf,-created,-id',
+			requestKey: null
+		});
+		if (userId !== this._auth.currentUserId || token !== this.refreshSequence) return false;
+
+		const key = this.positionKey(accountId, securityId);
+		const position = resolveSecurityBalanceValues(balances).get(key);
+		if (position) this.currentPositions.set(key, position);
+		else this.currentPositions.delete(key);
+		return true;
+	}
+
+	private positionKey(accountId: string, securityId: string) {
+		return `${accountId}:${securityId}`;
+	}
+
+	private upsertSecurity(security: SecuritiesResponse) {
+		const exists = this.securities.some((record) => record.id === security.id);
+		this.securities = (exists
+			? this.securities.map((record) => (record.id === security.id ? security : record))
+			: [...this.securities, security]
+		).toSorted((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+	}
+
+	private clearPositionRefreshTimers() {
+		for (const timer of this.positionRefreshTimers.values()) {
+			clearTimeout(timer);
+		}
+		this.positionRefreshTimers.clear();
 	}
 
 	private getLatestAccountBalanceRows() {
@@ -256,10 +354,8 @@ class SecuritiesContext {
 				.filter((account) => !account.closed)
 				.map((account) => [account.id, account])
 		);
-		const resolvedValues = resolveSecurityBalanceValues(this.securityBalances);
-
 		const rows: SecurityAccountBalance[] = [];
-		for (const resolved of resolvedValues.values()) {
+		for (const resolved of this.currentPositions.values()) {
 			const balance = resolved.balance;
 			const account = accounts.get(balance.account);
 			if (!account) continue;
@@ -330,7 +426,7 @@ class SecuritiesContext {
 	}
 
 	dispose() {
-		if (this.refreshTimer) clearTimeout(this.refreshTimer);
+		this.clearPositionRefreshTimers();
 		this.unsubscribeRealtime();
 	}
 }
