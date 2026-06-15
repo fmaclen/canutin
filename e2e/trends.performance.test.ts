@@ -4,8 +4,7 @@ import { startOfDay, startOfYear, subDays, subMonths, subYears } from 'date-fns'
 
 import {
 	AccountsBalanceGroupOptions,
-	AssetsBalanceGroupOptions,
-	AssetsTypeOptions
+	AssetsBalanceGroupOptions
 } from '../src/lib/pocketbase.schema';
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
 import {
@@ -163,7 +162,6 @@ test('trends performance table', async ({ page }) => {
 		balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
 		balanceType: 'Stock',
 		owner: user.id,
-		type: AssetsTypeOptions.WHOLE,
 		sold: closeSell.toISOString()
 	});
 	const excludedDebtAsset = await seedAsset({
@@ -171,7 +169,6 @@ test('trends performance table', async ({ page }) => {
 		balanceGroup: AssetsBalanceGroupOptions.DEBT,
 		balanceType: 'Loan',
 		owner: user.id,
-		type: AssetsTypeOptions.WHOLE,
 		excluded: now.toISOString()
 	});
 	for (const [date, marketValue] of [

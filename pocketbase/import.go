@@ -37,10 +37,8 @@ type importAccount struct {
 
 type importAsset struct {
 	Name         string          `json:"name"`
-	Symbol       string          `json:"symbol"`
 	BalanceGroup string          `json:"balanceGroup"`
 	BalanceType  string          `json:"balanceType"`
-	Type         string          `json:"type"`
 	Sold         bool            `json:"sold"`
 	Excluded     bool            `json:"excluded"`
 	Balance      *importAssetBal `json:"balance"`
@@ -59,9 +57,6 @@ type importBalance struct {
 type importAssetBal struct {
 	MarketValue float64 `json:"marketValue"`
 	BookValue   float64 `json:"bookValue"`
-	Quantity    float64 `json:"quantity"`
-	MarketPrice float64 `json:"marketPrice"`
-	BookPrice   float64 `json:"bookPrice"`
 	AsOf        string  `json:"asOf"`
 }
 
@@ -418,8 +413,6 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 	}
 
 	for _, asset := range payload.Assets {
-		symbol := asset.Symbol
-
 		btKey := asset.BalanceType + "::" + ownerID
 		btID, err := cachedFindOrCreate(btCache, btKey, app,
 			"balanceTypes", "name = {:name} && owner = {:owner}",
@@ -433,17 +426,11 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 
 		assetFilter := "name = {:name} && owner = {:owner}"
 		assetParams := map[string]any{"name": asset.Name, "owner": ownerID}
-		if symbol != "" {
-			assetFilter = "name = {:name} && symbol = {:symbol} && owner = {:owner}"
-			assetParams["symbol"] = symbol
-		}
 
 		rec, created, err := findOrCreate(app, "assets", assetFilter, assetParams, map[string]any{
 			"name":          asset.Name,
-			"symbol":        symbol,
 			"balanceGroup":  asset.BalanceGroup,
 			"balanceType":   btID,
-			"type":          asset.Type,
 			"sold":          boolToTimestamp(asset.Sold),
 			"excluded":      boolToTimestamp(asset.Excluded),
 			"owner":         ownerID,
@@ -473,9 +460,6 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 				asb.Set("asset", rec.Id)
 				asb.Set("marketValue", mv)
 				asb.Set("bookValue", asset.Balance.BookValue)
-				asb.Set("quantity", asset.Balance.Quantity)
-				asb.Set("marketPrice", asset.Balance.MarketPrice)
-				asb.Set("bookPrice", asset.Balance.BookPrice)
 				asb.Set("asOf", asset.Balance.AsOf)
 				asb.Set("owner", ownerID)
 				asb.Set("importSession", session.Id)

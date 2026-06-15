@@ -17,9 +17,6 @@ type AssetBalanceData = {
 	bookValue: number;
 	gain: number;
 	gainPercent: number;
-	quantity?: number;
-	bookPrice?: number;
-	marketPrice?: number;
 	balanceAsOf: string;
 };
 
@@ -28,9 +25,6 @@ const DEFAULT_BALANCE_DATA: AssetBalanceData = {
 	bookValue: 0,
 	gain: 0,
 	gainPercent: 0,
-	quantity: undefined,
-	bookPrice: undefined,
-	marketPrice: undefined,
 	balanceAsOf: ''
 };
 
@@ -71,7 +65,7 @@ class AssetsContext {
 		return this.balanceTypesContext.getName(id);
 	}
 
-	getAsset(id: string): AssetWithBalance | undefined {
+	getAsset(id: string) {
 		return this.assets.find((a) => a.id === id);
 	}
 
@@ -226,23 +220,17 @@ class AssetsContext {
 	}
 
 	private computeBalanceData(
-		balance: Pick<
-			AssetBalancesResponse,
-			'asOf' | 'bookPrice' | 'bookValue' | 'marketPrice' | 'marketValue' | 'quantity'
-		>,
+		balance: Pick<AssetBalancesResponse, 'asOf' | 'bookValue' | 'marketValue'>,
 		perspective: AssetSharesPerspectiveOptions
-	): AssetBalanceData {
+	) {
 		const projected = projectAssetFinancials(balance.bookValue, balance.marketValue, perspective);
 		return {
 			...projected,
-			quantity: balance.quantity,
-			bookPrice: balance.bookPrice,
-			marketPrice: balance.marketPrice,
 			balanceAsOf: balance.asOf
 		};
 	}
 
-	private toRawBalanceData(asset: AssetWithBalance): AssetBalanceData {
+	private toRawBalanceData(asset: AssetWithBalance) {
 		const rawBookValue =
 			asset.perspective === 'INVERSE' ? -(asset.bookValue ?? 0) : (asset.bookValue ?? 0);
 		const rawMarketValue =
@@ -253,17 +241,11 @@ class AssetsContext {
 			gain: rawMarketValue - rawBookValue,
 			gainPercent:
 				rawBookValue !== 0 ? ((rawMarketValue - rawBookValue) / Math.abs(rawBookValue)) * 100 : 0,
-			quantity: asset.quantity,
-			bookPrice: asset.bookPrice,
-			marketPrice: asset.marketPrice,
 			balanceAsOf: asset.balanceAsOf
 		};
 	}
 
-	private toAssetWithBalance(
-		asset: AssetsResponse,
-		rawBalanceData: AssetBalanceData
-	): AssetWithBalance {
+	private toAssetWithBalance(asset: AssetsResponse, rawBalanceData: AssetBalanceData) {
 		const incomingShare = this.getIncomingShare(asset.id);
 		const isOwner = asset.owner === this.currentUserId;
 		const perspective = isOwner
@@ -281,10 +263,7 @@ class AssetsContext {
 				{
 					asOf: rawBalanceData.balanceAsOf,
 					bookValue: rawBalanceData.bookValue,
-					marketValue: rawBalanceData.marketValue,
-					quantity: rawBalanceData.quantity ?? 0,
-					bookPrice: rawBalanceData.bookPrice ?? 0,
-					marketPrice: rawBalanceData.marketPrice ?? 0
+					marketValue: rawBalanceData.marketValue
 				},
 				perspective
 			),
@@ -313,10 +292,7 @@ class AssetsContext {
 								{
 									asOf: balanceData.balanceAsOf,
 									bookValue: balanceData.bookValue,
-									marketValue: balanceData.marketValue,
-									quantity: balanceData.quantity ?? 0,
-									bookPrice: balanceData.bookPrice ?? 0,
-									marketPrice: balanceData.marketPrice ?? 0
+									marketValue: balanceData.marketValue
 								},
 								x.perspective
 							)
@@ -329,7 +305,7 @@ class AssetsContext {
 		}
 	}
 
-	private async getLatestAssetBalance(assetId: string): Promise<AssetBalanceData> {
+	private async getLatestAssetBalance(assetId: string) {
 		const res = await this._pb.authedClient
 			.collection('assetBalances')
 			.getList<AssetBalancesResponse>(1, 1, {
@@ -348,9 +324,6 @@ class AssetsContext {
 							Math.abs(balance.bookValue ?? 0)) *
 						100
 					: 0,
-			quantity: balance.quantity,
-			bookPrice: balance.bookPrice,
-			marketPrice: balance.marketPrice,
 			balanceAsOf: balance.asOf
 		};
 	}

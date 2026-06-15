@@ -25,17 +25,12 @@ function importPayload(sessionLabel: string) {
 		],
 		assets: [
 			{
-				name: 'SPDR S&P 500',
-				symbol: 'SPY',
+				name: 'Nathan Rental Property',
 				balanceGroup: 'INVESTMENT',
-				balanceType: 'ETF',
-				type: 'SHARES',
+				balanceType: 'Property',
 				balance: {
-					quantity: 10,
-					marketPrice: 550,
-					bookPrice: 450,
-					marketValue: 5500,
-					bookValue: 4500,
+					marketValue: 275000,
+					bookValue: 250000,
 					asOf: '2025-06-15T00:00:00.000Z'
 				}
 			}
@@ -380,4 +375,44 @@ test('import rejects empty payload', async () => {
 	const user = await seedUser('rachel');
 	const response = await pbSend(IMPORT_PATH, { sessionLabel: 'empty-import' }, user.email);
 	expect(response.status).toBe(400);
+});
+
+test('import accepts security and cryptocurrency balance types in assets payload', async () => {
+	const user = await seedUser('xavier');
+	const importedAssets = [
+		{
+			name: 'Xavier Security',
+			balanceGroup: 'INVESTMENT',
+			balanceType: 'Security',
+			balance: { marketValue: 1000, bookValue: 900, asOf: '2025-10-01T00:00:00.000Z' }
+		},
+		{
+			name: 'Xavier Crypto',
+			balanceGroup: 'INVESTMENT',
+			balanceType: 'Cryptocurrency',
+			balance: { marketValue: 2000, bookValue: 1500, asOf: '2025-10-01T00:00:00.000Z' }
+		}
+	];
+
+	const response = await pbSend(
+		IMPORT_PATH,
+		{ sessionLabel: 'xavier-security-assets', assets: importedAssets },
+		user.email
+	);
+	const result = await response.json();
+	expect(response.status).toBe(200);
+	expect(result.assets.created).toBe(2);
+	expect(result.assetBalances.created).toBe(2);
+	expect(result.securities.created).toBe(0);
+
+	const pb = await getUserPB(user.email);
+	const assets = await pb.collection('assets').getFullList({
+		filter: `owner = "${user.id}"`
+	});
+	expect(assets.map((asset) => asset.name).sort()).toEqual(['Xavier Crypto', 'Xavier Security']);
+
+	const securities = await pb.collection('securities').getFullList({
+		filter: `owner = "${user.id}"`
+	});
+	expect(securities.length).toBe(0);
 });

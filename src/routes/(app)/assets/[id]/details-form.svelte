@@ -8,26 +8,22 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { m } from '$lib/paraglide/messages';
-	import { AssetsBalanceGroupOptions, AssetsTypeOptions } from '$lib/pocketbase.schema';
+	import { AssetsBalanceGroupOptions } from '$lib/pocketbase.schema';
 
 	interface Props {
 		formData: {
 			name: string;
 			balanceGroup: string;
-			assetTypeName: string;
-			symbol: string;
+			balanceTypeName: string;
 			notes: string;
 			excluded: boolean;
 			sold: boolean;
-			type: string;
 		};
-		isWhole: boolean;
-		isShares: boolean;
 		onSubmit: () => void;
 		disabled?: boolean;
 	}
 
-	let { formData, isWhole, isShares, onSubmit, disabled = false }: Props = $props();
+	let { formData, onSubmit, disabled = false }: Props = $props();
 </script>
 
 <div class="bg-muted border-border overflow-hidden rounded border">
@@ -51,7 +47,7 @@
 				<Input
 					id="category"
 					name="category"
-					bind:value={formData.assetTypeName}
+					bind:value={formData.balanceTypeName}
 					placeholder={m.assets_category_placeholder()}
 					required
 					{disabled}
@@ -130,48 +126,6 @@
 				</div>
 				<Textarea id="notes" bind:value={formData.notes} class="bg-background" {disabled} />
 			</FormFieldRow>
-		</Fieldset>
-
-		<Fieldset>
-			<FormFieldRow>
-				<Label id="type-label" for="type" class="justify-start pr-0 md:justify-end"
-					>{m.assets_label_type()}</Label
-				>
-				<Select.Root type="single" bind:value={formData.type} disabled>
-					<Select.Trigger
-						id="type"
-						name="type"
-						aria-labelledby="type-label"
-						class="bg-background w-full"
-					>
-						{#if isWhole}
-							{m.assets_type_whole_label()}
-						{:else if isShares}
-							{m.assets_type_shares_label()}
-						{/if}
-					</Select.Trigger>
-					<Select.Content>
-						<Select.Item value={AssetsTypeOptions.WHOLE}>
-							{m.assets_type_whole_label()}
-						</Select.Item>
-						<Select.Item value={AssetsTypeOptions.SHARES}>
-							{m.assets_type_shares_label()}
-						</Select.Item>
-					</Select.Content>
-				</Select.Root>
-			</FormFieldRow>
-
-			{#if isShares}
-				<FormFieldRow>
-					<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-						<Label for="symbol" class="justify-start pr-0 md:justify-end"
-							>{m.assets_label_symbol()}</Label
-						>
-						<span class="text-muted-foreground text-sm">{m.assets_text_optional()}</span>
-					</div>
-					<Input id="symbol" bind:value={formData.symbol} {disabled} />
-				</FormFieldRow>
-			{/if}
 		</Fieldset>
 
 		<Fieldset>

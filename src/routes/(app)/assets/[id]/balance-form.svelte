@@ -10,25 +10,13 @@
 		formData: {
 			marketValue: string;
 			bookValue: string;
-			quantity: string;
-			marketPrice: string;
-			bookPrice: string;
 		};
-		isWhole: boolean;
-		isShares: boolean;
 		balanceAsOf?: string;
 		onSubmit: () => void;
 		disabled?: boolean;
 	}
 
-	let {
-		formData,
-		isWhole,
-		isShares,
-		balanceAsOf = '',
-		onSubmit,
-		disabled = false
-	}: Props = $props();
+	let { formData, balanceAsOf = '', onSubmit, disabled = false }: Props = $props();
 
 	const parsedAsOf = $derived.by(() => {
 		if (!balanceAsOf) return null;
@@ -73,100 +61,45 @@
 		class="space-y-0"
 	>
 		<Fieldset isFirst={true}>
-			{#if isWhole}
-				<FormFieldRow>
-					<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-						<Label for="market-value" class="justify-start pr-0 md:justify-end"
-							>{m.assets_label_market_value()}</Label
-						>
-						{#if formattedAsOf}
-							{@const asOfParts = m.assets_text_balance_as_of({ date: '\u0000' }).split('\u0000')}
-							<span class="text-muted-foreground text-sm" data-testid="balance-as-of">
-								{asOfParts[0]}<time
-									datetime={isoAsOf}
-									title={fullAsOf}
-									class="border-muted-foreground/60 cursor-help border-b border-dashed"
-									>{formattedAsOf}</time
-								>{asOfParts[1] ?? ''}
-							</span>
-						{/if}
-					</div>
-					<CurrencyField
-						id="market-value"
-						name="market-value"
-						bind:value={formData.marketValue}
-						{disabled}
-					/>
-				</FormFieldRow>
-
-				<FormFieldRow>
-					<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-						<Label for="book-value" class="justify-start pr-0 md:justify-end"
-							>{m.assets_label_book_value()}</Label
-						>
-						<span class="text-muted-foreground text-sm">{m.assets_text_optional()}</span>
-					</div>
-					<CurrencyField
-						id="book-value"
-						name="book-value"
-						bind:value={formData.bookValue}
-						{disabled}
-					/>
-				</FormFieldRow>
-			{:else if isShares}
-				<FormFieldRow>
-					<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-						<Label for="quantity" class="justify-start pr-0 md:justify-end"
-							>{m.assets_label_quantity()}</Label
-						>
-						{#if formattedAsOf}
-							{@const asOfParts = m.assets_text_balance_as_of({ date: '\u0000' }).split('\u0000')}
-							<span class="text-muted-foreground text-sm" data-testid="balance-as-of">
-								{asOfParts[0]}<time
-									datetime={isoAsOf}
-									title={fullAsOf}
-									class="border-muted-foreground/60 cursor-help border-b border-dashed"
-									>{formattedAsOf}</time
-								>{asOfParts[1] ?? ''}
-							</span>
-						{/if}
-					</div>
-					<CurrencyField
-						id="quantity"
-						name="quantity"
-						bind:value={formData.quantity}
-						{disabled}
-						isCurrency={false}
-					/>
-				</FormFieldRow>
-
-				<FormFieldRow>
-					<Label for="market-price" class="justify-start pr-0 md:justify-end"
-						>{m.assets_label_market_price()}</Label
+			<FormFieldRow>
+				<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+					<Label for="market-value" class="justify-start pr-0 md:justify-end"
+						>{m.assets_label_market_value()}</Label
 					>
-					<CurrencyField
-						id="market-price"
-						name="market-price"
-						bind:value={formData.marketPrice}
-						{disabled}
-					/>
-				</FormFieldRow>
+					{#if formattedAsOf}
+						{@const asOfParts = m.assets_text_balance_as_of({ date: '\u0000' }).split('\u0000')}
+						<span class="text-muted-foreground text-sm" data-testid="balance-as-of">
+							{asOfParts[0]}<time
+								datetime={isoAsOf}
+								title={fullAsOf}
+								class="border-muted-foreground/60 cursor-help border-b border-dashed"
+								>{formattedAsOf}</time
+							>{asOfParts[1] ?? ''}
+						</span>
+					{/if}
+				</div>
+				<CurrencyField
+					id="market-value"
+					name="market-value"
+					bind:value={formData.marketValue}
+					{disabled}
+				/>
+			</FormFieldRow>
 
-				<FormFieldRow>
-					<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-						<Label for="book-price" class="justify-start pr-0 md:justify-end"
-							>{m.assets_label_book_price()}</Label
-						>
-						<span class="text-muted-foreground text-sm">{m.assets_text_optional()}</span>
-					</div>
-					<CurrencyField
-						id="book-price"
-						name="book-price"
-						bind:value={formData.bookPrice}
-						{disabled}
-					/>
-				</FormFieldRow>
-			{/if}
+			<FormFieldRow>
+				<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+					<Label for="book-value" class="justify-start pr-0 md:justify-end"
+						>{m.assets_label_book_value()}</Label
+					>
+					<span class="text-muted-foreground text-sm">{m.assets_text_optional()}</span>
+				</div>
+				<CurrencyField
+					id="book-value"
+					name="book-value"
+					bind:value={formData.bookValue}
+					{disabled}
+				/>
+			</FormFieldRow>
 		</Fieldset>
 
 		{#if !disabled}

@@ -2,8 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import {
 	AccountsBalanceGroupOptions,
-	AssetsBalanceGroupOptions,
-	AssetsTypeOptions
+	AssetsBalanceGroupOptions
 } from '../src/lib/pocketbase.schema';
 import { signIn } from './playwright.helpers';
 import {
@@ -55,17 +54,14 @@ test('account detail page shows "As of <date>" next to the Balance label', async
 	await expect(time).toHaveText(/\b(14|15)\b/);
 });
 
-test('asset detail page (WHOLE) shows "As of <date>" next to the Market value label', async ({
-	page
-}) => {
+test('asset detail page shows "As of <date>" next to the Market value label', async ({ page }) => {
 	const user = await seedUser('kendra');
 
 	const asset = await seedAsset({
 		name: 'As Of Collectible',
 		balanceGroup: AssetsBalanceGroupOptions.OTHER,
 		owner: user.id,
-		balanceType: 'Collectibles',
-		type: AssetsTypeOptions.WHOLE
+		balanceType: 'Collectibles'
 	});
 	await seedAssetBalance({
 		asset: asset.id,
@@ -94,52 +90,4 @@ test('asset detail page (WHOLE) shows "As of <date>" next to the Market value la
 	await expect(time).toContainText('Mar');
 	await expect(time).toContainText('2025');
 	await expect(time).toHaveText(/\b(14|15)\b/);
-});
-
-test('asset detail page (SHARES) shows "As of <date>" next to the Quantity label', async ({
-	page
-}) => {
-	const user = await seedUser('lorenzo');
-
-	const asset = await seedAsset({
-		name: 'As Of Shares',
-		balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Stocks',
-		type: AssetsTypeOptions.SHARES
-	});
-	await seedAssetBalance({
-		asset: asset.id,
-		owner: user.id,
-		asOf: REFERENCE_ASOF,
-		quantity: 10,
-		marketPrice: 100,
-		bookPrice: 80
-	});
-
-	await page.goto('/');
-	await signIn(page, user.email);
-
-	await page.goto(`/assets/${asset.id}`);
-
-	const asOf = page.getByTestId('balance-as-of').first();
-	await expect(asOf).toBeVisible();
-	await expect(asOf).toHaveText(/^As of /);
-
-	const time = asOf.locator('time');
-	await expect(time).toBeVisible();
-	await expect(time).toHaveAttribute('datetime', REFERENCE_ASOF);
-	await expect(time).toHaveAttribute('title', /.+/);
-	await expect(time).toHaveClass(/cursor-help/);
-	await expect(time).toHaveClass(/border-dashed/);
-	await expect(time).toHaveClass(/border-b/);
-	await expect(time).toContainText('Mar');
-	await expect(time).toContainText('2025');
-	await expect(time).toHaveText(/\b(14|15)\b/);
-
-	// Quantity is a share count, not a currency amount. The input must not render
-	// a currency symbol.
-	const quantity = page.getByLabel('Quantity', { exact: true });
-	await expect(quantity).toBeVisible();
-	await expect(quantity).not.toHaveValue(/\$/);
 });

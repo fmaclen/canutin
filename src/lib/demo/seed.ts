@@ -11,7 +11,7 @@ import {
 	ALL_ACCOUNTS,
 	type AccountDefinition
 } from './seed-data/accounts';
-import { ALL_ASSETS, type AssetDefinition } from './seed-data/assets';
+import { ALL_ASSETS } from './seed-data/assets';
 import {
 	generate401kBalances,
 	generateAutoLoanBalances,
@@ -112,24 +112,6 @@ async function createAccount(
 	return created.id;
 }
 
-async function createAsset(
-	pb: TypedPocketBase,
-	asset: AssetDefinition,
-	owner: string,
-	balanceTypeCache: IdMap
-) {
-	const created = await pb.collection('assets').create({
-		name: asset.name,
-		balanceGroup: asset.balanceGroup,
-		balanceType: balanceTypeCache[asset.balanceType],
-		type: asset.type,
-		symbol: asset.symbol,
-		owner
-	});
-
-	return created.id;
-}
-
 async function createTransactions(
 	pb: TypedPocketBase,
 	transactions: TransactionDefinition[],
@@ -177,8 +159,6 @@ async function createAssetBalances(
 			asset: assetId,
 			owner,
 			asOf: balance.asOf,
-			quantity: balance.quantity,
-			bookValue: balance.bookValue,
 			marketValue: balance.marketValue
 		})
 	);
@@ -246,7 +226,13 @@ export async function seedDemoData(pb: TypedPocketBase, userId: string) {
 	// Create all assets
 	const assetIds: IdMap = {};
 	for (const asset of ALL_ASSETS) {
-		assetIds[asset.name] = await createAsset(pb, asset, userId, balanceTypeCache);
+		const created = await pb.collection('assets').create({
+			name: asset.name,
+			balanceGroup: asset.balanceGroup,
+			balanceType: balanceTypeCache[asset.balanceType],
+			owner: userId
+		});
+		assetIds[asset.name] = created.id;
 	}
 
 	// Create transactions for auto-calculated accounts (sequentially to reduce load)
@@ -301,6 +287,18 @@ export async function seedDemoData(pb: TypedPocketBase, userId: string) {
 	// Create asset balances (sequentially)
 	await createAssetBalances(
 		pb,
+		generateCollectibleBalances(referenceDate),
+		assetIds['Funko Pop Collection'],
+		userId
+	);
+	await createAssetBalances(
+		pb,
+		generateVehicleBalances(referenceDate),
+		assetIds['1998 Fiat Multipla'],
+		userId
+	);
+	await createAssetBalances(
+		pb,
 		generateSpyBalances(referenceDate),
 		assetIds['SPDR S&P 500 ETF Trust'],
 		userId
@@ -321,18 +319,6 @@ export async function seedDemoData(pb: TypedPocketBase, userId: string) {
 		pb,
 		generateEthereumBalances(referenceDate),
 		assetIds['Ethereum'],
-		userId
-	);
-	await createAssetBalances(
-		pb,
-		generateCollectibleBalances(referenceDate),
-		assetIds['Funko Pop Collection'],
-		userId
-	);
-	await createAssetBalances(
-		pb,
-		generateVehicleBalances(referenceDate),
-		assetIds['1998 Fiat Multipla'],
 		userId
 	);
 

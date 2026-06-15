@@ -7,8 +7,6 @@ export interface AccountBalanceDefinition {
 
 export interface AssetBalanceDefinition {
 	asOf: string;
-	quantity?: number;
-	bookValue?: number;
 	marketValue: number;
 }
 
@@ -90,45 +88,45 @@ export function generateWalletBalances(referenceDate: Date) {
 
 export function generateSpyBalances(referenceDate: Date) {
 	return [
-		{ asOf: monthsAgo(0, referenceDate), quantity: 50, bookValue: 580, marketValue: 29000 },
-		{ asOf: monthsAgo(1, referenceDate), quantity: 50, bookValue: 570, marketValue: 28500 },
-		{ asOf: monthsAgo(3, referenceDate), quantity: 50, bookValue: 555, marketValue: 27750 },
-		{ asOf: monthsAgo(6, referenceDate), quantity: 50, bookValue: 530, marketValue: 26500 },
-		{ asOf: monthsAgo(9, referenceDate), quantity: 50, bookValue: 510, marketValue: 25500 },
-		{ asOf: monthsAgo(12, referenceDate), quantity: 50, bookValue: 490, marketValue: 24500 },
-		{ asOf: monthsAgo(18, referenceDate), quantity: 50, bookValue: 450, marketValue: 22500 }
+		{ asOf: monthsAgo(0, referenceDate), marketValue: 29000 },
+		{ asOf: monthsAgo(1, referenceDate), marketValue: 28500 },
+		{ asOf: monthsAgo(3, referenceDate), marketValue: 27750 },
+		{ asOf: monthsAgo(6, referenceDate), marketValue: 26500 },
+		{ asOf: monthsAgo(9, referenceDate), marketValue: 25500 },
+		{ asOf: monthsAgo(12, referenceDate), marketValue: 24500 },
+		{ asOf: monthsAgo(18, referenceDate), marketValue: 22500 }
 	];
 }
 
 export function generateGamestopBalances(referenceDate: Date) {
 	return [
-		{ asOf: monthsAgo(0, referenceDate), quantity: 125, bookValue: 25, marketValue: 3125 },
-		{ asOf: monthsAgo(1, referenceDate), quantity: 125, bookValue: 100, marketValue: 12500 },
-		{ asOf: monthsAgo(2, referenceDate), quantity: 125, bookValue: 325, marketValue: 40625 },
-		{ asOf: monthsAgo(4, referenceDate), quantity: 125, bookValue: 300, marketValue: 37500 },
-		{ asOf: monthsAgo(6, referenceDate), quantity: 125, bookValue: 100, marketValue: 12500 },
-		{ asOf: monthsAgo(10, referenceDate), quantity: 125, bookValue: 50, marketValue: 6250 },
-		{ asOf: monthsAgo(13, referenceDate), quantity: 125, bookValue: 25, marketValue: 3125 }
+		{ asOf: monthsAgo(0, referenceDate), marketValue: 3125 },
+		{ asOf: monthsAgo(1, referenceDate), marketValue: 12500 },
+		{ asOf: monthsAgo(2, referenceDate), marketValue: 40625 },
+		{ asOf: monthsAgo(4, referenceDate), marketValue: 37500 },
+		{ asOf: monthsAgo(6, referenceDate), marketValue: 12500 },
+		{ asOf: monthsAgo(10, referenceDate), marketValue: 6250 },
+		{ asOf: monthsAgo(13, referenceDate), marketValue: 3125 }
 	];
 }
 
 export function generateBitcoinBalances(referenceDate: Date) {
 	return [
-		{ asOf: monthsAgo(0, referenceDate), quantity: 1.5, bookValue: 46280, marketValue: 69420 },
-		{ asOf: monthsAgo(1, referenceDate), quantity: 1.4, bookValue: 43500, marketValue: 60900 },
-		{ asOf: monthsAgo(5, referenceDate), quantity: 1.3, bookValue: 33250, marketValue: 43225 },
-		{ asOf: monthsAgo(7, referenceDate), quantity: 1.2, bookValue: 40700, marketValue: 48840 },
-		{ asOf: monthsAgo(13, referenceDate), quantity: 0.75, bookValue: 25265, marketValue: 18948.75 }
+		{ asOf: monthsAgo(0, referenceDate), marketValue: 69420 },
+		{ asOf: monthsAgo(1, referenceDate), marketValue: 60900 },
+		{ asOf: monthsAgo(5, referenceDate), marketValue: 43225 },
+		{ asOf: monthsAgo(7, referenceDate), marketValue: 48840 },
+		{ asOf: monthsAgo(13, referenceDate), marketValue: 18948.75 }
 	];
 }
 
 export function generateEthereumBalances(referenceDate: Date) {
 	return [
-		{ asOf: monthsAgo(0, referenceDate), quantity: 5, bookValue: 3500, marketValue: 17500 },
-		{ asOf: monthsAgo(3, referenceDate), quantity: 3, bookValue: 2750, marketValue: 8250 },
-		{ asOf: monthsAgo(9, referenceDate), quantity: 3, bookValue: 1800, marketValue: 5400 },
-		{ asOf: monthsAgo(11, referenceDate), quantity: 1, bookValue: 2250, marketValue: 2250 },
-		{ asOf: monthsAgo(17, referenceDate), quantity: 1.5, bookValue: 1750, marketValue: 2625 }
+		{ asOf: monthsAgo(0, referenceDate), marketValue: 17500 },
+		{ asOf: monthsAgo(3, referenceDate), marketValue: 8250 },
+		{ asOf: monthsAgo(9, referenceDate), marketValue: 5400 },
+		{ asOf: monthsAgo(11, referenceDate), marketValue: 2250 },
+		{ asOf: monthsAgo(17, referenceDate), marketValue: 2625 }
 	];
 }
 

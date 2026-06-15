@@ -50,7 +50,6 @@
 	type AssetRow = {
 		id: string;
 		name: string;
-		symbol: string | null;
 		bookValue: number;
 		marketValue: number;
 		typeName: string;
@@ -90,10 +89,9 @@
 
 	let filter: FilterOption = $state('owned');
 
-	type AssetSortColumn = 'name' | 'symbol' | 'bookValue' | 'gain' | 'gainPercent' | 'marketValue';
+	type AssetSortColumn = 'name' | 'bookValue' | 'gain' | 'gainPercent' | 'marketValue';
 	const validSortColumns: AssetSortColumn[] = [
 		'name',
-		'symbol',
 		'bookValue',
 		'gain',
 		'gainPercent',
@@ -124,7 +122,6 @@
 		const rows = assetsContext.assets.map((asset) => ({
 			id: asset.id,
 			name: asset.name,
-			symbol: asset.symbol ?? null,
 			bookValue: asset.bookValue ?? 0,
 			marketValue: asset.marketValue ?? 0,
 			typeName: assetsContext.getTypeName(asset.balanceType),
@@ -138,7 +135,6 @@
 
 		const comparator = createSortComparator<AssetRow, AssetSortColumn>(sortState, {
 			name: (r) => r.name,
-			symbol: (r) => r.symbol,
 			bookValue: (r) => r.bookValue,
 			gain: (r) => r.gain,
 			gainPercent: (r) => r.gainPercent,
@@ -272,15 +268,6 @@
 											>
 												{m.assets_table_header_asset()}
 											</Table.SortableHead>
-											<Table.SortableHead
-												class="text-left whitespace-nowrap"
-												column="symbol"
-												sortColumn={sortState.column}
-												sortDirection={sortState.direction}
-												onSort={handleSort}
-											>
-												{m.assets_table_header_symbol()}
-											</Table.SortableHead>
 											<Table.Head class="text-left whitespace-nowrap">
 												{m.assets_table_header_group()}
 											</Table.Head>
@@ -339,13 +326,6 @@
 														isShared={row.isShared}
 														class="text-foreground/90 text-sm font-medium"
 													/>
-												</Table.Cell>
-												<Table.Cell class="text-foreground/80 text-sm tracking-wide uppercase">
-													{#if row.symbol}
-														{row.symbol}
-													{:else}
-														<span class="text-muted-foreground">~</span>
-													{/if}
 												</Table.Cell>
 												<Table.Cell>
 													<Badge variant={groupMeta[row.balanceGroup].badge}>

@@ -2,8 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import {
 	AccountsBalanceGroupOptions,
-	AssetsBalanceGroupOptions,
-	AssetsTypeOptions
+	AssetsBalanceGroupOptions
 } from '../src/lib/pocketbase.schema';
 import { signIn } from './playwright.helpers';
 import {
@@ -141,8 +140,7 @@ test('assets list → asset → save balance redirects back to /assets', async (
 		name: 'List Redirect Asset',
 		balanceGroup: AssetsBalanceGroupOptions.OTHER,
 		owner: user.id,
-		balanceType: 'Collectibles',
-		type: AssetsTypeOptions.WHOLE
+		balanceType: 'Collectibles'
 	});
 	await seedAssetBalance({
 		asset: asset.id,

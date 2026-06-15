@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 
-import { AssetsBalanceGroupOptions, AssetsTypeOptions } from '../src/lib/pocketbase.schema';
+import { AssetsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
 import {
 	recordExists,
@@ -10,6 +10,14 @@ import {
 	updateAsset
 } from './pocketbase.helpers';
 
+async function expectAssetRowCells(row: Locator, expectedCells: Array<[number, string]>) {
+	const cells = row.getByRole('cell');
+	await expect(cells).toHaveCount(8);
+	for (const [index, expectedText] of expectedCells) {
+		await expect(cells.nth(index)).toHaveText(expectedText);
+	}
+}
+
 test('assets table reflects filters and aggregate totals', async ({ page }) => {
 	const user = await seedUser('ivy');
 
@@ -17,8 +25,7 @@ test('assets table reflects filters and aggregate totals', async ({ page }) => {
 		name: 'Growth Fund',
 		balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
 		owner: user.id,
-		balanceType: 'ETF',
-		type: AssetsTypeOptions.WHOLE
+		balanceType: 'ETF'
 	});
 	await seedAssetBalance({
 		asset: ownedAsset.id,
@@ -32,7 +39,6 @@ test('assets table reflects filters and aggregate totals', async ({ page }) => {
 		balanceGroup: AssetsBalanceGroupOptions.OTHER,
 		owner: user.id,
 		balanceType: 'Collectible',
-		type: AssetsTypeOptions.WHOLE,
 		excluded: new Date().toISOString()
 	});
 	await seedAssetBalance({
@@ -47,7 +53,6 @@ test('assets table reflects filters and aggregate totals', async ({ page }) => {
 		balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
 		owner: user.id,
 		balanceType: 'Stock',
-		type: AssetsTypeOptions.WHOLE,
 		sold: new Date().toISOString()
 	});
 	await seedAssetBalance({
@@ -64,16 +69,29 @@ test('assets table reflects filters and aggregate totals', async ({ page }) => {
 
 	const ownedRow = page.getByRole('row', { name: 'Growth Fund' });
 	await expect(ownedRow).toBeVisible();
-	const ownedCells = ownedRow.locator('td');
-	await expect(ownedCells.nth(8)).toContainText('$5,000.00');
-	await expect(ownedRow.getByText('Excluded')).not.toBeVisible();
-	await expect(ownedRow.getByText('Sold')).not.toBeVisible();
+	await expect(page.locator('[data-slot="tabs-content"][data-state="active"] thead th')).toHaveText(
+		[
+			/Asset\s*/,
+			'Group',
+			'Category',
+			'Status',
+			/Book value\s*/,
+			/Gain\/loss\s*/,
+			/Gain %\s*/,
+			/Market value\s*/
+		]
+	);
+	await expectAssetRowCells(ownedRow, [
+		[3, '~'],
+		[7, '$5,000.00']
+	]);
 
 	const excludedRow = page.getByRole('row', { name: 'Hidden Collectible' });
 	await expect(excludedRow).toBeVisible();
-	const excludedCells = excludedRow.locator('td');
-	await expect(excludedCells.nth(8)).toContainText('$2,000.00');
-	await expect(excludedRow.getByText('Excluded')).toBeVisible();
+	await expectAssetRowCells(excludedRow, [
+		[3, 'Excluded'],
+		[7, '$2,000.00']
+	]);
 
 	const aggregateRow = page.getByRole('region', { name: 'Net market value' });
 	await expect(aggregateRow).toContainText('$5,000.00');
@@ -87,7 +105,10 @@ test('assets table reflects filters and aggregate totals', async ({ page }) => {
 	await page.getByRole('tab', { name: 'Sold' }).click();
 	const soldRow = page.getByRole('row', { name: 'Legacy Stock' });
 	await expect(soldRow).toBeVisible();
-	await expect(soldRow.getByText('Sold')).toBeVisible();
+	await expectAssetRowCells(soldRow, [
+		[3, 'Sold'],
+		[7, '$1,500.00']
+	]);
 	await expect(aggregateRow).toContainText('$1,500.00');
 });
 
@@ -98,8 +119,7 @@ test('assets table shows appreciation and depreciation for whole assets', async 
 		name: 'Primary Residence',
 		balanceGroup: AssetsBalanceGroupOptions.OTHER,
 		owner: user.id,
-		balanceType: 'Real Estate',
-		type: AssetsTypeOptions.WHOLE
+		balanceType: 'Real Estate'
 	});
 	await seedAssetBalance({
 		asset: appreciatingHouse.id,
@@ -113,8 +133,7 @@ test('assets table shows appreciation and depreciation for whole assets', async 
 		name: 'Vehicle',
 		balanceGroup: AssetsBalanceGroupOptions.OTHER,
 		owner: user.id,
-		balanceType: 'Vehicle',
-		type: AssetsTypeOptions.WHOLE
+		balanceType: 'Vehicle'
 	});
 	await seedAssetBalance({
 		asset: depreciatingCar.id,
@@ -128,8 +147,7 @@ test('assets table shows appreciation and depreciation for whole assets', async 
 		name: 'Stable Fund',
 		balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
 		owner: user.id,
-		balanceType: 'ETF',
-		type: AssetsTypeOptions.WHOLE
+		balanceType: 'ETF'
 	});
 	await seedAssetBalance({
 		asset: breakEvenAsset.id,
@@ -145,66 +163,61 @@ test('assets table shows appreciation and depreciation for whole assets', async 
 
 	const houseRow = page.getByRole('row', { name: 'Primary Residence' });
 	await expect(houseRow).toBeVisible();
-	const houseCells = houseRow.locator('td');
-	await expect(houseCells.nth(5)).toContainText('$500,000.00');
-	await expect(houseCells.nth(6)).toContainText('$150,000.00');
-	await expect(houseCells.nth(7)).toContainText('+30.0%');
-	await expect(houseCells.nth(8)).toContainText('$650,000.00');
+	await expectAssetRowCells(houseRow, [
+		[4, '$500,000.00'],
+		[5, '$150,000.00'],
+		[6, '+30.0%'],
+		[7, '$650,000.00']
+	]);
 
 	const carRow = page.getByRole('row', { name: 'Vehicle' });
 	await expect(carRow).toBeVisible();
-	const carCells = carRow.locator('td');
-	await expect(carCells.nth(5)).toContainText('$30,000.00');
-	await expect(carCells.nth(6)).toContainText('-$8,000.00');
-	await expect(carCells.nth(7)).toContainText('-26.7%');
-	await expect(carCells.nth(8)).toContainText('$22,000.00');
+	await expectAssetRowCells(carRow, [
+		[4, '$30,000.00'],
+		[5, '-$8,000.00'],
+		[6, '-26.7%'],
+		[7, '$22,000.00']
+	]);
 
 	const fundRow = page.getByRole('row', { name: 'Stable Fund' });
 	await expect(fundRow).toBeVisible();
-	const fundCells = fundRow.locator('td');
-	await expect(fundCells.nth(5)).toContainText('$10,000.00');
-	await expect(fundCells.nth(6)).toContainText('$0.00');
-	await expect(fundCells.nth(7)).toContainText('0.0%');
-	await expect(fundCells.nth(8)).toContainText('$10,000.00');
+	await expectAssetRowCells(fundRow, [
+		[4, '$10,000.00'],
+		[5, '$0.00'],
+		[6, '0.0%'],
+		[7, '$10,000.00']
+	]);
 });
 
-test('assets table shows appreciation and depreciation for shares assets', async ({ page }) => {
+test('assets table shows appreciation and depreciation for whole-value assets', async ({
+	page
+}) => {
 	const user = await seedUser('karen');
 
-	const gainStock = await seedAsset({
-		name: 'NVDA',
-		symbol: 'NVDA',
+	const gainAsset = await seedAsset({
+		name: 'Growth Portfolio',
 		balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
 		owner: user.id,
-		balanceType: 'Stock',
-		type: AssetsTypeOptions.SHARES
+		balanceType: 'Stock'
 	});
 	await seedAssetBalance({
-		asset: gainStock.id,
+		asset: gainAsset.id,
 		owner: user.id,
 		asOf: new Date().toISOString(),
-		quantity: 100,
-		bookPrice: 450,
-		marketPrice: 875,
 		bookValue: 45000,
 		marketValue: 87500
 	});
 
-	const lossStock = await seedAsset({
-		name: 'XYZ',
-		symbol: 'XYZ',
+	const lossAsset = await seedAsset({
+		name: 'Loss Portfolio',
 		balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
 		owner: user.id,
-		balanceType: 'Stock',
-		type: AssetsTypeOptions.SHARES
+		balanceType: 'Stock'
 	});
 	await seedAssetBalance({
-		asset: lossStock.id,
+		asset: lossAsset.id,
 		owner: user.id,
 		asOf: new Date().toISOString(),
-		quantity: 50,
-		bookPrice: 200,
-		marketPrice: 150,
 		bookValue: 10000,
 		marketValue: 7500
 	});
@@ -213,24 +226,26 @@ test('assets table shows appreciation and depreciation for shares assets', async
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Assets');
 
-	const nvdaRow = page.getByRole('row', { name: 'NVDA' });
-	await expect(nvdaRow).toBeVisible();
-	const nvdaCells = nvdaRow.locator('td');
-	await expect(nvdaCells.nth(5)).toContainText('$45,000.00');
-	await expect(nvdaCells.nth(6)).toContainText('$42,500.00');
-	await expect(nvdaCells.nth(7)).toContainText('+94.4%');
-	await expect(nvdaCells.nth(8)).toContainText('$87,500.00');
+	const growthPortfolioRow = page.getByRole('row', { name: 'Growth Portfolio' });
+	await expect(growthPortfolioRow).toBeVisible();
+	await expectAssetRowCells(growthPortfolioRow, [
+		[4, '$45,000.00'],
+		[5, '$42,500.00'],
+		[6, '+94.4%'],
+		[7, '$87,500.00']
+	]);
 
-	const xyzRow = page.getByRole('row', { name: 'XYZ' });
-	await expect(xyzRow).toBeVisible();
-	const xyzCells = xyzRow.locator('td');
-	await expect(xyzCells.nth(5)).toContainText('$10,000.00');
-	await expect(xyzCells.nth(6)).toContainText('-$2,500.00');
-	await expect(xyzCells.nth(7)).toContainText('-25.0%');
-	await expect(xyzCells.nth(8)).toContainText('$7,500.00');
+	const lossPortfolioRow = page.getByRole('row', { name: 'Loss Portfolio' });
+	await expect(lossPortfolioRow).toBeVisible();
+	await expectAssetRowCells(lossPortfolioRow, [
+		[4, '$10,000.00'],
+		[5, '-$2,500.00'],
+		[6, '-25.0%'],
+		[7, '$7,500.00']
+	]);
 });
 
-test('user can add a new asset with type WHOLE or SHARES', async ({ page }) => {
+test('user can add a new whole-valued asset', async ({ page }) => {
 	const user = await seedUser('liam');
 
 	await page.goto('/');
@@ -238,13 +253,10 @@ test('user can add a new asset with type WHOLE or SHARES', async ({ page }) => {
 	await goToPageViaSidebar(page, 'Assets');
 
 	await expect(page.getByRole('row', { name: 'Gold Coins' })).not.toBeVisible();
-	await expect(page.getByRole('row', { name: 'AAPL' })).not.toBeVisible();
 
 	await page.getByRole('link', { name: 'Add asset' }).click();
 	await expect(page).toHaveURL('/assets/add');
-
-	await page.getByLabel('Type', { exact: true }).click();
-	await page.getByText('Whole').click();
+	await expect(page.getByLabel('Symbol')).not.toBeVisible();
 	await expect(page.getByLabel('Quantity')).not.toBeVisible();
 	await expect(page.getByLabel('Book price')).not.toBeVisible();
 	await expect(page.getByLabel('Market price')).not.toBeVisible();
@@ -264,42 +276,10 @@ test('user can add a new asset with type WHOLE or SHARES', async ({ page }) => {
 
 	const wholeAssetRow = page.getByRole('row', { name: 'Gold Coins' });
 	await expect(wholeAssetRow).toBeVisible();
-
-	const wholeCells = wholeAssetRow.locator('td');
-	await expect(wholeCells.nth(0)).toContainText('Gold Coins');
-	await expect(wholeCells.nth(5)).toContainText('$12,000.00');
-	await expect(wholeCells.nth(8)).toContainText('$15,000.00');
-
-	await page.getByRole('link', { name: 'Add asset' }).click();
-	await expect(page).toHaveURL('/assets/add');
-
-	await page.getByLabel('Type', { exact: true }).click();
-	await page.getByText('Shares').click();
-	await expect(page.getByLabel('Quantity')).toBeVisible();
-	await expect(page.getByLabel('Book price')).toBeVisible();
-	await expect(page.getByLabel('Market price')).toBeVisible();
-	await expect(page.getByLabel('Book value')).not.toBeVisible();
-	await expect(page.getByLabel('Market value', { exact: true })).not.toBeVisible();
-
-	await page.getByLabel('Name').fill('Apple Inc.');
-	await page.getByLabel('Symbol').fill('AAPL');
-	await page.getByLabel('Balance group').click();
-	await page.getByText('Investments').click();
-	await page.getByLabel('Category').fill('Stock');
-	await page.getByLabel('Quantity').fill('50');
-	await page.getByLabel('Book price').fill('150');
-	await page.getByLabel('Market price').fill('180');
-	await page.getByRole('button', { name: 'Add' }).click();
-	await expect(page).toHaveURL('/assets');
-
-	const sharesAssetRow = page.getByRole('row', { name: 'AAPL' });
-	await expect(sharesAssetRow).toBeVisible();
-
-	const sharesCells = sharesAssetRow.locator('td');
-	await expect(sharesCells.nth(0)).toContainText('Apple Inc.');
-	await expect(sharesCells.nth(1)).toContainText('AAPL');
-	await expect(sharesCells.nth(5)).toContainText('$7,500.00');
-	await expect(sharesCells.nth(8)).toContainText('$9,000.00');
+	await expectAssetRowCells(wholeAssetRow, [
+		[4, '$12,000.00'],
+		[7, '$15,000.00']
+	]);
 });
 
 test('optional currency fields show placeholder when not set', async ({ page }) => {
@@ -312,8 +292,6 @@ test('optional currency fields show placeholder when not set', async ({ page }) 
 	await page.getByRole('link', { name: 'Add asset' }).click();
 	await expect(page).toHaveURL('/assets/add');
 
-	await page.getByLabel('Type', { exact: true }).click();
-	await page.getByText('Whole').click();
 	await page.getByLabel('Name').fill('Art Piece');
 	await page.getByLabel('Balance group').click();
 	await page.getByText('Other assets').click();
@@ -335,8 +313,7 @@ test('user can edit asset details and update balance', async ({ page }) => {
 		name: 'Vintage Watch Collection',
 		balanceGroup: AssetsBalanceGroupOptions.OTHER,
 		owner: user.id,
-		balanceType: 'Collectibles',
-		type: AssetsTypeOptions.WHOLE
+		balanceType: 'Collectibles'
 	});
 	await seedAssetBalance({
 		asset: wholeAsset.id,
@@ -352,16 +329,19 @@ test('user can edit asset details and update balance', async ({ page }) => {
 
 	const initialRow = page.getByRole('row', { name: 'Vintage Watch Collection' });
 	await expect(initialRow).toBeVisible();
-
-	const initialCells = initialRow.locator('td');
-	await expect(initialCells.nth(0)).toContainText('Vintage Watch Collection');
-	await expect(initialCells.nth(8)).toContainText('$10,000.00');
+	await expectAssetRowCells(initialRow, [
+		[4, '$10,000.00'],
+		[7, '$10,000.00']
+	]);
 
 	await initialRow.getByRole('link', { name: 'Vintage Watch Collection' }).click();
 	await expect(page).toHaveURL(new RegExp(`/assets/${wholeAsset.id}(\\?|$)`));
 	await expect(page.getByLabel('Name')).toHaveValue('Vintage Watch Collection');
 	await expect(page.getByLabel('Category')).toHaveValue('Collectibles');
-	await expect(page.getByLabel('Type', { exact: true })).toBeDisabled();
+	await expect(page.getByLabel('Symbol')).not.toBeVisible();
+	await expect(page.getByLabel('Quantity')).not.toBeVisible();
+	await expect(page.getByLabel('Book price')).not.toBeVisible();
+	await expect(page.getByLabel('Market price')).not.toBeVisible();
 	await expect(page.getByLabel('Notes')).toHaveValue('');
 
 	await page.getByLabel('Name').fill('Rare Coin Collection');
@@ -381,10 +361,7 @@ test('user can edit asset details and update balance', async ({ page }) => {
 
 	const renamedRow = page.getByRole('row', { name: 'Rare Coin Collection' });
 	await expect(renamedRow).toBeVisible();
-
-	const renamedCells = renamedRow.locator('td');
-	await expect(renamedCells.nth(0)).toContainText('Rare Coin Collection');
-	await expect(renamedCells.nth(3)).toContainText('Collectibles');
+	await expectAssetRowCells(renamedRow, [[2, 'Collectibles']]);
 
 	await renamedRow.getByRole('link', { name: 'Rare Coin Collection' }).click();
 	await expect(page).toHaveURL(new RegExp(`/assets/${wholeAsset.id}(\\?|$)`));
@@ -404,9 +381,10 @@ test('user can edit asset details and update balance', async ({ page }) => {
 
 	const updatedRow = page.getByRole('row', { name: 'Rare Coin Collection' });
 	await expect(updatedRow).toBeVisible();
-	const updatedCells = updatedRow.locator('td');
-	await expect(updatedCells.nth(5)).toContainText('$10,000.00');
-	await expect(updatedCells.nth(8)).toContainText('$12,500.00');
+	await expectAssetRowCells(updatedRow, [
+		[4, '$10,000.00'],
+		[7, '$12,500.00']
+	]);
 
 	await updatedRow.getByRole('link', { name: 'Rare Coin Collection' }).click();
 	await expect(page).toHaveURL(new RegExp(`/assets/${wholeAsset.id}(\\?|$)`));
@@ -428,81 +406,6 @@ test('user can edit asset details and update balance', async ({ page }) => {
 	await expect(page.getByLabel('Exclude from net worth')).not.toBeChecked();
 });
 
-test('user can edit shares asset and update balance', async ({ page }) => {
-	const user = await seedUser('noah');
-
-	const sharesAsset = await seedAsset({
-		name: 'Apple Inc',
-		symbol: 'AAPL',
-		balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Securities',
-		type: AssetsTypeOptions.SHARES
-	});
-	await seedAssetBalance({
-		asset: sharesAsset.id,
-		owner: user.id,
-		asOf: new Date().toISOString(),
-		quantity: 100,
-		bookPrice: 50,
-		marketPrice: 60,
-		bookValue: 5000,
-		marketValue: 6000
-	});
-
-	await page.goto('/');
-	await signIn(page, user.email);
-	await goToPageViaSidebar(page, 'Assets');
-
-	await page.getByRole('link', { name: 'Apple Inc' }).click();
-	await expect(page).toHaveURL(new RegExp(`/assets/${sharesAsset.id}(\\?|$)`));
-	await expect(page.getByLabel('Name')).toHaveValue('Apple Inc');
-	await expect(page.getByLabel('Symbol')).toHaveValue('AAPL');
-	await expect(page.getByLabel('Type', { exact: true })).toBeDisabled();
-	await expect(page.getByLabel('Quantity')).toHaveValue('100.00');
-	await expect(page.getByLabel('Market price')).toHaveValue('$60.00');
-	await expect(page.getByLabel('Book price')).toHaveValue('$50.00');
-
-	await page.getByLabel('Name').fill('NVIDIA Corporation');
-	await page.getByLabel('Symbol').fill('NVDA');
-	await page.getByLabel('Category').fill('Securities');
-	await page.getByRole('button', { name: 'Save' }).click();
-	await expect(page.getByText('Asset updated')).toBeVisible();
-	await expect(page).toHaveURL('/assets');
-	await expect(page.getByRole('row', { name: 'Apple Inc' })).not.toBeVisible();
-
-	const renamedRow = page.getByRole('row', { name: 'NVIDIA Corporation' });
-	await expect(renamedRow).toBeVisible();
-
-	await renamedRow.getByRole('link', { name: 'NVIDIA Corporation' }).click();
-	await expect(page).toHaveURL(new RegExp(`/assets/${sharesAsset.id}(\\?|$)`));
-	await page.getByLabel('Quantity').fill('150');
-	await page.getByLabel('Market price').fill('75');
-	await page.getByLabel('Book price').fill('50');
-	await page.getByRole('button', { name: 'Update' }).click();
-	await expect(page.getByText('Balance updated')).toBeVisible();
-	await expect(page).toHaveURL('/assets');
-
-	const updatedRow = page.getByRole('row', { name: 'NVIDIA Corporation' });
-	await expect(updatedRow).toBeVisible();
-
-	const updatedCells = updatedRow.locator('td');
-	await expect(updatedCells.nth(0)).toContainText('NVIDIA Corporation');
-	await expect(updatedCells.nth(1)).toContainText('NVDA');
-	await expect(updatedCells.nth(3)).toContainText('Securities');
-	await expect(updatedCells.nth(5)).toContainText('$7,500.00');
-	await expect(updatedCells.nth(8)).toContainText('$11,250.00');
-
-	await updatedRow.getByRole('link', { name: 'NVIDIA Corporation' }).click();
-	await expect(page).toHaveURL(new RegExp(`/assets/${sharesAsset.id}(\\?|$)`));
-	await expect(page.getByLabel('Name')).toHaveValue('NVIDIA Corporation');
-	await expect(page.getByLabel('Symbol')).toHaveValue('NVDA');
-	await expect(page.getByLabel('Category')).toHaveValue('Securities');
-	await expect(page.getByLabel('Quantity')).toHaveValue('150.00');
-	await expect(page.getByLabel('Market price')).toHaveValue('$75.00');
-	await expect(page.getByLabel('Book price')).toHaveValue('$50.00');
-});
-
 test('user can directly navigate to asset edit page', async ({ page }) => {
 	const user = await seedUser('olivia');
 
@@ -510,8 +413,7 @@ test('user can directly navigate to asset edit page', async ({ page }) => {
 		name: '2020 Honda Civic',
 		balanceGroup: AssetsBalanceGroupOptions.OTHER,
 		owner: user.id,
-		balanceType: 'Vehicle',
-		type: AssetsTypeOptions.WHOLE
+		balanceType: 'Vehicle'
 	});
 	await seedAssetBalance({
 		asset: vehicle.id,
@@ -539,8 +441,7 @@ test('user sees stale data warning and can refresh form', async ({ page }) => {
 		name: 'Vanguard Total Stock Market',
 		balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
 		owner: user.id,
-		balanceType: 'Index Fund',
-		type: AssetsTypeOptions.WHOLE
+		balanceType: 'Index Fund'
 	});
 	await seedAssetBalance({
 		asset: investment.id,
@@ -581,8 +482,7 @@ test('user can delete asset and cascade deletes balances', async ({ page }) => {
 		name: 'Old Investment',
 		balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
 		owner: user.id,
-		balanceType: 'ETF',
-		type: AssetsTypeOptions.WHOLE
+		balanceType: 'ETF'
 	});
 
 	const balance = await seedAssetBalance({
