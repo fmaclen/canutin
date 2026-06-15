@@ -69,7 +69,7 @@
 	);
 	let includeInNetWorth = $derived(incomingShare?.includeInNetWorth ?? true);
 
-	function isDirty(): boolean {
+	function isDirty() {
 		if (!syncState.lastSyncedData) return false;
 
 		return (
@@ -84,7 +84,7 @@
 		);
 	}
 
-	function getAssetVersion(assetData: typeof asset): string {
+	function getAssetVersion(assetData: typeof asset) {
 		if (!assetData) return '';
 		return `${assetData.updated || assetData.created}_${assetData.name}_${assetData.balanceGroup}_${assetData.notes}_${assetData.excluded}_${assetData.sold}_${assetData.marketValue}_${assetData.bookValue}`;
 	}

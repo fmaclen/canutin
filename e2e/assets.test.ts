@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 
 import { AssetsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
@@ -10,55 +10,11 @@ import {
 	updateAsset
 } from './pocketbase.helpers';
 
-const assetTableColumnLabels = {
-	asset: /^Asset$/,
-	group: /^Group$/,
-	category: /^Category$/,
-	status: /^Status$/,
-	bookValue: /^Book value$/,
-	gainLoss: /^Gain\/loss$/,
-	gainPercent: /^Gain %$/,
-	marketValue: /^Market value$/
-} as const;
-
-const assetTableColumnOrder = [
-	'asset',
-	'group',
-	'category',
-	'status',
-	'bookValue',
-	'gainLoss',
-	'gainPercent',
-	'marketValue'
-] as const satisfies ReadonlyArray<keyof typeof assetTableColumnLabels>;
-
-type AssetTableColumn = (typeof assetTableColumnOrder)[number];
-
-async function expectAssetRowCells(
-	page: Page,
-	row: Locator,
-	expectedCells: Partial<Record<AssetTableColumn, string>>
-) {
-	// NOTE: Playwright exposes this header row's labels as `cell`; `columnheader` resolves to 0.
-	const headers = page
-		.getByRole('row', {
-			name: /^Asset Group Category Status Book value Gain\/loss Gain % Market value$/
-		})
-		.getByRole('cell');
-	await expect(headers).toHaveCount(assetTableColumnOrder.length);
-	for (const column of assetTableColumnOrder) {
-		await expect(headers.nth(assetTableColumnOrder.indexOf(column))).toHaveAccessibleName(
-			assetTableColumnLabels[column]
-		);
-	}
-
+async function expectAssetRowCells(row: Locator, expectedCells: Array<[number, string]>) {
 	const cells = row.getByRole('cell');
-	await expect(cells).toHaveCount(assetTableColumnOrder.length);
-	for (const column of assetTableColumnOrder) {
-		const expectedText = expectedCells[column];
-		if (expectedText !== undefined) {
-			await expect(cells.nth(assetTableColumnOrder.indexOf(column))).toHaveText(expectedText);
-		}
+	await expect(cells).toHaveCount(8);
+	for (const [index, expectedText] of expectedCells) {
+		await expect(cells.nth(index)).toHaveText(expectedText);
 	}
 }
 
@@ -113,14 +69,29 @@ test('assets table reflects filters and aggregate totals', async ({ page }) => {
 
 	const ownedRow = page.getByRole('row', { name: 'Growth Fund' });
 	await expect(ownedRow).toBeVisible();
-	await expectAssetRowCells(page, ownedRow, { status: '~', marketValue: '$5,000.00' });
+	await expect(page.locator('[data-slot="tabs-content"][data-state="active"] thead th')).toHaveText(
+		[
+			/Asset\s*/,
+			'Group',
+			'Category',
+			'Status',
+			/Book value\s*/,
+			/Gain\/loss\s*/,
+			/Gain %\s*/,
+			/Market value\s*/
+		]
+	);
+	await expectAssetRowCells(ownedRow, [
+		[3, '~'],
+		[7, '$5,000.00']
+	]);
 
 	const excludedRow = page.getByRole('row', { name: 'Hidden Collectible' });
 	await expect(excludedRow).toBeVisible();
-	await expectAssetRowCells(page, excludedRow, {
-		status: 'Excluded',
-		marketValue: '$2,000.00'
-	});
+	await expectAssetRowCells(excludedRow, [
+		[3, 'Excluded'],
+		[7, '$2,000.00']
+	]);
 
 	const aggregateRow = page.getByRole('region', { name: 'Net market value' });
 	await expect(aggregateRow).toContainText('$5,000.00');
@@ -134,7 +105,10 @@ test('assets table reflects filters and aggregate totals', async ({ page }) => {
 	await page.getByRole('tab', { name: 'Sold' }).click();
 	const soldRow = page.getByRole('row', { name: 'Legacy Stock' });
 	await expect(soldRow).toBeVisible();
-	await expectAssetRowCells(page, soldRow, { status: 'Sold', marketValue: '$1,500.00' });
+	await expectAssetRowCells(soldRow, [
+		[3, 'Sold'],
+		[7, '$1,500.00']
+	]);
 	await expect(aggregateRow).toContainText('$1,500.00');
 });
 
@@ -189,30 +163,30 @@ test('assets table shows appreciation and depreciation for whole assets', async 
 
 	const houseRow = page.getByRole('row', { name: 'Primary Residence' });
 	await expect(houseRow).toBeVisible();
-	await expectAssetRowCells(page, houseRow, {
-		bookValue: '$500,000.00',
-		gainLoss: '$150,000.00',
-		gainPercent: '+30.0%',
-		marketValue: '$650,000.00'
-	});
+	await expectAssetRowCells(houseRow, [
+		[4, '$500,000.00'],
+		[5, '$150,000.00'],
+		[6, '+30.0%'],
+		[7, '$650,000.00']
+	]);
 
 	const carRow = page.getByRole('row', { name: 'Vehicle' });
 	await expect(carRow).toBeVisible();
-	await expectAssetRowCells(page, carRow, {
-		bookValue: '$30,000.00',
-		gainLoss: '-$8,000.00',
-		gainPercent: '-26.7%',
-		marketValue: '$22,000.00'
-	});
+	await expectAssetRowCells(carRow, [
+		[4, '$30,000.00'],
+		[5, '-$8,000.00'],
+		[6, '-26.7%'],
+		[7, '$22,000.00']
+	]);
 
 	const fundRow = page.getByRole('row', { name: 'Stable Fund' });
 	await expect(fundRow).toBeVisible();
-	await expectAssetRowCells(page, fundRow, {
-		bookValue: '$10,000.00',
-		gainLoss: '$0.00',
-		gainPercent: '0.0%',
-		marketValue: '$10,000.00'
-	});
+	await expectAssetRowCells(fundRow, [
+		[4, '$10,000.00'],
+		[5, '$0.00'],
+		[6, '0.0%'],
+		[7, '$10,000.00']
+	]);
 });
 
 test('assets table shows appreciation and depreciation for whole-value assets', async ({
@@ -254,21 +228,21 @@ test('assets table shows appreciation and depreciation for whole-value assets', 
 
 	const growthPortfolioRow = page.getByRole('row', { name: 'Growth Portfolio' });
 	await expect(growthPortfolioRow).toBeVisible();
-	await expectAssetRowCells(page, growthPortfolioRow, {
-		bookValue: '$45,000.00',
-		gainLoss: '$42,500.00',
-		gainPercent: '+94.4%',
-		marketValue: '$87,500.00'
-	});
+	await expectAssetRowCells(growthPortfolioRow, [
+		[4, '$45,000.00'],
+		[5, '$42,500.00'],
+		[6, '+94.4%'],
+		[7, '$87,500.00']
+	]);
 
 	const lossPortfolioRow = page.getByRole('row', { name: 'Loss Portfolio' });
 	await expect(lossPortfolioRow).toBeVisible();
-	await expectAssetRowCells(page, lossPortfolioRow, {
-		bookValue: '$10,000.00',
-		gainLoss: '-$2,500.00',
-		gainPercent: '-25.0%',
-		marketValue: '$7,500.00'
-	});
+	await expectAssetRowCells(lossPortfolioRow, [
+		[4, '$10,000.00'],
+		[5, '-$2,500.00'],
+		[6, '-25.0%'],
+		[7, '$7,500.00']
+	]);
 });
 
 test('user can add a new whole-valued asset', async ({ page }) => {
@@ -302,10 +276,10 @@ test('user can add a new whole-valued asset', async ({ page }) => {
 
 	const wholeAssetRow = page.getByRole('row', { name: 'Gold Coins' });
 	await expect(wholeAssetRow).toBeVisible();
-	await expectAssetRowCells(page, wholeAssetRow, {
-		bookValue: '$12,000.00',
-		marketValue: '$15,000.00'
-	});
+	await expectAssetRowCells(wholeAssetRow, [
+		[4, '$12,000.00'],
+		[7, '$15,000.00']
+	]);
 });
 
 test('optional currency fields show placeholder when not set', async ({ page }) => {
@@ -355,10 +329,10 @@ test('user can edit asset details and update balance', async ({ page }) => {
 
 	const initialRow = page.getByRole('row', { name: 'Vintage Watch Collection' });
 	await expect(initialRow).toBeVisible();
-	await expectAssetRowCells(page, initialRow, {
-		bookValue: '$10,000.00',
-		marketValue: '$10,000.00'
-	});
+	await expectAssetRowCells(initialRow, [
+		[4, '$10,000.00'],
+		[7, '$10,000.00']
+	]);
 
 	await initialRow.getByRole('link', { name: 'Vintage Watch Collection' }).click();
 	await expect(page).toHaveURL(new RegExp(`/assets/${wholeAsset.id}(\\?|$)`));
@@ -387,7 +361,7 @@ test('user can edit asset details and update balance', async ({ page }) => {
 
 	const renamedRow = page.getByRole('row', { name: 'Rare Coin Collection' });
 	await expect(renamedRow).toBeVisible();
-	await expectAssetRowCells(page, renamedRow, { category: 'Collectibles' });
+	await expectAssetRowCells(renamedRow, [[2, 'Collectibles']]);
 
 	await renamedRow.getByRole('link', { name: 'Rare Coin Collection' }).click();
 	await expect(page).toHaveURL(new RegExp(`/assets/${wholeAsset.id}(\\?|$)`));
@@ -407,10 +381,10 @@ test('user can edit asset details and update balance', async ({ page }) => {
 
 	const updatedRow = page.getByRole('row', { name: 'Rare Coin Collection' });
 	await expect(updatedRow).toBeVisible();
-	await expectAssetRowCells(page, updatedRow, {
-		bookValue: '$10,000.00',
-		marketValue: '$12,500.00'
-	});
+	await expectAssetRowCells(updatedRow, [
+		[4, '$10,000.00'],
+		[7, '$12,500.00']
+	]);
 
 	await updatedRow.getByRole('link', { name: 'Rare Coin Collection' }).click();
 	await expect(page).toHaveURL(new RegExp(`/assets/${wholeAsset.id}(\\?|$)`));

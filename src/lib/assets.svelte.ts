@@ -65,7 +65,7 @@ class AssetsContext {
 		return this.balanceTypesContext.getName(id);
 	}
 
-	getAsset(id: string): AssetWithBalance | undefined {
+	getAsset(id: string) {
 		return this.assets.find((a) => a.id === id);
 	}
 
@@ -222,7 +222,7 @@ class AssetsContext {
 	private computeBalanceData(
 		balance: Pick<AssetBalancesResponse, 'asOf' | 'bookValue' | 'marketValue'>,
 		perspective: AssetSharesPerspectiveOptions
-	): AssetBalanceData {
+	) {
 		const projected = projectAssetFinancials(balance.bookValue, balance.marketValue, perspective);
 		return {
 			...projected,
@@ -230,7 +230,7 @@ class AssetsContext {
 		};
 	}
 
-	private toRawBalanceData(asset: AssetWithBalance): AssetBalanceData {
+	private toRawBalanceData(asset: AssetWithBalance) {
 		const rawBookValue =
 			asset.perspective === 'INVERSE' ? -(asset.bookValue ?? 0) : (asset.bookValue ?? 0);
 		const rawMarketValue =
@@ -245,10 +245,7 @@ class AssetsContext {
 		};
 	}
 
-	private toAssetWithBalance(
-		asset: AssetsResponse,
-		rawBalanceData: AssetBalanceData
-	): AssetWithBalance {
+	private toAssetWithBalance(asset: AssetsResponse, rawBalanceData: AssetBalanceData) {
 		const incomingShare = this.getIncomingShare(asset.id);
 		const isOwner = asset.owner === this.currentUserId;
 		const perspective = isOwner
@@ -308,7 +305,7 @@ class AssetsContext {
 		}
 	}
 
-	private async getLatestAssetBalance(assetId: string): Promise<AssetBalanceData> {
+	private async getLatestAssetBalance(assetId: string) {
 		const res = await this._pb.authedClient
 			.collection('assetBalances')
 			.getList<AssetBalancesResponse>(1, 1, {

@@ -56,7 +56,6 @@ test('clicking Market Value header sorts by market value descending then ascendi
 
 	const rows = page.locator('[data-slot="table-body"] tr');
 
-	// Default sort is market value DESC (highest first)
 	expect(await getRowIndex(rows, 'High Value Asset')).toBeLessThan(
 		await getRowIndex(rows, 'Mid Value Asset')
 	);
@@ -64,7 +63,6 @@ test('clicking Market Value header sorts by market value descending then ascendi
 		await getRowIndex(rows, 'Low Value Asset')
 	);
 
-	// Click Market Value header - default is already DESC, so clicking toggles to ASC
 	const marketValueHeader = page.getByRole('button', { name: 'Market Value' });
 	await marketValueHeader.click();
 
@@ -78,7 +76,6 @@ test('clicking Market Value header sorts by market value descending then ascendi
 		await getRowIndex(rows, 'High Value Asset')
 	);
 
-	// Click again - should toggle back to DESC
 	await marketValueHeader.click();
 	await expect(page).toHaveURL(/dir=desc/);
 
@@ -357,7 +354,6 @@ test('sort indicator shows on active column', async ({ page }) => {
 	await expect(page.getByRole('tab', { name: 'Owned' })).toHaveAttribute('aria-selected', 'true');
 	await expect(page.getByRole('row', { name: 'Test Asset For Sorting' })).toBeVisible();
 
-	// Market Value is already default sorted DESC, clicking toggles to ASC
 	const marketValueButton = page.getByRole('button', { name: 'Market Value' });
 	const marketValueHeader = marketValueButton.locator('xpath=..');
 	await marketValueButton.click();
@@ -367,7 +363,6 @@ test('sort indicator shows on active column', async ({ page }) => {
 	await marketValueButton.click();
 	await expect(marketValueHeader).toHaveAttribute('aria-sort', 'descending');
 
-	// Click Asset header - first click on non-default column should sort DESC
 	const assetButton = page.getByRole('button', { name: 'Asset', exact: true });
 	const assetHeader = assetButton.locator('xpath=..');
 	await assetButton.click();
