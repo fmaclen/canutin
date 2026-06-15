@@ -5,6 +5,7 @@
 	import { formatCurrency } from '$lib/components/currency';
 	import Currency from '$lib/components/currency.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
+	import Skeleton from '$lib/components/ui/skeleton/skeleton.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
 
@@ -108,8 +109,8 @@
 
 <SectionTitle title={m.cashflow_section_title()} />
 
-<div class="bg-background overflow-hidden rounded shadow-md">
-	{#if chartData.length > 0}
+{#if chartData.length > 0}
+	<div class="bg-background overflow-hidden rounded shadow-md">
 		<Tooltip.Provider>
 			<!-- Outer grid: one column per period -->
 			<div class="grid" style="grid-template-columns: repeat({chartData.length}, minmax(0, 1fr));">
@@ -245,5 +246,7 @@
 				{/each}
 			</div>
 		</Tooltip.Provider>
-	{/if}
-</div>
+	</div>
+{:else}
+	<Skeleton class="h-[calc(50vh+2rem)] max-h-[22rem] min-h-72" />
+{/if}
