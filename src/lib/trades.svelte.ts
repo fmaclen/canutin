@@ -314,17 +314,9 @@ class TradesContext {
 			const fields =
 				'id,date,security,type,subtype,description,name,account,quantity,price,amount,fees,expand.account.id,expand.account.name,expand.security.id,expand.security.name,expand.security.symbol';
 			const filter = this.activeFilter;
-			const pageRequest = this._pb.authedClient
-				.collection('securityTransactions')
-				.getList<Trade>(this.page, this.pageSize, {
-					sort: '-date,-created,-id',
-					expand: 'account,security',
-					fields,
-					filter,
-					requestKey: null
-				});
 			if (includeSummary) {
-				const summaryRequest = this._pb.authedClient
+				const requestedPage = this.page;
+				const summaryList = await this._pb.authedClient
 					.collection('securityTransactions')
 					.getFullList<Trade>({
 						sort: '-date,-created,-id',
@@ -334,7 +326,6 @@ class TradesContext {
 						batch: 200,
 						requestKey: null
 					});
-				const [pageList, summaryList] = await Promise.all([pageRequest, summaryRequest]);
 				if (
 					userId !== this._activeUserId ||
 					refreshId !== this._refreshSequence ||
@@ -342,12 +333,22 @@ class TradesContext {
 				)
 					return;
 				if (pageRefreshId === this._pageRefreshSequence) {
-					this.rawTransactions = pageList.items;
-					this.totalItems = pageList.totalItems;
+					const start = (requestedPage - 1) * this.pageSize;
+					this.rawTransactions = summaryList.slice(start, start + this.pageSize);
+					this.totalItems = summaryList.length;
 				}
 				this.summaryTransactions = summaryList;
 				return;
 			}
+			const pageRequest = this._pb.authedClient
+				.collection('securityTransactions')
+				.getList<Trade>(this.page, this.pageSize, {
+					sort: '-date,-created,-id',
+					expand: 'account,security',
+					fields,
+					filter,
+					requestKey: null
+				});
 			const pageList = await pageRequest;
 			if (userId !== this._activeUserId || refreshId !== this._refreshSequence) return;
 			if (pageRefreshId === this._pageRefreshSequence) {
@@ -520,8 +521,7 @@ class TradesContext {
 
 		switch (option) {
 			case 'this-month': {
-				const adjusted = new Date(startOfThisMonth.getTime() - 1);
-				return { from: adjusted, to: null } as const;
+				return { from: startOfThisMonth, to: null } as const;
 			}
 			case 'last-month': {
 				const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;

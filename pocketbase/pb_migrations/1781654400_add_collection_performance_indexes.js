@@ -43,8 +43,7 @@ migrate((app) => {
   unmarshal({
     "indexes": [
       "CREATE INDEX idx_securityBalances_importSession ON securityBalances (importSession, owner)",
-      "CREATE INDEX idx_securityBalances_lookup ON securityBalances (account, security, asOf)",
-      "CREATE INDEX idx_securityBalances_account_asOf ON securityBalances (account, asOf)"
+      "CREATE INDEX idx_securityBalances_lookup ON securityBalances (account, security, asOf)"
     ]
   }, securityBalances)
 

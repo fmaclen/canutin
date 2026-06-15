@@ -16,6 +16,7 @@
 
 	import {
 		advanceTrendSecurityValue,
+		findEarliestBalanceDate,
 		type BalanceGroup,
 		type PreparedTrendMaps,
 		type TrendSecurityBalance,
@@ -23,21 +24,21 @@
 	} from './trends';
 
 	let {
-		prepared = $bindable(),
-		historyStart = $bindable(),
-		rawAccounts = $bindable(),
-		rawAssets = $bindable(),
-		rawAccountBalances = $bindable(),
-		rawSecurityBalances = $bindable(),
-		rawAssetBalances = $bindable()
+		prepared,
+		fullHistoryPrepared,
+		rawAccounts,
+		rawAssets,
+		rawFullHistoryAccountBalances,
+		rawFullHistorySecurityBalances,
+		rawFullHistoryAssetBalances
 	}: {
 		prepared: PreparedTrendMaps;
-		historyStart: Date | null;
+		fullHistoryPrepared: PreparedTrendMaps;
 		rawAccounts: AccountsResponse[];
 		rawAssets: AssetsResponse[];
-		rawAccountBalances: AccountBalancesResponse[];
-		rawSecurityBalances: TrendSecurityBalance[];
-		rawAssetBalances: AssetBalancesResponse[];
+		rawFullHistoryAccountBalances: AccountBalancesResponse[];
+		rawFullHistorySecurityBalances: TrendSecurityBalance[];
+		rawFullHistoryAssetBalances: AssetBalancesResponse[];
 	} = $props();
 
 	type PeriodOffset = {
@@ -67,26 +68,26 @@
 		return d;
 	}
 
-	function percentChange(currentValue: number, previousValue: number): number | null {
+	function percentChange(currentValue: number, previousValue: number) {
 		if (!previousValue || previousValue === 0) return null;
 		return (currentValue - previousValue) / Math.abs(previousValue);
 	}
 
-	function percentChangeDebtMagnitude(currentValue: number, previousValue: number): number | null {
+	function percentChangeDebtMagnitude(currentValue: number, previousValue: number) {
 		if (!previousValue || previousValue === 0) return null;
 		const currentAbs = Math.abs(currentValue);
 		const previousAbs = Math.abs(previousValue);
 		return (currentAbs - previousAbs) / previousAbs;
 	}
 
-	function computeTotals(anchorDates: Date[]) {
+	function computeTotals(maps: PreparedTrendMaps, anchorDates: Date[]) {
 		const {
 			accountBalancesByAccountId,
 			securityBalancesByAccountSecurity,
 			assetBalancesByAssetId,
 			accountById,
 			assetById
-		} = prepared;
+		} = maps;
 		const ascendingDates = [...anchorDates].sort((a, b) => a.getTime() - b.getTime());
 		const indexByTime = new Map(
 			ascendingDates.map((date, index) => [date.getTime(), index] as const)
@@ -182,39 +183,25 @@
 		const END_OF_TIME = new Date('9999-12-31T23:59:59.999Z');
 		const now = END_OF_TIME;
 
-		let earliest: Date | null = null;
-		for (const b of rawAccountBalances) {
-			const d = new Date(b.asOf);
-			if (!earliest || d < earliest) earliest = d;
-		}
-		for (const b of rawSecurityBalances) {
-			const d = new Date(b.asOf);
-			if (!earliest || d < earliest) earliest = d;
-		}
-		for (const b of rawAssetBalances) {
-			const d = new Date(b.asOf);
-			if (!earliest || d < earliest) earliest = d;
-		}
-
-		const visiblePeriods = historyStart
-			? periods.filter((periodDef) => !periodDef.offset.max)
-			: periods;
-		const anchorDates = visiblePeriods.map((periodDef) => {
-			if (periodDef.offset.max) return earliest ? new Date(earliest) : now;
+		const boundedPeriods = periods.filter((periodDef) => !periodDef.offset.max);
+		const anchorDates = boundedPeriods.map((periodDef) => {
 			if (periodDef.offset.ytd) return endOfDay(startOfYear(new UTCDate()));
 			const anchorDate = subtractFromDate(new UTCDate(), periodDef.offset);
 			return endOfDay(anchorDate);
 		});
-		const totals = computeTotals([...anchorDates, now]);
+		const totals = computeTotals(prepared, [...anchorDates, now]);
 		const current = totals[totals.length - 1];
 
 		const allTimes = [
-			...rawAccountBalances.map((balance) => new Date(balance.asOf).getTime()),
-			...rawSecurityBalances.map((balance) => new Date(balance.asOf).getTime()),
-			...rawAssetBalances.map((balance) => new Date(balance.asOf).getTime())
+			...rawFullHistoryAccountBalances.map((balance) => new Date(balance.asOf).getTime()),
+			...rawFullHistorySecurityBalances.map((balance) => new Date(balance.asOf).getTime()),
+			...rawFullHistoryAssetBalances.map((balance) => new Date(balance.asOf).getTime())
 		];
 		const uniqueAscendingTimes = Array.from(new Set(allTimes)).sort((a, b) => a - b);
-		const totalsAll = computeTotals(uniqueAscendingTimes.map((timestamp) => new Date(timestamp)));
+		const totalsAll = computeTotals(
+			fullHistoryPrepared,
+			uniqueAscendingTimes.map((timestamp) => new Date(timestamp))
+		);
 		let baseline = { net: 0, cash: 0, debt: 0, investment: 0, other: 0 };
 		for (const row of totalsAll) {
 			if (baseline.net === 0 && row.net !== 0) baseline.net = row.net;
@@ -232,68 +219,84 @@
 				break;
 		}
 
-		const columns = visiblePeriods.map((periodDef, columnIndex) => {
-			const previousTotals = totals[columnIndex];
+		const fullHistoryCurrent = computeTotals(fullHistoryPrepared, [now])[0];
+		const fullHistoryEarliest = findEarliestBalanceDate(
+			rawFullHistoryAccountBalances,
+			rawFullHistorySecurityBalances,
+			rawFullHistoryAssetBalances
+		);
+		let boundedColumnIndex = 0;
+		const columns = periods.map((periodDef) => {
+			if (periodDef.offset.max) {
+				return {
+					key: periodDef.key,
+					label: periodDef.label,
+					at: fullHistoryEarliest ? new Date(fullHistoryEarliest) : now,
+					values: {
+						net: {
+							pct: percentChange(fullHistoryCurrent.net, baseline.net),
+							cur: fullHistoryCurrent.net,
+							prev: baseline.net
+						},
+						cash: {
+							pct: percentChange(fullHistoryCurrent.cash, baseline.cash),
+							cur: fullHistoryCurrent.cash,
+							prev: baseline.cash
+						},
+						debt: {
+							pct: percentChangeDebtMagnitude(fullHistoryCurrent.debt, baseline.debt),
+							cur: fullHistoryCurrent.debt,
+							prev: baseline.debt
+						},
+						investment: {
+							pct: percentChange(fullHistoryCurrent.investment, baseline.investment),
+							cur: fullHistoryCurrent.investment,
+							prev: baseline.investment
+						},
+						other: {
+							pct: percentChange(fullHistoryCurrent.other, baseline.other),
+							cur: fullHistoryCurrent.other,
+							prev: baseline.other
+						}
+					}
+				};
+			}
+
+			const previousTotals = totals[boundedColumnIndex];
+			const at = anchorDates[boundedColumnIndex];
+			boundedColumnIndex++;
 
 			return {
 				key: periodDef.key,
 				label: periodDef.label,
-				at: anchorDates[columnIndex],
-				values: periodDef.offset.max
-					? {
-							net: {
-								pct: percentChange(current.net, baseline.net),
-								cur: current.net,
-								prev: baseline.net
-							},
-							cash: {
-								pct: percentChange(current.cash, baseline.cash),
-								cur: current.cash,
-								prev: baseline.cash
-							},
-							debt: {
-								pct: percentChangeDebtMagnitude(current.debt, baseline.debt),
-								cur: current.debt,
-								prev: baseline.debt
-							},
-							investment: {
-								pct: percentChange(current.investment, baseline.investment),
-								cur: current.investment,
-								prev: baseline.investment
-							},
-							other: {
-								pct: percentChange(current.other, baseline.other),
-								cur: current.other,
-								prev: baseline.other
-							}
-						}
-					: {
-							net: {
-								pct: percentChange(current.net, previousTotals.net),
-								cur: current.net,
-								prev: previousTotals.net
-							},
-							cash: {
-								pct: percentChange(current.cash, previousTotals.cash),
-								cur: current.cash,
-								prev: previousTotals.cash
-							},
-							debt: {
-								pct: percentChangeDebtMagnitude(current.debt, previousTotals.debt),
-								cur: current.debt,
-								prev: previousTotals.debt
-							},
-							investment: {
-								pct: percentChange(current.investment, previousTotals.investment),
-								cur: current.investment,
-								prev: previousTotals.investment
-							},
-							other: {
-								pct: percentChange(current.other, previousTotals.other),
-								cur: current.other,
-								prev: previousTotals.other
-							}
-						}
+				at,
+				values: {
+					net: {
+						pct: percentChange(current.net, previousTotals.net),
+						cur: current.net,
+						prev: previousTotals.net
+					},
+					cash: {
+						pct: percentChange(current.cash, previousTotals.cash),
+						cur: current.cash,
+						prev: previousTotals.cash
+					},
+					debt: {
+						pct: percentChangeDebtMagnitude(current.debt, previousTotals.debt),
+						cur: current.debt,
+						prev: previousTotals.debt
+					},
+					investment: {
+						pct: percentChange(current.investment, previousTotals.investment),
+						cur: current.investment,
+						prev: previousTotals.investment
+					},
+					other: {
+						pct: percentChange(current.other, previousTotals.other),
+						cur: current.other,
+						prev: previousTotals.other
+					}
+				}
 			};
 		});
 

@@ -28,12 +28,12 @@
 
 	let {
 		period = $bindable(),
-		prepared = $bindable(),
-		rawAccounts = $bindable(),
-		rawAssets = $bindable(),
-		rawAccountBalances = $bindable(),
-		rawSecurityBalances = $bindable(),
-		rawAssetBalances = $bindable()
+		prepared,
+		rawAccounts,
+		rawAssets,
+		rawAccountBalances,
+		rawSecurityBalances,
+		rawAssetBalances
 	}: {
 		period: PeriodKey;
 		prepared: PreparedTrendMaps;

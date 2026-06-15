@@ -42,6 +42,9 @@
 	let rawAccountBalances: AccountBalancesResponse[] = $state([]);
 	let rawSecurityBalances: TrendSecurityBalance[] = $state([]);
 	let rawAssetBalances: AssetBalancesResponse[] = $state([]);
+	let rawFullHistoryAccountBalances: AccountBalancesResponse[] = $state([]);
+	let rawFullHistorySecurityBalances: TrendSecurityBalance[] = $state([]);
+	let rawFullHistoryAssetBalances: AssetBalancesResponse[] = $state([]);
 	let historyStart: Date | null = $state(null);
 
 	const includedAccounts = $derived.by(
@@ -87,6 +90,15 @@
 			rawAssetBalances
 		)
 	);
+	const fullHistoryPrepared = $derived.by(() =>
+		buildPreparedMaps(
+			rawAccounts,
+			rawAssets,
+			rawFullHistoryAccountBalances,
+			rawFullHistorySecurityBalances,
+			rawFullHistoryAssetBalances
+		)
+	);
 
 	function isDefined<T>(value: T | null | undefined): value is T {
 		return value !== null && value !== undefined;
@@ -100,11 +112,25 @@
 		return ids.map((id) => `${field}='${quoteFilterValue(id)}'`).join(' || ');
 	}
 
-	function historyFilter(field: string, ids: string[], start: Date | null) {
-		const idsFilter = filterByIds(field, ids);
+	function historyFilter(idsFilter: string, start: Date | null) {
 		if (!idsFilter) return '';
 		return start ? `(${idsFilter}) && asOf>='${start.toISOString()}'` : idsFilter;
 	}
+
+	type TrendBalanceRecord = { asOf: string; created: string; id: string };
+
+	type BalanceRealtimeConfig<
+		TRecord extends TrendBalanceRecord,
+		TBalance extends TrendBalanceRecord
+	> = {
+		records: () => TBalance[];
+		fullHistoryRecords: () => TBalance[];
+		setRecords: (records: TBalance[]) => void;
+		setFullHistoryRecords: (records: TBalance[]) => void;
+		project: (record: TRecord) => TBalance | null;
+		carryKey: (record: TBalance) => string;
+		identityChanged: (existing: TBalance, balance: TBalance) => boolean;
+	};
 
 	function compareBalances<T extends { asOf: string; created: string; id: string }>(a: T, b: T) {
 		if (a.asOf !== b.asOf) return a.asOf.localeCompare(b.asOf);
@@ -121,54 +147,24 @@
 		return periodStart < performanceStart ? periodStart : performanceStart;
 	}
 
-	function trimAccountBalances(records: AccountBalancesResponse[], start: Date | null) {
+	function trimBalances<T extends TrendBalanceRecord>(
+		records: T[],
+		start: Date | null,
+		carryKey: (record: T) => string
+	) {
 		if (!start) return records.toSorted(compareBalances);
-		const previousByAccount = new SvelteMap<string, AccountBalancesResponse>();
-		const inRange: AccountBalancesResponse[] = [];
+		const previousByKey = new SvelteMap<string, T>();
+		const inRange: T[] = [];
 		for (const record of records) {
 			if (new Date(record.asOf) >= start) {
 				inRange.push(record);
 				continue;
 			}
-			const previous = previousByAccount.get(record.account);
-			if (!previous || compareBalances(previous, record) < 0)
-				previousByAccount.set(record.account, record);
+			const key = carryKey(record);
+			const previous = previousByKey.get(key);
+			if (!previous || compareBalances(previous, record) < 0) previousByKey.set(key, record);
 		}
-		return [...previousByAccount.values(), ...inRange].toSorted(compareBalances);
-	}
-
-	function trimSecurityBalances(records: TrendSecurityBalance[], start: Date | null) {
-		if (!start) return records.toSorted(compareBalances);
-		const previousByAccountSecurity = new SvelteMap<string, TrendSecurityBalance>();
-		const inRange: TrendSecurityBalance[] = [];
-		for (const record of records) {
-			if (new Date(record.asOf) >= start) {
-				inRange.push(record);
-				continue;
-			}
-			const key = `${record.account}:${record.security}`;
-			const previous = previousByAccountSecurity.get(key);
-			if (!previous || compareBalances(previous, record) < 0) {
-				previousByAccountSecurity.set(key, record);
-			}
-		}
-		return [...previousByAccountSecurity.values(), ...inRange].toSorted(compareBalances);
-	}
-
-	function trimAssetBalances(records: AssetBalancesResponse[], start: Date | null) {
-		if (!start) return records.toSorted(compareBalances);
-		const previousByAsset = new SvelteMap<string, AssetBalancesResponse>();
-		const inRange: AssetBalancesResponse[] = [];
-		for (const record of records) {
-			if (new Date(record.asOf) >= start) {
-				inRange.push(record);
-				continue;
-			}
-			const previous = previousByAsset.get(record.asset);
-			if (!previous || compareBalances(previous, record) < 0)
-				previousByAsset.set(record.asset, record);
-		}
-		return [...previousByAsset.values(), ...inRange].toSorted(compareBalances);
+		return [...previousByKey.values(), ...inRange].toSorted(compareBalances);
 	}
 
 	function projectAccountBalance(balance: AccountBalancesResponse) {
@@ -234,8 +230,7 @@
 		);
 	}
 
-	async function previousSecurityBalances(accountIds: string[], start: Date) {
-		const accountFilter = filterByIds('account', accountIds);
+	async function previousSecurityBalances(accountFilter: string, start: Date) {
 		if (!accountFilter) return [];
 		const balances = await pb.authedClient
 			.collection('securityBalances')
@@ -292,6 +287,38 @@
 		);
 	}
 
+	async function listAccountBalances(filter: string) {
+		if (!filter) return [];
+		return pb.authedClient.collection('accountBalances').getFullList<AccountBalancesResponse>({
+			sort: 'asOf,created,id',
+			filter,
+			fields: 'id,account,value,asOf,created',
+			requestKey: null
+		});
+	}
+
+	async function listSecurityBalances(filter: string) {
+		if (!filter) return [];
+		return pb.authedClient
+			.collection('securityBalances')
+			.getFullList<SecurityBalancesResponse<number, number, number, number>>({
+				sort: 'asOf,created,id',
+				filter,
+				fields: 'id,account,security,value,quantity,asOf,created',
+				requestKey: null
+			});
+	}
+
+	async function listAssetBalances(filter: string) {
+		if (!filter) return [];
+		return pb.authedClient.collection('assetBalances').getFullList<AssetBalancesResponse>({
+			sort: 'asOf,created,id',
+			filter,
+			fields: 'id,asset,marketValue,asOf,created',
+			requestKey: null
+		});
+	}
+
 	let refreshSequence = 0;
 
 	async function refreshBalances() {
@@ -299,80 +326,96 @@
 		const start = computeHistoryStart();
 		const accountIds = Array.from(includedAccounts.keys());
 		const assetIds = Array.from(includedAssets.keys());
-		const accountFilter = historyFilter('account', accountIds, start);
-		const securityFilter = historyFilter('account', accountIds, start);
-		const assetFilter = historyFilter('asset', assetIds, start);
+		const accountFilter = filterByIds('account', accountIds);
+		const assetFilter = filterByIds('asset', assetIds);
+		const accountHistoryFilter = historyFilter(accountFilter, start);
+		const assetHistoryFilter = historyFilter(assetFilter, start);
 		try {
-			const [accountBalancesRange, securityBalancesRangeRaw, assetBalancesRange] =
-				await Promise.all([
-					accountFilter
-						? pb.authedClient.collection('accountBalances').getFullList<AccountBalancesResponse>({
-								sort: 'asOf,created,id',
-								filter: accountFilter,
-								fields: 'id,account,value,asOf,created',
-								requestKey: null
-							})
-						: [],
-					securityFilter
-						? pb.authedClient
-								.collection('securityBalances')
-								.getFullList<SecurityBalancesResponse<number, number, number, number>>({
-									sort: 'asOf,created,id',
-									filter: securityFilter,
-									fields: 'id,account,security,value,quantity,asOf,created',
-									requestKey: null
-								})
-						: [],
-					assetFilter
-						? pb.authedClient.collection('assetBalances').getFullList<AssetBalancesResponse>({
-								sort: 'asOf,created,id',
-								filter: assetFilter,
-								fields: 'id,asset,marketValue,asOf,created',
-								requestKey: null
-							})
-						: []
-				]);
+			const [
+				accountBalancesRange,
+				securityBalancesRangeRaw,
+				assetBalancesRange,
+				fullHistoryRanges
+			] = await Promise.all([
+				listAccountBalances(accountHistoryFilter),
+				listSecurityBalances(accountHistoryFilter),
+				listAssetBalances(assetHistoryFilter),
+				start
+					? Promise.all([
+							listAccountBalances(accountFilter),
+							listSecurityBalances(accountFilter),
+							listAssetBalances(assetFilter)
+						])
+					: Promise.resolve(null)
+			]);
+			let accountBalancesFullHistory = accountBalancesRange;
+			let securityBalancesFullHistoryRaw = securityBalancesRangeRaw;
+			let assetBalancesFullHistory = assetBalancesRange;
+			if (fullHistoryRanges) {
+				[accountBalancesFullHistory, securityBalancesFullHistoryRaw, assetBalancesFullHistory] =
+					fullHistoryRanges;
+			}
 
 			const securityBalancesRange = securityBalancesRangeRaw
+				.map(projectSecurityBalance)
+				.filter(isDefined);
+			const securityBalancesFullHistory = securityBalancesFullHistoryRaw
 				.map(projectSecurityBalance)
 				.filter(isDefined);
 			const [accountBalancesPrevious, securityBalancesPrevious, assetBalancesPrevious] = start
 				? await Promise.all([
 						previousAccountBalances(accountIds, start),
-						previousSecurityBalances(accountIds, start),
+						previousSecurityBalances(accountFilter, start),
 						previousAssetBalances(assetIds, start)
 					])
 				: [[], [], []];
 
 			if (sequence !== refreshSequence) return;
 
-			const accountBalances = trimAccountBalances(
+			const accountBalances = trimBalances(
 				[...accountBalancesPrevious, ...accountBalancesRange]
 					.map((balance) => (balance ? projectAccountBalance(balance) : null))
 					.filter(isDefined),
-				start
+				start,
+				(balance) => balance.account
 			);
-			const securityBalances = trimSecurityBalances(
+			const securityBalances = trimBalances(
 				[
 					...securityBalancesPrevious
 						.map((balance) => (balance ? projectSecurityBalance(balance) : null))
 						.filter(isDefined),
 					...securityBalancesRange
 				],
-				start
+				start,
+				(balance) => `${balance.account}:${balance.security}`
 			);
-			const assetBalances = trimAssetBalances(
+			const assetBalances = trimBalances(
 				[...assetBalancesPrevious, ...assetBalancesRange]
 					.map((balance) => (balance ? projectAssetBalance(balance) : null))
 					.filter(isDefined),
-				start
+				start,
+				(balance) => balance.asset
 			);
-
 			rawAccounts = Array.from(includedAccounts.values());
 			rawAssets = Array.from(includedAssets.values());
 			rawAccountBalances = accountBalances;
 			rawSecurityBalances = securityBalances;
 			rawAssetBalances = assetBalances;
+			rawFullHistoryAccountBalances = trimBalances(
+				accountBalancesFullHistory.map(projectAccountBalance).filter(isDefined),
+				null,
+				(balance) => balance.account
+			);
+			rawFullHistorySecurityBalances = trimBalances(
+				securityBalancesFullHistory,
+				null,
+				(balance) => `${balance.account}:${balance.security}`
+			);
+			rawFullHistoryAssetBalances = trimBalances(
+				assetBalancesFullHistory.map(projectAssetBalance).filter(isDefined),
+				null,
+				(balance) => balance.asset
+			);
 			historyStart = start;
 		} catch (error) {
 			pb.handleConnectionError(error, 'trends', 'refresh_balances');
@@ -385,39 +428,53 @@
 	let bootstrapped = false;
 	let lastIncludedSignature = '';
 
-	function removeAccountBalance(id: string) {
-		rawAccountBalances = rawAccountBalances.filter((balance) => balance.id !== id);
-	}
-
-	function removeSecurityBalance(id: string) {
-		rawSecurityBalances = rawSecurityBalances.filter((balance) => balance.id !== id);
-	}
-
-	function removeAssetBalance(id: string) {
-		rawAssetBalances = rawAssetBalances.filter((balance) => balance.id !== id);
-	}
-
-	function handleAccountBalanceEvent(event: RecordSubscription<AccountBalancesResponse>) {
+	function handleBalanceEvent<
+		TRecord extends TrendBalanceRecord,
+		TBalance extends TrendBalanceRecord
+	>(event: RecordSubscription<TRecord>, config: BalanceRealtimeConfig<TRecord, TBalance>) {
 		if (!event.action) return;
 		if (!bootstrapped) {
 			pendingRefresh = true;
 			return;
 		}
-		const existing = rawAccountBalances.find((balance) => balance.id === event.record.id);
+		const records = config.records();
+		const fullHistoryRecords = config.fullHistoryRecords();
+		const existing = records.find((balance) => balance.id === event.record.id);
+		const fullHistoryExisting = fullHistoryRecords.find(
+			(balance) => balance.id === event.record.id
+		);
 		if (event.action === 'delete') {
-			if (!existing) return;
-			removeAccountBalance(event.record.id);
-			if (historyStart && new Date(existing.asOf) < historyStart) scheduleRefresh();
-			return;
-		}
-		const balance = projectAccountBalance(event.record);
-		if (!balance) {
 			if (existing) {
-				removeAccountBalance(event.record.id);
+				config.setRecords(records.filter((balance) => balance.id !== event.record.id));
 				if (historyStart && new Date(existing.asOf) < historyStart) scheduleRefresh();
+			}
+			if (fullHistoryExisting) {
+				config.setFullHistoryRecords(
+					fullHistoryRecords.filter((balance) => balance.id !== event.record.id)
+				);
 			}
 			return;
 		}
+		const balance = config.project(event.record);
+		if (!balance) {
+			if (existing) {
+				config.setRecords(records.filter((record) => record.id !== event.record.id));
+				if (historyStart && new Date(existing.asOf) < historyStart) scheduleRefresh();
+			}
+			if (fullHistoryExisting) {
+				config.setFullHistoryRecords(
+					fullHistoryRecords.filter((record) => record.id !== event.record.id)
+				);
+			}
+			return;
+		}
+		config.setFullHistoryRecords(
+			trimBalances(
+				[...fullHistoryRecords.filter((record) => record.id !== balance.id), balance],
+				null,
+				config.carryKey
+			)
+		);
 		if (
 			historyStart &&
 			((existing && new Date(existing.asOf) < historyStart) ||
@@ -426,90 +483,14 @@
 			scheduleRefresh();
 			return;
 		}
-		rawAccountBalances = trimAccountBalances(
-			[...rawAccountBalances.filter((record) => record.id !== balance.id), balance],
-			historyStart
+		config.setRecords(
+			trimBalances(
+				[...records.filter((record) => record.id !== balance.id), balance],
+				historyStart,
+				config.carryKey
+			)
 		);
-		if (existing && existing.account !== balance.account) scheduleRefresh();
-	}
-
-	function handleSecurityBalanceEvent(
-		event: RecordSubscription<SecurityBalancesResponse<number, number, number, number>>
-	) {
-		if (!event.action) return;
-		if (!bootstrapped) {
-			pendingRefresh = true;
-			return;
-		}
-		const existing = rawSecurityBalances.find((balance) => balance.id === event.record.id);
-		if (event.action === 'delete') {
-			if (!existing) return;
-			removeSecurityBalance(event.record.id);
-			if (historyStart && new Date(existing.asOf) < historyStart) scheduleRefresh();
-			return;
-		}
-		const balance = projectSecurityBalance(event.record);
-		if (!balance) {
-			if (existing) {
-				removeSecurityBalance(event.record.id);
-				if (historyStart && new Date(existing.asOf) < historyStart) scheduleRefresh();
-			}
-			return;
-		}
-		if (
-			historyStart &&
-			((existing && new Date(existing.asOf) < historyStart) ||
-				new Date(balance.asOf) < historyStart)
-		) {
-			scheduleRefresh();
-			return;
-		}
-		rawSecurityBalances = trimSecurityBalances(
-			[...rawSecurityBalances.filter((record) => record.id !== balance.id), balance],
-			historyStart
-		);
-		if (
-			existing &&
-			(existing.account !== balance.account || existing.security !== balance.security)
-		) {
-			scheduleRefresh();
-		}
-	}
-
-	function handleAssetBalanceEvent(event: RecordSubscription<AssetBalancesResponse>) {
-		if (!event.action) return;
-		if (!bootstrapped) {
-			pendingRefresh = true;
-			return;
-		}
-		const existing = rawAssetBalances.find((balance) => balance.id === event.record.id);
-		if (event.action === 'delete') {
-			if (!existing) return;
-			removeAssetBalance(event.record.id);
-			if (historyStart && new Date(existing.asOf) < historyStart) scheduleRefresh();
-			return;
-		}
-		const balance = projectAssetBalance(event.record);
-		if (!balance) {
-			if (existing) {
-				removeAssetBalance(event.record.id);
-				if (historyStart && new Date(existing.asOf) < historyStart) scheduleRefresh();
-			}
-			return;
-		}
-		if (
-			historyStart &&
-			((existing && new Date(existing.asOf) < historyStart) ||
-				new Date(balance.asOf) < historyStart)
-		) {
-			scheduleRefresh();
-			return;
-		}
-		rawAssetBalances = trimAssetBalances(
-			[...rawAssetBalances.filter((record) => record.id !== balance.id), balance],
-			historyStart
-		);
-		if (existing && existing.asset !== balance.asset) scheduleRefresh();
+		if (existing && config.identityChanged(existing, balance)) scheduleRefresh();
 	}
 
 	async function doRefresh() {
@@ -553,19 +534,46 @@
 		addSubscription(
 			pb.authedClient
 				.collection('accountBalances')
-				.subscribe<AccountBalancesResponse>('*', handleAccountBalanceEvent)
+				.subscribe<AccountBalancesResponse>('*', (event) =>
+					handleBalanceEvent(event, {
+						records: () => rawAccountBalances,
+						fullHistoryRecords: () => rawFullHistoryAccountBalances,
+						setRecords: (records) => (rawAccountBalances = records),
+						setFullHistoryRecords: (records) => (rawFullHistoryAccountBalances = records),
+						project: projectAccountBalance,
+						carryKey: (balance) => balance.account,
+						identityChanged: (existing, balance) => existing.account !== balance.account
+					})
+				)
 		);
 		addSubscription(
 			pb.authedClient
 				.collection('securityBalances')
-				.subscribe<
-					SecurityBalancesResponse<number, number, number, number>
-				>('*', handleSecurityBalanceEvent)
+				.subscribe<SecurityBalancesResponse<number, number, number, number>>('*', (event) =>
+					handleBalanceEvent(event, {
+						records: () => rawSecurityBalances,
+						fullHistoryRecords: () => rawFullHistorySecurityBalances,
+						setRecords: (records) => (rawSecurityBalances = records),
+						setFullHistoryRecords: (records) => (rawFullHistorySecurityBalances = records),
+						project: projectSecurityBalance,
+						carryKey: (balance) => `${balance.account}:${balance.security}`,
+						identityChanged: (existing, balance) =>
+							existing.account !== balance.account || existing.security !== balance.security
+					})
+				)
 		);
 		addSubscription(
-			pb.authedClient
-				.collection('assetBalances')
-				.subscribe<AssetBalancesResponse>('*', handleAssetBalanceEvent)
+			pb.authedClient.collection('assetBalances').subscribe<AssetBalancesResponse>('*', (event) =>
+				handleBalanceEvent(event, {
+					records: () => rawAssetBalances,
+					fullHistoryRecords: () => rawFullHistoryAssetBalances,
+					setRecords: (records) => (rawAssetBalances = records),
+					setFullHistoryRecords: (records) => (rawFullHistoryAssetBalances = records),
+					project: projectAssetBalance,
+					carryKey: (balance) => balance.asset,
+					identityChanged: (existing, balance) => existing.asset !== balance.asset
+				})
+			)
 		);
 
 		return () => {
@@ -639,12 +647,12 @@
 		<SectionTitle title={m.trends_performance_section_title()} />
 		<Performance
 			{prepared}
-			{historyStart}
+			{fullHistoryPrepared}
 			{rawAccounts}
 			{rawAssets}
-			{rawAccountBalances}
-			{rawSecurityBalances}
-			{rawAssetBalances}
+			{rawFullHistoryAccountBalances}
+			{rawFullHistorySecurityBalances}
+			{rawFullHistoryAssetBalances}
 		/>
 	</Section>
 </Page>

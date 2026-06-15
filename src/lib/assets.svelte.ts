@@ -106,34 +106,40 @@ class AssetsContext {
 		recipientEmail: string,
 		perspective: AssetSharesPerspectiveOptions
 	) {
+		const userId = this.currentUserId;
 		await this._pb.postJson('/api/shares/assets', {
 			assetId,
 			recipientEmail,
 			perspective
 		});
-		await this.refreshShares();
-		if (await this.refreshAsset(assetId)) this.lastBalanceEvent = Date.now();
+		await this.refreshShares(userId);
+		if (await this.refreshAsset(assetId, userId)) this.lastBalanceEvent = Date.now();
 	}
 
 	async updateShareIncludeInNetWorth(shareId: string, includeInNetWorth: boolean) {
+		const userId = this.currentUserId;
 		const share = await this._pb.authedClient
 			.collection('assetShares')
 			.update<AssetSharesResponse>(shareId, { includeInNetWorth });
-		await this.refreshShares();
-		if (await this.refreshAsset(share.asset)) this.lastBalanceEvent = Date.now();
+		await this.refreshShares(userId);
+		if (await this.refreshAsset(share.asset, userId)) this.lastBalanceEvent = Date.now();
 	}
 
 	async revokeShare(shareId: string) {
+		const userId = this.currentUserId;
 		const assetId = this.shares.find((share) => share.id === shareId)?.asset;
 		await this._pb.authedClient.collection('assetShares').delete(shareId);
-		await this.refreshShares();
-		if (assetId && (await this.refreshAsset(assetId))) this.lastBalanceEvent = Date.now();
+		await this.refreshShares(userId);
+		if (assetId && (await this.refreshAsset(assetId, userId))) {
+			this.lastBalanceEvent = Date.now();
+		}
 	}
 
 	private async init() {
 		try {
+			const userId = this.currentUserId;
 			this.realtimeSubscribe();
-			await this.refreshShares();
+			await this.refreshShares(userId);
 			await this.refreshAssets();
 			this.lastBalanceEvent = Date.now();
 		} catch (error) {
@@ -143,11 +149,16 @@ class AssetsContext {
 		}
 	}
 
-	private async refreshShares() {
-		this.shares = await this._pb.authedClient.collection('assetShares').getFullList({
+	private async refreshShares(userId: string) {
+		if (userId !== this.currentUserId) return false;
+
+		const shares = await this._pb.authedClient.collection('assetShares').getFullList({
 			sort: 'recipientEmail',
 			requestKey: null
 		});
+		if (userId !== this.currentUserId) return false;
+		this.shares = shares;
+		return true;
 	}
 
 	private async refreshAssets() {
@@ -173,38 +184,68 @@ class AssetsContext {
 	}
 
 	private realtimeSubscribe() {
+		const userId = this.currentUserId;
+		if (!userId) return;
+
 		this._pb.authedClient
 			.collection('assets')
 			.subscribe<AssetsResponse>('*', (event) => {
-				void this.onAssetEvent(event).catch((error) =>
-					this._pb.handleConnectionError(error, 'assets', 'asset_event')
-				);
+				void this.onAssetEvent(event, userId).catch((error) => {
+					if (userId === this.currentUserId) {
+						this._pb.handleConnectionError(error, 'assets', 'asset_event');
+					} else {
+						console.error('[assetsStore] Stale event failed:', error);
+					}
+				});
 			})
-			.catch((error) => this._pb.handleSubscriptionError(error, 'assets', 'subscribe_assets'));
+			.catch((error) => {
+				if (userId === this.currentUserId) {
+					this._pb.handleSubscriptionError(error, 'assets', 'subscribe_assets');
+				} else {
+					console.error('[assetsStore] Stale subscription failed:', error);
+				}
+			});
 		this._pb.authedClient
 			.collection('assetBalances')
-			.subscribe<AssetBalancesResponse>('*', this.onAssetBalanceEvent.bind(this))
-			.catch((error) => this._pb.handleSubscriptionError(error, 'assets', 'subscribe_balances'));
+			.subscribe<AssetBalancesResponse>('*', (event) => this.onAssetBalanceEvent(event, userId))
+			.catch((error) => {
+				if (userId === this.currentUserId) {
+					this._pb.handleSubscriptionError(error, 'assets', 'subscribe_balances');
+				} else {
+					console.error('[assetsStore] Stale subscription failed:', error);
+				}
+			});
 		this._pb.authedClient
 			.collection('assetShares')
-			.subscribe<AssetSharesResponse>('*', this.onAssetShareEvent.bind(this))
-			.catch((error) => this._pb.handleSubscriptionError(error, 'assets', 'subscribe_shares'));
+			.subscribe<AssetSharesResponse>('*', (event) => this.onAssetShareEvent(event, userId))
+			.catch((error) => {
+				if (userId === this.currentUserId) {
+					this._pb.handleSubscriptionError(error, 'assets', 'subscribe_shares');
+				} else {
+					console.error('[assetsStore] Stale subscription failed:', error);
+				}
+			});
 	}
 
-	private async onAssetEvent(e: RecordSubscription<AssetsResponse>) {
+	private async onAssetEvent(e: RecordSubscription<AssetsResponse>, userId: string) {
+		if (userId !== this.currentUserId) return;
+
 		if (e.action === 'create') {
 			await this.balanceTypesContext.ensureLoaded(e.record.balanceType);
 			const balanceData = await this.getLatestAssetBalance(e.record.id);
+			if (userId !== this.currentUserId) return;
 			this.rawAssets = [...this.rawAssets, e.record];
 			if (balanceData) this.latestBalanceByAsset.set(e.record.id, balanceData);
 		} else if (e.action === 'update') {
 			await this.balanceTypesContext.ensureLoaded(e.record.balanceType);
+			if (userId !== this.currentUserId) return;
 			const exists = this.rawAssets.some((asset) => asset.id === e.record.id);
 			this.rawAssets = exists
 				? this.rawAssets.map((asset) => (asset.id === e.record.id ? e.record : asset))
 				: [...this.rawAssets, e.record];
 			if (!this.latestBalanceByAsset.has(e.record.id)) {
 				const balanceData = await this.getLatestAssetBalance(e.record.id);
+				if (userId !== this.currentUserId) return;
 				if (balanceData) this.latestBalanceByAsset.set(e.record.id, balanceData);
 			}
 		} else if (e.action === 'delete') {
@@ -213,34 +254,42 @@ class AssetsContext {
 		}
 	}
 
-	private onAssetBalanceEvent(e: RecordSubscription<AssetBalancesResponse>) {
+	private onAssetBalanceEvent(e: RecordSubscription<AssetBalancesResponse>, userId: string) {
+		if (userId !== this.currentUserId) return;
 		if (!e.action) return;
 		const assetId = e.record.asset;
-		let previousAssetId: string | null = null;
+		let displayedAssetId: string | null = null;
 		for (const [key, currentBalance] of this.latestBalanceByAsset) {
 			if (currentBalance.id === e.record.id) {
-				previousAssetId = key;
+				displayedAssetId = key;
 				break;
 			}
 		}
-		if (previousAssetId && previousAssetId !== assetId) {
-			void this.refetchAssetBalance(previousAssetId);
+		if (displayedAssetId && displayedAssetId !== assetId) {
+			void this.refetchAssetBalance(displayedAssetId, userId);
 		}
 
 		if (e.action === 'create' || e.action === 'update') {
 			const asset = this.rawAssets.find((x) => x.id === assetId);
 			if (!asset) {
-				void this.refreshAsset(assetId)
+				void this.refreshAsset(assetId, userId)
 					.then((refreshed) => {
+						if (userId !== this.currentUserId) return;
 						if (refreshed) this.lastBalanceEvent = Date.now();
 					})
-					.catch((error) => this._pb.handleConnectionError(error, 'assets', 'balance'));
+					.catch((error) => {
+						if (userId === this.currentUserId) {
+							this._pb.handleConnectionError(error, 'assets', 'balance');
+						} else {
+							console.error('[assetsStore] Stale event failed:', error);
+						}
+					});
 				return;
 			}
 
 			const current = this.latestBalanceByAsset.get(assetId);
 			if (current?.id === e.record.id) {
-				void this.refetchAssetBalance(assetId);
+				void this.refetchAssetBalance(assetId, userId);
 				return;
 			}
 
@@ -248,12 +297,14 @@ class AssetsContext {
 				this.latestBalanceByAsset.set(assetId, this.toLatestAssetBalance(e.record));
 				this.lastBalanceEvent = Date.now();
 			}
-		} else if (e.action === 'delete') {
-			void this.refetchAssetBalance(assetId);
+		} else if (e.action === 'delete' && displayedAssetId === assetId) {
+			void this.refetchAssetBalance(assetId, userId);
 		}
 	}
 
-	private onAssetShareEvent(e: RecordSubscription<AssetSharesResponse>) {
+	private onAssetShareEvent(e: RecordSubscription<AssetSharesResponse>, userId: string) {
+		if (userId !== this.currentUserId) return;
+
 		if (e.action === 'create') {
 			this.shares = [...this.shares, e.record];
 		} else if (e.action === 'update') {
@@ -262,11 +313,18 @@ class AssetsContext {
 			this.shares = this.shares.filter((share) => share.id !== e.record.id);
 		}
 
-		void this.refreshAsset(e.record.asset)
+		void this.refreshAsset(e.record.asset, userId)
 			.then((refreshed) => {
+				if (userId !== this.currentUserId) return;
 				if (refreshed) this.lastBalanceEvent = Date.now();
 			})
-			.catch((error) => this._pb.handleConnectionError(error, 'assets', 'share'));
+			.catch((error) => {
+				if (userId === this.currentUserId) {
+					this._pb.handleConnectionError(error, 'assets', 'share');
+				} else {
+					console.error('[assetsStore] Stale event failed:', error);
+				}
+			});
 	}
 
 	private computeBalanceData(
@@ -316,24 +374,36 @@ class AssetsContext {
 		};
 	}
 
-	private async refetchAssetBalance(assetId: string) {
+	private async refetchAssetBalance(assetId: string, userId: string) {
+		if (userId !== this.currentUserId) return;
+
 		try {
 			const balanceData = await this.getLatestAssetBalance(assetId);
+			if (userId !== this.currentUserId) return;
 			if (balanceData) this.latestBalanceByAsset.set(assetId, balanceData);
 			else this.latestBalanceByAsset.delete(assetId);
 			this.lastBalanceEvent = Date.now();
 		} catch (error) {
-			console.error('[assets:refetch_balance]', error);
+			if (userId === this.currentUserId) {
+				console.error('[assets:refetch_balance]', error);
+			} else {
+				console.error('[assetsStore] Stale event failed:', error);
+			}
 		}
 	}
 
-	private async refreshAsset(assetId: string) {
+	private async refreshAsset(assetId: string, userId: string) {
+		if (userId !== this.currentUserId) return false;
+
 		try {
 			const asset = await this._pb.authedClient
 				.collection('assets')
 				.getOne<AssetsResponse>(assetId, { requestKey: null });
+			if (userId !== this.currentUserId) return false;
 			await this.balanceTypesContext.ensureLoaded(asset.balanceType);
+			if (userId !== this.currentUserId) return false;
 			const balanceData = await this.getLatestAssetBalance(assetId);
+			if (userId !== this.currentUserId) return false;
 			const exists = this.rawAssets.some((record) => record.id === asset.id);
 			this.rawAssets = exists
 				? this.rawAssets.map((record) => (record.id === asset.id ? asset : record))
@@ -342,6 +412,7 @@ class AssetsContext {
 			else this.latestBalanceByAsset.delete(assetId);
 			return true;
 		} catch (error) {
+			if (userId !== this.currentUserId) return false;
 			if (this.isUnavailableRecordError(error)) {
 				this.rawAssets = this.rawAssets.filter((asset) => asset.id !== assetId);
 				this.latestBalanceByAsset.delete(assetId);

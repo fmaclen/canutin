@@ -5,7 +5,7 @@
 	import { formatCurrency } from '$lib/components/currency';
 	import Currency from '$lib/components/currency.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
-	import Skeleton from '$lib/components/ui/skeleton/skeleton.svelte';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
 
@@ -247,6 +247,6 @@
 			</div>
 		</Tooltip.Provider>
 	</div>
-{:else}
+{:else if cashflow.isLoading}
 	<Skeleton class="h-[calc(50vh+2rem)] max-h-[22rem] min-h-72" />
 {/if}

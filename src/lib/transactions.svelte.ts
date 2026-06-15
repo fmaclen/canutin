@@ -375,7 +375,7 @@ class TransactionsContext {
 			filterParts.push(`account = '${this.escapeFilterValue(this.accountFilter)}'`);
 		}
 		if (this.labelFilter) {
-			filterParts.push(`labels ?= '${this.escapeFilterValue(this.labelFilter)}'`);
+			filterParts.push(`labels.id ?= '${this.escapeFilterValue(this.labelFilter)}'`);
 		}
 
 		return filterParts.length > 0 ? filterParts.join(' && ') : undefined;
@@ -439,15 +439,7 @@ class TransactionsContext {
 				'id,date,description,value,excluded,account,labels,expand.account.id,expand.account.name,expand.labels.id,expand.labels.name';
 			const filter = this.activeFilter;
 			const sort = this.activeSort;
-			const pageRequest = this._pb.authedClient
-				.collection('transactions')
-				.getList<TransactionsResponse<TransactionExpand>>(this.page, this.pageSize, {
-					sort,
-					expand: 'account,labels',
-					fields,
-					filter,
-					requestKey: null
-				});
+			const usesClientPagination = this.usesClientPagination;
 			if (includeSummary) {
 				const summaryRequest = this._pb.authedClient
 					.collection('transactions')
@@ -457,6 +449,26 @@ class TransactionsContext {
 						fields,
 						filter,
 						batch: 200,
+						requestKey: null
+					});
+				if (usesClientPagination) {
+					const summaryList = await summaryRequest;
+					if (
+						userId !== this._activeUserId ||
+						refreshId !== this._refreshSequence ||
+						summaryRefreshId !== this._summaryRefreshSequence
+					)
+						return;
+					this.summaryTransactions = summaryList;
+					return;
+				}
+				const pageRequest = this._pb.authedClient
+					.collection('transactions')
+					.getList<TransactionsResponse<TransactionExpand>>(this.page, this.pageSize, {
+						sort,
+						expand: 'account,labels',
+						fields,
+						filter,
 						requestKey: null
 					});
 				const [pageList, summaryList] = await Promise.all([pageRequest, summaryRequest]);
@@ -473,6 +485,16 @@ class TransactionsContext {
 				this.summaryTransactions = summaryList;
 				return;
 			}
+			if (usesClientPagination) return;
+			const pageRequest = this._pb.authedClient
+				.collection('transactions')
+				.getList<TransactionsResponse<TransactionExpand>>(this.page, this.pageSize, {
+					sort,
+					expand: 'account,labels',
+					fields,
+					filter,
+					requestKey: null
+				});
 			const pageList = await pageRequest;
 			if (userId !== this._activeUserId || refreshId !== this._refreshSequence) return;
 			if (pageRefreshId === this._pageRefreshSequence) {
@@ -566,8 +588,7 @@ class TransactionsContext {
 
 		switch (option) {
 			case 'this-month': {
-				const adjusted = new Date(startOfThisMonth.getTime() - 1);
-				return { from: adjusted, to: null } as const;
+				return { from: startOfThisMonth, to: null } as const;
 			}
 			case 'last-month': {
 				const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;

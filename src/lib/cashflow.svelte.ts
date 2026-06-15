@@ -45,6 +45,7 @@ class CashflowContext {
 	avg1y: CashflowAverages = $state({ income: 0, expenses: 0, surplus: 0 });
 
 	periods: CashflowPeriod[] = $state([]);
+	isLoading: boolean = $state(true);
 
 	private _pb: PocketBaseContext;
 	private _accountsContext: ReturnType<typeof getAccountsContext>;
@@ -92,7 +93,7 @@ class CashflowContext {
 	private onTransactionEvent(e: RecordSubscription<TransactionsResponse>) {
 		if (!e.action) return;
 
-		const window = this.getCashflowWindow();
+		const cashflowWindow = this.getCashflowWindow();
 		const activeWindow = this._activeWindow;
 		let shouldRecomputeAll = false;
 		let shouldRecomputeFromMap = false;
@@ -100,8 +101,8 @@ class CashflowContext {
 		if (
 			!this._hasTransactionSnapshot ||
 			!activeWindow ||
-			activeWindow.earliestKey !== window.earliestKey ||
-			activeWindow.startNextMonthKey !== window.startNextMonthKey
+			activeWindow.earliestKey !== cashflowWindow.earliestKey ||
+			activeWindow.startNextMonthKey !== cashflowWindow.startNextMonthKey
 		) {
 			shouldRecomputeAll = true;
 		} else {
@@ -145,26 +146,24 @@ class CashflowContext {
 			clearTimeout(this._debounceTimer);
 		}
 
-		this._debounceTimer = setTimeout(async () => {
+		this._debounceTimer = setTimeout(() => {
 			this._debounceTimer = null;
-			try {
-				await this.recomputeAll(this._accountsContext.accounts);
-			} catch (error) {
+			void this.recomputeAll(this._accountsContext.accounts).catch((error) => {
 				console.error('[cashflow:recompute_on_event]', error);
-			}
+			});
 		}, DEBOUNCE_MS);
 	}
 
 	private async recomputeAll(accounts: AccountWithBalance[]) {
 		const recomputeSequence = ++this._recomputeSequence;
-		const window = this.getCashflowWindow();
+		const cashflowWindow = this.getCashflowWindow();
 
 		this._recomputeAllInFlight++;
 		try {
 			const txns = await this._pb.authedClient
 				.collection('transactions')
 				.getFullList<TransactionsResponse>({
-					filter: `date >= '${window.earliestKey}' && date < '${window.startNextMonthKey}' && excluded = ''`,
+					filter: `date >= '${cashflowWindow.earliestKey}' && date < '${cashflowWindow.startNextMonthKey}' && excluded = ''`,
 					fields: 'id,date,account,value',
 					requestKey: null
 				});
@@ -174,11 +173,12 @@ class CashflowContext {
 			this._transactionsById = new SvelteMap(
 				txns.map((transaction) => [transaction.id, transaction])
 			);
-			this._activeWindow = window;
+			this._activeWindow = cashflowWindow;
 			this._hasTransactionSnapshot = true;
-			this.recomputeFromTransactionMap(accounts, window);
+			this.recomputeFromTransactionMap(accounts, cashflowWindow);
 		} finally {
 			this._recomputeAllInFlight--;
+			if (!this._disposed && recomputeSequence === this._recomputeSequence) this.isLoading = false;
 		}
 	}
 
@@ -203,16 +203,26 @@ class CashflowContext {
 		};
 	}
 
-	private transactionWindowMembership(transaction: TransactionsResponse, window: CashflowWindow) {
+	private transactionWindowMembership(
+		transaction: TransactionsResponse,
+		cashflowWindow: CashflowWindow
+	) {
 		if (!transaction.date || !('excluded' in transaction)) return null;
 
 		const date = new Date(transaction.date);
 		if (Number.isNaN(date.valueOf())) return null;
 
-		return date >= window.earliest && date < window.startNextMonth && !transaction.excluded;
+		return (
+			date >= cashflowWindow.earliest &&
+			date < cashflowWindow.startNextMonth &&
+			!transaction.excluded
+		);
 	}
 
-	private recomputeFromTransactionMap(accounts: AccountWithBalance[], window: CashflowWindow) {
+	private recomputeFromTransactionMap(
+		accounts: AccountWithBalance[],
+		cashflowWindow: CashflowWindow
+	) {
 		const accountPerspectiveById = new SvelteMap(
 			accounts.map((account) => [account.id, account.perspective])
 		);
@@ -223,7 +233,7 @@ class CashflowContext {
 		const sumsByMonth = new SvelteMap<string, { income: number; expenses: number }>();
 
 		for (let i = 0; i < CASHFLOW_PERIODS; i++) {
-			const month = addMonths(window.startOfThisMonth, -(CASHFLOW_PERIODS - 1 - i));
+			const month = addMonths(cashflowWindow.startOfThisMonth, -(CASHFLOW_PERIODS - 1 - i));
 			sumsByMonth.set(format(month, 'yyyy-MM'), { income: 0, expenses: 0 });
 		}
 
@@ -236,10 +246,10 @@ class CashflowContext {
 			);
 			const bucket = value >= 0 ? 'income' : 'expenses';
 
-			if (date >= window.start3m) sums3m[bucket] += value;
-			if (date >= window.start6m) sums6m[bucket] += value;
-			if (date >= window.startYtd) sumsYtd[bucket] += value;
-			if (date >= window.start12m) sums1y[bucket] += value;
+			if (date >= cashflowWindow.start3m) sums3m[bucket] += value;
+			if (date >= cashflowWindow.start6m) sums6m[bucket] += value;
+			if (date >= cashflowWindow.startYtd) sumsYtd[bucket] += value;
+			if (date >= cashflowWindow.start12m) sums1y[bucket] += value;
 
 			const monthSums = sumsByMonth.get(t.date.slice(0, 7));
 			if (monthSums) monthSums[bucket] += value;
@@ -250,7 +260,7 @@ class CashflowContext {
 		sumsYtd.surplus = sumsYtd.income + sumsYtd.expenses;
 		sums1y.surplus = sums1y.income + sums1y.expenses;
 
-		const monthsYtd = window.startOfThisMonth.getUTCMonth() + 1;
+		const monthsYtd = cashflowWindow.startOfThisMonth.getUTCMonth() + 1;
 
 		this.avg3m = {
 			income: sums3m.income / 3,
@@ -277,7 +287,7 @@ class CashflowContext {
 
 		for (let i = 0; i < CASHFLOW_PERIODS; i++) {
 			const monthOffset = CASHFLOW_PERIODS - 1 - i;
-			const month = addMonths(window.startOfThisMonth, -monthOffset);
+			const month = addMonths(cashflowWindow.startOfThisMonth, -monthOffset);
 			const isCurrentPeriod = monthOffset === 0;
 
 			const periodKey = format(month, 'yyyy-MM');
