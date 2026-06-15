@@ -9,8 +9,8 @@ import type { PocketBaseContext } from './pocketbase.svelte';
 import {
 	compareByValueDescThenName,
 	resolveSecurityBalanceValues,
-	type SecurityBalanceResolvedValue,
-	sumOrUnknown
+	sumOrUnknown,
+	type SecurityBalanceResolvedValue
 } from './security-balance-values';
 import { projectSignedValue } from './sharing';
 import { toNumber } from './utils';
@@ -315,11 +315,13 @@ class SecuritiesContext {
 	) {
 		if (!userId || userId !== this._auth.currentUserId || token !== this.refreshSequence)
 			return false;
-		const balances = await this._pb.authedClient.collection('securityBalances').getFullList<SecurityBalance>({
-			filter: `account='${accountId}' && security='${securityId}'`,
-			sort: '-asOf,-created,-id',
-			requestKey: null
-		});
+		const balances = await this._pb.authedClient
+			.collection('securityBalances')
+			.getFullList<SecurityBalance>({
+				filter: `account='${accountId}' && security='${securityId}'`,
+				sort: '-asOf,-created,-id',
+				requestKey: null
+			});
 		if (userId !== this._auth.currentUserId || token !== this.refreshSequence) return false;
 
 		const key = this.positionKey(accountId, securityId);
@@ -335,9 +337,10 @@ class SecuritiesContext {
 
 	private upsertSecurity(security: SecuritiesResponse) {
 		const exists = this.securities.some((record) => record.id === security.id);
-		this.securities = (exists
-			? this.securities.map((record) => (record.id === security.id ? security : record))
-			: [...this.securities, security]
+		this.securities = (
+			exists
+				? this.securities.map((record) => (record.id === security.id ? security : record))
+				: [...this.securities, security]
 		).toSorted((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 	}
 

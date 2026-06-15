@@ -48,7 +48,10 @@ export type AssetWithBalance = AssetsResponse &
 class AssetsContext {
 	assets: AssetWithBalance[] = $derived.by(() =>
 		this.rawAssets.map((asset) =>
-			this.toAssetWithBalance(asset, this.latestBalanceByAsset.get(asset.id) ?? DEFAULT_BALANCE_DATA)
+			this.toAssetWithBalance(
+				asset,
+				this.latestBalanceByAsset.get(asset.id) ?? DEFAULT_BALANCE_DATA
+			)
 		)
 	);
 	shares: AssetSharesResponse[] = $state([]);

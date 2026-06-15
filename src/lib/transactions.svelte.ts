@@ -25,7 +25,9 @@ import {
 export type TransactionSortColumn = 'date' | 'description' | 'account' | 'amount';
 
 function isTransactionSortColumn(column: string): column is TransactionSortColumn {
-	return column === 'date' || column === 'description' || column === 'account' || column === 'amount';
+	return (
+		column === 'date' || column === 'description' || column === 'account' || column === 'amount'
+	);
 }
 
 export type PeriodOption =
@@ -447,16 +449,16 @@ class TransactionsContext {
 					requestKey: null
 				});
 			if (includeSummary) {
-				const summaryRequest = this._pb.authedClient.collection('transactions').getFullList<
-					TransactionsResponse<TransactionExpand>
-				>({
-					sort,
-					expand: 'account,labels',
-					fields,
-					filter,
-					batch: 200,
-					requestKey: null
-				});
+				const summaryRequest = this._pb.authedClient
+					.collection('transactions')
+					.getFullList<TransactionsResponse<TransactionExpand>>({
+						sort,
+						expand: 'account,labels',
+						fields,
+						filter,
+						batch: 200,
+						requestKey: null
+					});
 				const [pageList, summaryList] = await Promise.all([pageRequest, summaryRequest]);
 				if (
 					userId !== this._activeUserId ||

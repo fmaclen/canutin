@@ -171,7 +171,9 @@ class CashflowContext {
 
 			if (recomputeSequence !== this._recomputeSequence) return;
 
-			this._transactionsById = new SvelteMap(txns.map((transaction) => [transaction.id, transaction]));
+			this._transactionsById = new SvelteMap(
+				txns.map((transaction) => [transaction.id, transaction])
+			);
 			this._activeWindow = window;
 			this._hasTransactionSnapshot = true;
 			this.recomputeFromTransactionMap(accounts, window);

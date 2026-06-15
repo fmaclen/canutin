@@ -47,12 +47,7 @@ class AccountsContext {
 			const cash = this.latestCashByAccount.get(record.id);
 			const positions = this.positionsSource?.positionsValueByAccount;
 			const positionsValue = positions && positions.has(record.id) ? positions.get(record.id)! : 0;
-			return this.toAccountWithBalance(
-				record,
-				cash?.value ?? 0,
-				positionsValue,
-				cash?.asOf ?? ''
-			);
+			return this.toAccountWithBalance(record, cash?.value ?? 0, positionsValue, cash?.asOf ?? '');
 		})
 	);
 	get accountRecords(): AccountsResponse[] {
@@ -208,10 +203,12 @@ class AccountsContext {
 
 	private async refreshAccounts(userId = this.currentUserId, token = this.refreshSequence) {
 		if (!userId || userId !== this.currentUserId || token !== this.refreshSequence) return;
-		const accounts = await this._pb.authedClient.collection('accounts').getFullList<AccountsResponse>({
-			filter: `owner='${userId}' || accountShares_via_account.recipient ?= '${userId}'`,
-			requestKey: null
-		});
+		const accounts = await this._pb.authedClient
+			.collection('accounts')
+			.getFullList<AccountsResponse>({
+				filter: `owner='${userId}' || accountShares_via_account.recipient ?= '${userId}'`,
+				requestKey: null
+			});
 		for (const account of accounts) {
 			await this.balanceTypesContext.ensureLoaded(account.balanceType);
 		}
@@ -312,7 +309,8 @@ class AccountsContext {
 		void this.refreshAccount(e.record.account, userId)
 			.then(() => this.notifyBalancesChanged())
 			.catch((error) => {
-				if (userId === this.currentUserId) this._pb.handleConnectionError(error, 'accounts', 'share');
+				if (userId === this.currentUserId)
+					this._pb.handleConnectionError(error, 'accounts', 'share');
 			});
 	}
 

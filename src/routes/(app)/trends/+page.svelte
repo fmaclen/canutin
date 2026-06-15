@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { RecordSubscription } from 'pocketbase';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAssetsContext } from '$lib/assets.svelte';
@@ -43,19 +44,21 @@
 	let rawAssetBalances: AssetBalancesResponse[] = $state([]);
 	let historyStart: Date | null = $state(null);
 
-	const includedAccounts = $derived.by(() =>
-		new Map(
-			(accountsCtx?.accounts ?? [])
-				.filter((account) => !account.participantExcluded)
-				.map((account) => [account.id, account] as const)
-		)
+	const includedAccounts = $derived.by(
+		() =>
+			new Map(
+				(accountsCtx?.accounts ?? [])
+					.filter((account) => !account.participantExcluded)
+					.map((account) => [account.id, account] as const)
+			)
 	);
-	const includedAssets = $derived.by(() =>
-		new Map(
-			(assetsCtx?.assets ?? [])
-				.filter((asset) => !asset.participantExcluded)
-				.map((asset) => [asset.id, asset] as const)
-		)
+	const includedAssets = $derived.by(
+		() =>
+			new Map(
+				(assetsCtx?.assets ?? [])
+					.filter((asset) => !asset.participantExcluded)
+					.map((asset) => [asset.id, asset] as const)
+			)
 	);
 	const includedSignature = $derived.by(() =>
 		JSON.stringify({
@@ -120,7 +123,7 @@
 
 	function trimAccountBalances(records: AccountBalancesResponse[], start: Date | null) {
 		if (!start) return records.toSorted(compareBalances);
-		const previousByAccount = new Map<string, AccountBalancesResponse>();
+		const previousByAccount = new SvelteMap<string, AccountBalancesResponse>();
 		const inRange: AccountBalancesResponse[] = [];
 		for (const record of records) {
 			if (new Date(record.asOf) >= start) {
@@ -128,14 +131,15 @@
 				continue;
 			}
 			const previous = previousByAccount.get(record.account);
-			if (!previous || compareBalances(previous, record) < 0) previousByAccount.set(record.account, record);
+			if (!previous || compareBalances(previous, record) < 0)
+				previousByAccount.set(record.account, record);
 		}
 		return [...previousByAccount.values(), ...inRange].toSorted(compareBalances);
 	}
 
 	function trimSecurityBalances(records: TrendSecurityBalance[], start: Date | null) {
 		if (!start) return records.toSorted(compareBalances);
-		const previousByAccountSecurity = new Map<string, TrendSecurityBalance>();
+		const previousByAccountSecurity = new SvelteMap<string, TrendSecurityBalance>();
 		const inRange: TrendSecurityBalance[] = [];
 		for (const record of records) {
 			if (new Date(record.asOf) >= start) {
@@ -153,7 +157,7 @@
 
 	function trimAssetBalances(records: AssetBalancesResponse[], start: Date | null) {
 		if (!start) return records.toSorted(compareBalances);
-		const previousByAsset = new Map<string, AssetBalancesResponse>();
+		const previousByAsset = new SvelteMap<string, AssetBalancesResponse>();
 		const inRange: AssetBalancesResponse[] = [];
 		for (const record of records) {
 			if (new Date(record.asOf) >= start) {
@@ -161,7 +165,8 @@
 				continue;
 			}
 			const previous = previousByAsset.get(record.asset);
-			if (!previous || compareBalances(previous, record) < 0) previousByAsset.set(record.asset, record);
+			if (!previous || compareBalances(previous, record) < 0)
+				previousByAsset.set(record.asset, record);
 		}
 		return [...previousByAsset.values(), ...inRange].toSorted(compareBalances);
 	}
@@ -178,7 +183,9 @@
 		};
 	}
 
-	function projectSecurityBalance(balance: SecurityBalancesResponse<number, number, number, number>) {
+	function projectSecurityBalance(
+		balance: SecurityBalancesResponse<number, number, number, number>
+	) {
 		const account = includedAccounts.get(balance.account);
 		if (!account) return null;
 		const value = toNumber(balance.value);
@@ -195,9 +202,7 @@
 						? null
 						: projectSignedValue(value, account.perspective),
 			quantity:
-				account.closed && new Date(balance.asOf) >= new Date(account.closed)
-					? 0
-					: balance.quantity
+				account.closed && new Date(balance.asOf) >= new Date(account.closed) ? 0 : balance.quantity
 		};
 	}
 
@@ -241,7 +246,7 @@
 				requestKey: null
 			});
 
-		const latestByKey = new Map<
+		const latestByKey = new SvelteMap<
 			string,
 			{
 				balance: SecurityBalancesResponse<number, number, number, number>;
@@ -298,34 +303,35 @@
 		const securityFilter = historyFilter('account', accountIds, start);
 		const assetFilter = historyFilter('asset', assetIds, start);
 		try {
-			const [accountBalancesRange, securityBalancesRangeRaw, assetBalancesRange] = await Promise.all([
-				accountFilter
-					? pb.authedClient.collection('accountBalances').getFullList<AccountBalancesResponse>({
-							sort: 'asOf,created,id',
-							filter: accountFilter,
-							fields: 'id,account,value,asOf,created',
-							requestKey: null
-						})
-					: [],
-				securityFilter
-					? pb.authedClient
-							.collection('securityBalances')
-							.getFullList<SecurityBalancesResponse<number, number, number, number>>({
+			const [accountBalancesRange, securityBalancesRangeRaw, assetBalancesRange] =
+				await Promise.all([
+					accountFilter
+						? pb.authedClient.collection('accountBalances').getFullList<AccountBalancesResponse>({
 								sort: 'asOf,created,id',
-								filter: securityFilter,
-								fields: 'id,account,security,value,quantity,asOf,created',
+								filter: accountFilter,
+								fields: 'id,account,value,asOf,created',
 								requestKey: null
 							})
-					: [],
-				assetFilter
-					? pb.authedClient.collection('assetBalances').getFullList<AssetBalancesResponse>({
-							sort: 'asOf,created,id',
-							filter: assetFilter,
-							fields: 'id,asset,marketValue,asOf,created',
-							requestKey: null
-						})
-					: []
-			]);
+						: [],
+					securityFilter
+						? pb.authedClient
+								.collection('securityBalances')
+								.getFullList<SecurityBalancesResponse<number, number, number, number>>({
+									sort: 'asOf,created,id',
+									filter: securityFilter,
+									fields: 'id,account,security,value,quantity,asOf,created',
+									requestKey: null
+								})
+						: [],
+					assetFilter
+						? pb.authedClient.collection('assetBalances').getFullList<AssetBalancesResponse>({
+								sort: 'asOf,created,id',
+								filter: assetFilter,
+								fields: 'id,asset,marketValue,asOf,created',
+								requestKey: null
+							})
+						: []
+				]);
 
 			const securityBalancesRange = securityBalancesRangeRaw
 				.map(projectSecurityBalance)
@@ -414,7 +420,8 @@
 		}
 		if (
 			historyStart &&
-			((existing && new Date(existing.asOf) < historyStart) || new Date(balance.asOf) < historyStart)
+			((existing && new Date(existing.asOf) < historyStart) ||
+				new Date(balance.asOf) < historyStart)
 		) {
 			scheduleRefresh();
 			return;
@@ -451,7 +458,8 @@
 		}
 		if (
 			historyStart &&
-			((existing && new Date(existing.asOf) < historyStart) || new Date(balance.asOf) < historyStart)
+			((existing && new Date(existing.asOf) < historyStart) ||
+				new Date(balance.asOf) < historyStart)
 		) {
 			scheduleRefresh();
 			return;
@@ -491,7 +499,8 @@
 		}
 		if (
 			historyStart &&
-			((existing && new Date(existing.asOf) < historyStart) || new Date(balance.asOf) < historyStart)
+			((existing && new Date(existing.asOf) < historyStart) ||
+				new Date(balance.asOf) < historyStart)
 		) {
 			scheduleRefresh();
 			return;
@@ -549,10 +558,9 @@
 		addSubscription(
 			pb.authedClient
 				.collection('securityBalances')
-				.subscribe<SecurityBalancesResponse<number, number, number, number>>(
-					'*',
-					handleSecurityBalanceEvent
-				)
+				.subscribe<
+					SecurityBalancesResponse<number, number, number, number>
+				>('*', handleSecurityBalanceEvent)
 		);
 		addSubscription(
 			pb.authedClient
@@ -583,7 +591,6 @@
 		lastIncludedSignature = signature;
 		scheduleRefresh();
 	});
-
 </script>
 
 <header class="bg-background flex h-16 shrink-0 items-center gap-2 border-b">

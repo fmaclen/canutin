@@ -196,7 +196,9 @@
 			if (!earliest || d < earliest) earliest = d;
 		}
 
-		const visiblePeriods = historyStart ? periods.filter((periodDef) => !periodDef.offset.max) : periods;
+		const visiblePeriods = historyStart
+			? periods.filter((periodDef) => !periodDef.offset.max)
+			: periods;
 		const anchorDates = visiblePeriods.map((periodDef) => {
 			if (periodDef.offset.max) return earliest ? new Date(earliest) : now;
 			if (periodDef.offset.ytd) return endOfDay(startOfYear(new UTCDate()));
