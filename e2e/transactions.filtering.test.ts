@@ -229,6 +229,89 @@ test('transactions pagination navigates between pages', async ({ page }) => {
 	await expect(creditRows.first()).toBeVisible();
 });
 
+test('credits filter paginates across pages client-side', async ({ page }) => {
+	const user = await seedUser('dakota');
+
+	const account = await seedAccount({
+		name: 'Primary Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 5000
+	});
+
+	const prefix = 'Credit Batch Tx';
+	const baseDate = new Date();
+	const seededDescriptions: string[] = [];
+	for (let i = 0; i < 51; i++) {
+		const date = new Date(
+			Date.UTC(
+				baseDate.getUTCFullYear(),
+				baseDate.getUTCMonth(),
+				baseDate.getUTCDate(),
+				12,
+				0,
+				0,
+				0
+			)
+		);
+		date.setUTCDate(date.getUTCDate() - i);
+		const description = `${prefix} ${String(i + 1).padStart(3, '0')}`;
+		await seedTransaction({
+			account: account.id,
+			owner: user.id,
+			date: date.toISOString(),
+			description,
+			value: 100 + i
+		});
+		seededDescriptions.push(description);
+	}
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	// Use "Lifetime" so every seeded credit is in range regardless of month boundaries
+	await page.getByLabel('Period').click();
+	await page.getByRole('button', { name: 'Lifetime' }).click();
+	await expect(page.getByLabel('Period')).toContainText('Lifetime');
+
+	await page.getByLabel('Type').click();
+	await page.getByRole('option', { name: 'Credits only' }).click();
+	await expect(page.getByLabel('Type')).toContainText('Credits only');
+
+	const rowsForBatch = page.getByRole('row', { name: prefix });
+	const previousButton = page.getByRole('button', { name: 'Previous' });
+	const nextButton = page.getByRole('button', { name: 'Next' });
+	await expect(rowsForBatch).toHaveCount(50);
+	await expect(previousButton).toBeDisabled();
+	await expect(nextButton).toBeEnabled();
+
+	// Newest transaction is on page 1; the oldest is on page 2 (client-side slice)
+	const firstDescription = seededDescriptions[0] ?? '';
+	const lastDescription = seededDescriptions[seededDescriptions.length - 1] ?? '';
+	await expect(page.getByRole('row', { name: firstDescription })).toBeVisible();
+	await expect(page.getByRole('row', { name: lastDescription })).toHaveCount(0);
+
+	await nextButton.click();
+	await expect(rowsForBatch).toHaveCount(1);
+	await expect(page.getByRole('row', { name: lastDescription })).toBeVisible();
+	await expect(page.getByRole('row', { name: firstDescription })).toHaveCount(0);
+	await expect(nextButton).toBeDisabled();
+	await expect(previousButton).toBeEnabled();
+
+	await previousButton.click();
+	await expect(rowsForBatch).toHaveCount(50);
+	await expect(page.getByRole('row', { name: firstDescription })).toBeVisible();
+	await expect(previousButton).toBeDisabled();
+	await expect(nextButton).toBeEnabled();
+});
+
 test('transactions can be searched by description', async ({ page }) => {
 	const user = await seedUser('grace');
 

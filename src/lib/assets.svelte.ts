@@ -1,5 +1,6 @@
 import { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
+import { SvelteMap } from 'svelte/reactivity';
 
 import { setBalanceTypesContext } from './balance-types.svelte';
 import {
@@ -18,6 +19,11 @@ type AssetBalanceData = {
 	gain: number;
 	gainPercent: number;
 	balanceAsOf: string;
+};
+
+type LatestAssetBalance = AssetBalanceData & {
+	id: string;
+	created: string;
 };
 
 const DEFAULT_BALANCE_DATA: AssetBalanceData = {
@@ -40,13 +46,23 @@ export type AssetWithBalance = AssetsResponse &
 	};
 
 class AssetsContext {
-	assets: AssetWithBalance[] = $state([]);
+	assets: AssetWithBalance[] = $derived.by(() =>
+		this.rawAssets.map((asset) =>
+			this.toAssetWithBalance(
+				asset,
+				this.latestBalanceByAsset.get(asset.id) ?? DEFAULT_BALANCE_DATA
+			)
+		)
+	);
 	shares: AssetSharesResponse[] = $state([]);
 	lastBalanceEvent: number = $state(0);
 	isLoading: boolean = $state(true);
 
+	private rawAssets: AssetsResponse[] = $state([]);
+	private latestBalanceByAsset = new SvelteMap<string, LatestAssetBalance>();
 	private _pb: PocketBaseContext;
 	private balanceTypesContext: ReturnType<typeof setBalanceTypesContext>;
+	private _refreshAssetsSequence = 0;
 
 	constructor(
 		pb: PocketBaseContext,
@@ -90,29 +106,40 @@ class AssetsContext {
 		recipientEmail: string,
 		perspective: AssetSharesPerspectiveOptions
 	) {
+		const userId = this.currentUserId;
 		await this._pb.postJson('/api/shares/assets', {
 			assetId,
 			recipientEmail,
 			perspective
 		});
-		await this.refreshShares();
+		await this.refreshShares(userId);
+		if (await this.refreshAsset(assetId, userId)) this.lastBalanceEvent = Date.now();
 	}
 
 	async updateShareIncludeInNetWorth(shareId: string, includeInNetWorth: boolean) {
-		await this._pb.authedClient.collection('assetShares').update(shareId, { includeInNetWorth });
-		await this.refreshShares();
-		await this.refreshAssets();
+		const userId = this.currentUserId;
+		const share = await this._pb.authedClient
+			.collection('assetShares')
+			.update<AssetSharesResponse>(shareId, { includeInNetWorth });
+		await this.refreshShares(userId);
+		if (await this.refreshAsset(share.asset, userId)) this.lastBalanceEvent = Date.now();
 	}
 
 	async revokeShare(shareId: string) {
+		const userId = this.currentUserId;
+		const assetId = this.shares.find((share) => share.id === shareId)?.asset;
 		await this._pb.authedClient.collection('assetShares').delete(shareId);
-		await this.refreshShares();
+		await this.refreshShares(userId);
+		if (assetId && (await this.refreshAsset(assetId, userId))) {
+			this.lastBalanceEvent = Date.now();
+		}
 	}
 
 	private async init() {
 		try {
+			const userId = this.currentUserId;
 			this.realtimeSubscribe();
-			await this.refreshShares();
+			await this.refreshShares(userId);
 			await this.refreshAssets();
 			this.lastBalanceEvent = Date.now();
 		} catch (error) {
@@ -122,91 +149,162 @@ class AssetsContext {
 		}
 	}
 
-	private async refreshShares() {
-		this.shares = await this._pb.authedClient.collection('assetShares').getFullList({
+	private async refreshShares(userId: string) {
+		if (userId !== this.currentUserId) return false;
+
+		const shares = await this._pb.authedClient.collection('assetShares').getFullList({
 			sort: 'recipientEmail',
 			requestKey: null
 		});
+		if (userId !== this.currentUserId) return false;
+		this.shares = shares;
+		return true;
 	}
 
 	private async refreshAssets() {
+		const refreshId = ++this._refreshAssetsSequence;
 		const list = await this._pb.authedClient.collection('assets').getFullList<AssetsResponse>({
 			requestKey: null
 		});
-		const next: AssetWithBalance[] = [];
+		const latestBalances = new SvelteMap<string, LatestAssetBalance>();
 		for (const asset of list) {
 			await this.balanceTypesContext.ensureLoaded(asset.balanceType);
+			if (refreshId !== this._refreshAssetsSequence) return false;
 			const balanceData = await this.getLatestAssetBalance(asset.id);
-			next.push(this.toAssetWithBalance(asset, balanceData));
+			if (refreshId !== this._refreshAssetsSequence) return false;
+			if (balanceData) latestBalances.set(asset.id, balanceData);
 		}
-		this.assets = next;
+		if (refreshId !== this._refreshAssetsSequence) return false;
+		this.latestBalanceByAsset.clear();
+		for (const [assetId, balance] of latestBalances) {
+			this.latestBalanceByAsset.set(assetId, balance);
+		}
+		this.rawAssets = list;
+		return true;
 	}
 
 	private realtimeSubscribe() {
+		const userId = this.currentUserId;
+		if (!userId) return;
+
 		this._pb.authedClient
 			.collection('assets')
-			.subscribe('*', this.onAssetEvent.bind(this))
-			.catch((error) => this._pb.handleSubscriptionError(error, 'assets', 'subscribe_assets'));
+			.subscribe<AssetsResponse>('*', (event) => {
+				void this.onAssetEvent(event, userId).catch((error) => {
+					if (userId === this.currentUserId) {
+						this._pb.handleConnectionError(error, 'assets', 'asset_event');
+					} else {
+						console.error('[assetsStore] Stale event failed:', error);
+					}
+				});
+			})
+			.catch((error) => {
+				if (userId === this.currentUserId) {
+					this._pb.handleSubscriptionError(error, 'assets', 'subscribe_assets');
+				} else {
+					console.error('[assetsStore] Stale subscription failed:', error);
+				}
+			});
 		this._pb.authedClient
 			.collection('assetBalances')
-			.subscribe('*', this.onAssetBalanceEvent.bind(this))
-			.catch((error) => this._pb.handleSubscriptionError(error, 'assets', 'subscribe_balances'));
+			.subscribe<AssetBalancesResponse>('*', (event) => this.onAssetBalanceEvent(event, userId))
+			.catch((error) => {
+				if (userId === this.currentUserId) {
+					this._pb.handleSubscriptionError(error, 'assets', 'subscribe_balances');
+				} else {
+					console.error('[assetsStore] Stale subscription failed:', error);
+				}
+			});
 		this._pb.authedClient
 			.collection('assetShares')
-			.subscribe('*', this.onAssetShareEvent.bind(this))
-			.catch((error) => this._pb.handleSubscriptionError(error, 'assets', 'subscribe_shares'));
+			.subscribe<AssetSharesResponse>('*', (event) => this.onAssetShareEvent(event, userId))
+			.catch((error) => {
+				if (userId === this.currentUserId) {
+					this._pb.handleSubscriptionError(error, 'assets', 'subscribe_shares');
+				} else {
+					console.error('[assetsStore] Stale subscription failed:', error);
+				}
+			});
 	}
 
-	private async onAssetEvent(e: RecordSubscription<AssetsResponse>) {
+	private async onAssetEvent(e: RecordSubscription<AssetsResponse>, userId: string) {
+		if (userId !== this.currentUserId) return;
+
 		if (e.action === 'create') {
 			await this.balanceTypesContext.ensureLoaded(e.record.balanceType);
 			const balanceData = await this.getLatestAssetBalance(e.record.id);
-			this.assets = [...this.assets, this.toAssetWithBalance(e.record, balanceData)];
+			if (userId !== this.currentUserId) return;
+			this.rawAssets = [...this.rawAssets, e.record];
+			if (balanceData) this.latestBalanceByAsset.set(e.record.id, balanceData);
 		} else if (e.action === 'update') {
-			const existing = this.assets.find((a) => a.id === e.record.id);
-			const balanceData = existing
-				? this.toRawBalanceData(existing)
-				: await this.getLatestAssetBalance(e.record.id);
 			await this.balanceTypesContext.ensureLoaded(e.record.balanceType);
-			this.assets = this.assets.map((x) =>
-				x.id === e.record.id ? this.toAssetWithBalance(e.record, balanceData) : x
-			);
+			if (userId !== this.currentUserId) return;
+			const exists = this.rawAssets.some((asset) => asset.id === e.record.id);
+			this.rawAssets = exists
+				? this.rawAssets.map((asset) => (asset.id === e.record.id ? e.record : asset))
+				: [...this.rawAssets, e.record];
+			if (!this.latestBalanceByAsset.has(e.record.id)) {
+				const balanceData = await this.getLatestAssetBalance(e.record.id);
+				if (userId !== this.currentUserId) return;
+				if (balanceData) this.latestBalanceByAsset.set(e.record.id, balanceData);
+			}
 		} else if (e.action === 'delete') {
-			this.assets = this.assets.filter((x) => x.id !== e.record.id);
+			this.rawAssets = this.rawAssets.filter((x) => x.id !== e.record.id);
+			this.latestBalanceByAsset.delete(e.record.id);
 		}
 	}
 
-	private onAssetBalanceEvent(e: RecordSubscription<AssetBalancesResponse>) {
+	private onAssetBalanceEvent(e: RecordSubscription<AssetBalancesResponse>, userId: string) {
+		if (userId !== this.currentUserId) return;
 		if (!e.action) return;
 		const assetId = e.record.asset;
-		const newAsOf = e.record.asOf;
+		let displayedAssetId: string | null = null;
+		for (const [key, currentBalance] of this.latestBalanceByAsset) {
+			if (currentBalance.id === e.record.id) {
+				displayedAssetId = key;
+				break;
+			}
+		}
+		if (displayedAssetId && displayedAssetId !== assetId) {
+			void this.refetchAssetBalance(displayedAssetId, userId);
+		}
 
 		if (e.action === 'create' || e.action === 'update') {
-			const asset = this.assets.find((x) => x.id === assetId);
+			const asset = this.rawAssets.find((x) => x.id === assetId);
 			if (!asset) {
-				void this.refreshAssets().then(() => {
-					this.lastBalanceEvent = Date.now();
-				});
+				void this.refreshAsset(assetId, userId)
+					.then((refreshed) => {
+						if (userId !== this.currentUserId) return;
+						if (refreshed) this.lastBalanceEvent = Date.now();
+					})
+					.catch((error) => {
+						if (userId === this.currentUserId) {
+							this._pb.handleConnectionError(error, 'assets', 'balance');
+						} else {
+							console.error('[assetsStore] Stale event failed:', error);
+						}
+					});
 				return;
 			}
 
-			if (!asset.balanceAsOf || newAsOf >= asset.balanceAsOf) {
-				this.assets = this.assets.map((x) =>
-					x.id === assetId
-						? {
-								...x,
-								...this.computeBalanceData(e.record, x.perspective)
-							}
-						: x
-				);
+			const current = this.latestBalanceByAsset.get(assetId);
+			if (current?.id === e.record.id) {
+				void this.refetchAssetBalance(assetId, userId);
+				return;
+			}
+
+			if (!current || this.isAtLeastAsRecent(e.record, current)) {
+				this.latestBalanceByAsset.set(assetId, this.toLatestAssetBalance(e.record));
 				this.lastBalanceEvent = Date.now();
 			}
-		} else if (e.action === 'delete') {
-			void this.refetchAssetBalance(assetId);
+		} else if (e.action === 'delete' && displayedAssetId === assetId) {
+			void this.refetchAssetBalance(assetId, userId);
 		}
 	}
 
-	private async onAssetShareEvent(e: RecordSubscription<AssetSharesResponse>) {
+	private onAssetShareEvent(e: RecordSubscription<AssetSharesResponse>, userId: string) {
+		if (userId !== this.currentUserId) return;
+
 		if (e.action === 'create') {
 			this.shares = [...this.shares, e.record];
 		} else if (e.action === 'update') {
@@ -215,8 +313,18 @@ class AssetsContext {
 			this.shares = this.shares.filter((share) => share.id !== e.record.id);
 		}
 
-		await this.refreshAssets();
-		this.lastBalanceEvent = Date.now();
+		void this.refreshAsset(e.record.asset, userId)
+			.then((refreshed) => {
+				if (userId !== this.currentUserId) return;
+				if (refreshed) this.lastBalanceEvent = Date.now();
+			})
+			.catch((error) => {
+				if (userId === this.currentUserId) {
+					this._pb.handleConnectionError(error, 'assets', 'share');
+				} else {
+					console.error('[assetsStore] Stale event failed:', error);
+				}
+			});
 	}
 
 	private computeBalanceData(
@@ -227,21 +335,6 @@ class AssetsContext {
 		return {
 			...projected,
 			balanceAsOf: balance.asOf
-		};
-	}
-
-	private toRawBalanceData(asset: AssetWithBalance) {
-		const rawBookValue =
-			asset.perspective === 'INVERSE' ? -(asset.bookValue ?? 0) : (asset.bookValue ?? 0);
-		const rawMarketValue =
-			asset.perspective === 'INVERSE' ? -(asset.marketValue ?? 0) : (asset.marketValue ?? 0);
-		return {
-			marketValue: rawMarketValue,
-			bookValue: rawBookValue,
-			gain: rawMarketValue - rawBookValue,
-			gainPercent:
-				rawBookValue !== 0 ? ((rawMarketValue - rawBookValue) / Math.abs(rawBookValue)) * 100 : 0,
-			balanceAsOf: asset.balanceAsOf
 		};
 	}
 
@@ -281,27 +374,51 @@ class AssetsContext {
 		};
 	}
 
-	private async refetchAssetBalance(assetId: string) {
+	private async refetchAssetBalance(assetId: string, userId: string) {
+		if (userId !== this.currentUserId) return;
+
 		try {
 			const balanceData = await this.getLatestAssetBalance(assetId);
-			this.assets = this.assets.map((x) =>
-				x.id === assetId
-					? {
-							...x,
-							...this.computeBalanceData(
-								{
-									asOf: balanceData.balanceAsOf,
-									bookValue: balanceData.bookValue,
-									marketValue: balanceData.marketValue
-								},
-								x.perspective
-							)
-						}
-					: x
-			);
+			if (userId !== this.currentUserId) return;
+			if (balanceData) this.latestBalanceByAsset.set(assetId, balanceData);
+			else this.latestBalanceByAsset.delete(assetId);
 			this.lastBalanceEvent = Date.now();
 		} catch (error) {
-			console.error('[assets:refetch_balance]', error);
+			if (userId === this.currentUserId) {
+				console.error('[assets:refetch_balance]', error);
+			} else {
+				console.error('[assetsStore] Stale event failed:', error);
+			}
+		}
+	}
+
+	private async refreshAsset(assetId: string, userId: string) {
+		if (userId !== this.currentUserId) return false;
+
+		try {
+			const asset = await this._pb.authedClient
+				.collection('assets')
+				.getOne<AssetsResponse>(assetId, { requestKey: null });
+			if (userId !== this.currentUserId) return false;
+			await this.balanceTypesContext.ensureLoaded(asset.balanceType);
+			if (userId !== this.currentUserId) return false;
+			const balanceData = await this.getLatestAssetBalance(assetId);
+			if (userId !== this.currentUserId) return false;
+			const exists = this.rawAssets.some((record) => record.id === asset.id);
+			this.rawAssets = exists
+				? this.rawAssets.map((record) => (record.id === asset.id ? asset : record))
+				: [...this.rawAssets, asset];
+			if (balanceData) this.latestBalanceByAsset.set(assetId, balanceData);
+			else this.latestBalanceByAsset.delete(assetId);
+			return true;
+		} catch (error) {
+			if (userId !== this.currentUserId) return false;
+			if (this.isUnavailableRecordError(error)) {
+				this.rawAssets = this.rawAssets.filter((asset) => asset.id !== assetId);
+				this.latestBalanceByAsset.delete(assetId);
+				return true;
+			}
+			throw error;
 		}
 	}
 
@@ -310,11 +427,16 @@ class AssetsContext {
 			.collection('assetBalances')
 			.getList<AssetBalancesResponse>(1, 1, {
 				filter: `asset='${assetId}'`,
-				sort: '-asOf,-created,-id'
+				sort: '-asOf,-created,-id',
+				requestKey: null
 			});
 		const balance = res.items[0];
-		if (!balance) return DEFAULT_BALANCE_DATA;
+		return balance ? this.toLatestAssetBalance(balance) : null;
+	}
+
+	private toLatestAssetBalance(balance: AssetBalancesResponse) {
 		return {
+			id: balance.id,
 			marketValue: balance.marketValue ?? 0,
 			bookValue: balance.bookValue ?? 0,
 			gain: (balance.marketValue ?? 0) - (balance.bookValue ?? 0),
@@ -324,14 +446,34 @@ class AssetsContext {
 							Math.abs(balance.bookValue ?? 0)) *
 						100
 					: 0,
-			balanceAsOf: balance.asOf
+			balanceAsOf: balance.asOf,
+			created: balance.created
 		};
 	}
 
+	private isAtLeastAsRecent(
+		balance: Pick<AssetBalancesResponse, 'asOf' | 'created' | 'id'>,
+		current: Pick<LatestAssetBalance, 'balanceAsOf' | 'created' | 'id'>
+	) {
+		if (balance.asOf !== current.balanceAsOf) return balance.asOf > current.balanceAsOf;
+		if (balance.created !== current.created) return balance.created > current.created;
+		return balance.id >= current.id;
+	}
+
+	private isUnavailableRecordError(error: unknown) {
+		return (
+			typeof error === 'object' &&
+			error !== null &&
+			'status' in error &&
+			(error.status === 403 || error.status === 404)
+		);
+	}
+
 	dispose() {
-		this._pb.authedClient.collection('assets').unsubscribe();
-		this._pb.authedClient.collection('assetBalances').unsubscribe();
-		this._pb.authedClient.collection('assetShares').unsubscribe();
+		this._refreshAssetsSequence++;
+		this._pb.authedClient.collection('assets').unsubscribe('*');
+		this._pb.authedClient.collection('assetBalances').unsubscribe('*');
+		this._pb.authedClient.collection('assetShares').unsubscribe('*');
 	}
 }
 

@@ -38,7 +38,7 @@
 	}
 </script>
 
-{#if tradesContext.filteredRows.length === 0}
+{#if tradesContext.totalItems === 0}
 	<Empty>
 		{m.trades_table_empty()}
 	</Empty>
@@ -187,9 +187,10 @@
 					<Table.Row class="border-t">
 						<Table.Cell colspan={10} class="bg-background px-0 py-3 whitespace-normal">
 							<Pagination.Root
-								count={tradesContext.filteredRows.length}
+								count={tradesContext.totalItems}
 								perPage={tradesContext.pageSize}
-								bind:page={tradesContext.page}
+								page={tradesContext.page}
+								onPageChange={(page) => tradesContext.setPage(page)}
 							>
 								{#snippet children({ pages, currentPage })}
 									<Pagination.Content

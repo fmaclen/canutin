@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
+
 	import { setCashflowContext } from '$lib/cashflow.svelte';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
@@ -14,7 +16,11 @@
 	import TrailingCashflow from './trailing-cashflow.svelte';
 
 	const pb = getPocketBaseContext();
-	setCashflowContext(pb);
+	const cashflowContext = setCashflowContext(pb);
+
+	onDestroy(() => {
+		cashflowContext.dispose();
+	});
 </script>
 
 <header class="bg-background flex h-16 shrink-0 items-center gap-2 border-b">

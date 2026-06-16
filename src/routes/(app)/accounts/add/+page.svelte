@@ -3,6 +3,7 @@
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAuthContext } from '$lib/auth.svelte';
 	import { getBalanceTypesContext } from '$lib/balance-types.svelte';
 	import CurrencyField from '$lib/components/currency-field.svelte';
@@ -26,6 +27,7 @@
 
 	const pb = getPocketBaseContext();
 	const auth = getAuthContext();
+	const accountsContext = getAccountsContext();
 	const balanceTypesContext = getBalanceTypesContext();
 
 	const ownerId = $derived(auth.currentUser?.record?.id);
@@ -69,6 +71,9 @@
 			};
 
 			await pb.authedClient.collection('accountBalances').create(balanceData);
+			if (await accountsContext.refreshAccount(account.id, currentOwnerId)) {
+				accountsContext.notifyBalancesChanged();
+			}
 
 			toast.success(m.accounts_add_success());
 			await goto(resolve('/accounts'));

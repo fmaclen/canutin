@@ -13,7 +13,7 @@
 >
 	<KeyValue
 		title={m.transactions_summary_count_label()}
-		value={txContext.filteredRows.length}
+		value={txContext.totalItems}
 		variant="outline"
 		format="number"
 	/>

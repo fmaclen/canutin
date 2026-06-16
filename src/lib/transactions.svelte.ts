@@ -24,6 +24,12 @@ import {
 
 export type TransactionSortColumn = 'date' | 'description' | 'account' | 'amount';
 
+function isTransactionSortColumn(column: string): column is TransactionSortColumn {
+	return (
+		column === 'date' || column === 'description' || column === 'account' || column === 'amount'
+	);
+}
+
 export type PeriodOption =
 	| 'this-month'
 	| 'last-month'
@@ -52,6 +58,7 @@ export type TransactionRow = {
 	accountId: string | null;
 	accountIsShared: boolean;
 	value: number;
+	hasProjectedValue: boolean;
 	excluded: boolean;
 };
 
@@ -65,6 +72,8 @@ class TransactionsContext {
 	page: number = $state(1);
 	isLoading: boolean = $state(true);
 	rawTransactions: TransactionsResponse<TransactionExpand>[] = $state([]);
+	summaryTransactions: TransactionsResponse<TransactionExpand>[] = $state([]);
+	serverTotalItems: number = $state(0);
 	transactionLabels: TransactionLabelsResponse[] = $state([]);
 	sortColumn: TransactionSortColumn | null = $state('date');
 	sortDirection: SortDirection | null = $state('desc');
@@ -75,12 +84,16 @@ class TransactionsContext {
 	private _customLabel: string | null = $state(null);
 	private _searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 	private _loadingDelayTimer: ReturnType<typeof setTimeout> | null = null;
+	private _refreshTimer: ReturnType<typeof setTimeout> | null = null;
 	private _activeUserId = '';
 	private _isSubscribed = false;
 	private _refreshSequence = 0;
+	private _pageRefreshSequence = 0;
+	private _summaryRefreshSequence = 0;
 
 	private static readonly LOADING_DELAY_MS = 150;
 	private static readonly SEARCH_DEBOUNCE_MS = 300;
+	private static readonly REFRESH_DEBOUNCE_MS = 200;
 
 	readonly periodOptions: PeriodOption[] = [
 		'this-month',
@@ -122,9 +135,8 @@ class TransactionsContext {
 
 		const sortParam = params.get('sort');
 		const dirParam = params.get('dir');
-		const validSortColumns: TransactionSortColumn[] = ['date', 'description', 'account', 'amount'];
-		if (sortParam && validSortColumns.includes(sortParam as TransactionSortColumn)) {
-			this.sortColumn = sortParam as TransactionSortColumn;
+		if (sortParam && isTransactionSortColumn(sortParam)) {
+			this.sortColumn = sortParam;
 			this.sortDirection = dirParam === 'asc' || dirParam === 'desc' ? dirParam : 'desc';
 		} else {
 			this.sortColumn = 'date';
@@ -183,6 +195,7 @@ class TransactionsContext {
 		}
 
 		if (shouldRefresh) {
+			this.page = 1;
 			this.refreshTransactions();
 		}
 	}
@@ -241,6 +254,10 @@ class TransactionsContext {
 			if (userId === this._activeUserId) return;
 			this.unsubscribeRealtime();
 			this._refreshSequence++;
+			if (this._refreshTimer) {
+				clearTimeout(this._refreshTimer);
+				this._refreshTimer = null;
+			}
 			if (this._loadingDelayTimer) {
 				clearTimeout(this._loadingDelayTimer);
 				this._loadingDelayTimer = null;
@@ -249,6 +266,8 @@ class TransactionsContext {
 
 			if (!userId) {
 				this.rawTransactions = [];
+				this.summaryTransactions = [];
+				this.serverTotalItems = 0;
 				this.transactionLabels = [];
 				this.isLoading = false;
 				return;
@@ -314,14 +333,91 @@ class TransactionsContext {
 		this.updateUrl(params);
 	}
 
-	async refreshTransactions(userId = this._activeUserId) {
+	private escapeFilterValue(value: string) {
+		return value.replace(/'/g, "''");
+	}
+
+	private get activeFilter() {
+		const filterParts: string[] = [];
+
+		let from: Date | null;
+		let to: Date | null;
+		if (this._customFromDate !== null || this._customToDate !== null) {
+			from = this._customFromDate;
+			to = this._customToDate;
+		} else {
+			const range = this.getPeriodRange(this.period);
+			from = range.from;
+			to = range.to;
+		}
+
+		if (from) {
+			filterParts.push(`date >= '${toPocketBaseDateString(from)}'`);
+		}
+		if (to) {
+			filterParts.push(`date < '${toPocketBaseDateString(to)}'`);
+		}
+
+		if (this.kind === 'excluded') {
+			filterParts.push('excluded != ""');
+		} else if (this.kind === 'credits') {
+			filterParts.push('excluded = ""');
+		} else if (this.kind === 'debits') {
+			filterParts.push('excluded = ""');
+		}
+
+		const searchQuery = this.search.trim();
+		if (searchQuery) {
+			filterParts.push(`description ~ '${this.escapeFilterValue(searchQuery)}'`);
+		}
+
+		if (this.accountFilter) {
+			filterParts.push(`account = '${this.escapeFilterValue(this.accountFilter)}'`);
+		}
+		if (this.labelFilter) {
+			filterParts.push(`labels.id ?= '${this.escapeFilterValue(this.labelFilter)}'`);
+		}
+
+		return filterParts.length > 0 ? filterParts.join(' && ') : undefined;
+	}
+
+	private get activeSort() {
+		if (!this.sortColumn || !this.sortDirection) return '-date,-created,-id';
+
+		const direction = this.sortDirection === 'desc' ? '-' : '';
+		switch (this.sortColumn) {
+			case 'amount':
+				// NOTE: Displayed amounts are projected from frontend share perspective, so raw
+				// `value` cannot be sorted server-side safely.
+				return '-date,-created,-id';
+			case 'description':
+				return `${direction}description,${direction}date,${direction}id`;
+			case 'account':
+				return `${direction}account.name,${direction}date,${direction}id`;
+			case 'date':
+			default:
+				return `${direction}date,${direction}created,${direction}id`;
+		}
+	}
+
+	private get usesClientPagination() {
+		return this.sortColumn === 'amount' || this.kind === 'credits' || this.kind === 'debits';
+	}
+
+	async refreshTransactions(userId = this._activeUserId, includeSummary = true) {
 		if (userId && userId !== this._activeUserId) return;
 		if (!userId) {
 			this.rawTransactions = [];
+			this.summaryTransactions = [];
+			this.serverTotalItems = 0;
 			this.isLoading = false;
 			return;
 		}
-		const refreshId = ++this._refreshSequence;
+		const refreshId = this._refreshSequence;
+		const pageRefreshId = ++this._pageRefreshSequence;
+		const summaryRefreshId = includeSummary
+			? ++this._summaryRefreshSequence
+			: this._summaryRefreshSequence;
 
 		if (this._loadingDelayTimer) {
 			clearTimeout(this._loadingDelayTimer);
@@ -329,67 +425,100 @@ class TransactionsContext {
 		}
 
 		this._loadingDelayTimer = setTimeout(() => {
-			if (userId !== this._activeUserId || refreshId !== this._refreshSequence) return;
+			if (
+				userId !== this._activeUserId ||
+				refreshId !== this._refreshSequence ||
+				pageRefreshId !== this._pageRefreshSequence
+			)
+				return;
 			this.isLoading = true;
 		}, TransactionsContext.LOADING_DELAY_MS);
 
 		try {
-			const filterParts: string[] = [];
-
-			let from: Date | null;
-			let to: Date | null;
-			if (this._customFromDate !== null || this._customToDate !== null) {
-				from = this._customFromDate;
-				to = this._customToDate;
-			} else {
-				const range = this.getPeriodRange(this.period);
-				from = range.from;
-				to = range.to;
+			const fields =
+				'id,date,description,value,excluded,account,labels,expand.account.id,expand.account.name,expand.labels.id,expand.labels.name';
+			const filter = this.activeFilter;
+			const sort = this.activeSort;
+			const usesClientPagination = this.usesClientPagination;
+			if (includeSummary) {
+				const summaryRequest = this._pb.authedClient
+					.collection('transactions')
+					.getFullList<TransactionsResponse<TransactionExpand>>({
+						sort,
+						expand: 'account,labels',
+						fields,
+						filter,
+						batch: 200,
+						requestKey: null
+					});
+				if (usesClientPagination) {
+					const summaryList = await summaryRequest;
+					if (
+						userId !== this._activeUserId ||
+						refreshId !== this._refreshSequence ||
+						summaryRefreshId !== this._summaryRefreshSequence
+					)
+						return;
+					this.summaryTransactions = summaryList;
+					return;
+				}
+				const pageRequest = this._pb.authedClient
+					.collection('transactions')
+					.getList<TransactionsResponse<TransactionExpand>>(this.page, this.pageSize, {
+						sort,
+						expand: 'account,labels',
+						fields,
+						filter,
+						requestKey: null
+					});
+				const [pageList, summaryList] = await Promise.all([pageRequest, summaryRequest]);
+				if (
+					userId !== this._activeUserId ||
+					refreshId !== this._refreshSequence ||
+					summaryRefreshId !== this._summaryRefreshSequence
+				)
+					return;
+				if (pageRefreshId === this._pageRefreshSequence) {
+					this.rawTransactions = pageList.items;
+					this.serverTotalItems = pageList.totalItems;
+				}
+				this.summaryTransactions = summaryList;
+				return;
 			}
-
-			if (from) {
-				filterParts.push(`date >= '${toPocketBaseDateString(from)}'`);
-			}
-			if (to) {
-				filterParts.push(`date < '${toPocketBaseDateString(to)}'`);
-			}
-
-			if (this.kind === 'excluded') {
-				filterParts.push('excluded != ""');
-			}
-
-			const searchQuery = this.search.trim();
-			if (searchQuery) {
-				const escaped = searchQuery.replace(/'/g, "''");
-				filterParts.push(`description ~ '${escaped}'`);
-			}
-
-			if (this.accountFilter) {
-				filterParts.push(`account = '${this.accountFilter}'`);
-			}
-
-			const filter = filterParts.length > 0 ? filterParts.join(' && ') : undefined;
-
-			const list = await this._pb.authedClient
+			if (usesClientPagination) return;
+			const pageRequest = this._pb.authedClient
 				.collection('transactions')
-				.getFullList<TransactionsResponse<TransactionExpand>>({
-					sort: '-date,-created,-id',
+				.getList<TransactionsResponse<TransactionExpand>>(this.page, this.pageSize, {
+					sort,
 					expand: 'account,labels',
-					batch: 200,
+					fields,
 					filter,
 					requestKey: null
 				});
+			const pageList = await pageRequest;
 			if (userId !== this._activeUserId || refreshId !== this._refreshSequence) return;
-			this.rawTransactions = list;
+			if (pageRefreshId === this._pageRefreshSequence) {
+				this.rawTransactions = pageList.items;
+				this.serverTotalItems = pageList.totalItems;
+			}
 		} catch (error) {
 			if (userId !== this._activeUserId || refreshId !== this._refreshSequence) return;
+			if (
+				pageRefreshId !== this._pageRefreshSequence &&
+				(!includeSummary || summaryRefreshId !== this._summaryRefreshSequence)
+			)
+				return;
 			this._pb.handleConnectionError(error, 'transactions', 'refresh');
 		} finally {
 			if (this._loadingDelayTimer) {
 				clearTimeout(this._loadingDelayTimer);
 				this._loadingDelayTimer = null;
 			}
-			if (userId === this._activeUserId && refreshId === this._refreshSequence)
+			if (
+				userId === this._activeUserId &&
+				refreshId === this._refreshSequence &&
+				pageRefreshId === this._pageRefreshSequence
+			)
 				this.isLoading = false;
 		}
 	}
@@ -434,31 +563,21 @@ class TransactionsContext {
 		this._pb.authedClient.collection('transactionLabels').unsubscribe('*');
 	}
 
-	private async onTransactionEvent(
+	private onTransactionEvent(
 		e: RecordSubscription<TransactionsResponse<TransactionExpand>>,
 		userId: string
 	) {
 		if (!userId || userId !== this._activeUserId) return;
 
-		if (e.action === 'create') {
-			const txn = await this._pb.authedClient
-				.collection('transactions')
-				.getOne<TransactionsResponse<TransactionExpand>>(e.record.id, {
-					expand: 'account,labels'
-				});
+		if (!e.action) return;
+		if (this._refreshTimer) clearTimeout(this._refreshTimer);
+		this._refreshTimer = setTimeout(() => {
+			this._refreshTimer = null;
 			if (userId !== this._activeUserId) return;
-			this.rawTransactions = [...this.rawTransactions, txn];
-		} else if (e.action === 'update') {
-			const txn = await this._pb.authedClient
-				.collection('transactions')
-				.getOne<TransactionsResponse<TransactionExpand>>(e.record.id, {
-					expand: 'account,labels'
-				});
-			if (userId !== this._activeUserId) return;
-			this.rawTransactions = this.rawTransactions.map((x) => (x.id === e.record.id ? txn : x));
-		} else if (e.action === 'delete') {
-			this.rawTransactions = this.rawTransactions.filter((x) => x.id !== e.record.id);
-		}
+			this.refreshTransactions(userId).catch((error) =>
+				this._pb.handleConnectionError(error, 'transactions', 'realtime_refresh')
+			);
+		}, TransactionsContext.REFRESH_DEBOUNCE_MS);
 	}
 
 	private getPeriodRange(option: PeriodOption) {
@@ -469,8 +588,7 @@ class TransactionsContext {
 
 		switch (option) {
 			case 'this-month': {
-				const adjusted = new Date(startOfThisMonth.getTime() - 1);
-				return { from: adjusted, to: null } as const;
+				return { from: startOfThisMonth, to: null } as const;
 			}
 			case 'last-month': {
 				const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
@@ -511,8 +629,8 @@ class TransactionsContext {
 		return map;
 	}
 
-	get allRows() {
-		return this.rawTransactions.map((txn) => {
+	private mapTransactions(transactions: TransactionsResponse<TransactionExpand>[]) {
+		return transactions.map((txn) => {
 			const dateIso = txn.date;
 			const date = new Date(dateIso);
 			const expandedAccount = txn.expand?.account;
@@ -543,9 +661,14 @@ class TransactionsContext {
 				accountId: txn.account ?? null,
 				accountIsShared: Boolean(contextAccount?.isShared),
 				value,
+				hasProjectedValue: Boolean(contextAccount),
 				excluded: Boolean(txn.excluded)
 			};
 		});
+	}
+
+	get allRows() {
+		return this.mapTransactions(this.summaryTransactions);
 	}
 
 	get filteredRows() {
@@ -569,8 +692,8 @@ class TransactionsContext {
 			if (toTime !== null && time >= toTime) return false;
 			if (this.accountFilter && row.accountId !== this.accountFilter) return false;
 			if (this.labelFilter && !row.labelIds.includes(this.labelFilter)) return false;
-			if (this.kind === 'credits') return row.value > 0 && !row.excluded;
-			if (this.kind === 'debits') return row.value < 0 && !row.excluded;
+			if (this.kind === 'credits') return row.hasProjectedValue && row.value > 0 && !row.excluded;
+			if (this.kind === 'debits') return row.hasProjectedValue && row.value < 0 && !row.excluded;
 			if (this.kind === 'excluded') return row.excluded;
 			return true;
 		});
@@ -596,14 +719,21 @@ class TransactionsContext {
 	}
 
 	get totalPages() {
-		const total = this.filteredRows.length;
+		const total = this.totalItems;
 		if (total === 0) return 1;
 		return Math.ceil(total / this.pageSize);
 	}
 
+	get totalItems() {
+		return this.usesClientPagination ? this.filteredRows.length : this.serverTotalItems;
+	}
+
 	get paginatedRows() {
-		const start = (this.page - 1) * this.pageSize;
-		return this.filteredRows.slice(start, start + this.pageSize);
+		if (this.usesClientPagination) {
+			const start = (this.page - 1) * this.pageSize;
+			return this.filteredRows.slice(start, start + this.pageSize);
+		}
+		return this.mapTransactions(this.rawTransactions);
 	}
 
 	get netBalance() {
@@ -648,6 +778,7 @@ class TransactionsContext {
 		params.delete('periodLabel');
 
 		this.updateUrl(params);
+		this.page = 1;
 		this.refreshTransactions();
 	}
 
@@ -666,11 +797,13 @@ class TransactionsContext {
 		this.syncFiltersToParams(params);
 
 		this.updateUrl(params);
+		this.page = 1;
 		this.refreshTransactions();
 	}
 
 	setKind(option: KindFilter) {
 		this.kind = option;
+		this.page = 1;
 
 		const params = new SvelteURLSearchParams(this.currentUrl.searchParams);
 		this.syncFiltersToParams(params);
@@ -705,7 +838,8 @@ class TransactionsContext {
 		return { column: this.sortColumn, direction: this.sortDirection };
 	}
 
-	setSort(column: TransactionSortColumn) {
+	setSort(column: string) {
+		if (!isTransactionSortColumn(column)) return;
 		if (this.sortColumn !== column) {
 			this.sortColumn = column;
 			this.sortDirection = 'desc';
@@ -721,6 +855,15 @@ class TransactionsContext {
 		params.set('dir', this.sortDirection);
 
 		this.updateUrl(params);
+		this.refreshTransactions();
+	}
+
+	setPage(page: number) {
+		const nextPage = Math.min(Math.max(1, page), this.totalPages);
+		if (nextPage === this.page) return;
+		this.page = nextPage;
+		if (this.usesClientPagination) return;
+		this.refreshTransactions(this._activeUserId, false);
 	}
 
 	get selectedIds() {
@@ -786,6 +929,9 @@ class TransactionsContext {
 	}
 
 	dispose() {
+		if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
+		if (this._loadingDelayTimer) clearTimeout(this._loadingDelayTimer);
+		if (this._refreshTimer) clearTimeout(this._refreshTimer);
 		this.unsubscribeRealtime();
 	}
 }

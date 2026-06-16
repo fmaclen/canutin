@@ -20,21 +20,25 @@
 	import TransactionTable from './transaction-table.svelte';
 
 	const txContext = getTransactionsContext();
-	txContext.syncFromUrl();
+	let hasNavigated = $state(false);
 
-	// Sync filters from URL after navigation (e.g., clicking sidebar link)
 	afterNavigate(({ to }) => {
-		if (to?.url.pathname !== '/transactions') return;
+		if (to?.url.pathname !== resolve('/transactions')) return;
+		if (!hasNavigated) {
+			hasNavigated = true;
+			if (to.url.pathname + to.url.search !== txContext.currentListPath) {
+				txContext.syncFromUrl();
+			}
+			return;
+		}
 		txContext.syncFromUrl();
 	});
 
-	// Keep page within valid bounds
 	$effect(() => {
-		if (txContext.page > txContext.totalPages) txContext.page = txContext.totalPages;
-		if (txContext.page < 1) txContext.page = 1;
+		if (txContext.page > txContext.totalPages) txContext.setPage(txContext.totalPages);
+		if (txContext.page < 1) txContext.setPage(1);
 	});
 
-	// Reset pagination whenever the active filters change
 	$effect(() => {
 		void txContext.period;
 		void txContext.kind;

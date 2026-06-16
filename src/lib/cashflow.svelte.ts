@@ -1,13 +1,28 @@
 import { UTCDate } from '@date-fns/utc';
 import { addMonths, format, startOfMonth, startOfYear } from 'date-fns';
 import { type RecordSubscription } from 'pocketbase';
-import { getContext, setContext } from 'svelte';
+import { getContext, setContext, untrack } from 'svelte';
+import { SvelteMap } from 'svelte/reactivity';
 
-import type { TransactionsResponse } from './pocketbase.schema';
+import { getAccountsContext, type AccountWithBalance } from './accounts.svelte';
+import { AccountSharesPerspectiveOptions, type TransactionsResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
+import { projectSignedValue } from './sharing';
 import { toPocketBaseDateString } from './utils';
 
 type CashflowAverages = { income: number; expenses: number; surplus: number };
+
+type CashflowWindow = {
+	startOfThisMonth: Date;
+	start12m: Date;
+	start6m: Date;
+	start3m: Date;
+	startYtd: Date;
+	earliest: Date;
+	startNextMonth: Date;
+	earliestKey: string;
+	startNextMonthKey: string;
+};
 
 export const CASHFLOW_PERIODS = 13;
 
@@ -30,89 +45,263 @@ class CashflowContext {
 	avg1y: CashflowAverages = $state({ income: 0, expenses: 0, surplus: 0 });
 
 	periods: CashflowPeriod[] = $state([]);
+	isLoading: boolean = $state(true);
 
 	private _pb: PocketBaseContext;
+	private _accountsContext: ReturnType<typeof getAccountsContext>;
 	private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
+	private _unsubscribe: (() => void) | null = null;
+	private _disposed = false;
+	private _recomputeSequence = 0;
+	private _recomputeAllInFlight = 0;
+	private _transactionsById = new SvelteMap<string, TransactionsResponse>();
+	private _activeWindow: CashflowWindow | null = null;
+	private _hasTransactionSnapshot = false;
+	private _watchedAccountsKey: string | null = null;
 
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
+		this._accountsContext = getAccountsContext();
 		this.init();
 	}
 
-	private async init() {
-		try {
-			// Subscribe FIRST to avoid missing events during initial fetch
-			this.realtimeSubscribe();
-			await this.recomputeAll();
-		} catch (error) {
-			this._pb.handleConnectionError(error, 'cashflow', 'init');
-		}
+	private init() {
+		this.realtimeSubscribe();
+		// Perf-critical: `accounts` is a $derived that gets a new identity on every
+		// balance tick, so this effect re-runs constantly. It must NOT refetch all
+		// transactions each time. We gate on `watchedAccountsKey` (account ids +
+		// perspectives): a balance-only change recomputes from the in-memory
+		// transaction map (no network); only a change to the watched accounts or a
+		// roll-over of the cashflow window triggers a full recomputeAll() fetch.
+		// Reverting this to recomputeAll(accounts) on every run reintroduces a full
+		// transactions getFullList on every balance event (the regression this fixes).
+		$effect(() => {
+			const accounts = this._accountsContext.accounts;
+			const watchedAccountsKey = this.getWatchedAccountsKey(accounts);
+			const activeWindow = this._activeWindow;
+			const cashflowWindow = this.getCashflowWindow();
+
+			if (watchedAccountsKey === this._watchedAccountsKey) {
+				if (!activeWindow) {
+					if (this._recomputeAllInFlight > 0) return;
+				} else if (
+					activeWindow.earliestKey === cashflowWindow.earliestKey &&
+					activeWindow.startNextMonthKey === cashflowWindow.startNextMonthKey &&
+					this._hasTransactionSnapshot
+				) {
+					untrack(() => {
+						if (this._recomputeAllInFlight === 0) {
+							this.recomputeFromTransactionMap(accounts, activeWindow);
+						}
+					});
+					return;
+				}
+			}
+
+			this._watchedAccountsKey = watchedAccountsKey;
+			void this.recomputeAll(accounts).catch((error) => {
+				if (this._watchedAccountsKey === watchedAccountsKey) this._watchedAccountsKey = null;
+				this._pb.handleConnectionError(error, 'cashflow', 'init');
+			});
+		});
+	}
+
+	private getWatchedAccountsKey(accounts: AccountWithBalance[]) {
+		return accounts
+			.map((account) => `${account.id}:${account.perspective}`)
+			.sort()
+			.join('|');
 	}
 
 	private realtimeSubscribe() {
 		this._pb.authedClient
 			.collection('transactions')
 			.subscribe('*', this.onTransactionEvent.bind(this))
-			.catch((error) => this._pb.handleSubscriptionError(error, 'cashflow', 'subscribe'));
+			.then((unsubscribe) => {
+				if (this._disposed) {
+					unsubscribe();
+					return;
+				}
+
+				this._unsubscribe = unsubscribe;
+			})
+			.catch((error) => {
+				if (!this._disposed) this._pb.handleSubscriptionError(error, 'cashflow', 'subscribe');
+			});
 	}
 
 	private onTransactionEvent(e: RecordSubscription<TransactionsResponse>) {
 		if (!e.action) return;
 
+		const cashflowWindow = this.getCashflowWindow();
+		const activeWindow = this._activeWindow;
+		let shouldRecomputeAll = false;
+		let shouldRecomputeFromMap = false;
+
+		if (
+			!this._hasTransactionSnapshot ||
+			!activeWindow ||
+			activeWindow.earliestKey !== cashflowWindow.earliestKey ||
+			activeWindow.startNextMonthKey !== cashflowWindow.startNextMonthKey
+		) {
+			shouldRecomputeAll = true;
+		} else {
+			if (e.action === 'delete') {
+				if (this._transactionsById.delete(e.record.id)) {
+					shouldRecomputeFromMap = true;
+				} else {
+					const membership = this.transactionWindowMembership(e.record, activeWindow);
+					shouldRecomputeAll = membership !== false;
+				}
+			} else if (e.action === 'create' || e.action === 'update') {
+				const membership = this.transactionWindowMembership(e.record, activeWindow);
+
+				if (membership === null) {
+					shouldRecomputeAll = true;
+				} else if (membership) {
+					if (!this._accountsContext.accounts.some((account) => account.id === e.record.account)) {
+						shouldRecomputeAll = true;
+					} else {
+						this._transactionsById.set(e.record.id, e.record);
+						shouldRecomputeFromMap = true;
+					}
+				} else if (this._transactionsById.delete(e.record.id)) {
+					shouldRecomputeFromMap = true;
+				}
+			} else {
+				shouldRecomputeAll = true;
+			}
+
+			if (shouldRecomputeFromMap) {
+				shouldRecomputeAll = this._recomputeAllInFlight > 0;
+				this._recomputeSequence++;
+				this.recomputeFromTransactionMap(this._accountsContext.accounts, activeWindow);
+				if (!shouldRecomputeAll) return;
+			}
+		}
+
+		if (!shouldRecomputeAll) return;
+
 		if (this._debounceTimer) {
 			clearTimeout(this._debounceTimer);
 		}
 
-		this._debounceTimer = setTimeout(async () => {
+		this._debounceTimer = setTimeout(() => {
 			this._debounceTimer = null;
-			try {
-				await this.recomputeAll();
-			} catch (error) {
+			void this.recomputeAll(this._accountsContext.accounts).catch((error) => {
 				console.error('[cashflow:recompute_on_event]', error);
-			}
+			});
 		}, DEBOUNCE_MS);
 	}
 
-	private async recomputeAll() {
+	private async recomputeAll(accounts: AccountWithBalance[]) {
+		const recomputeSequence = ++this._recomputeSequence;
+		const cashflowWindow = this.getCashflowWindow();
+
+		this._recomputeAllInFlight++;
+		try {
+			const txns = await this._pb.authedClient
+				.collection('transactions')
+				.getFullList<TransactionsResponse>({
+					filter: `date >= '${cashflowWindow.earliestKey}' && date < '${cashflowWindow.startNextMonthKey}' && excluded = ''`,
+					fields: 'id,date,account,value',
+					requestKey: null
+				});
+
+			if (recomputeSequence !== this._recomputeSequence) return;
+
+			this._transactionsById = new SvelteMap(
+				txns.map((transaction) => [transaction.id, transaction])
+			);
+			this._activeWindow = cashflowWindow;
+			this._hasTransactionSnapshot = true;
+			this._watchedAccountsKey = this.getWatchedAccountsKey(accounts);
+			this.recomputeFromTransactionMap(accounts, cashflowWindow);
+		} finally {
+			this._recomputeAllInFlight--;
+			if (!this._disposed && recomputeSequence === this._recomputeSequence) this.isLoading = false;
+		}
+	}
+
+	private getCashflowWindow() {
 		const now = new UTCDate();
 		const startOfThisMonth = startOfMonth(now);
 		const start13m = addMonths(startOfThisMonth, -(CASHFLOW_PERIODS - 1));
-		const start12m = addMonths(startOfThisMonth, -11);
-		const start6m = addMonths(startOfThisMonth, -5);
-		const start3m = addMonths(startOfThisMonth, -2);
 		const startYtd = startOfYear(now);
-
-		// Fetch all needed transactions since the earliest required start (13 months for the chart)
 		const earliest = start13m < startYtd ? start13m : startYtd;
+		const startNextMonth = addMonths(startOfThisMonth, 1);
 
-		const txns = await this._pb.authedClient
-			.collection('transactions')
-			.getFullList<TransactionsResponse>({
-				filter: `date >= '${toPocketBaseDateString(earliest)}'`,
-				requestKey: null // Disable auto-cancellation to prevent glitches during bulk operations
-			});
-
-		const compute = (from: Date) => {
-			let income = 0;
-			let expenses = 0;
-			for (const t of txns) {
-				if (t.excluded) continue;
-				const td = t.date ? new Date(t.date) : null;
-				if (!td || td < from) continue;
-				const v = t.value ?? 0;
-				if (v >= 0) income += v;
-				else expenses += v; // negative values accumulate
-			}
-			const surplus = income + expenses;
-			return { income, expenses, surplus } as const;
+		return {
+			startOfThisMonth,
+			start12m: addMonths(startOfThisMonth, -11),
+			start6m: addMonths(startOfThisMonth, -5),
+			start3m: addMonths(startOfThisMonth, -2),
+			startYtd,
+			earliest,
+			startNextMonth,
+			earliestKey: toPocketBaseDateString(earliest),
+			startNextMonthKey: toPocketBaseDateString(startNextMonth)
 		};
+	}
 
-		const sums3m = compute(start3m);
-		const sums6m = compute(start6m);
-		const sumsYtd = compute(startYtd);
-		const sums1y = compute(start12m);
+	private transactionWindowMembership(
+		transaction: TransactionsResponse,
+		cashflowWindow: CashflowWindow
+	) {
+		if (!transaction.date || !('excluded' in transaction)) return null;
 
-		const monthsYtd = startOfThisMonth.getUTCMonth() + 1; // Jan=0 -> count inclusive
+		const date = new Date(transaction.date);
+		if (Number.isNaN(date.valueOf())) return null;
+
+		return (
+			date >= cashflowWindow.earliest &&
+			date < cashflowWindow.startNextMonth &&
+			!transaction.excluded
+		);
+	}
+
+	private recomputeFromTransactionMap(
+		accounts: AccountWithBalance[],
+		cashflowWindow: CashflowWindow
+	) {
+		const accountPerspectiveById = new SvelteMap(
+			accounts.map((account) => [account.id, account.perspective])
+		);
+		const sums3m = { income: 0, expenses: 0, surplus: 0 };
+		const sums6m = { income: 0, expenses: 0, surplus: 0 };
+		const sumsYtd = { income: 0, expenses: 0, surplus: 0 };
+		const sums1y = { income: 0, expenses: 0, surplus: 0 };
+		const sumsByMonth = new SvelteMap<string, { income: number; expenses: number }>();
+
+		for (let i = 0; i < CASHFLOW_PERIODS; i++) {
+			const month = addMonths(cashflowWindow.startOfThisMonth, -(CASHFLOW_PERIODS - 1 - i));
+			sumsByMonth.set(format(month, 'yyyy-MM'), { income: 0, expenses: 0 });
+		}
+
+		for (const t of this._transactionsById.values()) {
+			if (!t.date) continue;
+			const date = new Date(t.date);
+			const value = projectSignedValue(
+				t.value ?? 0,
+				accountPerspectiveById.get(t.account) ?? AccountSharesPerspectiveOptions.NORMAL
+			);
+			const bucket = value >= 0 ? 'income' : 'expenses';
+
+			if (date >= cashflowWindow.start3m) sums3m[bucket] += value;
+			if (date >= cashflowWindow.start6m) sums6m[bucket] += value;
+			if (date >= cashflowWindow.startYtd) sumsYtd[bucket] += value;
+			if (date >= cashflowWindow.start12m) sums1y[bucket] += value;
+
+			const monthSums = sumsByMonth.get(t.date.slice(0, 7));
+			if (monthSums) monthSums[bucket] += value;
+		}
+
+		sums3m.surplus = sums3m.income + sums3m.expenses;
+		sums6m.surplus = sums6m.income + sums6m.expenses;
+		sumsYtd.surplus = sumsYtd.income + sumsYtd.expenses;
+		sums1y.surplus = sums1y.income + sums1y.expenses;
+
+		const monthsYtd = cashflowWindow.startOfThisMonth.getUTCMonth() + 1;
 
 		this.avg3m = {
 			income: sums3m.income / 3,
@@ -139,33 +328,18 @@ class CashflowContext {
 
 		for (let i = 0; i < CASHFLOW_PERIODS; i++) {
 			const monthOffset = CASHFLOW_PERIODS - 1 - i;
-			const month = addMonths(startOfThisMonth, -monthOffset);
+			const month = addMonths(cashflowWindow.startOfThisMonth, -monthOffset);
 			const isCurrentPeriod = monthOffset === 0;
 
-			// Use YYYY-MM for simpler comparison (avoid timezone issues)
 			const periodKey = format(month, 'yyyy-MM');
-
-			let income = 0;
-			let expenses = 0;
-
-			for (const t of txns) {
-				if (t.excluded) continue;
-				if (!t.date) continue;
-				// Compare by YYYY-MM to avoid timezone edge cases
-				const txMonth = t.date.slice(0, 7);
-				if (txMonth === periodKey) {
-					const v = t.value ?? 0;
-					if (v >= 0) income += v;
-					else expenses += v;
-				}
-			}
+			const monthSums = sumsByMonth.get(periodKey) ?? { income: 0, expenses: 0 };
 
 			periods.push({
 				id: i,
 				month,
-				income,
-				expenses,
-				surplus: income + expenses,
+				income: monthSums.income,
+				expenses: monthSums.expenses,
+				surplus: monthSums.income + monthSums.expenses,
 				isCurrentPeriod,
 				periodLabel: format(month, 'MMMM yyyy')
 			});
@@ -175,10 +349,14 @@ class CashflowContext {
 	}
 
 	dispose() {
+		this._disposed = true;
+		this._recomputeSequence++;
 		if (this._debounceTimer) {
 			clearTimeout(this._debounceTimer);
+			this._debounceTimer = null;
 		}
-		this._pb.authedClient.collection('transactions').unsubscribe();
+		this._unsubscribe?.();
+		this._unsubscribe = null;
 	}
 }
 

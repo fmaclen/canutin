@@ -17,24 +17,26 @@
 
 	import {
 		advanceTrendSecurityValue,
-		buildPreparedMaps,
 		computeRangeForPeriod,
 		latestIndexBeforeOrEqual,
 		type BalanceGroup,
 		type PeriodKey,
+		type PreparedTrendMaps,
 		type TrendSecurityBalance,
 		type TrendSecurityValueState
 	} from './trends';
 
 	let {
 		period = $bindable(),
-		rawAccounts = $bindable(),
-		rawAssets = $bindable(),
-		rawAccountBalances = $bindable(),
-		rawSecurityBalances = $bindable(),
-		rawAssetBalances = $bindable()
+		prepared,
+		rawAccounts,
+		rawAssets,
+		rawAccountBalances,
+		rawSecurityBalances,
+		rawAssetBalances
 	}: {
 		period: PeriodKey;
+		prepared: PreparedTrendMaps;
 		rawAccounts: AccountsResponse[];
 		rawAssets: AssetsResponse[];
 		rawAccountBalances: AccountBalancesResponse[];
@@ -104,7 +106,7 @@
 		return Math.max(48, Math.ceil(maxW) + 16);
 	});
 
-	async function recomputeSeries() {
+	function recomputeSeries() {
 		if (!rawAccounts.length && !rawAssets.length) return;
 		const { start, end } = computeRangeForPeriod(
 			period,
@@ -127,13 +129,7 @@
 			assetBalancesByAssetId,
 			accountById,
 			assetById
-		} = buildPreparedMaps(
-			rawAccounts,
-			rawAssets,
-			rawAccountBalances,
-			rawSecurityBalances,
-			rawAssetBalances
-		);
+		} = prepared;
 
 		const accountIndexPointer = new SvelteMap<string, number>();
 		for (const [accountId, balances] of accountBalancesByAccountId)
@@ -215,7 +211,7 @@
 		series = rows;
 	}
 
-	$effect(() => void recomputeSeries());
+	$effect(() => recomputeSeries());
 </script>
 
 {#if series.length}
@@ -273,5 +269,5 @@
 		</Chart.Container>
 	</div>
 {:else}
-	<Skeleton class="h-96" />
+	<Skeleton class="h-96" showSpinner />
 {/if}

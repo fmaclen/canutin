@@ -57,6 +57,8 @@ class TradesContext {
 	page: number = $state(1);
 	isLoading: boolean = $state(true);
 	rawTransactions: Trade[] = $state([]);
+	summaryTransactions: Trade[] = $state([]);
+	totalItems: number = $state(0);
 
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
@@ -65,13 +67,17 @@ class TradesContext {
 	private _customFromDate: Date | null = $state(null);
 	private _customToDate: Date | null = $state(null);
 	private _customLabel: string | null = $state(null);
+	private _searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 	private _loadingDelayTimer: ReturnType<typeof setTimeout> | null = null;
 	private _refreshTimer: ReturnType<typeof setTimeout> | null = null;
 	private _activeUserId = '';
 	private _isSubscribed = false;
 	private _refreshSequence = 0;
+	private _pageRefreshSequence = 0;
+	private _summaryRefreshSequence = 0;
 
 	private static readonly LOADING_DELAY_MS = 150;
+	private static readonly SEARCH_DEBOUNCE_MS = 300;
 	private static readonly REFRESH_DEBOUNCE_MS = 200;
 
 	readonly periodOptions: PeriodOption[] = [
@@ -154,7 +160,10 @@ class TradesContext {
 			this.typeFilter = typeParam as SecurityTransactionsTypeOptions;
 		}
 
-		if (shouldRefresh) this.refreshTransactions();
+		if (shouldRefresh) {
+			this.page = 1;
+			this.refreshTransactions();
+		}
 	}
 
 	private parseDate(dateString: string) {
@@ -169,6 +178,14 @@ class TradesContext {
 		this.search = query;
 		this.page = 1;
 		this.syncFiltersToUrl();
+
+		if (this._searchDebounceTimer) {
+			clearTimeout(this._searchDebounceTimer);
+		}
+
+		this._searchDebounceTimer = setTimeout(() => {
+			this.refreshTransactions();
+		}, TradesContext.SEARCH_DEBOUNCE_MS);
 	}
 
 	setPresetPeriod(option: PeriodOption) {
@@ -185,6 +202,7 @@ class TradesContext {
 		params.set('period', option);
 
 		this.updateUrl(params);
+		this.page = 1;
 		this.refreshTransactions();
 	}
 
@@ -201,6 +219,7 @@ class TradesContext {
 		params.delete('periodLabel');
 
 		this.updateUrl(params);
+		this.page = 1;
 		this.refreshTransactions();
 	}
 
@@ -220,18 +239,61 @@ class TradesContext {
 
 	setTypeFilter(type: TradeTypeFilter) {
 		this.typeFilter = type;
+		this.page = 1;
 		this.syncFiltersToUrl();
 		this.refreshTransactions();
 	}
 
-	async refreshTransactions(userId = this._activeUserId) {
+	private escapeFilterValue(value: string) {
+		return value.replace(/'/g, "''");
+	}
+
+	private get activeFilter() {
+		const filterParts: string[] = [];
+
+		const { from, to } = this.activeDateRange;
+		if (from) {
+			filterParts.push(`date >= '${toPocketBaseDateString(from)}'`);
+		}
+		if (to) {
+			filterParts.push(`date < '${toPocketBaseDateString(to)}'`);
+		}
+
+		if (this.accountFilter) {
+			filterParts.push(`account = '${this.escapeFilterValue(this.accountFilter)}'`);
+		}
+		if (this.securityFilter) {
+			filterParts.push(`security = '${this.escapeFilterValue(this.securityFilter)}'`);
+		}
+		if (this.typeFilter !== 'all') {
+			filterParts.push(`type = '${this.escapeFilterValue(this.typeFilter)}'`);
+		}
+
+		const searchQuery = this.search.trim();
+		if (searchQuery) {
+			const escaped = this.escapeFilterValue(searchQuery);
+			filterParts.push(
+				`(description ~ '${escaped}' || name ~ '${escaped}' || subtype ~ '${escaped}' || type ~ '${escaped}' || security.name ~ '${escaped}' || security.symbol ~ '${escaped}' || account.name ~ '${escaped}')`
+			);
+		}
+
+		return filterParts.length > 0 ? filterParts.join(' && ') : undefined;
+	}
+
+	async refreshTransactions(userId = this._activeUserId, includeSummary = true) {
 		if (userId && userId !== this._activeUserId) return;
 		if (!userId) {
 			this.rawTransactions = [];
+			this.summaryTransactions = [];
+			this.totalItems = 0;
 			this.isLoading = false;
 			return;
 		}
-		const refreshId = ++this._refreshSequence;
+		const refreshId = this._refreshSequence;
+		const pageRefreshId = ++this._pageRefreshSequence;
+		const summaryRefreshId = includeSummary
+			? ++this._summaryRefreshSequence
+			: this._summaryRefreshSequence;
 
 		if (this._loadingDelayTimer) {
 			clearTimeout(this._loadingDelayTimer);
@@ -239,60 +301,78 @@ class TradesContext {
 		}
 
 		this._loadingDelayTimer = setTimeout(() => {
-			if (userId !== this._activeUserId || refreshId !== this._refreshSequence) return;
+			if (
+				userId !== this._activeUserId ||
+				refreshId !== this._refreshSequence ||
+				pageRefreshId !== this._pageRefreshSequence
+			)
+				return;
 			this.isLoading = true;
 		}, TradesContext.LOADING_DELAY_MS);
 
 		try {
-			const filterParts: string[] = [];
-
-			const { from, to } = this.activeDateRange;
-			if (from) {
-				filterParts.push(`date >= '${toPocketBaseDateString(from)}'`);
+			const fields =
+				'id,date,security,type,subtype,description,name,account,quantity,price,amount,fees,expand.account.id,expand.account.name,expand.security.id,expand.security.name,expand.security.symbol';
+			const filter = this.activeFilter;
+			if (includeSummary) {
+				const requestedPage = this.page;
+				const summaryList = await this._pb.authedClient
+					.collection('securityTransactions')
+					.getFullList<Trade>({
+						sort: '-date,-created,-id',
+						expand: 'account,security',
+						fields,
+						filter,
+						batch: 200,
+						requestKey: null
+					});
+				if (
+					userId !== this._activeUserId ||
+					refreshId !== this._refreshSequence ||
+					summaryRefreshId !== this._summaryRefreshSequence
+				)
+					return;
+				if (pageRefreshId === this._pageRefreshSequence) {
+					const start = (requestedPage - 1) * this.pageSize;
+					this.rawTransactions = summaryList.slice(start, start + this.pageSize);
+					this.totalItems = summaryList.length;
+				}
+				this.summaryTransactions = summaryList;
+				return;
 			}
-			if (to) {
-				filterParts.push(`date < '${toPocketBaseDateString(to)}'`);
-			}
-
-			if (this.accountFilter) {
-				filterParts.push(`account = '${this.accountFilter}'`);
-			}
-			if (this.securityFilter) {
-				filterParts.push(`security = '${this.securityFilter}'`);
-			}
-			if (this.typeFilter !== 'all') {
-				filterParts.push(`type = '${this.typeFilter}'`);
-			}
-
-			const searchQuery = this.search.trim();
-			if (searchQuery) {
-				const escaped = searchQuery.replace(/'/g, "''");
-				filterParts.push(
-					`(description ~ '${escaped}' || subtype ~ '${escaped}' || type ~ '${escaped}' || security.name ~ '${escaped}' || security.symbol ~ '${escaped}' || account.name ~ '${escaped}')`
-				);
-			}
-
-			const filter = filterParts.length > 0 ? filterParts.join(' && ') : undefined;
-			const transactions = await this._pb.authedClient
+			const pageRequest = this._pb.authedClient
 				.collection('securityTransactions')
-				.getFullList<Trade>({
+				.getList<Trade>(this.page, this.pageSize, {
 					sort: '-date,-created,-id',
 					expand: 'account,security',
-					batch: 200,
+					fields,
 					filter,
 					requestKey: null
 				});
+			const pageList = await pageRequest;
 			if (userId !== this._activeUserId || refreshId !== this._refreshSequence) return;
-			this.rawTransactions = transactions;
+			if (pageRefreshId === this._pageRefreshSequence) {
+				this.rawTransactions = pageList.items;
+				this.totalItems = pageList.totalItems;
+			}
 		} catch (error) {
 			if (userId !== this._activeUserId || refreshId !== this._refreshSequence) return;
+			if (
+				pageRefreshId !== this._pageRefreshSequence &&
+				(!includeSummary || summaryRefreshId !== this._summaryRefreshSequence)
+			)
+				return;
 			this._pb.handleConnectionError(error, 'securityTransactions', 'refresh');
 		} finally {
 			if (this._loadingDelayTimer) {
 				clearTimeout(this._loadingDelayTimer);
 				this._loadingDelayTimer = null;
 			}
-			if (userId === this._activeUserId && refreshId === this._refreshSequence)
+			if (
+				userId === this._activeUserId &&
+				refreshId === this._refreshSequence &&
+				pageRefreshId === this._pageRefreshSequence
+			)
 				this.isLoading = false;
 		}
 	}
@@ -315,6 +395,8 @@ class TradesContext {
 
 			if (!userId) {
 				this.rawTransactions = [];
+				this.summaryTransactions = [];
+				this.totalItems = 0;
 				this.isLoading = false;
 				return;
 			}
@@ -439,8 +521,7 @@ class TradesContext {
 
 		switch (option) {
 			case 'this-month': {
-				const adjusted = new Date(startOfThisMonth.getTime() - 1);
-				return { from: adjusted, to: null } as const;
+				return { from: startOfThisMonth, to: null } as const;
 			}
 			case 'last-month': {
 				const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
@@ -476,7 +557,11 @@ class TradesContext {
 	}
 
 	get allRows() {
-		return this.rawTransactions.map((transaction) => {
+		return this.mapTransactions(this.summaryTransactions);
+	}
+
+	private mapTransactions(transactions: Trade[]) {
+		return transactions.map((transaction) => {
 			const date = new Date(transaction.date);
 			const dateValue = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 			const account = this._accountsContext.getAccount(transaction.account);
@@ -538,17 +623,24 @@ class TradesContext {
 	}
 
 	get totalPages() {
-		const total = this.filteredRows.length;
+		const total = this.totalItems;
 		if (total === 0) return 1;
 		return Math.ceil(total / this.pageSize);
 	}
 
 	get paginatedRows() {
-		const start = (this.page - 1) * this.pageSize;
-		return this.filteredRows.slice(start, start + this.pageSize);
+		return this.mapTransactions(this.rawTransactions);
+	}
+
+	setPage(page: number) {
+		const nextPage = Math.min(Math.max(1, page), this.totalPages);
+		if (nextPage === this.page) return;
+		this.page = nextPage;
+		this.refreshTransactions(this._activeUserId, false);
 	}
 
 	dispose() {
+		if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
 		if (this._loadingDelayTimer) clearTimeout(this._loadingDelayTimer);
 		if (this._refreshTimer) clearTimeout(this._refreshTimer);
 		this.unsubscribeRealtime();

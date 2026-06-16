@@ -14,7 +14,7 @@ export type PeriodKey = '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | 'max';
 export type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
 export type TrendSecurityBalance = Pick<
 	SecurityBalancesResponse<number, number, number, number>,
-	'id' | 'account' | 'security' | 'value' | 'quantity' | 'asOf'
+	'id' | 'account' | 'security' | 'value' | 'quantity' | 'asOf' | 'created'
 >;
 
 export type TrendSecurityValueState = {
@@ -22,6 +22,17 @@ export type TrendSecurityValueState = {
 	lastKnownValue: number | null;
 	soldOut: boolean;
 };
+
+export function computeBoundedHistoryStart(period: PeriodKey) {
+	const now = startOfDay(new UTCDate());
+	if (period === '3m') return subMonths(now, 3);
+	if (period === '6m') return subMonths(now, 6);
+	if (period === 'ytd') return startOfYear(now);
+	if (period === '1y') return subYears(now, 1);
+	if (period === '2y') return subYears(now, 2);
+	if (period === '5y') return subYears(now, 5);
+	return null;
+}
 
 export function latestIndexBeforeOrEqual<T extends { asOf: string }>(
 	entries: T[],
@@ -62,12 +73,8 @@ export function computeRangeForPeriod(
 	rawAssetBalances: AssetBalancesResponse[]
 ) {
 	const now = startOfDay(new UTCDate());
-	if (period === '3m') return { start: subMonths(now, 3), end: now };
-	if (period === '6m') return { start: subMonths(now, 6), end: now };
-	if (period === 'ytd') return { start: startOfYear(now), end: now };
-	if (period === '1y') return { start: subYears(now, 1), end: now };
-	if (period === '2y') return { start: subYears(now, 2), end: now };
-	if (period === '5y') return { start: subYears(now, 5), end: now };
+	const boundedStart = computeBoundedHistoryStart(period);
+	if (boundedStart) return { start: boundedStart, end: now };
 
 	const earliest = findEarliestBalanceDate(
 		rawAccountBalances,
@@ -98,9 +105,10 @@ export function buildPreparedMaps(
 		existing.push(balance);
 		securityBalancesByAccountSecurity.set(key, existing);
 	}
+	const assetById = new Map(assets.map((a) => [a.id, a] as const));
 	const assetBalancesByAssetId = new Map<string, AssetBalancesResponse[]>();
 	for (const balance of assetBalances) {
-		if (!assets.find((a) => a.id === balance.asset)) continue;
+		if (!assetById.has(balance.asset)) continue;
 		const existing = assetBalancesByAssetId.get(balance.asset) || [];
 		existing.push(balance);
 		assetBalancesByAssetId.set(balance.asset, existing);
@@ -110,9 +118,11 @@ export function buildPreparedMaps(
 		securityBalancesByAccountSecurity,
 		assetBalancesByAssetId,
 		accountById: new Map(accounts.map((a) => [a.id, a] as const)),
-		assetById: new Map(assets.map((a) => [a.id, a] as const))
+		assetById
 	};
 }
+
+export type PreparedTrendMaps = ReturnType<typeof buildPreparedMaps>;
 
 export function advanceTrendSecurityValue(
 	balances: TrendSecurityBalance[],

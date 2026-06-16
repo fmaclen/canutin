@@ -37,6 +37,7 @@ test('balance sheet', async ({ page }) => {
 	await expect(investments).toContainText('$0');
 	await expect(debt).toContainText('$0');
 	await expect(other).toContainText('$0');
+	await expect(page.getByText('No accounts or assets for this balance group')).toHaveCount(4);
 
 	const creditCard = await seedAccount({
 		name: 'Crescent Classic',
