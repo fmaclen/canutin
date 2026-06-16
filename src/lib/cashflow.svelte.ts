@@ -67,6 +67,14 @@ class CashflowContext {
 
 	private init() {
 		this.realtimeSubscribe();
+		// Perf-critical: `accounts` is a $derived that gets a new identity on every
+		// balance tick, so this effect re-runs constantly. It must NOT refetch all
+		// transactions each time. We gate on `watchedAccountsKey` (account ids +
+		// perspectives): a balance-only change recomputes from the in-memory
+		// transaction map (no network); only a change to the watched accounts or a
+		// roll-over of the cashflow window triggers a full recomputeAll() fetch.
+		// Reverting this to recomputeAll(accounts) on every run reintroduces a full
+		// transactions getFullList on every balance event (the regression this fixes).
 		$effect(() => {
 			const accounts = this._accountsContext.accounts;
 			const watchedAccountsKey = this.getWatchedAccountsKey(accounts);
