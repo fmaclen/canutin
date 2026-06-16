@@ -300,7 +300,7 @@ test('clicking cashflow chart bar navigates to transactions filtered by that mon
 	await expect(page.getByText('Current Month Transaction')).toBeVisible();
 });
 
-test('recipient sees inverse shared account cashflow in projected income and expense buckets', async ({
+test('recipient sees inverse shared account cashflow in per-month income and expense averages', async ({
 	page
 }) => {
 	const marisol = await seedUser('marisol');

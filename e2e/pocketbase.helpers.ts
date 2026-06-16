@@ -264,6 +264,11 @@ export async function deleteUser(id: string) {
 	await pb.collection('users').delete(id);
 }
 
+export async function deleteAssetBalance(id: string) {
+	const pb = await getAdminPB();
+	await pb.collection('assetBalances').delete(id);
+}
+
 export async function getTransactionLabelsByName(owner: string, name: string) {
 	const pb = await getAdminPB();
 	return await pb.collection('transactionLabels').getFullList({

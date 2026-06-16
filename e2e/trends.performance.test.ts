@@ -217,6 +217,17 @@ test('trends performance table', async ({ page }) => {
 	await expect(growthChart).toHaveAttribute('data-growth-start-net', '22500');
 	await expect(growthChart).toHaveAttribute('data-growth-end-net', '5000');
 
+	// The performance table is bounded to 5 years, but the MAX growth chart receives the
+	// full-history balances, so its range start reaches the earliest seeded balance (6 years
+	// back) rather than the 2Y window start.
+	await page.getByRole('tab', { name: 'MAX' }).click();
+	const maxChart = page.locator('[data-growth-period="max"]');
+	await expect(maxChart).toHaveAttribute('data-growth-start', earliest.toISOString().slice(0, 10));
+	await expect(maxChart).not.toHaveAttribute(
+		'data-growth-start',
+		twoYearsStart.toISOString().slice(0, 10)
+	);
+
 	// Table columns: Group | 1W | 1M | 6M | YTD | 1Y | 2Y | 5Y | MAX | Allocation
 	// Columns 1-5 (1W, 1M, 6M, YTD, 1Y) can have date collisions depending on
 	// when the test runs (e.g., 1W and YTD collide in early January).

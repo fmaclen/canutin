@@ -3,6 +3,7 @@ import { expect, test, type Locator } from '@playwright/test';
 import { AssetsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
 import {
+	deleteAssetBalance,
 	recordExists,
 	seedAsset,
 	seedAssetBalance,
@@ -475,7 +476,9 @@ test('user sees stale data warning and can refresh form', async ({ page }) => {
 	await expect(page.getByLabel('Name')).toHaveValue('Vanguard S&P 500 Index Fund');
 });
 
-test('user can delete asset and cascade deletes balances', async ({ page }) => {
+test('asset reverts to prior balance on balance delete, then cascade deletes on asset delete', async ({
+	page
+}) => {
 	const user = await seedUser('victor');
 
 	const asset = await seedAsset({
@@ -485,16 +488,27 @@ test('user can delete asset and cascade deletes balances', async ({ page }) => {
 		balanceType: 'ETF'
 	});
 
-	const balance = await seedAssetBalance({
+	const oldestBalance = await seedAssetBalance({
 		asset: asset.id,
 		owner: user.id,
-		asOf: new Date().toISOString(),
-		bookValue: 10000,
-		marketValue: 12000
+		asOf: '2023-01-01T00:00:00.000Z',
+		marketValue: 3000
+	});
+	const middleBalance = await seedAssetBalance({
+		asset: asset.id,
+		owner: user.id,
+		asOf: '2024-01-01T00:00:00.000Z',
+		marketValue: 7000
+	});
+	const newestBalance = await seedAssetBalance({
+		asset: asset.id,
+		owner: user.id,
+		asOf: '2025-01-01T00:00:00.000Z',
+		marketValue: 9000
 	});
 
 	expect(await recordExists('assets', asset.id)).toBe(true);
-	expect(await recordExists('assetBalances', balance.id)).toBe(true);
+	expect(await recordExists('assetBalances', newestBalance.id)).toBe(true);
 
 	await page.goto('/');
 	await signIn(page, user.email);
@@ -502,6 +516,15 @@ test('user can delete asset and cascade deletes balances', async ({ page }) => {
 
 	const assetRow = page.getByRole('row', { name: 'Old Investment' });
 	await expect(assetRow).toBeVisible();
+	await expectAssetRowCells(assetRow, [[7, '$9,000.00']]);
+
+	await deleteAssetBalance(oldestBalance.id);
+	await expectAssetRowCells(assetRow, [[7, '$9,000.00']]);
+
+	await deleteAssetBalance(newestBalance.id);
+	await expectAssetRowCells(assetRow, [[7, '$7,000.00']]);
+
+	expect(await recordExists('assetBalances', middleBalance.id)).toBe(true);
 
 	await assetRow.getByRole('link', { name: 'Old Investment' }).click();
 	await expect(page).toHaveURL(new RegExp(`/assets/${asset.id}(\\?|$)`));
@@ -517,5 +540,5 @@ test('user can delete asset and cascade deletes balances', async ({ page }) => {
 	await expect(page.getByRole('row', { name: 'Old Investment' })).not.toBeVisible();
 
 	expect(await recordExists('assets', asset.id)).toBe(false);
-	expect(await recordExists('assetBalances', balance.id)).toBe(false);
+	expect(await recordExists('assetBalances', middleBalance.id)).toBe(false);
 });

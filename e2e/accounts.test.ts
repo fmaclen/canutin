@@ -23,7 +23,7 @@ test('accounts table reflects filters, transactions, and aggregate totals', asyn
 	await seedAccountBalance({
 		account: openAccount.id,
 		owner: user.id,
-		asOf: new Date().toISOString(),
+		asOf: '2025-01-01T00:00:00.000Z',
 		value: 2500
 	});
 	await seedTransaction({
@@ -112,6 +112,29 @@ test('accounts table reflects filters, transactions, and aggregate totals', asyn
 	await expect(closedRow).toContainText('-$400');
 	await expect(closedRow.getByText('Closed')).toBeVisible();
 	await expect(aggregateRow).toContainText('-$400');
+
+	await page.getByRole('tab', { name: 'Open' }).click();
+	const openBalanceCell = openRow.locator('td').nth(6);
+	await expect(openBalanceCell).toContainText('$2,500.00');
+	await expect(aggregateRow).toContainText('$2,500.00');
+
+	await seedAccountBalance({
+		account: openAccount.id,
+		owner: user.id,
+		asOf: '2025-02-01T00:00:00.000Z',
+		value: 7777
+	});
+	await expect(openBalanceCell).toContainText('$7,777.00');
+	await expect(aggregateRow).toContainText('$7,777.00');
+
+	await seedAccountBalance({
+		account: openAccount.id,
+		owner: user.id,
+		asOf: '2024-12-01T00:00:00.000Z',
+		value: 3333
+	});
+	await expect(openBalanceCell).toContainText('$7,777.00');
+	await expect(aggregateRow).toContainText('$7,777.00');
 });
 
 test('user can add a new account', async ({ page }) => {
