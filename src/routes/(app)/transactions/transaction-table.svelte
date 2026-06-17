@@ -5,13 +5,14 @@
 	import Empty from '$lib/components/empty.svelte';
 	import Link from '$lib/components/link.svelte';
 	import RecordLink from '$lib/components/record-link.svelte';
-	import { Badge } from '$lib/components/ui/badge/index.js';
+	import { badgeVariants } from '$lib/components/ui/badge/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import * as Pagination from '$lib/components/ui/pagination/index';
 	import * as Table from '$lib/components/ui/table/index';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import { getTransactionsContext } from '$lib/transactions.svelte';
+	import { cn } from '$lib/utils.js';
 
 	const txContext = getTransactionsContext();
 
@@ -149,12 +150,22 @@
 							{/if}
 						</Table.Cell>
 						<Table.Cell>
-							{#if row.labels.length}
+							{#if row.labelChips.length}
 								<div class="flex flex-wrap gap-2">
-									{#each row.labels as label, labelIndex (row.id + '-' + labelIndex)}
-										<Badge variant="outline">
-											{label}
-										</Badge>
+									{#each row.labelChips as label (label.id)}
+										{@const isActive = txContext.labelFilters.includes(label.id)}
+										<button
+											type="button"
+											class={cn(
+												badgeVariants({ variant: 'outline' }),
+												'hover:border-brand hover:text-brand cursor-pointer'
+											)}
+											aria-pressed={isActive}
+											aria-label={m.transactions_filter_by_label({ name: label.name })}
+											onclick={() => txContext.toggleLabelFilter(label.id)}
+										>
+											{label.name}
+										</button>
 									{/each}
 								</div>
 							{:else}

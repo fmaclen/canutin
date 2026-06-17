@@ -43,7 +43,7 @@
 		void txContext.period;
 		void txContext.kind;
 		void txContext.accountFilter;
-		void txContext.labelFilter;
+		void txContext.labelFilters;
 		txContext.page = 1;
 	});
 </script>

@@ -28,11 +28,15 @@
 			? accountsContext.accounts.find((a) => a.id === txContext.accountFilter)
 			: null
 	);
-	let selectedLabel = $derived(
-		txContext.labelFilter
-			? txContext.transactionLabels.find((label) => label.id === txContext.labelFilter)
-			: null
-	);
+	let labelTriggerText = $derived.by(() => {
+		const selected = txContext.labelFilters;
+		if (selected.length === 0) return m.transactions_filter_label_all();
+		if (selected.length === 1) {
+			const label = txContext.transactionLabels.find((l) => l.id === selected[0]);
+			return label?.name ?? m.transactions_filter_label_all();
+		}
+		return m.transactions_filter_label_count({ count: selected.length });
+	});
 
 	let periodPopoverOpen = $state(false);
 
@@ -220,23 +224,23 @@
 		placeholder={m.transactions_filter_account_all()}
 	/>
 	<Select.Root
-		type="single"
-		value={txContext.labelFilter ?? ''}
-		onValueChange={(v) => txContext.setLabelFilter(v || null)}
+		type="multiple"
+		value={txContext.labelFilters}
+		onValueChange={(v) => txContext.setLabelFilters(v)}
 	>
 		<Select.Trigger
 			aria-label={m.transactions_filter_label_label()}
 			class="bg-background w-full sm:w-fit sm:max-w-64"
 		>
-			{#if selectedLabel}
+			{#if txContext.labelFilters.length > 0}
 				<div class="flex w-full items-center gap-2">
-					<span class="max-w-40 truncate">{selectedLabel.name}</span>
+					<span class="max-w-40 truncate">{labelTriggerText}</span>
 					<ClearButton
 						class="ml-auto"
 						onclick={(e) => {
 							e.preventDefault();
 							e.stopPropagation();
-							txContext.setLabelFilter(null);
+							txContext.clearLabelFilters();
 						}}
 						onpointerdown={(e) => {
 							e.preventDefault();
@@ -250,7 +254,7 @@
 					/>
 				</div>
 			{:else}
-				{m.transactions_filter_label_all()}
+				{labelTriggerText}
 			{/if}
 		</Select.Trigger>
 		<Select.Content>
