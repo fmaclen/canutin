@@ -9,6 +9,7 @@
 	import AccountPicker from '$lib/components/account-picker.svelte';
 	import ClearButton from '$lib/components/clear-button.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import { Combobox } from '$lib/components/ui/combobox/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
 	import { RangeCalendar } from '$lib/components/ui/range-calendar/index.js';
@@ -223,15 +224,16 @@
 		selectedNameClass="max-w-40 truncate"
 		placeholder={m.transactions_filter_account_all()}
 	/>
-	<Select.Root
+	<Combobox
 		type="multiple"
 		value={txContext.labelFilters}
-		onValueChange={(v) => txContext.setLabelFilters(v)}
+		onValueChange={(v) => txContext.setLabelFilters(Array.isArray(v) ? v : [v])}
+		items={txContext.transactionLabels.map((l) => ({ value: l.id, label: l.name }))}
+		placeholder={m.transactions_filter_label_all()}
+		ariaLabel={m.transactions_filter_label_label()}
+		triggerClass="sm:w-fit sm:max-w-64"
 	>
-		<Select.Trigger
-			aria-label={m.transactions_filter_label_label()}
-			class="bg-background w-full sm:w-fit sm:max-w-64"
-		>
+		{#snippet triggerContent()}
 			{#if txContext.labelFilters.length > 0}
 				<div class="flex w-full items-center gap-2">
 					<span class="max-w-40 truncate">{labelTriggerText}</span>
@@ -256,11 +258,6 @@
 			{:else}
 				{labelTriggerText}
 			{/if}
-		</Select.Trigger>
-		<Select.Content>
-			{#each txContext.transactionLabels as label (label.id)}
-				<Select.Item value={label.id}>{label.name}</Select.Item>
-			{/each}
-		</Select.Content>
-	</Select.Root>
+		{/snippet}
+	</Combobox>
 </div>
