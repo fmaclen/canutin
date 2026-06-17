@@ -54,6 +54,7 @@ export type TransactionRow = {
 	description: string;
 	labelIds: string[];
 	labels: string[];
+	labelChips: { id: string; name: string }[];
 	accountName: string;
 	accountId: string | null;
 	accountIsShared: boolean;
@@ -67,7 +68,7 @@ class TransactionsContext {
 	kind: KindFilter = $state('all');
 	search: string = $state('');
 	accountFilter: string | null = $state(null);
-	labelFilter: string | null = $state(null);
+	labelFilters: string[] = $state([]);
 	currentListPath: string = $state('/transactions');
 	page: number = $state(1);
 	isLoading: boolean = $state(true);
@@ -131,7 +132,7 @@ class TransactionsContext {
 		this.kind = 'all';
 		this.search = '';
 		this.accountFilter = null;
-		this.labelFilter = null;
+		this.labelFilters = [];
 
 		const sortParam = params.get('sort');
 		const dirParam = params.get('dir');
@@ -184,14 +185,12 @@ class TransactionsContext {
 			}
 		}
 
-		const labelParam = params.get('label');
-		if (labelParam) {
-			const isValid =
-				this.transactionLabels.length === 0 ||
-				this.transactionLabels.some((l) => l.id === labelParam);
-			if (isValid) {
-				this.labelFilter = labelParam;
-			}
+		const labelParams = params.getAll('label');
+		if (labelParams.length > 0) {
+			this.labelFilters = labelParams.filter(
+				(id) =>
+					this.transactionLabels.length === 0 || this.transactionLabels.some((l) => l.id === id)
+			);
 		}
 
 		if (shouldRefresh) {
@@ -241,10 +240,9 @@ class TransactionsContext {
 		} else {
 			params.delete('account');
 		}
-		if (this.labelFilter) {
-			params.set('label', this.labelFilter);
-		} else {
-			params.delete('label');
+		params.delete('label');
+		for (const labelId of this.labelFilters) {
+			params.append('label', labelId);
 		}
 	}
 
@@ -374,8 +372,11 @@ class TransactionsContext {
 		if (this.accountFilter) {
 			filterParts.push(`account = '${this.escapeFilterValue(this.accountFilter)}'`);
 		}
-		if (this.labelFilter) {
-			filterParts.push(`labels.id ?= '${this.escapeFilterValue(this.labelFilter)}'`);
+		if (this.labelFilters.length > 0) {
+			const labelClauses = this.labelFilters.map(
+				(labelId) => `labels.id ?= '${this.escapeFilterValue(labelId)}'`
+			);
+			filterParts.push(`(${labelClauses.join(' || ')})`);
 		}
 
 		return filterParts.length > 0 ? filterParts.join(' && ') : undefined;
@@ -642,10 +643,11 @@ class TransactionsContext {
 				'';
 			const expandedLabels = txn.expand?.labels ?? [];
 			const dateValue = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
-			const labelNames = expandedLabels
-				.map((label) => label.name)
-				.filter((name): name is string => Boolean(name))
-				.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+			const labelChips = expandedLabels
+				.filter((label): label is typeof label & { name: string } => Boolean(label.name))
+				.map((label) => ({ id: label.id, name: label.name }))
+				.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+			const labelNames = labelChips.map((label) => label.name);
 			const labelIds = txn.labels ?? [];
 			const rawValue = txn.value ?? 0;
 			const value = contextAccount?.perspective === 'INVERSE' ? -rawValue : rawValue;
@@ -657,6 +659,7 @@ class TransactionsContext {
 				description: (txn.description ?? '').trim(),
 				labelIds,
 				labels: labelNames,
+				labelChips,
 				accountName,
 				accountId: txn.account ?? null,
 				accountIsShared: Boolean(contextAccount?.isShared),
@@ -691,7 +694,11 @@ class TransactionsContext {
 			if (fromTime !== null && time < fromTime) return false;
 			if (toTime !== null && time >= toTime) return false;
 			if (this.accountFilter && row.accountId !== this.accountFilter) return false;
-			if (this.labelFilter && !row.labelIds.includes(this.labelFilter)) return false;
+			if (
+				this.labelFilters.length > 0 &&
+				!this.labelFilters.some((labelId) => row.labelIds.includes(labelId))
+			)
+				return false;
 			if (this.kind === 'credits') return row.hasProjectedValue && row.value > 0 && !row.excluded;
 			if (this.kind === 'debits') return row.hasProjectedValue && row.value < 0 && !row.excluded;
 			if (this.kind === 'excluded') return row.excluded;
@@ -823,8 +830,8 @@ class TransactionsContext {
 		this.refreshTransactions();
 	}
 
-	setLabelFilter(labelId: string | null) {
-		this.labelFilter = labelId;
+	private applyLabelFilters(labelIds: string[]) {
+		this.labelFilters = labelIds;
 		this.page = 1;
 
 		const params = new SvelteURLSearchParams(this.currentUrl.searchParams);
@@ -832,6 +839,21 @@ class TransactionsContext {
 
 		this.updateUrl(params);
 		this.refreshTransactions();
+	}
+
+	toggleLabelFilter(labelId: string) {
+		const next = this.labelFilters.includes(labelId)
+			? this.labelFilters.filter((id) => id !== labelId)
+			: [...this.labelFilters, labelId];
+		this.applyLabelFilters(next);
+	}
+
+	setLabelFilters(labelIds: string[]) {
+		this.applyLabelFilters(labelIds);
+	}
+
+	clearLabelFilters() {
+		this.applyLabelFilters([]);
 	}
 
 	get sortState(): SortState<TransactionSortColumn> {

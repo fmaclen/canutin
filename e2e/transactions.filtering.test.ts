@@ -1211,6 +1211,8 @@ test('transactions can be filtered by label', async ({ page }) => {
 	await expect(page.getByRole('option', { name: 'Groceries' })).toBeVisible();
 	await expect(page.getByRole('option', { name: 'Utilities' })).toBeVisible();
 	await page.getByRole('option', { name: 'Groceries' }).click();
+	// Multi-select keeps the menu open after picking an item; close it before asserting the trigger
+	await page.keyboard.press('Escape');
 
 	await expect(page.getByLabel('Label', { exact: true })).toContainText('Groceries');
 	await expect(page.getByText('Farm Stand Produce')).toBeVisible();
@@ -1249,6 +1251,162 @@ test('transactions can be filtered by label', async ({ page }) => {
 	await expect(page).not.toHaveURL(/label=/);
 	await expect(page.getByLabel('Label', { exact: true })).toContainText('All labels');
 	await expect(page.getByText('Electric Company Bill')).toBeVisible();
+});
+
+test('clicking a label chip on a row applies the label filter', async ({ page }) => {
+	const user = await seedUser('sage');
+
+	const account = await seedAccount({
+		name: 'Household Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 2500
+	});
+
+	const groceriesLabel = await seedTransactionLabel({ name: 'Groceries', owner: user.id });
+	const utilitiesLabel = await seedTransactionLabel({ name: 'Utilities', owner: user.id });
+	const now = new UTCDate();
+
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Farm Stand Produce',
+		value: -42,
+		labels: [groceriesLabel.id]
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Electric Company Bill',
+		value: -118,
+		labels: [utilitiesLabel.id]
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Unlabeled Cash Withdrawal',
+		value: -80
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	await expect(page.getByText('Farm Stand Produce')).toBeVisible();
+	await expect(page.getByText('Electric Company Bill')).toBeVisible();
+	await expect(page.getByText('Unlabeled Cash Withdrawal')).toBeVisible();
+	await expect(page.getByLabel('Label', { exact: true })).toContainText('All labels');
+
+	const groceriesChip = page.getByRole('button', { name: 'Filter by Groceries' });
+	await expect(groceriesChip).toHaveAttribute('aria-pressed', 'false');
+
+	await groceriesChip.click();
+
+	await expect(groceriesChip).toHaveAttribute('aria-pressed', 'true');
+	await expect(page.getByLabel('Label', { exact: true })).toContainText('Groceries');
+	await expect(page.getByText('Farm Stand Produce')).toBeVisible();
+	await expect(page.getByText('Electric Company Bill')).not.toBeVisible();
+	await expect(page.getByText('Unlabeled Cash Withdrawal')).not.toBeVisible();
+	await expect(page).toHaveURL(/label=/);
+
+	// Clicking the active chip again removes the label and returns to the unfiltered view
+	await groceriesChip.click();
+
+	await expect(groceriesChip).toHaveAttribute('aria-pressed', 'false');
+	await expect(page.getByLabel('Label', { exact: true })).toContainText('All labels');
+	await expect(page.getByText('Farm Stand Produce')).toBeVisible();
+	await expect(page.getByText('Electric Company Bill')).toBeVisible();
+	await expect(page.getByText('Unlabeled Cash Withdrawal')).toBeVisible();
+	await expect(page).not.toHaveURL(/label=/);
+});
+
+test('selecting multiple labels filters with OR semantics', async ({ page }) => {
+	const user = await seedUser('willow');
+
+	const account = await seedAccount({
+		name: 'Household Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 2500
+	});
+
+	const groceriesLabel = await seedTransactionLabel({ name: 'Groceries', owner: user.id });
+	const utilitiesLabel = await seedTransactionLabel({ name: 'Utilities', owner: user.id });
+	const now = new UTCDate();
+
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Farm Stand Produce',
+		value: -42,
+		labels: [groceriesLabel.id]
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Electric Company Bill',
+		value: -118,
+		labels: [utilitiesLabel.id]
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Unlabeled Cash Withdrawal',
+		value: -80
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	await expect(page.getByText('Farm Stand Produce')).toBeVisible();
+	await expect(page.getByText('Electric Company Bill')).toBeVisible();
+	await expect(page.getByText('Unlabeled Cash Withdrawal')).toBeVisible();
+	await expect(page.getByLabel('Label', { exact: true })).toContainText('All labels');
+
+	// The dropdown lists every label, so it can select both even after the first pick
+	// filters the Utilities row (and its chip) out of the table. Multi-select keeps the
+	// menu open between clicks; close it with Escape before asserting the trigger.
+	await page.getByLabel('Label', { exact: true }).click();
+	await page.getByRole('option', { name: 'Groceries' }).click();
+	await page.getByRole('option', { name: 'Utilities' }).click();
+	await page.keyboard.press('Escape');
+
+	// OR semantics: a row matching either label stays visible, a row matching neither is hidden
+	await expect(page.getByText('Farm Stand Produce')).toBeVisible();
+	await expect(page.getByText('Electric Company Bill')).toBeVisible();
+	await expect(page.getByText('Unlabeled Cash Withdrawal')).not.toBeVisible();
+	await expect(page.getByLabel('Label', { exact: true })).toContainText('2 labels');
+
+	const labelParams = new URL(page.url()).searchParams.getAll('label');
+	expect(labelParams).toContain(groceriesLabel.id);
+	expect(labelParams).toContain(utilitiesLabel.id);
+
+	await page.getByLabel('Clear label filter').click();
+
+	await expect(page.getByLabel('Label', { exact: true })).toContainText('All labels');
+	await expect(page.getByText('Farm Stand Produce')).toBeVisible();
+	await expect(page.getByText('Electric Company Bill')).toBeVisible();
+	await expect(page.getByText('Unlabeled Cash Withdrawal')).toBeVisible();
+	await expect(page).not.toHaveURL(/label=/);
 });
 
 test('account filter works with other filters combined', async ({ page }) => {
