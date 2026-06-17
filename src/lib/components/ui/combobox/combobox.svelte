@@ -160,7 +160,10 @@
 			<span class="truncate">{triggerLabel}</span>
 		{/if}
 	</Popover.SelectTrigger>
-	<Popover.Content class={cn('w-(--bits-popover-anchor-width) p-0', contentClass)} align="start">
+	<Popover.Content
+		class={cn('min-w-[max(var(--bits-popover-anchor-width),14rem)] p-0', contentClass)}
+		align="start"
+	>
 		<Command.Root filter={comboboxFilter}>
 			<Command.Input placeholder={searchPlaceholder} autofocus />
 			<Command.List>
@@ -169,12 +172,17 @@
 						<LoaderCircleIcon class="text-muted-foreground size-4 animate-spin" />
 					</Command.Loading>
 				{:else if items.length === 0 && !pinned}
-					<Command.Item disabled forceMount>{emptyText}</Command.Item>
+					<Command.Group>
+						<Command.Item disabled forceMount>{emptyText}</Command.Item>
+					</Command.Group>
 				{:else}
 					{#if pinned}
 						<Command.Group forceMount>
 							{@render pinned({ close })}
 						</Command.Group>
+						{#if items.length > 0}
+							<Command.Separator forceMount />
+						{/if}
 					{/if}
 					{#if items.length > 0}
 						<Command.Empty>{m.select_search_no_results()}</Command.Empty>
@@ -195,9 +203,11 @@
 							</Command.Group>
 						{/each}
 					{:else}
-						{#each items as entry (entry.value)}
-							{@render commandItem(entry)}
-						{/each}
+						<Command.Group>
+							{#each items as entry (entry.value)}
+								{@render commandItem(entry)}
+							{/each}
+						</Command.Group>
 					{/if}
 				{/if}
 			</Command.List>

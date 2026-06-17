@@ -205,7 +205,6 @@
 	"securities_name_required": "Ingresa un nombre de título",
 	"securities_select_placeholder": "Seleccionar título",
 	"securities_select_new_label": "Agregar nuevo título",
-	"securities_select_group_new": "Crear nuevo",
 	"securities_select_add_option": "Agregar título",
 	"securities_button_add": "Agregar título",
 	"securities_button_add_balance": "Agregar balance",

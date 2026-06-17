@@ -16,7 +16,7 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
-	import { tradeTypeLabel } from '$lib/trade-display';
+	import { securityComboboxLabel, tradeTypeLabel } from '$lib/trade-display';
 	import { getTradesContext, type TradeTypeFilter } from '$lib/trades.svelte';
 	import type { PeriodOption } from '$lib/transactions.svelte';
 
@@ -33,7 +33,7 @@
 		securitiesContext.securities.map(
 			(security): ComboboxItem => ({
 				value: security.id,
-				label: security.name,
+				label: securityComboboxLabel(security),
 				keywords: security.symbol ? [security.symbol] : undefined
 			})
 		)

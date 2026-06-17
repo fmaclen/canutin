@@ -20,6 +20,7 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
+	import { securityComboboxLabel } from '$lib/trade-display';
 
 	import BalanceFields from '../balance-fields.svelte';
 	import { createSecurityBalanceFormData, toSecurityBalanceInput } from '../balance-form';
@@ -46,7 +47,7 @@
 	const securityItems = $derived<ComboboxItem[]>(
 		securitiesContext.securities.map((security) => ({
 			value: security.id,
-			label: security.name,
+			label: securityComboboxLabel(security),
 			keywords: security.symbol ? [security.symbol] : undefined
 		}))
 	);
@@ -153,23 +154,21 @@
 								{#if isNewSecurity}
 									{m.securities_select_new_label()}
 								{:else if selectedSecurity}
-									{selectedSecurity.name}
+									{securityComboboxLabel(selectedSecurity)}
 								{:else}
 									<span class="text-muted-foreground">{m.securities_select_placeholder()}</span>
 								{/if}
 							{/snippet}
 							{#snippet pinned({ close })}
-								<Command.Group heading={m.securities_select_group_new()}>
-									<Command.Item
-										value={newSecurityValue}
-										onSelect={() => {
-											securityId = newSecurityValue;
-											close();
-										}}
-									>
-										{m.securities_select_add_option()}
-									</Command.Item>
-								</Command.Group>
+								<Command.Item
+									value={newSecurityValue}
+									onSelect={() => {
+										securityId = newSecurityValue;
+										close();
+									}}
+								>
+									{m.securities_select_add_option()}
+								</Command.Item>
 							{/snippet}
 						</Combobox>
 					</FormFieldRow>

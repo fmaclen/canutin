@@ -205,7 +205,6 @@
 	"securities_name_required": "Enter a security name",
 	"securities_select_placeholder": "Select security",
 	"securities_select_new_label": "Add new security",
-	"securities_select_group_new": "Create new",
 	"securities_select_add_option": "Add security",
 	"securities_button_add": "Add security",
 	"securities_button_add_balance": "Add balance",

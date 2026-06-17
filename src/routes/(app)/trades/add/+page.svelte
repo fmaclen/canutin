@@ -25,7 +25,7 @@
 	import { SecurityTransactionsTypeOptions } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
-	import { tradeTypeLabel } from '$lib/trade-display';
+	import { securityComboboxLabel, tradeTypeLabel } from '$lib/trade-display';
 	import { toNumber } from '$lib/utils';
 
 	const pb = getPocketBaseContext();
@@ -57,7 +57,7 @@
 		securitiesContext.securities.map(
 			(security): ComboboxItem => ({
 				value: security.id,
-				label: security.name,
+				label: securityComboboxLabel(security),
 				keywords: security.symbol ? [security.symbol] : undefined
 			})
 		)

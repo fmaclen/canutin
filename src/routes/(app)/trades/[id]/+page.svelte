@@ -34,7 +34,7 @@
 	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
-	import { tradeTypeLabel } from '$lib/trade-display';
+	import { securityComboboxLabel, tradeTypeLabel } from '$lib/trade-display';
 	import { sanitizeFromParam, toNumber } from '$lib/utils';
 
 	type TradeResponse = SecurityTransactionsResponse<
@@ -98,14 +98,14 @@
 		const items = securitiesContext.securities.map(
 			(security): ComboboxItem => ({
 				value: security.id,
-				label: security.name,
+				label: securityComboboxLabel(security),
 				keywords: security.symbol ? [security.symbol] : undefined
 			})
 		);
 		if (selectedSecurity && !items.some((item) => item.value === selectedSecurity.id)) {
 			items.unshift({
 				value: selectedSecurity.id,
-				label: selectedSecurity.name,
+				label: securityComboboxLabel(selectedSecurity),
 				keywords: selectedSecurity.symbol ? [selectedSecurity.symbol] : undefined
 			});
 		}

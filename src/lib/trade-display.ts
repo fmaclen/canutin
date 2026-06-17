@@ -1,6 +1,10 @@
 import { m } from '$lib/paraglide/messages';
 import { SecurityTransactionsTypeOptions } from '$lib/pocketbase.schema';
 
+export function securityComboboxLabel(security: { name: string; symbol?: string }) {
+	return security.symbol ? `${security.name} (${security.symbol})` : security.name;
+}
+
 export function tradeTypeLabel(type: SecurityTransactionsTypeOptions) {
 	switch (type) {
 		case SecurityTransactionsTypeOptions.buy:

@@ -77,7 +77,7 @@ test('user can edit and delete a trade from the trades list', async ({ page }) =
 	await expect(page).toHaveURL(new RegExp(`/trades/${trade.id}(\\?|$)`));
 	await expect(page.getByLabel('Account')).toHaveText('Summit Brokerage');
 	await expect(page.getByLabel('Date')).toHaveValue(formatDateForInput(tradeDate));
-	await expect(page.getByLabel('Security')).toHaveText('Cobalt Growth Fund');
+	await expect(page.getByLabel('Security')).toHaveText('Cobalt Growth Fund (CGF)');
 	await expect(page.getByLabel('Description')).toHaveValue('Cobalt opening position');
 	await expect(page.getByLabel('Quantity')).toHaveValue('10.00');
 	await expect(page.getByLabel('Price')).toHaveValue('$200.00');
