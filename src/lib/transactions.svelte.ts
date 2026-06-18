@@ -88,6 +88,9 @@ class TransactionsContext {
 	private _refreshTimer: ReturnType<typeof setTimeout> | null = null;
 	private _activeUserId = '';
 	private _isSubscribed = false;
+	private _teardownCallback = () => this.unsubscribeRealtime();
+	private _unsubscribe: (() => void) | null = null;
+	private _unsubscribeLabels: (() => void) | null = null;
 	private _refreshSequence = 0;
 	private _pageRefreshSequence = 0;
 	private _summaryRefreshSequence = 0;
@@ -115,6 +118,7 @@ class TransactionsContext {
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
 		this._auth = getAuthContext();
+		this._auth.registerRealtimeTeardown(this._teardownCallback);
 		this._accountsContext = getAccountsContext();
 		this.syncFromUrl(false);
 		this.init();
@@ -532,6 +536,13 @@ class TransactionsContext {
 			.subscribe<TransactionsResponse<TransactionExpand>>('*', (event) =>
 				this.onTransactionEvent(event, userId)
 			)
+			.then((unsubscribe) => {
+				if (userId !== this._activeUserId) {
+					unsubscribe();
+					return;
+				}
+				this._unsubscribe = unsubscribe;
+			})
 			.catch((error) => {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'transactions', 'subscribe_transactions');
@@ -548,6 +559,13 @@ class TransactionsContext {
 		this._pb.authedClient
 			.collection('transactionLabels')
 			.subscribe('*', () => this.refreshLabels(userId))
+			.then((unsubscribe) => {
+				if (userId !== this._activeUserId) {
+					unsubscribe();
+					return;
+				}
+				this._unsubscribeLabels = unsubscribe;
+			})
 			.catch((error) => {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'transactionLabels', 'subscribe_labels');
@@ -560,8 +578,10 @@ class TransactionsContext {
 	private unsubscribeRealtime() {
 		if (!this._isSubscribed) return;
 		this._isSubscribed = false;
-		this._pb.authedClient.collection('transactions').unsubscribe('*');
-		this._pb.authedClient.collection('transactionLabels').unsubscribe('*');
+		this._unsubscribe?.();
+		this._unsubscribe = null;
+		this._unsubscribeLabels?.();
+		this._unsubscribeLabels = null;
 	}
 
 	private onTransactionEvent(
@@ -951,6 +971,7 @@ class TransactionsContext {
 	}
 
 	dispose() {
+		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
 		if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
 		if (this._loadingDelayTimer) clearTimeout(this._loadingDelayTimer);
 		if (this._refreshTimer) clearTimeout(this._refreshTimer);

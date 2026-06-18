@@ -5,6 +5,7 @@ import { getContext, setContext, untrack } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 
 import { getAccountsContext, type AccountWithBalance } from './accounts.svelte';
+import { getAuthContext } from './auth.svelte';
 import { AccountSharesPerspectiveOptions, type TransactionsResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
 import { projectSignedValue } from './sharing';
@@ -48,25 +49,57 @@ class CashflowContext {
 	isLoading: boolean = $state(true);
 
 	private _pb: PocketBaseContext;
+	private _auth: ReturnType<typeof getAuthContext>;
 	private _accountsContext: ReturnType<typeof getAccountsContext>;
 	private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
 	private _unsubscribe: (() => void) | null = null;
 	private _disposed = false;
+	private _activeUserId = '';
+	private _isSubscribed = false;
 	private _recomputeSequence = 0;
 	private _recomputeAllInFlight = 0;
 	private _transactionsById = new SvelteMap<string, TransactionsResponse>();
 	private _activeWindow: CashflowWindow | null = null;
 	private _hasTransactionSnapshot = false;
 	private _watchedAccountsKey: string | null = null;
+	private _teardownCallback = () => this.unsubscribeRealtime();
 
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
+		this._auth = getAuthContext();
+		this._auth.registerRealtimeTeardown(this._teardownCallback);
 		this._accountsContext = getAccountsContext();
 		this.init();
 	}
 
 	private init() {
-		this.realtimeSubscribe();
+		$effect(() => {
+			const userId = this._auth.currentUserId;
+			if (userId === this._activeUserId) return;
+			this.unsubscribeRealtime();
+			this._activeUserId = userId;
+			if (!userId) {
+				this._recomputeSequence++;
+				if (this._debounceTimer) {
+					clearTimeout(this._debounceTimer);
+					this._debounceTimer = null;
+				}
+				this._transactionsById = new SvelteMap();
+				this._activeWindow = null;
+				this._hasTransactionSnapshot = false;
+				this._watchedAccountsKey = null;
+				this.periods = [];
+				this.avg3m = { income: 0, expenses: 0, surplus: 0 };
+				this.avg6m = { income: 0, expenses: 0, surplus: 0 };
+				this.avgYtd = { income: 0, expenses: 0, surplus: 0 };
+				this.avg1y = { income: 0, expenses: 0, surplus: 0 };
+				this.isLoading = false;
+				return;
+			}
+			this.isLoading = true;
+			this.realtimeSubscribe(userId);
+		});
+
 		// Perf-critical: `accounts` is a $derived that gets a new identity on every
 		// balance tick, so this effect re-runs constantly. It must NOT refetch all
 		// transactions each time. We gate on `watchedAccountsKey` (account ids +
@@ -76,7 +109,9 @@ class CashflowContext {
 		// Reverting this to recomputeAll(accounts) on every run reintroduces a full
 		// transactions getFullList on every balance event (the regression this fixes).
 		$effect(() => {
+			const userId = this._auth.currentUserId;
 			const accounts = this._accountsContext.accounts;
+			if (!userId || userId !== this._activeUserId) return;
 			const watchedAccountsKey = this.getWatchedAccountsKey(accounts);
 			const activeWindow = this._activeWindow;
 			const cashflowWindow = this.getCashflowWindow();
@@ -113,12 +148,14 @@ class CashflowContext {
 			.join('|');
 	}
 
-	private realtimeSubscribe() {
+	private realtimeSubscribe(userId = this._activeUserId) {
+		if (this._isSubscribed || !userId || userId !== this._activeUserId) return;
+		this._isSubscribed = true;
 		this._pb.authedClient
 			.collection('transactions')
 			.subscribe('*', this.onTransactionEvent.bind(this))
 			.then((unsubscribe) => {
-				if (this._disposed) {
+				if (this._disposed || userId !== this._activeUserId) {
 					unsubscribe();
 					return;
 				}
@@ -126,8 +163,20 @@ class CashflowContext {
 				this._unsubscribe = unsubscribe;
 			})
 			.catch((error) => {
-				if (!this._disposed) this._pb.handleSubscriptionError(error, 'cashflow', 'subscribe');
+				if (this._disposed) return;
+				if (userId === this._activeUserId) {
+					this._pb.handleSubscriptionError(error, 'cashflow', 'subscribe');
+				} else {
+					console.error('[cashflowStore] Stale subscription failed:', error);
+				}
 			});
+	}
+
+	private unsubscribeRealtime() {
+		if (!this._isSubscribed) return;
+		this._isSubscribed = false;
+		this._unsubscribe?.();
+		this._unsubscribe = null;
 	}
 
 	private onTransactionEvent(e: RecordSubscription<TransactionsResponse>) {
@@ -355,8 +404,8 @@ class CashflowContext {
 			clearTimeout(this._debounceTimer);
 			this._debounceTimer = null;
 		}
-		this._unsubscribe?.();
-		this._unsubscribe = null;
+		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
+		this.unsubscribeRealtime();
 	}
 }
 

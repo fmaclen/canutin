@@ -2,6 +2,7 @@ import { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 
+import { getAuthContext } from './auth.svelte';
 import { setBalanceTypesContext } from './balance-types.svelte';
 import {
 	AssetSharesAccessRoleOptions,
@@ -61,20 +62,26 @@ class AssetsContext {
 	private rawAssets: AssetsResponse[] = $state([]);
 	private latestBalanceByAsset = new SvelteMap<string, LatestAssetBalance>();
 	private _pb: PocketBaseContext;
+	private _auth: ReturnType<typeof getAuthContext>;
 	private balanceTypesContext: ReturnType<typeof setBalanceTypesContext>;
 	private _refreshAssetsSequence = 0;
+	private _activeUserId = '';
+	private _isSubscribed = false;
+	private _teardownCallback = () => this.unsubscribeRealtime();
 
 	constructor(
 		pb: PocketBaseContext,
 		balanceTypesContext: ReturnType<typeof setBalanceTypesContext>
 	) {
 		this._pb = pb;
+		this._auth = getAuthContext();
+		this._auth.registerRealtimeTeardown(this._teardownCallback);
 		this.balanceTypesContext = balanceTypesContext;
 		this.init();
 	}
 
 	private get currentUserId() {
-		return this._pb.authedClient.authStore.record?.id ?? '';
+		return this._auth.currentUserId;
 	}
 
 	getTypeName(id: string) {
@@ -135,17 +142,39 @@ class AssetsContext {
 		}
 	}
 
-	private async init() {
-		try {
+	private init() {
+		$effect(() => {
 			const userId = this.currentUserId;
-			this.realtimeSubscribe();
+			if (userId === this._activeUserId) return;
+			this.unsubscribeRealtime();
+			this._activeUserId = userId;
+			if (!userId) {
+				this._refreshAssetsSequence++;
+				this.rawAssets = [];
+				this.latestBalanceByAsset.clear();
+				this.shares = [];
+				this.lastBalanceEvent = 0;
+				this.isLoading = false;
+				return;
+			}
+			this.isLoading = true;
+			this.lastBalanceEvent = 0;
+			this.realtimeSubscribe(userId);
+			void this.refreshForCurrentUser();
+		});
+	}
+
+	private async refreshForCurrentUser() {
+		const userId = this.currentUserId;
+		try {
 			await this.refreshShares(userId);
 			await this.refreshAssets();
 			this.lastBalanceEvent = Date.now();
 		} catch (error) {
+			if (userId !== this.currentUserId) return;
 			this._pb.handleConnectionError(error, 'assets', 'init');
 		} finally {
-			this.isLoading = false;
+			if (userId === this.currentUserId) this.isLoading = false;
 		}
 	}
 
@@ -183,9 +212,8 @@ class AssetsContext {
 		return true;
 	}
 
-	private realtimeSubscribe() {
-		const userId = this.currentUserId;
-		if (!userId) return;
+	private realtimeSubscribe(userId = this._activeUserId) {
+		if (this._isSubscribed || !userId || userId !== this._activeUserId) return;
 
 		this._pb.authedClient
 			.collection('assets')
@@ -199,7 +227,7 @@ class AssetsContext {
 				});
 			})
 			.catch((error) => {
-				if (userId === this.currentUserId) {
+				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'assets', 'subscribe_assets');
 				} else {
 					console.error('[assetsStore] Stale subscription failed:', error);
@@ -209,7 +237,7 @@ class AssetsContext {
 			.collection('assetBalances')
 			.subscribe<AssetBalancesResponse>('*', (event) => this.onAssetBalanceEvent(event, userId))
 			.catch((error) => {
-				if (userId === this.currentUserId) {
+				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'assets', 'subscribe_balances');
 				} else {
 					console.error('[assetsStore] Stale subscription failed:', error);
@@ -219,12 +247,21 @@ class AssetsContext {
 			.collection('assetShares')
 			.subscribe<AssetSharesResponse>('*', (event) => this.onAssetShareEvent(event, userId))
 			.catch((error) => {
-				if (userId === this.currentUserId) {
+				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'assets', 'subscribe_shares');
 				} else {
 					console.error('[assetsStore] Stale subscription failed:', error);
 				}
 			});
+		this._isSubscribed = true;
+	}
+
+	private unsubscribeRealtime() {
+		if (!this._isSubscribed) return;
+		this._isSubscribed = false;
+		this._pb.authedClient.collection('assets').unsubscribe('*');
+		this._pb.authedClient.collection('assetBalances').unsubscribe('*');
+		this._pb.authedClient.collection('assetShares').unsubscribe('*');
 	}
 
 	private async onAssetEvent(e: RecordSubscription<AssetsResponse>, userId: string) {
@@ -471,9 +508,8 @@ class AssetsContext {
 
 	dispose() {
 		this._refreshAssetsSequence++;
-		this._pb.authedClient.collection('assets').unsubscribe('*');
-		this._pb.authedClient.collection('assetBalances').unsubscribe('*');
-		this._pb.authedClient.collection('assetShares').unsubscribe('*');
+		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
+		this.unsubscribeRealtime();
 	}
 }
 

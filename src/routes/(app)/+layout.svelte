@@ -3,6 +3,7 @@
 
 	import { setAccountsContext } from '$lib/accounts.svelte';
 	import { setAssetsContext } from '$lib/assets.svelte';
+	import { getAuthContext } from '$lib/auth.svelte';
 	import { setBalanceTypesContext } from '$lib/balance-types.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { setImportSessionsContext } from '$lib/import-sessions.svelte';
@@ -14,6 +15,7 @@
 	let { children } = $props();
 
 	const pb = getPocketBaseContext();
+	const auth = getAuthContext();
 	const balanceTypesContext = setBalanceTypesContext(pb);
 	const accountsContext = setAccountsContext(pb, balanceTypesContext);
 	const assetsContext = setAssetsContext(pb, balanceTypesContext);
@@ -33,6 +35,8 @@
 <Sidebar.Provider>
 	<AppSidebar />
 	<Sidebar.Inset>
-		{@render children?.()}
+		{#if auth.currentUserId}
+			{@render children?.()}
+		{/if}
 	</Sidebar.Inset>
 </Sidebar.Provider>
