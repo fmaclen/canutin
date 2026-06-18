@@ -12,6 +12,14 @@ export function toNumber(value: unknown) {
 	return Number.isFinite(numberValue) ? numberValue : null;
 }
 
+export function formatPercent(value: number) {
+	const normalized = value === 0 ? 0 : value;
+	return `${normalized > 0 ? '+' : ''}${normalized.toLocaleString('en-US', {
+		minimumFractionDigits: 1,
+		maximumFractionDigits: 1
+	})}%`;
+}
+
 // Validates a `?from=` redirect target. Returns the value only if it is a
 // same-origin relative path (starts with a single `/`, not `//` or `/\`, and
 // contains no protocol scheme before the first slash). Returns null otherwise.

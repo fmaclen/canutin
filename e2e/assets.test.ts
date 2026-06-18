@@ -206,7 +206,7 @@ test('assets table shows appreciation and depreciation for whole-value assets', 
 		owner: user.id,
 		asOf: new Date().toISOString(),
 		bookValue: 45000,
-		marketValue: 87500
+		marketValue: 562500
 	});
 
 	const lossAsset = await seedAsset({
@@ -231,9 +231,9 @@ test('assets table shows appreciation and depreciation for whole-value assets', 
 	await expect(growthPortfolioRow).toBeVisible();
 	await expectAssetRowCells(growthPortfolioRow, [
 		[4, '$45,000.00'],
-		[5, '$42,500.00'],
-		[6, '+94.4%'],
-		[7, '$87,500.00']
+		[5, '$517,500.00'],
+		[6, '+1,150.0%'],
+		[7, '$562,500.00']
 	]);
 
 	const lossPortfolioRow = page.getByRole('row', { name: 'Loss Portfolio' });

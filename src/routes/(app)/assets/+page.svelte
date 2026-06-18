@@ -25,6 +25,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import {
 		createSortComparator,
+		formatPercent,
 		getSortFromUrl,
 		setSortInUrl,
 		toggleSort,
@@ -377,7 +378,7 @@
 												</Table.Cell>
 												<Table.Cell class="text-right tabular-nums">
 													<Number
-														value={`${row.gainPercent > 0 ? '+' : ''}${row.gainPercent.toFixed(1)}%`}
+														value={formatPercent(row.gainPercent)}
 														sentiment={row.gainPercent > 0
 															? 'positive'
 															: row.gainPercent < 0
