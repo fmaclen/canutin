@@ -18,6 +18,7 @@ enum ToastId {
 export class PocketBaseContext {
 	authedClient: TypedPocketBase;
 	setupStatus: SetupStatus = $state('checking');
+	onAuthInvalidated?: () => void;
 
 	constructor() {
 		this.authedClient = new PocketBase(env.PUBLIC_PB_URL || 'http://127.0.0.1:42070');
@@ -85,31 +86,44 @@ export class PocketBaseContext {
 		console.error(`[${context}:${operation}]`, error);
 	}
 
+	private isTransientError(error: unknown) {
+		return error instanceof ClientResponseError && error.isAbort;
+	}
+
 	private isAuthError(error: unknown) {
 		return error instanceof ClientResponseError && (error.status === 401 || error.status === 403);
 	}
 
 	private getErrorType(error: unknown, errorContext: 'connection' | 'subscription') {
+		if (this.isTransientError(error)) {
+			return { isAuth: false, isTransient: true } as const;
+		}
 		if (this.isAuthError(error)) {
-			return { isAuth: true, toastId: ToastId.AUTH_ERROR };
+			return { isAuth: true, isTransient: false, toastId: ToastId.AUTH_ERROR } as const;
 		}
 		const toastId =
 			errorContext === 'subscription' ? ToastId.SUBSCRIPTION_ERROR : ToastId.CONNECTION_ERROR;
-		return { isAuth: false, toastId };
+		return { isAuth: false, isTransient: false, toastId } as const;
 	}
 
 	handleConnectionError(error: unknown, context: string, operation: string) {
-		this.captureError(error, context, operation);
 		const errorType = this.getErrorType(error, 'connection');
+		if (errorType.isTransient) return;
+
+		this.captureError(error, context, operation);
 		const message = errorType.isAuth ? m.error_auth_failed() : m.error_connection_failed();
 		toast.error(message, { id: errorType.toastId });
+		if (errorType.isAuth) this.onAuthInvalidated?.();
 	}
 
 	handleSubscriptionError(error: unknown, context: string, operation: string) {
-		this.captureError(error, context, operation);
 		const errorType = this.getErrorType(error, 'subscription');
+		if (errorType.isTransient) return;
+
+		this.captureError(error, context, operation);
 		const message = errorType.isAuth ? m.error_auth_failed() : m.error_subscription_failed();
 		toast.error(message, { id: errorType.toastId });
+		if (errorType.isAuth) this.onAuthInvalidated?.();
 	}
 }
 
