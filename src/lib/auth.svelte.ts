@@ -40,10 +40,7 @@ export class AuthContext {
 			this.currentUserId = this._pb.authStore.record?.id ?? '';
 			return true;
 		} catch {
-			this.unsubscribeFromCurrentUser();
-			this._pb.authStore.clear();
-			this.currentUser = null;
-			this.currentUserId = '';
+			this.teardownSession();
 			toast.error(m.error_auth_failed(), { id: 'auth-error' });
 			return false;
 		}
@@ -69,12 +66,16 @@ export class AuthContext {
 			.catch((error) => console.error('[auth:unsubscribe]', error));
 	}
 
+	private teardownSession() {
+		this.unsubscribeFromCurrentUser();
+		this._pb.authStore.clear();
+		this.currentUser = null;
+		this.currentUserId = '';
+	}
+
 	private onCurrentUserEvent(e: RecordSubscription<UsersResponse>) {
 		if (e.action === 'delete') {
-			this.unsubscribeFromCurrentUser();
-			this._pb.authStore.clear();
-			this.currentUser = null;
-			this.currentUserId = '';
+			this.teardownSession();
 		}
 	}
 
@@ -134,10 +135,7 @@ export class AuthContext {
 	}
 
 	invalidateSession() {
-		this.unsubscribeFromCurrentUser();
-		this._pb.authStore.clear();
-		this.currentUser = null;
-		this.currentUserId = '';
+		this.teardownSession();
 	}
 }
 
