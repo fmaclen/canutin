@@ -4,6 +4,8 @@
 	"app_tagline": "Plataforma de finanzas personales",
 	"summary_net_balance": "Saldo neto",
 	"summary_net_amount": "Importe neto",
+	"summary_net_credits": "Créditos netos",
+	"summary_net_debits": "Débitos netos",
 	"summary_net_market_value": "Valor de mercado neto",
 	"summary_net_gain_loss": "Ganancia/pérdida neta",
 	"summary_net_gain_percent": "Ganancia neta %",

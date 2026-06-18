@@ -325,8 +325,15 @@ test('transactions page shows correct count and net balance in summary', async (
 	const summaryRegion = page.getByRole('region', { name: 'Transactions summary' });
 	await expect(summaryRegion.getByText('Transactions')).toBeVisible();
 	await expect(summaryRegion.getByText('5', { exact: true })).toBeVisible();
-	await expect(summaryRegion.getByText('Net balance')).toBeVisible();
+	await expect(summaryRegion.getByText('Net amount')).toBeVisible();
 	await expect(summaryRegion.getByText('$450.67')).toBeVisible();
+
+	// Credits and debits cards both render under the "all" filter, the only state
+	// where both totals are uniquely visible: credits +801.25, debits -350.58
+	await expect(summaryRegion.getByText('Net credits')).toBeVisible();
+	await expect(summaryRegion.getByText('$801.25')).toBeVisible();
+	await expect(summaryRegion.getByText('Net debits')).toBeVisible();
+	await expect(summaryRegion.getByText('-$350.58')).toBeVisible();
 
 	// Change filter to "Credits only"
 	// Expected: count = 2 (excluded credits are shown only by the excluded filter), net balance = $801.25 (500.75 + 300.50)
@@ -334,7 +341,9 @@ test('transactions page shows correct count and net balance in summary', async (
 	await page.getByRole('option', { name: 'Credits only' }).click();
 
 	await expect(summaryRegion.getByText('2', { exact: true })).toBeVisible();
-	await expect(summaryRegion.getByText('$801.25')).toBeVisible();
+	await expect(summaryRegion.getByLabel('Net amount').getByText('$801.25')).toBeVisible();
+	// Net credits is hidden under the credits filter: it equals Net amount, so it's redundant
+	await expect(summaryRegion.getByText('Net credits')).not.toBeVisible();
 
 	// Change filter to "Debits only"
 	// Expected: count = 2, net balance = -$350.58 (-200.25 + -150.33)
@@ -342,7 +351,9 @@ test('transactions page shows correct count and net balance in summary', async (
 	await page.getByRole('option', { name: 'Debits only' }).click();
 
 	await expect(summaryRegion.getByText('2', { exact: true })).toBeVisible();
-	await expect(summaryRegion.getByText('-$350.58')).toBeVisible();
+	await expect(summaryRegion.getByLabel('Net amount').getByText('-$350.58')).toBeVisible();
+	// Net debits is hidden under the debits filter: it equals Net amount, so it's redundant
+	await expect(summaryRegion.getByText('Net debits')).not.toBeVisible();
 
 	// Change filter to "Excluded only"
 	// Expected: count = 1, net balance = $0.00 (excluded transactions don't count toward net)
@@ -351,4 +362,7 @@ test('transactions page shows correct count and net balance in summary', async (
 
 	await expect(summaryRegion.getByText('1', { exact: true })).toBeVisible();
 	await expect(summaryRegion.getByText('$0.00')).toBeVisible();
+	// Both cards are hidden under the excluded filter: their predicates require non-excluded rows
+	await expect(summaryRegion.getByText('Net credits')).not.toBeVisible();
+	await expect(summaryRegion.getByText('Net debits')).not.toBeVisible();
 });
