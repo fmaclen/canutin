@@ -67,6 +67,7 @@ class AccountsContext {
 	private refreshSequence = 0;
 	private _activeUserId = '';
 	private _isSubscribed = false;
+	private _teardownCallback = () => this.unsubscribeRealtime();
 
 	constructor(
 		pb: PocketBaseContext,
@@ -74,6 +75,7 @@ class AccountsContext {
 	) {
 		this._pb = pb;
 		this._auth = getAuthContext();
+		this._auth.registerRealtimeTeardown(this._teardownCallback);
 		this.balanceTypesContext = balanceTypesContext;
 		this.init();
 	}
@@ -488,6 +490,7 @@ class AccountsContext {
 	}
 
 	dispose() {
+		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
 		this.unsubscribeRealtime();
 	}
 }

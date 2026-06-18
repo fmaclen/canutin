@@ -1,6 +1,11 @@
-import PocketBase, { type BaseAuthStore, type RecordSubscription } from 'pocketbase';
+import PocketBase, {
+	ClientResponseError,
+	type BaseAuthStore,
+	type RecordSubscription
+} from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 import { toast } from 'svelte-sonner';
+import { SvelteSet } from 'svelte/reactivity';
 
 import { m } from '$lib/paraglide/messages.js';
 import type { UsersResponse } from '$lib/pocketbase.schema';
@@ -13,6 +18,7 @@ export class AuthContext {
 	error: string | null = $state(null);
 
 	private _pb: PocketBase;
+	private _realtimeTeardowns = new SvelteSet<() => void>();
 
 	constructor(pb: PocketBase) {
 		this._pb = pb;
@@ -36,14 +42,16 @@ export class AuthContext {
 
 		try {
 			await this._pb.collection('users').authRefresh();
-			this.currentUser = this._pb.authStore;
-			this.currentUserId = this._pb.authStore.record?.id ?? '';
-			return true;
-		} catch {
-			this.teardownSession();
-			toast.error(m.error_auth_failed(), { id: 'auth-error' });
-			return false;
+		} catch (error) {
+			if (error instanceof ClientResponseError && (error.status === 401 || error.status === 403)) {
+				this.teardownSession();
+				toast.error(m.error_auth_failed(), { id: 'auth-error' });
+				return false;
+			}
 		}
+		this.currentUser = this._pb.authStore;
+		this.currentUserId = this._pb.authStore.record?.id ?? '';
+		return true;
 	}
 
 	private subscribeToCurrentUser() {
@@ -66,7 +74,26 @@ export class AuthContext {
 			.catch((error) => console.error('[auth:unsubscribe]', error));
 	}
 
+	private runRealtimeTeardowns() {
+		for (const teardown of this._realtimeTeardowns) {
+			try {
+				teardown();
+			} catch (error) {
+				console.error('[auth:teardown]', error);
+			}
+		}
+	}
+
+	registerRealtimeTeardown(teardown: () => void) {
+		this._realtimeTeardowns.add(teardown);
+	}
+
+	unregisterRealtimeTeardown(teardown: () => void) {
+		this._realtimeTeardowns.delete(teardown);
+	}
+
 	private teardownSession() {
+		this.runRealtimeTeardowns();
 		this.unsubscribeFromCurrentUser();
 		this._pb.authStore.clear();
 		this.currentUser = null;
@@ -126,6 +153,7 @@ export class AuthContext {
 	async logout() {
 		this.error = null;
 		try {
+			this.runRealtimeTeardowns();
 			this.unsubscribeFromCurrentUser();
 			this._pb.authStore.clear();
 		} finally {

@@ -85,10 +85,12 @@ class SecuritiesContext {
 	private refreshSequence = 0;
 	private _activeUserId = '';
 	private _isSubscribed = false;
+	private _teardownCallback = () => this.unsubscribeRealtime();
 
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
 		this._auth = getAuthContext();
+		this._auth.registerRealtimeTeardown(this._teardownCallback);
 		this._accounts = getAccountsContext();
 		this.init();
 	}
@@ -429,6 +431,7 @@ class SecuritiesContext {
 	}
 
 	dispose() {
+		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
 		this.clearPositionRefreshTimers();
 		this.unsubscribeRealtime();
 	}
