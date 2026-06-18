@@ -37,6 +37,9 @@
 	const accountsCtx = getAccountsContext();
 	const assetsCtx = getAssetsContext();
 
+	let bootstrapped = $state(false);
+	const isLoading = $derived(!bootstrapped);
+
 	let period: PeriodKey = $state('1y');
 	let rawAccounts: AccountsResponse[] = $state([]);
 	let rawAssets: AssetsResponse[] = $state([]);
@@ -408,7 +411,6 @@
 	let refreshTimer: number | null = null;
 	let refreshInFlight = false;
 	let pendingRefresh = false;
-	let bootstrapped = false;
 	let lastIncludedSignature = '';
 
 	function handleBalanceEvent<
@@ -618,6 +620,7 @@
 
 			<ChartNetWorth
 				bind:period
+				{isLoading}
 				prepared={period === 'max' ? fullHistoryPrepared : prepared}
 				{rawAccounts}
 				{rawAssets}
@@ -633,6 +636,7 @@
 	<Section>
 		<SectionTitle title={m.trends_performance_section_title()} />
 		<Performance
+			{isLoading}
 			{prepared}
 			{fullHistoryPrepared}
 			{rawAccounts}

@@ -24,6 +24,7 @@
 	} from './trends';
 
 	let {
+		isLoading,
 		prepared,
 		fullHistoryPrepared,
 		rawAccounts,
@@ -32,6 +33,7 @@
 		rawFullHistorySecurityBalances,
 		rawFullHistoryAssetBalances
 	}: {
+		isLoading: boolean;
 		prepared: PreparedTrendMaps;
 		fullHistoryPrepared: PreparedTrendMaps;
 		rawAccounts: AccountsResponse[];
@@ -178,8 +180,24 @@
 		other: m.trends_series_other_label()
 	};
 
+	const zeroTotals = { net: 0, cash: 0, debt: 0, investment: 0, other: 0 };
+
 	const table = $derived.by(() => {
-		if (!rawAccounts.length && !rawAssets.length) return null;
+		if (!rawAccounts.length && !rawAssets.length) {
+			const columns = periods.map((periodDef) => ({
+				key: periodDef.key,
+				label: periodDef.label,
+				at: new Date(),
+				values: {
+					net: { pct: null, cur: 0, prev: 0 },
+					cash: { pct: null, cur: 0, prev: 0 },
+					debt: { pct: null, cur: 0, prev: 0 },
+					investment: { pct: null, cur: 0, prev: 0 },
+					other: { pct: null, cur: 0, prev: 0 }
+				}
+			}));
+			return { columns, current: zeroTotals, allocation: { ...zeroTotals } };
+		}
 		const END_OF_TIME = new Date('9999-12-31T23:59:59.999Z');
 		const now = END_OF_TIME;
 
@@ -333,7 +351,9 @@
 	}
 </script>
 
-{#if table}
+{#if isLoading}
+	<Skeleton class="h-64" showSpinner />
+{:else}
 	<div class="bg-background rounded-sm shadow-md">
 		<div class="overflow-x-auto">
 			<Tooltip.Provider delayDuration={150}>
@@ -556,6 +576,4 @@
 			</Tooltip.Provider>
 		</div>
 	</div>
-{:else}
-	<Skeleton class="h-64" showSpinner />
 {/if}
