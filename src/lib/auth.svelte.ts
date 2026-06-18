@@ -132,6 +132,13 @@ export class AuthContext {
 			this.currentUserId = '';
 		}
 	}
+
+	invalidateSession() {
+		this.unsubscribeFromCurrentUser();
+		this._pb.authStore.clear();
+		this.currentUser = null;
+		this.currentUserId = '';
+	}
 }
 
 const CONTEXT_KEY = 'auth-store';

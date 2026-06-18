@@ -22,6 +22,8 @@
 	const auth = setAuthContext(pb.authedClient);
 	setDemoContext(pb.authedClient, auth);
 
+	pb.onAuthInvalidated = () => auth.invalidateSession();
+
 	if (browser) {
 		void initializeLocale();
 	}

@@ -72,6 +72,56 @@ test('shows auth error toast when session expires', async ({ page }) => {
 	).toBeVisible();
 });
 
+test('stays silent when a request is aborted mid-flight', async ({ page }) => {
+	const user = await seedUser('hannah');
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await expect(page.getByRole('region', { name: 'Net worth' })).toBeVisible();
+
+	await page.route('**/api/collections/transactions/**', (route) => {
+		route.abort('aborted');
+	});
+
+	await page.goto('/transactions');
+	await expect(page).toHaveURL('/transactions');
+	await expect(
+		page.locator('[data-sonner-toast]', {
+			hasText: "Can't connect to the database server"
+		})
+	).not.toBeVisible();
+});
+
+test('forces logout without reload when a request returns 401 mid-session', async ({ page }) => {
+	const user = await seedUser('isabel');
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await expect(page.getByRole('region', { name: 'Net worth' })).toBeVisible();
+	await expect(page).not.toHaveURL('/auth');
+
+	await page.route('**/api/collections/**', (route) => {
+		route.fulfill({
+			status: 401,
+			contentType: 'application/json',
+			body: JSON.stringify({
+				code: 401,
+				message: 'The request requires valid record authorization token to be set.',
+				data: {}
+			})
+		});
+	});
+
+	await page.goto('/transactions');
+	await expect(page).toHaveURL('/auth');
+	await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
+	await expect(
+		page.locator('[data-sonner-toast]', {
+			hasText: 'Your session has expired'
+		})
+	).toBeVisible();
+});
+
 test('logs out user automatically when their account is deleted', async ({ page }) => {
 	const user = await seedUser('george');
 
