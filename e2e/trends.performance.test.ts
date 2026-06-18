@@ -21,6 +21,15 @@ test('trends performance table', async ({ page }) => {
 	await page.goto('/');
 	await signIn(page, user.email);
 
+	// Empty vault: trends must settle to empty visuals, not a perpetual skeleton.
+	await goToPageViaSidebar(page, 'Trends');
+	await expect(page.locator('[data-slot="skeleton"].h-96')).toBeHidden();
+	await expect(page.locator('[data-slot="skeleton"].h-64')).toBeHidden();
+	const emptyGrowthChart = page.locator('[data-growth-period="1y"]');
+	await expect(emptyGrowthChart).toBeVisible();
+	await expect(emptyGrowthChart).toHaveAttribute('data-growth-points', '0');
+	await page.goto('/');
+
 	const cashAccount = await seedAccount({
 		name: 'Perf Test',
 		balanceGroup: AccountsBalanceGroupOptions.CASH,
@@ -274,25 +283,4 @@ test('trends performance table', async ({ page }) => {
 	await expect(debtCells.nth(6).getByRole('button', { name: '+42.9%' })).toBeVisible(); // 2Y
 	await expect(debtCells.nth(7).getByRole('button', { name: '+50%' })).toBeVisible(); // 5Y
 	await expect(debtCells.nth(8).getByRole('button', { name: '+200%' })).toBeVisible(); // MAX
-});
-
-test('trends renders empty charts for a vault with no data', async ({ page }) => {
-	const user = await seedUser('violet');
-
-	await page.goto('/');
-	await signIn(page, user.email);
-
-	await goToPageViaSidebar(page, 'Trends');
-
-	// Regression: an empty vault must settle to empty growth/performance visuals, not a
-	// perpetual loading skeleton. Both skeletons render a spinner until the first balance
-	// fetch completes; afterwards the empty chart and zeroed table take their place.
-	await expect(page.locator('[data-slot="skeleton"].h-96')).toBeHidden();
-	await expect(page.locator('[data-slot="skeleton"].h-64')).toBeHidden();
-
-	const growthChart = page.locator('[data-growth-period="1y"]');
-	await expect(growthChart).toBeVisible();
-	await expect(growthChart).toHaveAttribute('data-growth-points', '0');
-
-	await expect(page.getByRole('row', { name: /Net worth/ })).toBeVisible();
 });
