@@ -769,6 +769,34 @@ class TransactionsContext {
 			.reduce((sum, row) => sum + row.value, 0);
 	}
 
+	private get creditRows() {
+		return this.filteredRows.filter(
+			(row) => row.hasProjectedValue && row.value > 0 && !row.excluded
+		);
+	}
+
+	private get debitRows() {
+		return this.filteredRows.filter(
+			(row) => row.hasProjectedValue && row.value < 0 && !row.excluded
+		);
+	}
+
+	get creditsTotal() {
+		return this.creditRows.reduce((sum, row) => sum + row.value, 0);
+	}
+
+	get debitsTotal() {
+		return this.debitRows.reduce((sum, row) => sum + row.value, 0);
+	}
+
+	get hasCredits() {
+		return this.creditRows.length > 0;
+	}
+
+	get hasDebits() {
+		return this.debitRows.length > 0;
+	}
+
 	get customFromDate() {
 		return this._customFromDate;
 	}

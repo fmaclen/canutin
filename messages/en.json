@@ -4,6 +4,8 @@
 	"app_tagline": "Personal finance platform",
 	"summary_net_balance": "Net balance",
 	"summary_net_amount": "Net amount",
+	"summary_net_credits": "Net credits",
+	"summary_net_debits": "Net debits",
 	"summary_net_market_value": "Net market value",
 	"summary_net_gain_loss": "Net gain/loss",
 	"summary_net_gain_percent": "Net gain %",
