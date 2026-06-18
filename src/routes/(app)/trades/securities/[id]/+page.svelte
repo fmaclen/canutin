@@ -26,6 +26,7 @@
 		gainLossPercentOrNull,
 		sumOrUnknown
 	} from '$lib/security-balance-values';
+	import { formatPercent } from '$lib/utils';
 
 	import BalanceFields from '../balance-fields.svelte';
 	import { createSecurityBalanceFormData, toSecurityBalanceInput } from '../balance-form';
@@ -299,7 +300,7 @@
 											<span class="text-muted-foreground">~</span>
 										{:else}
 											<NumberDisplay
-												value={`${gainLossPercent > 0 ? '+' : ''}${gainLossPercent.toFixed(1)}%`}
+												value={formatPercent(gainLossPercent)}
 												sentiment={gainLossPercent > 0
 													? 'positive'
 													: gainLossPercent < 0
