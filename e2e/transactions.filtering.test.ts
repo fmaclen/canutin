@@ -1329,6 +1329,91 @@ test('clicking a label chip on a row applies the label filter', async ({ page })
 	await expect(page).not.toHaveURL(/label=/);
 });
 
+test('label filter combobox filters options by typing and ignores the record id', async ({
+	page
+}) => {
+	const user = await seedUser('wesley');
+
+	const account = await seedAccount({
+		name: 'Household Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 2500
+	});
+
+	const groceriesLabel = await seedTransactionLabel({ name: 'Groceries', owner: user.id });
+	const utilitiesLabel = await seedTransactionLabel({ name: 'Utilities', owner: user.id });
+	const now = new UTCDate();
+
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Farm Stand Produce',
+		value: -42,
+		labels: [groceriesLabel.id]
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: now.toISOString(),
+		description: 'Electric Company Bill',
+		value: -118,
+		labels: [utilitiesLabel.id]
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	await page.getByLabel('Label', { exact: true }).click();
+	const groceriesOption = page.getByRole('option', { name: 'Groceries' });
+	const utilitiesOption = page.getByRole('option', { name: 'Utilities' });
+	await expect(groceriesOption).toBeVisible();
+	await expect(utilitiesOption).toBeVisible();
+
+	const searchInput = page.getByPlaceholder('Search', { exact: true });
+	await searchInput.fill('Gro');
+
+	await expect(groceriesOption).toBeVisible();
+	await expect(utilitiesOption).toHaveCount(0);
+
+	// The combobox scores against the label only; the opaque record id must never match. Pick
+	// a slice of the id that is absent from both label names so a hit could only come from the id.
+	const idFragment = groceriesLabel.id
+		.toLowerCase()
+		.split('')
+		.filter((char) => !'groceriesutilities'.includes(char))
+		.join('')
+		.slice(0, 3);
+	expect(idFragment.length).toBeGreaterThan(0);
+	await searchInput.fill(idFragment);
+
+	await expect(groceriesOption).toHaveCount(0);
+	await expect(utilitiesOption).toHaveCount(0);
+	await expect(page.getByText('No matches')).toBeVisible();
+
+	await searchInput.fill('');
+
+	await expect(groceriesOption).toBeVisible();
+	await expect(utilitiesOption).toBeVisible();
+
+	await searchInput.fill('Gro');
+	await groceriesOption.click();
+	await page.keyboard.press('Escape');
+
+	await expect(page.getByLabel('Label', { exact: true })).toContainText('Groceries');
+	await expect(page).toHaveURL(/label=/);
+	await expect(page.getByText('Farm Stand Produce')).toBeVisible();
+	await expect(page.getByText('Electric Company Bill')).not.toBeVisible();
+});
+
 test('selecting multiple labels filters with OR semantics', async ({ page }) => {
 	const user = await seedUser('willow');
 

@@ -9,13 +9,14 @@
 	import AccountPicker from '$lib/components/account-picker.svelte';
 	import ClearButton from '$lib/components/clear-button.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import { Combobox, type ComboboxItem } from '$lib/components/ui/combobox/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
 	import { RangeCalendar } from '$lib/components/ui/range-calendar/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
-	import { tradeTypeLabel } from '$lib/trade-display';
+	import { securityComboboxLabel, tradeTypeLabel } from '$lib/trade-display';
 	import { getTradesContext, type TradeTypeFilter } from '$lib/trades.svelte';
 	import type { PeriodOption } from '$lib/transactions.svelte';
 
@@ -28,12 +29,14 @@
 			? accountsContext.accounts.find((account) => account.id === tradesContext.accountFilter)
 			: null
 	);
-	const selectedSecurity = $derived(
-		tradesContext.securityFilter
-			? securitiesContext.securities.find(
-					(security) => security.id === tradesContext.securityFilter
-				)
-			: null
+	const securityItems = $derived(
+		securitiesContext.securities.map(
+			(security): ComboboxItem => ({
+				value: security.id,
+				label: securityComboboxLabel(security),
+				keywords: security.symbol ? [security.symbol] : undefined
+			})
+		)
 	);
 
 	let periodPopoverOpen = $state(false);
@@ -189,18 +192,20 @@
 		selectedNameClass="max-w-40 truncate"
 		placeholder={m.transactions_filter_account_all()}
 	/>
-	<Select.Root
+	<Combobox
 		type="single"
+		items={securityItems}
 		value={tradesContext.securityFilter ?? ''}
-		onValueChange={(value) => tradesContext.setSecurityFilter(value || null)}
+		onValueChange={(value) =>
+			tradesContext.setSecurityFilter(typeof value === 'string' && value ? value : null)}
+		placeholder={m.trades_filter_security_all()}
+		ariaLabel={m.trades_filter_security_label()}
+		triggerClass="sm:w-fit sm:max-w-64"
 	>
-		<Select.Trigger
-			aria-label={m.trades_filter_security_label()}
-			class="bg-background w-full sm:w-fit sm:max-w-64"
-		>
-			{#if selectedSecurity}
+		{#snippet triggerContent({ selected })}
+			{#if selected.length > 0}
 				<div class="flex w-full items-center gap-2">
-					<span class="max-w-40 truncate">{selectedSecurity.name}</span>
+					<span class="max-w-40 truncate">{selected[0].label}</span>
 					<ClearButton
 						class="ml-auto"
 						onclick={(event) => {
@@ -222,13 +227,8 @@
 			{:else}
 				{m.trades_filter_security_all()}
 			{/if}
-		</Select.Trigger>
-		<Select.Content>
-			{#each securitiesContext.securities as security (security.id)}
-				<Select.Item value={security.id}>{security.name}</Select.Item>
-			{/each}
-		</Select.Content>
-	</Select.Root>
+		{/snippet}
+	</Combobox>
 	<Select.Root
 		type="single"
 		value={tradesContext.typeFilter}

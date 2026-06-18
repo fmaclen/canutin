@@ -1,9 +1,7 @@
 <script lang="ts">
-	import { SvelteMap } from 'svelte/reactivity';
-
 	import { BALANCE_GROUP_ORDER, getBalanceGroupMeta } from '$lib/account-utils';
 	import ClearButton from '$lib/components/clear-button.svelte';
-	import * as Select from '$lib/components/ui/select/index.js';
+	import { Combobox, type ComboboxItem } from '$lib/components/ui/combobox/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import { AccountsBalanceGroupOptions } from '$lib/pocketbase.schema';
 	import { cn } from '$lib/utils';
@@ -43,14 +41,15 @@
 	} = $props();
 
 	const groupMeta = getBalanceGroupMeta();
-	const accountsByGroup = $derived.by(() => {
-		const grouped = new SvelteMap<AccountsBalanceGroupOptions, AccountPickerAccount[]>();
-		for (const account of accounts) {
-			const group = account.balanceGroup;
-			grouped.set(group, [...(grouped.get(group) ?? []), account]);
-		}
-		return grouped;
-	});
+	const items = $derived(
+		accounts.map(
+			(account): ComboboxItem => ({
+				value: account.id,
+				label: account.name,
+				group: account.balanceGroup
+			})
+		)
+	);
 	const triggerAccount = $derived(
 		selectedAccount === undefined
 			? accounts.find((account) => account.id === value)
@@ -64,8 +63,22 @@
 	}
 </script>
 
-<Select.Root type="single" bind:value {disabled} {onValueChange}>
-	<Select.Trigger {id} aria-label={ariaLabel} class={cn('bg-background w-full pl-3', triggerClass)}>
+<Combobox
+	type="single"
+	bind:value
+	{items}
+	{id}
+	{ariaLabel}
+	{disabled}
+	{placeholder}
+	onValueChange={(next) => {
+		if (typeof next === 'string') onValueChange?.(next);
+	}}
+	groupOrder={BALANCE_GROUP_ORDER}
+	emptyText={m.account_picker_empty()}
+	triggerClass={cn('pl-3', triggerClass)}
+>
+	{#snippet triggerContent()}
 		{#if triggerAccount}
 			<div class="flex w-full items-center gap-2">
 				<div
@@ -85,29 +98,9 @@
 		{:else}
 			<span class="text-muted-foreground">{placeholder}</span>
 		{/if}
-	</Select.Trigger>
-	<Select.Content>
-		{#if accounts.length === 0}
-			<Select.Item value="__empty_accounts__" disabled>
-				{m.account_picker_empty()}
-			</Select.Item>
-		{:else}
-			{#each BALANCE_GROUP_ORDER as group (group)}
-				{@const accountsInGroup = accountsByGroup.get(group) ?? []}
-				{#if accountsInGroup.length > 0}
-					<Select.Group>
-						<Select.Label>
-							<div class="flex items-center gap-2">
-								<div class="size-2 rounded-full {groupMeta[group].color}"></div>
-								{groupMeta[group].label}
-							</div>
-						</Select.Label>
-						{#each accountsInGroup as account (account.id)}
-							<Select.Item value={account.id}>{account.name}</Select.Item>
-						{/each}
-					</Select.Group>
-				{/if}
-			{/each}
-		{/if}
-	</Select.Content>
-</Select.Root>
+	{/snippet}
+	{#snippet groupHeading({ key })}
+		<div class="size-2 rounded-full {groupMeta[key as AccountsBalanceGroupOptions].color}"></div>
+		{groupMeta[key as AccountsBalanceGroupOptions].label}
+	{/snippet}
+</Combobox>

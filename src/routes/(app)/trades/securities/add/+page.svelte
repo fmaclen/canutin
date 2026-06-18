@@ -12,13 +12,15 @@
 	import Section from '$lib/components/section.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import { Combobox, type ComboboxItem } from '$lib/components/ui/combobox';
+	import * as Command from '$lib/components/ui/command/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import * as Select from '$lib/components/ui/select/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
+	import { securityComboboxLabel } from '$lib/trade-display';
 
 	import BalanceFields from '../balance-fields.svelte';
 	import { createSecurityBalanceFormData, toSecurityBalanceInput } from '../balance-form';
@@ -42,6 +44,13 @@
 		securitiesContext.securities.find((security) => security.id === securityId) ?? null
 	);
 	const isNewSecurity = $derived(securityId === newSecurityValue);
+	const securityItems = $derived<ComboboxItem[]>(
+		securitiesContext.securities.map((security) => ({
+			value: security.id,
+			label: securityComboboxLabel(security),
+			keywords: security.symbol ? [security.symbol] : undefined
+		}))
+	);
 
 	async function handleSubmit() {
 		const currentOwnerId = ownerId;
@@ -131,33 +140,37 @@
 						<Label for="security" class="justify-start pr-0 md:justify-end">
 							{m.securities_table_header_security()}
 						</Label>
-						<Select.Root type="single" bind:value={securityId} disabled={isSaving}>
-							<Select.Trigger id="security" class="bg-background w-full">
+						<Combobox
+							type="single"
+							bind:value={securityId}
+							items={securityItems}
+							placeholder={m.securities_select_placeholder()}
+							disabled={isSaving}
+							id="security"
+							ariaLabel={m.securities_table_header_security()}
+							triggerClass="bg-background w-full"
+						>
+							{#snippet triggerContent()}
 								{#if isNewSecurity}
 									{m.securities_select_new_label()}
 								{:else if selectedSecurity}
-									{selectedSecurity.name}
+									{securityComboboxLabel(selectedSecurity)}
 								{:else}
 									<span class="text-muted-foreground">{m.securities_select_placeholder()}</span>
 								{/if}
-							</Select.Trigger>
-							<Select.Content>
-								<Select.Group>
-									<Select.Label>{m.securities_select_group_new()}</Select.Label>
-									<Select.Item value={newSecurityValue}
-										>{m.securities_select_add_option()}</Select.Item
-									>
-								</Select.Group>
-								{#if securitiesContext.securities.length > 0}
-									<Select.Group>
-										<Select.Label>{m.securities_select_group_existing()}</Select.Label>
-										{#each securitiesContext.securities as security (security.id)}
-											<Select.Item value={security.id}>{security.name}</Select.Item>
-										{/each}
-									</Select.Group>
-								{/if}
-							</Select.Content>
-						</Select.Root>
+							{/snippet}
+							{#snippet pinned({ close })}
+								<Command.Item
+									value={newSecurityValue}
+									onSelect={() => {
+										securityId = newSecurityValue;
+										close();
+									}}
+								>
+									{m.securities_select_add_option()}
+								</Command.Item>
+							{/snippet}
+						</Combobox>
 					</FormFieldRow>
 
 					{#if isNewSecurity}

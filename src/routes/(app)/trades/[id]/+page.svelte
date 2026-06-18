@@ -18,6 +18,7 @@
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import { Combobox, type ComboboxItem } from '$lib/components/ui/combobox/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
@@ -33,7 +34,7 @@
 	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
-	import { tradeTypeLabel } from '$lib/trade-display';
+	import { securityComboboxLabel, tradeTypeLabel } from '$lib/trade-display';
 	import { sanitizeFromParam, toNumber } from '$lib/utils';
 
 	type TradeResponse = SecurityTransactionsResponse<
@@ -93,6 +94,23 @@
 			null
 	);
 	const canWrite = $derived(Boolean(trade?.owner && ownerId && trade.owner === ownerId));
+	const securityItems = $derived.by(() => {
+		const items = securitiesContext.securities.map(
+			(security): ComboboxItem => ({
+				value: security.id,
+				label: securityComboboxLabel(security),
+				keywords: security.symbol ? [security.symbol] : undefined
+			})
+		);
+		if (selectedSecurity && !items.some((item) => item.value === selectedSecurity.id)) {
+			items.unshift({
+				value: selectedSecurity.id,
+				label: securityComboboxLabel(selectedSecurity),
+				keywords: selectedSecurity.symbol ? [selectedSecurity.symbol] : undefined
+			});
+		}
+		return items;
+	});
 
 	$effect(() => {
 		if (tradeId && ownerId) {
@@ -287,32 +305,16 @@
 							<Label for="security" class="justify-start pr-0 md:justify-end">
 								{m.trades_label_security()}
 							</Label>
-							<Select.Root type="single" bind:value={formData.securityId} disabled={!canWrite}>
-								<Select.Trigger id="security" class="bg-background w-full">
-									{#if selectedSecurity}
-										{selectedSecurity.name}
-									{:else}
-										<span class="text-muted-foreground">
-											{m.trades_security_select_placeholder()}
-										</span>
-									{/if}
-								</Select.Trigger>
-								<Select.Content>
-									{#if securitiesContext.isLoading}
-										<Select.Item value="__loading_securities__" disabled>
-											{m.trades_securities_loading()}
-										</Select.Item>
-									{:else if securitiesContext.securities.length === 0}
-										<Select.Item value="__empty_securities__" disabled>
-											{m.trades_securities_empty()}
-										</Select.Item>
-									{:else}
-										{#each securitiesContext.securities as security (security.id)}
-											<Select.Item value={security.id}>{security.name}</Select.Item>
-										{/each}
-									{/if}
-								</Select.Content>
-							</Select.Root>
+							<Combobox
+								id="security"
+								ariaLabel={m.trades_label_security()}
+								items={securityItems}
+								bind:value={formData.securityId}
+								placeholder={m.trades_security_select_placeholder()}
+								isLoading={securitiesContext.isLoading}
+								emptyText={m.trades_securities_empty()}
+								disabled={!canWrite}
+							/>
 						</FormFieldRow>
 
 						<FormFieldRow>
