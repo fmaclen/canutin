@@ -71,6 +71,7 @@ test.describe('transactions table sorting', () => {
 
 		await expect(page).toHaveURL(/sort=date/);
 		await expect(page).toHaveURL(/dir=asc/);
+		await expect(rows.first()).toContainText('Old Transaction');
 
 		expect(await getRowIndex(rows, 'Old Transaction')).toBeLessThan(
 			await getRowIndex(rows, 'Mid Transaction')
@@ -82,6 +83,7 @@ test.describe('transactions table sorting', () => {
 		// Click again - should toggle back to DESC
 		await dateHeader.click();
 		await expect(page).toHaveURL(/dir=desc/);
+		await expect(rows.first()).toContainText('Recent Transaction');
 
 		expect(await getRowIndex(rows, 'Recent Transaction')).toBeLessThan(
 			await getRowIndex(rows, 'Mid Transaction')
@@ -140,12 +142,14 @@ test.describe('transactions table sorting', () => {
 
 		await expect(page).toHaveURL(/sort=description/);
 		await expect(page).toHaveURL(/dir=desc/);
+		await expect(rows.first()).toContainText('Zebra Store');
 		expect(await getRowIndex(rows, 'Zebra Store')).toBeLessThan(
 			await getRowIndex(rows, 'Apple Purchase')
 		);
 
 		await descriptionHeader.click();
 		await expect(page).toHaveURL(/dir=asc/);
+		await expect(rows.first()).toContainText('Apple Purchase');
 		expect(await getRowIndex(rows, 'Apple Purchase')).toBeLessThan(
 			await getRowIndex(rows, 'Zebra Store')
 		);
@@ -209,12 +213,14 @@ test.describe('transactions table sorting', () => {
 
 		await expect(page).toHaveURL(/sort=account/);
 		await expect(page).toHaveURL(/dir=desc/);
+		await expect(rows.first()).toContainText('Zeta Account');
 		expect(await getRowIndex(rows, 'Zeta Account')).toBeLessThan(
 			await getRowIndex(rows, 'Alpha Account')
 		);
 
 		await accountHeader.click();
 		await expect(page).toHaveURL(/dir=asc/);
+		await expect(rows.first()).toContainText('Alpha Account');
 		expect(await getRowIndex(rows, 'Alpha Account')).toBeLessThan(
 			await getRowIndex(rows, 'Zeta Account')
 		);
