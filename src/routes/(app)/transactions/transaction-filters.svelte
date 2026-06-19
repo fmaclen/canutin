@@ -3,7 +3,7 @@
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import type { DateRange } from 'bits-ui';
-	import { addDays, format, subDays } from 'date-fns';
+	import { addDays, subDays } from 'date-fns';
 
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import AccountPicker from '$lib/components/account-picker.svelte';
@@ -14,6 +14,7 @@
 	import * as Popover from '$lib/components/ui/popover/index.js';
 	import { RangeCalendar } from '$lib/components/ui/range-calendar/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
+	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import {
 		getTransactionsContext,
@@ -61,7 +62,13 @@
 	function formatCustomDateRange(from: Date, to: Date, label: string | null): string {
 		if (label) return label;
 		const toInclusive = subDays(to, 1);
-		return `${format(from, 'MMM d, yyyy')} – ${format(toInclusive, 'MMM d, yyyy')}`;
+		const dateFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
+			month: 'short',
+			day: 'numeric',
+			year: 'numeric',
+			timeZone: 'UTC'
+		});
+		return `${dateFormatter.format(from)} – ${dateFormatter.format(toInclusive)}`;
 	}
 
 	function handleSearchInput(e: Event) {
@@ -119,7 +126,7 @@
 	}
 
 	function dateValueToDate(dateValue: DateValue): Date {
-		return new Date(dateValue.year, dateValue.month - 1, dateValue.day);
+		return new Date(Date.UTC(dateValue.year, dateValue.month - 1, dateValue.day));
 	}
 
 	function handleCalendarChange(value: DateRange | undefined) {

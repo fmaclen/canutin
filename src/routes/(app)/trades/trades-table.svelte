@@ -8,6 +8,7 @@
 	import RecordLink from '$lib/components/record-link.svelte';
 	import * as Pagination from '$lib/components/ui/pagination/index';
 	import * as Table from '$lib/components/ui/table/index';
+	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { formatSecurityQuantity } from '$lib/security-balance-values';
 	import { tradeTypeLabel } from '$lib/trade-display';
@@ -21,7 +22,7 @@
 		await goto(resolve(`/trades/${id}?from=${encodeURIComponent(from)}`));
 	}
 
-	const dateFormatter = new Intl.DateTimeFormat(undefined, {
+	const dateFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
 		year: 'numeric',
 		month: 'short',
 		day: 'numeric',

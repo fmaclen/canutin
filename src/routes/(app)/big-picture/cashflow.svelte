@@ -7,6 +7,7 @@
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
 
 	const cashflow = getCashflowContext();
@@ -14,11 +15,17 @@
 
 	let hoveredIndex = $state<number | null>(null);
 
-	const monthFormatter = new Intl.DateTimeFormat(undefined, { month: 'short', timeZone: 'UTC' });
-	const yearFormatter = new Intl.DateTimeFormat(undefined, { year: '2-digit', timeZone: 'UTC' });
+	const chartData = $derived.by(() => {
+		const monthFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
+			month: 'short',
+			timeZone: 'UTC'
+		});
+		const yearFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
+			year: '2-digit',
+			timeZone: 'UTC'
+		});
 
-	const chartData = $derived.by(() =>
-		periods.map((p) => {
+		return periods.map((p) => {
 			const isJanuary = p.month.getMonth() === 0;
 			const month = monthFormatter.format(p.month);
 			const periodFrom = format(p.month, 'yyyy-MM-dd');
@@ -29,8 +36,8 @@
 				label: isJanuary ? `${month} '${yearFormatter.format(p.month)}` : month,
 				transactionsUrl: `/transactions?periodFrom=${periodFrom}&periodTo=${periodTo}&periodLabel=${periodLabel}`
 			};
-		})
-	);
+		});
+	});
 
 	const chartRatios = $derived.by(() => {
 		if (!periods.length) {

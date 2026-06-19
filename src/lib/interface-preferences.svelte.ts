@@ -5,7 +5,14 @@ export const interfaceLocales = ['en', 'es'] as const;
 export type InterfaceLocale = (typeof interfaceLocales)[number];
 export type InterfaceThemeMode = 'system' | 'light' | 'dark';
 
-export const interfacePreferences = $state({ locale: 'en' as InterfaceLocale });
+export const interfacePreferences = $state({
+	locale: 'en' as InterfaceLocale,
+	formatLocale: 'en-US'
+});
+
+export function getFormattingLocale() {
+	return interfacePreferences.formatLocale;
+}
 
 function isInterfaceLocale(value: string | null | undefined): value is InterfaceLocale {
 	return value === 'en' || value === 'es';
@@ -59,6 +66,8 @@ export async function setInterfaceLocale(locale: InterfaceLocale) {
 }
 
 export async function initializeLocale() {
+	interfacePreferences.formatLocale = navigator.language || 'en-US';
+
 	const persistedLocale = readPersistedLocale();
 
 	if (persistedLocale) {

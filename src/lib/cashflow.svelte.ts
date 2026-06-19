@@ -6,6 +6,7 @@ import { SvelteMap } from 'svelte/reactivity';
 
 import { getAccountsContext, type AccountWithBalance } from './accounts.svelte';
 import { getAuthContext } from './auth.svelte';
+import { getFormattingLocale } from './interface-preferences.svelte';
 import { AccountSharesPerspectiveOptions, type TransactionsResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
 import { projectSignedValue } from './sharing';
@@ -390,7 +391,11 @@ class CashflowContext {
 				expenses: monthSums.expenses,
 				surplus: monthSums.income + monthSums.expenses,
 				isCurrentPeriod,
-				periodLabel: format(month, 'MMMM yyyy')
+				periodLabel: new Intl.DateTimeFormat(getFormattingLocale(), {
+					month: 'long',
+					year: 'numeric',
+					timeZone: 'UTC'
+				}).format(month)
 			});
 		}
 

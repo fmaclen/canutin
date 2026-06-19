@@ -22,6 +22,7 @@
 	import * as Table from '$lib/components/ui/table/index';
 	import { getImportSessionsContext } from '$lib/import-sessions.svelte';
 	import {
+		getFormattingLocale,
 		interfacePreferences,
 		setInterfaceLocale,
 		type InterfaceThemeMode
@@ -100,7 +101,7 @@
 	});
 
 	function formatDate(iso: string) {
-		return new Date(iso).toLocaleDateString(undefined, {
+		return new Date(iso).toLocaleDateString(getFormattingLocale(), {
 			year: 'numeric',
 			month: 'short',
 			day: 'numeric',

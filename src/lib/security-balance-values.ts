@@ -1,13 +1,11 @@
 import { compareDesc } from 'date-fns';
 
+import { getFormattingLocale } from '$lib/interface-preferences.svelte';
+
 import { toNumber } from './utils';
 
-const quantityFormatter = new Intl.NumberFormat('en-US', {
-	maximumFractionDigits: 8
-});
-
 export function formatSecurityQuantity(value: number) {
-	return quantityFormatter.format(value);
+	return new Intl.NumberFormat(getFormattingLocale(), { maximumFractionDigits: 8 }).format(value);
 }
 
 export type SecurityBalanceValueInput = {

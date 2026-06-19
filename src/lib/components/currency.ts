@@ -1,7 +1,20 @@
 import { formatValue } from '@canutin/svelte-currency-input';
 
-export const intlConfig = { locale: 'en-US', currency: 'USD' };
+import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 
-export function formatCurrency(value: number | null | undefined, decimalScale = 0) {
-	return formatValue({ value: String(value ?? 0), intlConfig, decimalScale, roundValue: true });
+export function getIntlConfig(currency = 'USD') {
+	return { locale: getFormattingLocale(), currency };
+}
+
+export function formatCurrency(
+	value: number | null | undefined,
+	decimalScale = 0,
+	currency = 'USD'
+) {
+	return formatValue({
+		value: String(value ?? 0),
+		intlConfig: getIntlConfig(currency),
+		decimalScale,
+		roundValue: true
+	});
 }

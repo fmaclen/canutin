@@ -1,6 +1,8 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+import { getFormattingLocale } from '$lib/interface-preferences.svelte';
+
 export function cn(...inputs: ClassValue[]) {
 	return twMerge(clsx(inputs));
 }
@@ -14,7 +16,7 @@ export function toNumber(value: unknown) {
 
 export function formatPercent(value: number) {
 	const normalized = value === 0 ? 0 : value;
-	return `${normalized > 0 ? '+' : ''}${normalized.toLocaleString('en-US', {
+	return `${normalized > 0 ? '+' : ''}${normalized.toLocaleString(getFormattingLocale(), {
 		minimumFractionDigits: 1,
 		maximumFractionDigits: 1
 	})}%`;

@@ -6,6 +6,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton/index';
 	import * as Table from '$lib/components/ui/table/index';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import type {
 		AccountBalancesResponse,
@@ -313,7 +314,7 @@
 
 	function formatPercent(v: number | null) {
 		if (v === null) return '~';
-		return new Intl.NumberFormat('en-US', {
+		return new Intl.NumberFormat(getFormattingLocale(), {
 			style: 'percent',
 			maximumFractionDigits: 1,
 			signDisplay: 'exceptZero'
