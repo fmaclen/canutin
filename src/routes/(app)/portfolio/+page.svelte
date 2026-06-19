@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
 	import KeyValue from '$lib/components/key-value.svelte';
@@ -14,13 +16,71 @@
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Table from '$lib/components/ui/table/index';
 	import { m } from '$lib/paraglide/messages';
-	import { getSecuritiesContext } from '$lib/securities.svelte';
-	import { formatSecurityQuantity } from '$lib/security-balance-values';
-	import { formatPercent } from '$lib/utils';
+	import { getSecuritiesContext, type SecurityAggregate } from '$lib/securities.svelte';
+	import { formatSecurityQuantity, gainLossPercentOrNull } from '$lib/security-balance-values';
+	import {
+		createSortComparator,
+		formatPercent,
+		getSortFromUrl,
+		setSortInUrl,
+		toggleSort,
+		type SortState
+	} from '$lib/utils';
 
 	const securitiesContext = getSecuritiesContext();
 
 	const rows = $derived(securitiesContext.aggregateRows);
+
+	type PortfolioSortColumn =
+		| 'name'
+		| 'symbol'
+		| 'quantity'
+		| 'costBasis'
+		| 'gainLoss'
+		| 'gainLossPercent'
+		| 'value';
+	const validSortColumns: PortfolioSortColumn[] = [
+		'name',
+		'symbol',
+		'quantity',
+		'costBasis',
+		'gainLoss',
+		'gainLossPercent',
+		'value'
+	];
+
+	const defaultSort: SortState<PortfolioSortColumn> = { column: 'value', direction: 'desc' };
+	const sortState = $derived.by(() => {
+		const urlSort = getSortFromUrl(page.url);
+		if (
+			urlSort.column &&
+			urlSort.direction &&
+			validSortColumns.includes(urlSort.column as PortfolioSortColumn)
+		) {
+			return urlSort as SortState<PortfolioSortColumn>;
+		}
+		return defaultSort;
+	});
+
+	function handleSort(column: string) {
+		const newState = toggleSort(sortState, column as PortfolioSortColumn);
+		const newUrl = setSortInUrl(page.url, newState);
+		// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic URL computed at runtime
+		goto(newUrl, { replaceState: true, keepFocus: true });
+	}
+
+	const sortedRows = $derived.by(() => {
+		const comparator = createSortComparator<SecurityAggregate, PortfolioSortColumn>(sortState, {
+			name: (r) => r.name,
+			symbol: (r) => r.symbol,
+			quantity: (r) => r.quantity,
+			costBasis: (r) => r.costBasis,
+			gainLoss: (r) => r.gainLoss,
+			gainLossPercent: (r) => gainLossPercentOrNull(r.gainLoss, r.costBasis),
+			value: (r) => r.value
+		});
+		return [...rows].sort(comparator);
+	});
 
 	const marketValueTotal = $derived(
 		rows.some((row) => row.value === null)
@@ -97,38 +157,77 @@
 				<Table.Root>
 					<Table.Header>
 						<Table.Row>
-							<Table.Head class="text-left whitespace-nowrap">
+							<Table.SortableHead
+								class="text-left whitespace-nowrap"
+								column="name"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
 								{m.securities_table_header_security()}
-							</Table.Head>
-							<Table.Head class="text-left whitespace-nowrap">
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-left whitespace-nowrap"
+								column="symbol"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
 								{m.securities_table_header_symbol()}
-							</Table.Head>
+							</Table.SortableHead>
 							<Table.Head class="text-left whitespace-nowrap">
 								{m.securities_table_header_accounts()}
 							</Table.Head>
-							<Table.Head class="text-right whitespace-nowrap">
+							<Table.SortableHead
+								class="text-right whitespace-nowrap"
+								column="quantity"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
 								{m.securities_table_header_quantity()}
-							</Table.Head>
-							<Table.Head class="text-right whitespace-nowrap">
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-right whitespace-nowrap"
+								column="costBasis"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
 								{m.securities_table_header_cost_basis()}
-							</Table.Head>
-							<Table.Head class="text-right whitespace-nowrap">
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-right whitespace-nowrap"
+								column="gainLoss"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
 								{m.securities_table_header_gain_loss()}
-							</Table.Head>
-							<Table.Head class="text-right whitespace-nowrap">
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-right whitespace-nowrap"
+								column="gainLossPercent"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
 								{m.securities_table_header_gain_loss_percent()}
-							</Table.Head>
-							<Table.Head class="text-right whitespace-nowrap">
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-right whitespace-nowrap"
+								column="value"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
 								{m.securities_table_header_value()}
-							</Table.Head>
+							</Table.SortableHead>
 						</Table.Row>
 					</Table.Header>
 					<Table.Body>
-						{#each rows as row (row.id)}
-							{@const gainLossPercent =
-								row.gainLoss !== null && row.costBasis !== null && row.costBasis !== 0
-									? (row.gainLoss / row.costBasis) * 100
-									: null}
+						{#each sortedRows as row (row.id)}
+							{@const gainLossPercent = gainLossPercentOrNull(row.gainLoss, row.costBasis)}
 							<Table.Row>
 								<Table.Cell>
 									<Link

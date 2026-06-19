@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import Empty from '$lib/components/empty.svelte';
 	import Link from '$lib/components/link.svelte';
 	import Page from '$lib/components/page.svelte';
@@ -11,9 +13,48 @@
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Table from '$lib/components/ui/table/index';
 	import { m } from '$lib/paraglide/messages';
+	import type { SecuritiesResponse } from '$lib/pocketbase.schema';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
+	import {
+		createSortComparator,
+		getSortFromUrl,
+		setSortInUrl,
+		toggleSort,
+		type SortState
+	} from '$lib/utils';
 
 	const securitiesContext = getSecuritiesContext();
+
+	type SecuritiesSortColumn = 'name' | 'symbol';
+	const validSortColumns: SecuritiesSortColumn[] = ['name', 'symbol'];
+
+	const defaultSort: SortState<SecuritiesSortColumn> = { column: 'name', direction: 'asc' };
+	const sortState = $derived.by(() => {
+		const urlSort = getSortFromUrl(page.url);
+		if (
+			urlSort.column &&
+			urlSort.direction &&
+			validSortColumns.includes(urlSort.column as SecuritiesSortColumn)
+		) {
+			return urlSort as SortState<SecuritiesSortColumn>;
+		}
+		return defaultSort;
+	});
+
+	function handleSort(column: string) {
+		const newState = toggleSort(sortState, column as SecuritiesSortColumn);
+		const newUrl = setSortInUrl(page.url, newState);
+		// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic URL computed at runtime
+		goto(newUrl, { replaceState: true, keepFocus: true });
+	}
+
+	const sortedRows = $derived.by(() => {
+		const comparator = createSortComparator<SecuritiesResponse, SecuritiesSortColumn>(sortState, {
+			name: (r) => r.name,
+			symbol: (r) => r.symbol ?? null
+		});
+		return [...securitiesContext.securities].sort(comparator);
+	});
 </script>
 
 <header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
@@ -52,16 +93,28 @@
 				<Table.Root>
 					<Table.Header>
 						<Table.Row>
-							<Table.Head class="text-left whitespace-nowrap">
+							<Table.SortableHead
+								class="text-left whitespace-nowrap"
+								column="name"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
 								{m.securities_table_header_security()}
-							</Table.Head>
-							<Table.Head class="text-left whitespace-nowrap">
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-left whitespace-nowrap"
+								column="symbol"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
 								{m.securities_table_header_symbol()}
-							</Table.Head>
+							</Table.SortableHead>
 						</Table.Row>
 					</Table.Header>
 					<Table.Body>
-						{#each securitiesContext.securities as row (row.id)}
+						{#each sortedRows as row (row.id)}
 							<Table.Row>
 								<Table.Cell>
 									<Link

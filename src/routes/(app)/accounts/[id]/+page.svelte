@@ -38,12 +38,19 @@
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
 	import {
-		compareByValueDescThenName,
 		formatSecurityQuantity,
 		gainLossPercentOrNull,
 		sumOrUnknown
 	} from '$lib/security-balance-values';
-	import { formatPercent, sanitizeFromParam } from '$lib/utils';
+	import {
+		createSortComparator,
+		formatPercent,
+		getSortFromUrl,
+		sanitizeFromParam,
+		setSortInUrl,
+		toggleSort,
+		type SortState
+	} from '$lib/utils';
 
 	import BalanceForm from './balance-form.svelte';
 	import DetailsForm from './details-form.svelte';
@@ -71,19 +78,64 @@
 				)
 			: []
 	);
-	const positionsRows = $derived(
-		positionsBalances
-			.map((balance) => ({
-				...balance,
-				securityName: securitiesContext.getSecurity(balance.securityId)?.name ?? ''
-			}))
-			.sort(
-				compareByValueDescThenName(
-					(row) => row.value,
-					(row) => row.securityName
-				)
-			)
-	);
+	type PositionSortColumn =
+		| 'asOf'
+		| 'securityName'
+		| 'quantity'
+		| 'price'
+		| 'costBasis'
+		| 'gainLoss'
+		| 'gainLossPercent'
+		| 'value';
+	const validSortColumns: PositionSortColumn[] = [
+		'asOf',
+		'securityName',
+		'quantity',
+		'price',
+		'costBasis',
+		'gainLoss',
+		'gainLossPercent',
+		'value'
+	];
+
+	const defaultSort: SortState<PositionSortColumn> = { column: 'value', direction: 'desc' };
+	const sortState = $derived.by(() => {
+		const urlSort = getSortFromUrl(page.url);
+		if (
+			urlSort.column &&
+			urlSort.direction &&
+			validSortColumns.includes(urlSort.column as PositionSortColumn)
+		) {
+			return urlSort as SortState<PositionSortColumn>;
+		}
+		return defaultSort;
+	});
+
+	function handleSort(column: string) {
+		const newState = toggleSort(sortState, column as PositionSortColumn);
+		const newUrl = setSortInUrl(page.url, newState);
+		// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic URL computed at runtime
+		goto(newUrl, { replaceState: true, keepFocus: true });
+	}
+
+	const positionsRows = $derived.by(() => {
+		const rows = positionsBalances.map((balance) => ({
+			...balance,
+			securityName: securitiesContext.getSecurity(balance.securityId)?.name ?? ''
+		}));
+
+		const comparator = createSortComparator<(typeof rows)[number], PositionSortColumn>(sortState, {
+			asOf: (row) => new Date(row.asOf).getTime(),
+			securityName: (row) => row.securityName,
+			quantity: (row) => row.quantity,
+			price: (row) => row.price,
+			costBasis: (row) => row.costBasis,
+			gainLoss: (row) => row.gainLoss,
+			gainLossPercent: (row) => gainLossPercentOrNull(row.gainLoss, row.costBasis),
+			value: (row) => row.value
+		});
+		return rows.sort(comparator);
+	});
 	const positionsMarketValue = $derived(sumOrUnknown(positionsRows.map((row) => row.value)));
 	const dateFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
 		year: 'numeric',
@@ -436,30 +488,78 @@
 				<Table.Root>
 					<Table.Header>
 						<Table.Row>
-							<Table.Head class="text-left whitespace-nowrap">
+							<Table.SortableHead
+								class="text-left whitespace-nowrap"
+								column="asOf"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
 								{m.securities_table_header_as_of()}
-							</Table.Head>
-							<Table.Head class="text-left whitespace-nowrap">
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-left whitespace-nowrap"
+								column="securityName"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
 								{m.securities_table_header_security()}
-							</Table.Head>
-							<Table.Head class="text-right whitespace-nowrap">
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-right whitespace-nowrap"
+								column="quantity"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
 								{m.securities_table_header_quantity()}
-							</Table.Head>
-							<Table.Head class="text-right whitespace-nowrap">
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-right whitespace-nowrap"
+								column="price"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
 								{m.securities_table_header_price()}
-							</Table.Head>
-							<Table.Head class="text-right whitespace-nowrap">
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-right whitespace-nowrap"
+								column="costBasis"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
 								{m.securities_table_header_cost_basis()}
-							</Table.Head>
-							<Table.Head class="text-right whitespace-nowrap">
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-right whitespace-nowrap"
+								column="gainLoss"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
 								{m.securities_table_header_gain_loss()}
-							</Table.Head>
-							<Table.Head class="text-right whitespace-nowrap">
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-right whitespace-nowrap"
+								column="gainLossPercent"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
 								{m.securities_table_header_gain_loss_percent()}
-							</Table.Head>
-							<Table.Head class="text-right whitespace-nowrap">
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-right whitespace-nowrap"
+								column="value"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
 								{m.securities_table_header_value()}
-							</Table.Head>
+							</Table.SortableHead>
 						</Table.Row>
 					</Table.Header>
 					<Table.Body>
