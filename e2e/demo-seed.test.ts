@@ -18,13 +18,13 @@ test('/demo route seeds data and displays net worth', async ({ page }) => {
 
 	// Seeded trades are visible under the default "last 3 months" filter
 	await page.goto('/trades');
-	await expect(page.getByText('Sold GameStop')).toBeVisible({ timeout: 30_000 });
+	await expect(page.getByText('Sold GameStop')).toBeVisible();
 	await expect(page.getByText('Bought SPDR S&P 500').first()).toBeVisible();
 	await expect(page.getByText('Bought Bitcoin').first()).toBeVisible();
 	await expect(page.getByText('Bought Ethereum').first()).toBeVisible();
 
 	// Portfolio shows the seeded holdings
 	await page.goto('/portfolio');
-	await expect(page.getByText('SPDR S&P 500 ETF Trust')).toBeVisible({ timeout: 30_000 });
+	await expect(page.getByText('SPDR S&P 500 ETF Trust')).toBeVisible();
 	await expect(page.getByText('Bitcoin')).toBeVisible();
 });
