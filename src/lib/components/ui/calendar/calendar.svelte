@@ -3,6 +3,7 @@
 	import { Calendar as CalendarPrimitive } from 'bits-ui';
 	import type { Snippet } from 'svelte';
 
+	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { cn, type WithoutChildrenOrChild } from '$lib/utils.js';
 
 	import type { ButtonVariant } from '../button/button.svelte';
@@ -16,7 +17,7 @@
 		weekdayFormat = 'short',
 		buttonVariant = 'ghost',
 		captionLayout = 'label',
-		locale = 'en-US',
+		locale = getFormattingLocale(),
 		months: monthsProp,
 		years,
 		monthFormat: monthFormatProp,

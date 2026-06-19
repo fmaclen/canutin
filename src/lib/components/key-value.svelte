@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Currency from '$lib/components/currency.svelte';
 	import Number from '$lib/components/number.svelte';
+	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { formatPercent } from '$lib/utils';
 
 	type Variant = 'filled' | 'outline' | 'cash' | 'debt' | 'investment' | 'other';
@@ -41,7 +42,7 @@
 		{:else if format === 'percent'}
 			<Number value={formatPercent(value)} />
 		{:else if format === 'number'}
-			<Number value={value.toLocaleString('en-US')} />
+			<Number value={value.toLocaleString(getFormattingLocale())} />
 		{:else}
 			<Currency {value} {decimalScale} />
 		{/if}

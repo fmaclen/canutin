@@ -246,6 +246,44 @@ test('assets table shows appreciation and depreciation for whole-value assets', 
 	]);
 });
 
+// Formatting follows the browser locale (navigator.language), independent of the
+// en/es UI language. Under de-DE the UI text stays English but numbers flip
+// separators: the gain renders as +1.150,0% instead of the en-US +1,150.0%.
+// See: https://github.com/fmaclen/canutin/issues/367
+test.describe('locale-aware formatting follows the browser locale', () => {
+	test.use({ locale: 'de-DE' });
+
+	test('gain percentage renders with German separators while UI stays English', async ({
+		page
+	}) => {
+		const user = await seedUser('ruth');
+
+		const gainAsset = await seedAsset({
+			name: 'Growth Portfolio',
+			balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
+			owner: user.id,
+			balanceType: 'Stock'
+		});
+		await seedAssetBalance({
+			asset: gainAsset.id,
+			owner: user.id,
+			asOf: new Date().toISOString(),
+			bookValue: 45000,
+			marketValue: 562500
+		});
+
+		await page.goto('/');
+		await signIn(page, user.email);
+		await goToPageViaSidebar(page, 'Assets');
+
+		await expect(page.getByRole('tab', { name: 'Owned' })).toBeVisible();
+
+		const growthPortfolioRow = page.getByRole('row', { name: 'Growth Portfolio' });
+		await expect(growthPortfolioRow).toBeVisible();
+		await expectAssetRowCells(growthPortfolioRow, [[6, '+1.150,0%']]);
+	});
+});
+
 test('user can add a new whole-valued asset', async ({ page }) => {
 	const user = await seedUser('liam');
 

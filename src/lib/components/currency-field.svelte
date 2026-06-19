@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { CurrencyInput, formatValue } from '@canutin/svelte-currency-input';
 
-	import { intlConfig } from './currency';
+	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
+
+	import { getIntlConfig } from './currency';
 
 	interface Props {
 		id: string;
@@ -22,7 +24,7 @@
 	}: Props = $props();
 
 	const fieldIntlConfig = $derived(
-		isCurrency ? intlConfig : { locale: intlConfig.locale, style: 'decimal' as const }
+		isCurrency ? getIntlConfig() : { locale: getFormattingLocale(), style: 'decimal' as const }
 	);
 
 	const placeholder = $derived(

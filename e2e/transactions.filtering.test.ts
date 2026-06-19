@@ -868,6 +868,60 @@ test('date range picker allows selecting custom range via calendar', async ({ pa
 	await expect(page.getByText('This Month Payment')).not.toBeVisible();
 });
 
+// Regression test for the date-range picker storing the wrong day for users ahead of
+// UTC. The picker builds the picked day in UTC field-space; a viewer in Asia/Tokyo
+// (UTC+9) picking day 10 must round-trip to periodFrom=...-10, not ...-09.
+test.describe('date range picker in a UTC+ timezone', () => {
+	test.use({ timezoneId: 'Asia/Tokyo' });
+
+	test('picked range round-trips to the same days', async ({ page }) => {
+		const user = await seedUser('tokyo');
+
+		const account = await seedAccount({
+			name: 'Tokyo Checking',
+			balanceGroup: AccountsBalanceGroupOptions.CASH,
+			owner: user.id,
+			balanceType: 'Checking'
+		});
+		await seedAccountBalance({
+			account: account.id,
+			owner: user.id,
+			asOf: new Date().toISOString(),
+			value: 5000
+		});
+
+		const now = new UTCDate();
+		const lastMonth = addMonths(startOfMonth(now), -1);
+		const lastMonthYear = lastMonth.getUTCFullYear();
+		const lastMonthIndex = lastMonth.getUTCMonth() + 1;
+		const pad = (value: number) => String(value).padStart(2, '0');
+		const expectedFrom = `${lastMonthYear}-${pad(lastMonthIndex)}-10`;
+		// End is exclusive: clicking day 20 (inclusive) stores the next UTC day, day 21.
+		const expectedTo = `${lastMonthYear}-${pad(lastMonthIndex)}-21`;
+
+		await seedTransaction({
+			account: account.id,
+			owner: user.id,
+			date: new UTCDate(lastMonthYear, lastMonth.getUTCMonth(), 15, 12, 0, 0, 0).toISOString(),
+			description: 'In Range Payment',
+			value: 200
+		});
+
+		await page.goto('/');
+		await signIn(page, user.email);
+		await goToPageViaSidebar(page, 'Transactions');
+
+		await page.getByLabel('Period').click();
+		await page.getByRole('button', { name: 'Previous' }).click();
+		await page.getByRole('button', { name: /10,/ }).first().click();
+		await page.getByRole('button', { name: /20,/ }).first().click();
+
+		await expect(page).toHaveURL(new RegExp(`periodFrom=${expectedFrom}`));
+		await expect(page).toHaveURL(new RegExp(`periodTo=${expectedTo}`));
+		await expect(page.getByText('In Range Payment')).toBeVisible();
+	});
+});
+
 test('switching from custom range back to preset clears custom URL params and updates transactions', async ({
 	page
 }) => {

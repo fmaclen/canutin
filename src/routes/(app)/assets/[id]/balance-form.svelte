@@ -4,6 +4,7 @@
 	import FormFieldRow from '$lib/components/form-field-row.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
 
 	interface Props {
@@ -27,7 +28,7 @@
 
 	const formattedAsOf = $derived(
 		parsedAsOf
-			? parsedAsOf.toLocaleDateString(undefined, {
+			? parsedAsOf.toLocaleDateString(getFormattingLocale(), {
 					year: 'numeric',
 					month: 'short',
 					day: 'numeric'
@@ -37,7 +38,7 @@
 
 	const fullAsOf = $derived(
 		parsedAsOf
-			? parsedAsOf.toLocaleString(undefined, {
+			? parsedAsOf.toLocaleString(getFormattingLocale(), {
 					year: 'numeric',
 					month: 'long',
 					day: 'numeric',

@@ -29,6 +29,7 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Table from '$lib/components/ui/table/index';
+	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import {
 		AccountsBalanceGroupOptions,
@@ -84,7 +85,7 @@
 			)
 	);
 	const positionsMarketValue = $derived(sumOrUnknown(positionsRows.map((row) => row.value)));
-	const dateFormatter = new Intl.DateTimeFormat(undefined, {
+	const dateFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
 		year: 'numeric',
 		month: 'short',
 		day: 'numeric',

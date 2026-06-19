@@ -4,6 +4,7 @@
 	import type { Snippet } from 'svelte';
 
 	import type { ButtonVariant } from '$lib/components/ui/button/index.js';
+	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { cn, type WithoutChildrenOrChild } from '$lib/utils.js';
 
 	import * as RangeCalendar from './index.js';
@@ -16,7 +17,7 @@
 		class: className,
 		buttonVariant = 'ghost',
 		captionLayout = 'label',
-		locale = 'en-US',
+		locale = getFormattingLocale(),
 		months: monthsProp,
 		years,
 		monthFormat: monthFormatProp,

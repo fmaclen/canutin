@@ -10,6 +10,7 @@
 	import * as Pagination from '$lib/components/ui/pagination/index';
 	import * as Table from '$lib/components/ui/table/index';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { getTransactionsContext } from '$lib/transactions.svelte';
 	import { cn } from '$lib/utils.js';
@@ -26,7 +27,7 @@
 		txContext.setSort(column);
 	}
 
-	const dateFormatter = new Intl.DateTimeFormat(undefined, {
+	const dateFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
 		year: 'numeric',
 		month: 'short',
 		day: 'numeric',
