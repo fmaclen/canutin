@@ -15,17 +15,18 @@ import { ALL_ASSETS } from './seed-data/assets';
 import {
 	generate401kBalances,
 	generateAutoLoanBalances,
-	generateBitcoinBalances,
 	generateCollectibleBalances,
-	generateEthereumBalances,
-	generateGamestopBalances,
 	generateRothIraBalances,
-	generateSpyBalances,
 	generateVehicleBalances,
 	generateWalletBalances,
 	type AccountBalanceDefinition,
 	type AssetBalanceDefinition
 } from './seed-data/balances';
+import {
+	ALL_SECURITIES,
+	generateSecurityBalances,
+	generateSecurityTrades
+} from './seed-data/securities';
 import {
 	generateCheckingTransactions,
 	generateCreditCardTransactions,
@@ -297,30 +298,50 @@ export async function seedDemoData(pb: TypedPocketBase, userId: string) {
 		assetIds['1998 Fiat Multipla'],
 		userId
 	);
-	await createAssetBalances(
-		pb,
-		generateSpyBalances(referenceDate),
-		assetIds['SPDR S&P 500 ETF Trust'],
-		userId
-	);
-	await createAssetBalances(
-		pb,
-		generateGamestopBalances(referenceDate),
-		assetIds['GameStop'],
-		userId
-	);
-	await createAssetBalances(
-		pb,
-		generateBitcoinBalances(referenceDate),
-		assetIds['Bitcoin'],
-		userId
-	);
-	await createAssetBalances(
-		pb,
-		generateEthereumBalances(referenceDate),
-		assetIds['Ethereum'],
-		userId
-	);
+
+	// Create securities with their positions and trades (sequentially)
+	const securityIds: IdMap = {};
+	for (const security of ALL_SECURITIES) {
+		const created = await pb.collection('securities').create({
+			name: security.name,
+			symbol: security.symbol,
+			owner: userId
+		});
+		securityIds[security.name] = created.id;
+	}
+
+	for (const security of ALL_SECURITIES) {
+		const accountId = accountIds[security.account];
+		const securityId = securityIds[security.name];
+
+		await runInBatches(generateSecurityBalances(security.name, referenceDate), (balance) =>
+			pb.collection('securityBalances').create({
+				account: accountId,
+				security: securityId,
+				owner: userId,
+				asOf: balance.asOf,
+				quantity: balance.quantity,
+				price: balance.price,
+				value: balance.value,
+				costBasis: balance.costBasis
+			})
+		);
+
+		await runInBatches(generateSecurityTrades(security.name, referenceDate), (trade) =>
+			pb.collection('securityTransactions').create({
+				account: accountId,
+				security: securityId,
+				owner: userId,
+				date: trade.date,
+				type: trade.type,
+				description: trade.description,
+				quantity: trade.quantity,
+				price: trade.price,
+				amount: trade.amount,
+				fees: trade.fees
+			})
+		);
+	}
 
 	// Wait for Go hooks to finish calculating balances for auto-calculated accounts
 	const autoCalculatedAccountIds = AUTO_CALCULATED_ACCOUNTS.map((a) => accountIds[a.name]);
