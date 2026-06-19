@@ -1,19 +1,20 @@
 import PocketBase from 'pocketbase';
 
-import type {
-	AccountBalancesRecord,
-	AccountsRecord,
-	AssetBalancesRecord,
-	AssetsRecord,
-	BalanceTypesRecord,
-	SecuritiesRecord,
-	SecurityBalancesRecord,
-	SecurityTransactionsRecord,
-	SecurityTransactionsTypeOptions,
-	TransactionLabelsRecord,
-	TransactionsRecord,
-	TypedPocketBase,
-	UsersRecord
+import {
+	AccountsBalanceGroupOptions,
+	type AccountBalancesRecord,
+	type AccountsRecord,
+	type AssetBalancesRecord,
+	type AssetsRecord,
+	type BalanceTypesRecord,
+	type SecuritiesRecord,
+	type SecurityBalancesRecord,
+	type SecurityTransactionsRecord,
+	type SecurityTransactionsTypeOptions,
+	type TransactionLabelsRecord,
+	type TransactionsRecord,
+	type TypedPocketBase,
+	type UsersRecord
 } from '../src/lib/pocketbase.schema';
 
 export const DEFAULT_PASSWORD = '123qweasdzxc';
@@ -181,6 +182,76 @@ export async function seedTrade(tradeInput: {
 }) {
 	const pb = await getAdminPB();
 	return await pb.collection('securityTransactions').create(tradeInput);
+}
+
+// Seeds a set of brokerage accounts, securities, and the security balances that link
+// them, resolving the balances' `account`/`security` references by name. Returns the
+// created accounts and securities so callers can read ids for navigation.
+export async function seedPortfolio(
+	owner: UsersRecord['id'],
+	spec: {
+		accounts: string[];
+		securities: { name: SecuritiesRecord['name']; symbol?: SecuritiesRecord['symbol'] }[];
+		balances: {
+			account: string;
+			security: string;
+			quantity?: number | null;
+			price?: number | null;
+			value?: number | null;
+			costBasis?: number | null;
+		}[];
+		asOf?: string;
+	}
+) {
+	const asOf = spec.asOf ?? new Date().toISOString();
+
+	const accountsByName = new Map<string, AccountsRecord>();
+	for (const name of spec.accounts) {
+		accountsByName.set(
+			name,
+			await seedAccount({
+				name,
+				balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+				balanceType: 'Brokerage',
+				owner
+			})
+		);
+	}
+
+	const securitiesByName = new Map<string, SecuritiesRecord>();
+	for (const security of spec.securities) {
+		securitiesByName.set(
+			security.name,
+			await seedSecurity({ name: security.name, symbol: security.symbol, owner })
+		);
+	}
+
+	for (const balance of spec.balances) {
+		const account = accountsByName.get(balance.account);
+		const security = securitiesByName.get(balance.security);
+		if (!account) {
+			throw new Error(`seedPortfolio: balance references unknown account "${balance.account}"`);
+		}
+		if (!security) {
+			throw new Error(`seedPortfolio: balance references unknown security "${balance.security}"`);
+		}
+		await seedSecurityBalance({
+			account: account.id,
+			security: security.id,
+			owner,
+			asOf,
+			quantity: balance.quantity,
+			price: balance.price,
+			value: balance.value,
+			costBasis: balance.costBasis
+		});
+	}
+
+	return {
+		accounts: [...accountsByName.values()],
+		securities: [...securitiesByName.values()],
+		asOf
+	};
 }
 
 export async function updateAsset(

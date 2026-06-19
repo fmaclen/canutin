@@ -1,10 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
 import { getRowIndex, signIn } from './playwright.helpers';
-import { seedAccount, seedSecurity, seedSecurityBalance, seedUser } from './pocketbase.helpers';
-
-// --- securities list ---
+import { seedPortfolio, seedSecurity, seedUser } from './pocketbase.helpers';
 
 test('securities list: defaults to security name ascending', async ({ page }) => {
 	const user = await seedUser('bianca');
@@ -149,59 +146,39 @@ test('securities list: sort state persists across reload', async ({ page }) => {
 	await expect(page).toHaveURL(/dir=asc/);
 });
 
-// --- security detail ---
-
 test('security detail: defaults to market value descending', async ({ page }) => {
 	const user = await seedUser('dominic');
-	const security = await seedSecurity({ name: 'Detail Security', symbol: 'DTL', owner: user.id });
-	const alpha = await seedAccount({
-		name: 'Alpha Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const beta = await seedAccount({
-		name: 'Beta Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const gamma = await seedAccount({
-		name: 'Gamma Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const asOf = new Date().toISOString();
-	await seedSecurityBalance({
-		account: alpha.id,
-		owner: user.id,
-		security: security.id,
-		asOf,
-		quantity: 10,
-		price: 100,
-		value: 1000,
-		costBasis: 800
-	});
-	await seedSecurityBalance({
-		account: beta.id,
-		owner: user.id,
-		security: security.id,
-		asOf,
-		quantity: 30,
-		price: 100,
-		value: 3000,
-		costBasis: 2000
-	});
-	await seedSecurityBalance({
-		account: gamma.id,
-		owner: user.id,
-		security: security.id,
-		asOf,
-		quantity: 20,
-		price: 100,
-		value: 2000,
-		costBasis: 2500
+	const {
+		securities: [security]
+	} = await seedPortfolio(user.id, {
+		accounts: ['Alpha Brokerage', 'Beta Brokerage', 'Gamma Brokerage'],
+		securities: [{ name: 'Detail Security', symbol: 'DTL' }],
+		balances: [
+			{
+				account: 'Alpha Brokerage',
+				security: 'Detail Security',
+				quantity: 10,
+				price: 100,
+				value: 1000,
+				costBasis: 800
+			},
+			{
+				account: 'Beta Brokerage',
+				security: 'Detail Security',
+				quantity: 30,
+				price: 100,
+				value: 3000,
+				costBasis: 2000
+			},
+			{
+				account: 'Gamma Brokerage',
+				security: 'Detail Security',
+				quantity: 20,
+				price: 100,
+				value: 2000,
+				costBasis: 2500
+			}
+		]
 	});
 
 	await page.goto('/');
@@ -220,55 +197,37 @@ test('security detail: clicking Account header sorts by account name descending 
 	page
 }) => {
 	const user = await seedUser('dominic');
-	const security = await seedSecurity({ name: 'Detail Security', symbol: 'DTL', owner: user.id });
-	const alpha = await seedAccount({
-		name: 'Alpha Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const beta = await seedAccount({
-		name: 'Beta Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const gamma = await seedAccount({
-		name: 'Gamma Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const asOf = new Date().toISOString();
-	await seedSecurityBalance({
-		account: alpha.id,
-		owner: user.id,
-		security: security.id,
-		asOf,
-		quantity: 10,
-		price: 100,
-		value: 1000,
-		costBasis: 800
-	});
-	await seedSecurityBalance({
-		account: beta.id,
-		owner: user.id,
-		security: security.id,
-		asOf,
-		quantity: 30,
-		price: 100,
-		value: 3000,
-		costBasis: 2000
-	});
-	await seedSecurityBalance({
-		account: gamma.id,
-		owner: user.id,
-		security: security.id,
-		asOf,
-		quantity: 20,
-		price: 100,
-		value: 2000,
-		costBasis: 2500
+	const {
+		securities: [security]
+	} = await seedPortfolio(user.id, {
+		accounts: ['Alpha Brokerage', 'Beta Brokerage', 'Gamma Brokerage'],
+		securities: [{ name: 'Detail Security', symbol: 'DTL' }],
+		balances: [
+			{
+				account: 'Alpha Brokerage',
+				security: 'Detail Security',
+				quantity: 10,
+				price: 100,
+				value: 1000,
+				costBasis: 800
+			},
+			{
+				account: 'Beta Brokerage',
+				security: 'Detail Security',
+				quantity: 30,
+				price: 100,
+				value: 3000,
+				costBasis: 2000
+			},
+			{
+				account: 'Gamma Brokerage',
+				security: 'Detail Security',
+				quantity: 20,
+				price: 100,
+				value: 2000,
+				costBasis: 2500
+			}
+		]
 	});
 
 	await page.goto('/');
@@ -301,55 +260,37 @@ test('security detail: clicking Market value header sorts value ascending from d
 	page
 }) => {
 	const user = await seedUser('dominic');
-	const security = await seedSecurity({ name: 'Detail Security', symbol: 'DTL', owner: user.id });
-	const alpha = await seedAccount({
-		name: 'Alpha Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const beta = await seedAccount({
-		name: 'Beta Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const gamma = await seedAccount({
-		name: 'Gamma Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const asOf = new Date().toISOString();
-	await seedSecurityBalance({
-		account: alpha.id,
-		owner: user.id,
-		security: security.id,
-		asOf,
-		quantity: 10,
-		price: 100,
-		value: 1000,
-		costBasis: 800
-	});
-	await seedSecurityBalance({
-		account: beta.id,
-		owner: user.id,
-		security: security.id,
-		asOf,
-		quantity: 30,
-		price: 100,
-		value: 3000,
-		costBasis: 2000
-	});
-	await seedSecurityBalance({
-		account: gamma.id,
-		owner: user.id,
-		security: security.id,
-		asOf,
-		quantity: 20,
-		price: 100,
-		value: 2000,
-		costBasis: 2500
+	const {
+		securities: [security]
+	} = await seedPortfolio(user.id, {
+		accounts: ['Alpha Brokerage', 'Beta Brokerage', 'Gamma Brokerage'],
+		securities: [{ name: 'Detail Security', symbol: 'DTL' }],
+		balances: [
+			{
+				account: 'Alpha Brokerage',
+				security: 'Detail Security',
+				quantity: 10,
+				price: 100,
+				value: 1000,
+				costBasis: 800
+			},
+			{
+				account: 'Beta Brokerage',
+				security: 'Detail Security',
+				quantity: 30,
+				price: 100,
+				value: 3000,
+				costBasis: 2000
+			},
+			{
+				account: 'Gamma Brokerage',
+				security: 'Detail Security',
+				quantity: 20,
+				price: 100,
+				value: 2000,
+				costBasis: 2500
+			}
+		]
 	});
 
 	await page.goto('/');
@@ -375,55 +316,37 @@ test('security detail: clicking Gain/loss header sorts by gain amount descending
 	page
 }) => {
 	const user = await seedUser('dominic');
-	const security = await seedSecurity({ name: 'Detail Security', symbol: 'DTL', owner: user.id });
-	const alpha = await seedAccount({
-		name: 'Alpha Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const beta = await seedAccount({
-		name: 'Beta Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const gamma = await seedAccount({
-		name: 'Gamma Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const asOf = new Date().toISOString();
-	await seedSecurityBalance({
-		account: alpha.id,
-		owner: user.id,
-		security: security.id,
-		asOf,
-		quantity: 10,
-		price: 100,
-		value: 1000,
-		costBasis: 800
-	});
-	await seedSecurityBalance({
-		account: beta.id,
-		owner: user.id,
-		security: security.id,
-		asOf,
-		quantity: 30,
-		price: 100,
-		value: 3000,
-		costBasis: 2000
-	});
-	await seedSecurityBalance({
-		account: gamma.id,
-		owner: user.id,
-		security: security.id,
-		asOf,
-		quantity: 20,
-		price: 100,
-		value: 2000,
-		costBasis: 2500
+	const {
+		securities: [security]
+	} = await seedPortfolio(user.id, {
+		accounts: ['Alpha Brokerage', 'Beta Brokerage', 'Gamma Brokerage'],
+		securities: [{ name: 'Detail Security', symbol: 'DTL' }],
+		balances: [
+			{
+				account: 'Alpha Brokerage',
+				security: 'Detail Security',
+				quantity: 10,
+				price: 100,
+				value: 1000,
+				costBasis: 800
+			},
+			{
+				account: 'Beta Brokerage',
+				security: 'Detail Security',
+				quantity: 30,
+				price: 100,
+				value: 3000,
+				costBasis: 2000
+			},
+			{
+				account: 'Gamma Brokerage',
+				security: 'Detail Security',
+				quantity: 20,
+				price: 100,
+				value: 2000,
+				costBasis: 2500
+			}
+		]
 	});
 
 	await page.goto('/');
@@ -447,55 +370,37 @@ test('security detail: clicking Gain/loss header sorts by gain amount descending
 
 test('security detail: sort indicator shows on active column', async ({ page }) => {
 	const user = await seedUser('dominic');
-	const security = await seedSecurity({ name: 'Detail Security', symbol: 'DTL', owner: user.id });
-	const alpha = await seedAccount({
-		name: 'Alpha Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const beta = await seedAccount({
-		name: 'Beta Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const gamma = await seedAccount({
-		name: 'Gamma Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const asOf = new Date().toISOString();
-	await seedSecurityBalance({
-		account: alpha.id,
-		owner: user.id,
-		security: security.id,
-		asOf,
-		quantity: 10,
-		price: 100,
-		value: 1000,
-		costBasis: 800
-	});
-	await seedSecurityBalance({
-		account: beta.id,
-		owner: user.id,
-		security: security.id,
-		asOf,
-		quantity: 30,
-		price: 100,
-		value: 3000,
-		costBasis: 2000
-	});
-	await seedSecurityBalance({
-		account: gamma.id,
-		owner: user.id,
-		security: security.id,
-		asOf,
-		quantity: 20,
-		price: 100,
-		value: 2000,
-		costBasis: 2500
+	const {
+		securities: [security]
+	} = await seedPortfolio(user.id, {
+		accounts: ['Alpha Brokerage', 'Beta Brokerage', 'Gamma Brokerage'],
+		securities: [{ name: 'Detail Security', symbol: 'DTL' }],
+		balances: [
+			{
+				account: 'Alpha Brokerage',
+				security: 'Detail Security',
+				quantity: 10,
+				price: 100,
+				value: 1000,
+				costBasis: 800
+			},
+			{
+				account: 'Beta Brokerage',
+				security: 'Detail Security',
+				quantity: 30,
+				price: 100,
+				value: 3000,
+				costBasis: 2000
+			},
+			{
+				account: 'Gamma Brokerage',
+				security: 'Detail Security',
+				quantity: 20,
+				price: 100,
+				value: 2000,
+				costBasis: 2500
+			}
+		]
 	});
 
 	await page.goto('/');
@@ -519,55 +424,37 @@ test('security detail: sort indicator shows on active column', async ({ page }) 
 
 test('security detail: sort state persists across reload', async ({ page }) => {
 	const user = await seedUser('dominic');
-	const security = await seedSecurity({ name: 'Detail Security', symbol: 'DTL', owner: user.id });
-	const alpha = await seedAccount({
-		name: 'Alpha Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const beta = await seedAccount({
-		name: 'Beta Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const gamma = await seedAccount({
-		name: 'Gamma Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const asOf = new Date().toISOString();
-	await seedSecurityBalance({
-		account: alpha.id,
-		owner: user.id,
-		security: security.id,
-		asOf,
-		quantity: 10,
-		price: 100,
-		value: 1000,
-		costBasis: 800
-	});
-	await seedSecurityBalance({
-		account: beta.id,
-		owner: user.id,
-		security: security.id,
-		asOf,
-		quantity: 30,
-		price: 100,
-		value: 3000,
-		costBasis: 2000
-	});
-	await seedSecurityBalance({
-		account: gamma.id,
-		owner: user.id,
-		security: security.id,
-		asOf,
-		quantity: 20,
-		price: 100,
-		value: 2000,
-		costBasis: 2500
+	const {
+		securities: [security]
+	} = await seedPortfolio(user.id, {
+		accounts: ['Alpha Brokerage', 'Beta Brokerage', 'Gamma Brokerage'],
+		securities: [{ name: 'Detail Security', symbol: 'DTL' }],
+		balances: [
+			{
+				account: 'Alpha Brokerage',
+				security: 'Detail Security',
+				quantity: 10,
+				price: 100,
+				value: 1000,
+				costBasis: 800
+			},
+			{
+				account: 'Beta Brokerage',
+				security: 'Detail Security',
+				quantity: 30,
+				price: 100,
+				value: 3000,
+				costBasis: 2000
+			},
+			{
+				account: 'Gamma Brokerage',
+				security: 'Detail Security',
+				quantity: 20,
+				price: 100,
+				value: 2000,
+				costBasis: 2500
+			}
+		]
 	});
 
 	await page.goto('/');
@@ -590,51 +477,45 @@ test('security detail: sort state persists across reload', async ({ page }) => {
 	await expect(page).toHaveURL(/dir=asc/);
 });
 
-// --- account positions ---
-
 test('account positions: positions table sorts by column with order, aria-sort, and URL reflecting the active sort', async ({
 	page
 }) => {
 	const user = await seedUser('helena');
-	const account = await seedAccount({
-		name: 'Helena Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const alpha = await seedSecurity({ name: 'Alpha Position', symbol: 'ALP', owner: user.id });
-	const beta = await seedSecurity({ name: 'Beta Position', symbol: 'BET', owner: user.id });
-	const gamma = await seedSecurity({ name: 'Gamma Position', symbol: 'GAM', owner: user.id });
-	const asOf = new Date().toISOString();
-	await seedSecurityBalance({
-		account: account.id,
-		owner: user.id,
-		security: alpha.id,
-		asOf,
-		quantity: 10,
-		price: 100,
-		value: 1000,
-		costBasis: 800
-	});
-	await seedSecurityBalance({
-		account: account.id,
-		owner: user.id,
-		security: beta.id,
-		asOf,
-		quantity: 30,
-		price: 100,
-		value: 3000,
-		costBasis: 2000
-	});
-	await seedSecurityBalance({
-		account: account.id,
-		owner: user.id,
-		security: gamma.id,
-		asOf,
-		quantity: 20,
-		price: 100,
-		value: 2000,
-		costBasis: 2500
+	const {
+		accounts: [account]
+	} = await seedPortfolio(user.id, {
+		accounts: ['Helena Brokerage'],
+		securities: [
+			{ name: 'Alpha Position', symbol: 'ALP' },
+			{ name: 'Beta Position', symbol: 'BET' },
+			{ name: 'Gamma Position', symbol: 'GAM' }
+		],
+		balances: [
+			{
+				account: 'Helena Brokerage',
+				security: 'Alpha Position',
+				quantity: 10,
+				price: 100,
+				value: 1000,
+				costBasis: 800
+			},
+			{
+				account: 'Helena Brokerage',
+				security: 'Beta Position',
+				quantity: 30,
+				price: 100,
+				value: 3000,
+				costBasis: 2000
+			},
+			{
+				account: 'Helena Brokerage',
+				security: 'Gamma Position',
+				quantity: 20,
+				price: 100,
+				value: 2000,
+				costBasis: 2500
+			}
+		]
 	});
 
 	await page.goto('/');

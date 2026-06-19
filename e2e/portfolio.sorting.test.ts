@@ -1,95 +1,70 @@
 import { expect, test } from '@playwright/test';
 
-import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
 import { signIn } from './playwright.helpers';
-import { seedAccount, seedSecurity, seedSecurityBalance, seedUser } from './pocketbase.helpers';
+import { seedPortfolio, seedUser } from './pocketbase.helpers';
 
 test('portfolio: aggregate table defaults to market value descending with unknown values last', async ({
 	page
 }) => {
 	const user = await seedUser('fatima');
-	const mainAccount = await seedAccount({
-		name: 'Main Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const secondAccount = await seedAccount({
-		name: 'Second Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const thirdAccount = await seedAccount({
-		name: 'Third Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const alpha = await seedSecurity({ name: 'Alpha Holdings', symbol: 'ZZZ', owner: user.id });
-	const bravo = await seedSecurity({ name: 'Bravo Holdings', symbol: 'WWW', owner: user.id });
-	const charlie = await seedSecurity({ name: 'Charlie Holdings', symbol: 'YYY', owner: user.id });
-	const delta = await seedSecurity({ name: 'Delta Holdings', symbol: 'XXX', owner: user.id });
-	const asOf = new Date().toISOString();
-	await seedSecurityBalance({
-		account: mainAccount.id,
-		owner: user.id,
-		security: alpha.id,
-		asOf,
-		quantity: 5,
-		price: 300,
-		value: 1500,
-		costBasis: 1200
-	});
-	await seedSecurityBalance({
-		account: thirdAccount.id,
-		owner: user.id,
-		security: alpha.id,
-		asOf,
-		quantity: 10,
-		price: 300,
-		value: 3000,
-		costBasis: 2500
-	});
-	await seedSecurityBalance({
-		account: mainAccount.id,
-		owner: user.id,
-		security: bravo.id,
-		asOf,
-		quantity: 14,
-		price: 250,
-		value: 3500,
-		costBasis: 3000
-	});
-	await seedSecurityBalance({
-		account: secondAccount.id,
-		owner: user.id,
-		security: charlie.id,
-		asOf,
-		quantity: 16,
-		price: 250,
-		value: 4000,
-		costBasis: 3400
-	});
-	await seedSecurityBalance({
-		account: secondAccount.id,
-		owner: user.id,
-		security: delta.id,
-		asOf,
-		quantity: 6,
-		price: null,
-		value: null,
-		costBasis: 600
-	});
-	await seedSecurityBalance({
-		account: thirdAccount.id,
-		owner: user.id,
-		security: delta.id,
-		asOf,
-		quantity: 2,
-		price: 50,
-		value: 100,
-		costBasis: 80
+	await seedPortfolio(user.id, {
+		accounts: ['Main Brokerage', 'Second Brokerage', 'Third Brokerage'],
+		securities: [
+			{ name: 'Alpha Holdings', symbol: 'ZZZ' },
+			{ name: 'Bravo Holdings', symbol: 'WWW' },
+			{ name: 'Charlie Holdings', symbol: 'YYY' },
+			{ name: 'Delta Holdings', symbol: 'XXX' }
+		],
+		balances: [
+			{
+				account: 'Main Brokerage',
+				security: 'Alpha Holdings',
+				quantity: 5,
+				price: 300,
+				value: 1500,
+				costBasis: 1200
+			},
+			{
+				account: 'Third Brokerage',
+				security: 'Alpha Holdings',
+				quantity: 10,
+				price: 300,
+				value: 3000,
+				costBasis: 2500
+			},
+			{
+				account: 'Main Brokerage',
+				security: 'Bravo Holdings',
+				quantity: 14,
+				price: 250,
+				value: 3500,
+				costBasis: 3000
+			},
+			{
+				account: 'Second Brokerage',
+				security: 'Charlie Holdings',
+				quantity: 16,
+				price: 250,
+				value: 4000,
+				costBasis: 3400
+			},
+			{
+				account: 'Second Brokerage',
+				security: 'Delta Holdings',
+				quantity: 6,
+				price: null,
+				value: null,
+				costBasis: 600
+			},
+			{
+				account: 'Third Brokerage',
+				security: 'Delta Holdings',
+				quantity: 2,
+				price: 50,
+				value: 100,
+				costBasis: 80
+			}
+		]
 	});
 
 	await page.goto('/');
@@ -107,88 +82,64 @@ test('portfolio: aggregate table sorts by security name descending then ascendin
 	page
 }) => {
 	const user = await seedUser('fatima');
-	const mainAccount = await seedAccount({
-		name: 'Main Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const secondAccount = await seedAccount({
-		name: 'Second Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const thirdAccount = await seedAccount({
-		name: 'Third Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const alpha = await seedSecurity({ name: 'Alpha Holdings', symbol: 'ZZZ', owner: user.id });
-	const bravo = await seedSecurity({ name: 'Bravo Holdings', symbol: 'WWW', owner: user.id });
-	const charlie = await seedSecurity({ name: 'Charlie Holdings', symbol: 'YYY', owner: user.id });
-	const delta = await seedSecurity({ name: 'Delta Holdings', symbol: 'XXX', owner: user.id });
-	const asOf = new Date().toISOString();
-	await seedSecurityBalance({
-		account: mainAccount.id,
-		owner: user.id,
-		security: alpha.id,
-		asOf,
-		quantity: 5,
-		price: 300,
-		value: 1500,
-		costBasis: 1200
-	});
-	await seedSecurityBalance({
-		account: thirdAccount.id,
-		owner: user.id,
-		security: alpha.id,
-		asOf,
-		quantity: 10,
-		price: 300,
-		value: 3000,
-		costBasis: 2500
-	});
-	await seedSecurityBalance({
-		account: mainAccount.id,
-		owner: user.id,
-		security: bravo.id,
-		asOf,
-		quantity: 14,
-		price: 250,
-		value: 3500,
-		costBasis: 3000
-	});
-	await seedSecurityBalance({
-		account: secondAccount.id,
-		owner: user.id,
-		security: charlie.id,
-		asOf,
-		quantity: 16,
-		price: 250,
-		value: 4000,
-		costBasis: 3400
-	});
-	await seedSecurityBalance({
-		account: secondAccount.id,
-		owner: user.id,
-		security: delta.id,
-		asOf,
-		quantity: 6,
-		price: null,
-		value: null,
-		costBasis: 600
-	});
-	await seedSecurityBalance({
-		account: thirdAccount.id,
-		owner: user.id,
-		security: delta.id,
-		asOf,
-		quantity: 2,
-		price: 50,
-		value: 100,
-		costBasis: 80
+	await seedPortfolio(user.id, {
+		accounts: ['Main Brokerage', 'Second Brokerage', 'Third Brokerage'],
+		securities: [
+			{ name: 'Alpha Holdings', symbol: 'ZZZ' },
+			{ name: 'Bravo Holdings', symbol: 'WWW' },
+			{ name: 'Charlie Holdings', symbol: 'YYY' },
+			{ name: 'Delta Holdings', symbol: 'XXX' }
+		],
+		balances: [
+			{
+				account: 'Main Brokerage',
+				security: 'Alpha Holdings',
+				quantity: 5,
+				price: 300,
+				value: 1500,
+				costBasis: 1200
+			},
+			{
+				account: 'Third Brokerage',
+				security: 'Alpha Holdings',
+				quantity: 10,
+				price: 300,
+				value: 3000,
+				costBasis: 2500
+			},
+			{
+				account: 'Main Brokerage',
+				security: 'Bravo Holdings',
+				quantity: 14,
+				price: 250,
+				value: 3500,
+				costBasis: 3000
+			},
+			{
+				account: 'Second Brokerage',
+				security: 'Charlie Holdings',
+				quantity: 16,
+				price: 250,
+				value: 4000,
+				costBasis: 3400
+			},
+			{
+				account: 'Second Brokerage',
+				security: 'Delta Holdings',
+				quantity: 6,
+				price: null,
+				value: null,
+				costBasis: 600
+			},
+			{
+				account: 'Third Brokerage',
+				security: 'Delta Holdings',
+				quantity: 2,
+				price: 50,
+				value: 100,
+				costBasis: 80
+			}
+		]
 	});
 
 	await page.goto('/');
@@ -216,88 +167,64 @@ test('portfolio: aggregate table sorts by security name descending then ascendin
 
 test('portfolio: aggregate table sorts by symbol', async ({ page }) => {
 	const user = await seedUser('fatima');
-	const mainAccount = await seedAccount({
-		name: 'Main Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const secondAccount = await seedAccount({
-		name: 'Second Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const thirdAccount = await seedAccount({
-		name: 'Third Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const alpha = await seedSecurity({ name: 'Alpha Holdings', symbol: 'ZZZ', owner: user.id });
-	const bravo = await seedSecurity({ name: 'Bravo Holdings', symbol: 'WWW', owner: user.id });
-	const charlie = await seedSecurity({ name: 'Charlie Holdings', symbol: 'YYY', owner: user.id });
-	const delta = await seedSecurity({ name: 'Delta Holdings', symbol: 'XXX', owner: user.id });
-	const asOf = new Date().toISOString();
-	await seedSecurityBalance({
-		account: mainAccount.id,
-		owner: user.id,
-		security: alpha.id,
-		asOf,
-		quantity: 5,
-		price: 300,
-		value: 1500,
-		costBasis: 1200
-	});
-	await seedSecurityBalance({
-		account: thirdAccount.id,
-		owner: user.id,
-		security: alpha.id,
-		asOf,
-		quantity: 10,
-		price: 300,
-		value: 3000,
-		costBasis: 2500
-	});
-	await seedSecurityBalance({
-		account: mainAccount.id,
-		owner: user.id,
-		security: bravo.id,
-		asOf,
-		quantity: 14,
-		price: 250,
-		value: 3500,
-		costBasis: 3000
-	});
-	await seedSecurityBalance({
-		account: secondAccount.id,
-		owner: user.id,
-		security: charlie.id,
-		asOf,
-		quantity: 16,
-		price: 250,
-		value: 4000,
-		costBasis: 3400
-	});
-	await seedSecurityBalance({
-		account: secondAccount.id,
-		owner: user.id,
-		security: delta.id,
-		asOf,
-		quantity: 6,
-		price: null,
-		value: null,
-		costBasis: 600
-	});
-	await seedSecurityBalance({
-		account: thirdAccount.id,
-		owner: user.id,
-		security: delta.id,
-		asOf,
-		quantity: 2,
-		price: 50,
-		value: 100,
-		costBasis: 80
+	await seedPortfolio(user.id, {
+		accounts: ['Main Brokerage', 'Second Brokerage', 'Third Brokerage'],
+		securities: [
+			{ name: 'Alpha Holdings', symbol: 'ZZZ' },
+			{ name: 'Bravo Holdings', symbol: 'WWW' },
+			{ name: 'Charlie Holdings', symbol: 'YYY' },
+			{ name: 'Delta Holdings', symbol: 'XXX' }
+		],
+		balances: [
+			{
+				account: 'Main Brokerage',
+				security: 'Alpha Holdings',
+				quantity: 5,
+				price: 300,
+				value: 1500,
+				costBasis: 1200
+			},
+			{
+				account: 'Third Brokerage',
+				security: 'Alpha Holdings',
+				quantity: 10,
+				price: 300,
+				value: 3000,
+				costBasis: 2500
+			},
+			{
+				account: 'Main Brokerage',
+				security: 'Bravo Holdings',
+				quantity: 14,
+				price: 250,
+				value: 3500,
+				costBasis: 3000
+			},
+			{
+				account: 'Second Brokerage',
+				security: 'Charlie Holdings',
+				quantity: 16,
+				price: 250,
+				value: 4000,
+				costBasis: 3400
+			},
+			{
+				account: 'Second Brokerage',
+				security: 'Delta Holdings',
+				quantity: 6,
+				price: null,
+				value: null,
+				costBasis: 600
+			},
+			{
+				account: 'Third Brokerage',
+				security: 'Delta Holdings',
+				quantity: 2,
+				price: 50,
+				value: 100,
+				costBasis: 80
+			}
+		]
 	});
 
 	await page.goto('/');
@@ -320,88 +247,64 @@ test('portfolio: aggregate table sorts by market value ascending with unknown va
 	page
 }) => {
 	const user = await seedUser('fatima');
-	const mainAccount = await seedAccount({
-		name: 'Main Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const secondAccount = await seedAccount({
-		name: 'Second Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const thirdAccount = await seedAccount({
-		name: 'Third Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const alpha = await seedSecurity({ name: 'Alpha Holdings', symbol: 'ZZZ', owner: user.id });
-	const bravo = await seedSecurity({ name: 'Bravo Holdings', symbol: 'WWW', owner: user.id });
-	const charlie = await seedSecurity({ name: 'Charlie Holdings', symbol: 'YYY', owner: user.id });
-	const delta = await seedSecurity({ name: 'Delta Holdings', symbol: 'XXX', owner: user.id });
-	const asOf = new Date().toISOString();
-	await seedSecurityBalance({
-		account: mainAccount.id,
-		owner: user.id,
-		security: alpha.id,
-		asOf,
-		quantity: 5,
-		price: 300,
-		value: 1500,
-		costBasis: 1200
-	});
-	await seedSecurityBalance({
-		account: thirdAccount.id,
-		owner: user.id,
-		security: alpha.id,
-		asOf,
-		quantity: 10,
-		price: 300,
-		value: 3000,
-		costBasis: 2500
-	});
-	await seedSecurityBalance({
-		account: mainAccount.id,
-		owner: user.id,
-		security: bravo.id,
-		asOf,
-		quantity: 14,
-		price: 250,
-		value: 3500,
-		costBasis: 3000
-	});
-	await seedSecurityBalance({
-		account: secondAccount.id,
-		owner: user.id,
-		security: charlie.id,
-		asOf,
-		quantity: 16,
-		price: 250,
-		value: 4000,
-		costBasis: 3400
-	});
-	await seedSecurityBalance({
-		account: secondAccount.id,
-		owner: user.id,
-		security: delta.id,
-		asOf,
-		quantity: 6,
-		price: null,
-		value: null,
-		costBasis: 600
-	});
-	await seedSecurityBalance({
-		account: thirdAccount.id,
-		owner: user.id,
-		security: delta.id,
-		asOf,
-		quantity: 2,
-		price: 50,
-		value: 100,
-		costBasis: 80
+	await seedPortfolio(user.id, {
+		accounts: ['Main Brokerage', 'Second Brokerage', 'Third Brokerage'],
+		securities: [
+			{ name: 'Alpha Holdings', symbol: 'ZZZ' },
+			{ name: 'Bravo Holdings', symbol: 'WWW' },
+			{ name: 'Charlie Holdings', symbol: 'YYY' },
+			{ name: 'Delta Holdings', symbol: 'XXX' }
+		],
+		balances: [
+			{
+				account: 'Main Brokerage',
+				security: 'Alpha Holdings',
+				quantity: 5,
+				price: 300,
+				value: 1500,
+				costBasis: 1200
+			},
+			{
+				account: 'Third Brokerage',
+				security: 'Alpha Holdings',
+				quantity: 10,
+				price: 300,
+				value: 3000,
+				costBasis: 2500
+			},
+			{
+				account: 'Main Brokerage',
+				security: 'Bravo Holdings',
+				quantity: 14,
+				price: 250,
+				value: 3500,
+				costBasis: 3000
+			},
+			{
+				account: 'Second Brokerage',
+				security: 'Charlie Holdings',
+				quantity: 16,
+				price: 250,
+				value: 4000,
+				costBasis: 3400
+			},
+			{
+				account: 'Second Brokerage',
+				security: 'Delta Holdings',
+				quantity: 6,
+				price: null,
+				value: null,
+				costBasis: 600
+			},
+			{
+				account: 'Third Brokerage',
+				security: 'Delta Holdings',
+				quantity: 2,
+				price: 50,
+				value: 100,
+				costBasis: 80
+			}
+		]
 	});
 
 	await page.goto('/');
@@ -422,23 +325,19 @@ test('portfolio: aggregate table sorts by market value ascending with unknown va
 
 test('portfolio: aggregate table marks the active sort column with aria-sort', async ({ page }) => {
 	const user = await seedUser('fatima');
-	const mainAccount = await seedAccount({
-		name: 'Main Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const alpha = await seedSecurity({ name: 'Alpha Holdings', symbol: 'ZZZ', owner: user.id });
-	const asOf = new Date().toISOString();
-	await seedSecurityBalance({
-		account: mainAccount.id,
-		owner: user.id,
-		security: alpha.id,
-		asOf,
-		quantity: 5,
-		price: 300,
-		value: 1500,
-		costBasis: 1200
+	await seedPortfolio(user.id, {
+		accounts: ['Main Brokerage'],
+		securities: [{ name: 'Alpha Holdings', symbol: 'ZZZ' }],
+		balances: [
+			{
+				account: 'Main Brokerage',
+				security: 'Alpha Holdings',
+				quantity: 5,
+				price: 300,
+				value: 1500,
+				costBasis: 1200
+			}
+		]
 	});
 
 	await page.goto('/');
@@ -458,23 +357,19 @@ test('portfolio: aggregate table marks the active sort column with aria-sort', a
 
 test('portfolio: aggregate table sort state persists across reload', async ({ page }) => {
 	const user = await seedUser('fatima');
-	const mainAccount = await seedAccount({
-		name: 'Main Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const alpha = await seedSecurity({ name: 'Alpha Holdings', symbol: 'ZZZ', owner: user.id });
-	const asOf = new Date().toISOString();
-	await seedSecurityBalance({
-		account: mainAccount.id,
-		owner: user.id,
-		security: alpha.id,
-		asOf,
-		quantity: 5,
-		price: 300,
-		value: 1500,
-		costBasis: 1200
+	await seedPortfolio(user.id, {
+		accounts: ['Main Brokerage'],
+		securities: [{ name: 'Alpha Holdings', symbol: 'ZZZ' }],
+		balances: [
+			{
+				account: 'Main Brokerage',
+				security: 'Alpha Holdings',
+				quantity: 5,
+				price: 300,
+				value: 1500,
+				costBasis: 1200
+			}
+		]
 	});
 
 	await page.goto('/');
@@ -496,23 +391,19 @@ test('portfolio: aggregate table sort state persists across reload', async ({ pa
 
 test('portfolio: aggregate table does not make the Accounts column sortable', async ({ page }) => {
 	const user = await seedUser('gunnar');
-	const account = await seedAccount({
-		name: 'Solo Brokerage',
-		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
-		owner: user.id,
-		balanceType: 'Brokerage'
-	});
-	const security = await seedSecurity({ name: 'Solo Holdings', symbol: 'SOL', owner: user.id });
-	const asOf = new Date().toISOString();
-	await seedSecurityBalance({
-		account: account.id,
-		owner: user.id,
-		security: security.id,
-		asOf,
-		quantity: 5,
-		price: 300,
-		value: 1500,
-		costBasis: 1200
+	await seedPortfolio(user.id, {
+		accounts: ['Solo Brokerage'],
+		securities: [{ name: 'Solo Holdings', symbol: 'SOL' }],
+		balances: [
+			{
+				account: 'Solo Brokerage',
+				security: 'Solo Holdings',
+				quantity: 5,
+				price: 300,
+				value: 1500,
+				costBasis: 1200
+			}
+		]
 	});
 
 	await page.goto('/');
