@@ -63,6 +63,14 @@ export const ACCOUNT_WALLET: AccountDefinition = {
 	isAutoCalculated: false
 };
 
+export const ACCOUNT_CRYPTO_BROKERAGE: AccountDefinition = {
+	name: "Alice's Crypto Brokerage",
+	balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+	balanceType: 'Crypto',
+	institution: 'Coinpurse',
+	isAutoCalculated: false
+};
+
 export const ALL_ACCOUNTS = [
 	ACCOUNT_CHECKING,
 	ACCOUNT_SAVINGS,
@@ -70,5 +78,6 @@ export const ALL_ACCOUNTS = [
 	ACCOUNT_AUTO_LOAN,
 	ACCOUNT_ROTH_IRA,
 	ACCOUNT_401K,
-	ACCOUNT_WALLET
+	ACCOUNT_WALLET,
+	ACCOUNT_CRYPTO_BROKERAGE
 ];
