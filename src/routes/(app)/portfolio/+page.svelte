@@ -127,9 +127,7 @@
 	<Section>
 		<SectionTitle title={m.portfolio_section_positions()} />
 		{#if securitiesContext.isLoading}
-			<div class="bg-background overflow-hidden rounded-sm shadow-md">
-				<Skeleton class="h-64" showSpinner />
-			</div>
+			<Skeleton class="h-64" showSpinner />
 		{:else if rows.length === 0}
 			<Empty>{m.portfolio_empty()}</Empty>
 		{:else}
