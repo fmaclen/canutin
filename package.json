@@ -69,6 +69,7 @@
 		"format": "bun run prettier --write .",
 		"lint": "bun run prettier --check . && bun run eslint .",
 		"test": "playwright test",
+		"verify": "bun run lint && bun run check && bun run build",
 		"quality": "bun run format && bun run eslint . && bun run check",
 		"pb": "IS_DEV=true bun scripts/pb-server.ts",
 		"pb:import": "bun scripts/pb-import.ts",
