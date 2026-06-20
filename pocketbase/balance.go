@@ -57,9 +57,10 @@ func calculateBalance(app *pocketbase.PocketBase, accountID string) {
 		return
 	}
 
+	owner := account.GetString("owner")
 	transactions, err := app.FindRecordsByFilter(
-		"transactions", "account = {:aid}", "", 0, 0,
-		map[string]any{"aid": accountID},
+		"transactions", "account = {:aid} && owner = {:owner}", "", 0, 0,
+		map[string]any{"aid": accountID, "owner": owner},
 	)
 	if err != nil {
 		log.Printf("Failed to fetch transactions for account %s: %v", accountID, err)
