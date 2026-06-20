@@ -56,20 +56,14 @@ test('transactions table responds to period filters', async ({ page }) => {
 		await expect(selectedPresetButton).toHaveAttribute('data-selected');
 		await page.keyboard.press('Escape');
 
-		for (const txn of transactions) {
-			const shouldBeVisible = isWithinPeriod(txn.date, value, now);
-			await expectRowVisibility(page, txn.description, shouldBeVisible);
-		}
+		await expectPeriodFilteredRows(page, transactions, value, now);
 
 		await page.reload();
 		await expect(page.getByLabel('Period')).toContainText(label);
 		if (label !== 'Last 3 months') {
 			await expect(page.getByLabel('Period')).not.toContainText('Last 3 months');
 		}
-		for (const txn of transactions) {
-			const shouldBeVisible = isWithinPeriod(txn.date, value, now);
-			await expectRowVisibility(page, txn.description, shouldBeVisible);
-		}
+		await expectPeriodFilteredRows(page, transactions, value, now);
 	}
 
 	// Test that sidebar navigation resets filter to match URL state
@@ -582,6 +576,21 @@ async function expectRowVisibility(page: Page, description: string, shouldBeVisi
 		await expect(row).toBeVisible();
 	} else {
 		await expect(row).toHaveCount(0);
+	}
+}
+
+async function expectPeriodFilteredRows(
+	page: Page,
+	transactions: Array<{ description: string; date: Date }>,
+	value: PeriodOption,
+	now: Date
+) {
+	const expectedVisibleCount = transactions.filter((txn) =>
+		isWithinPeriod(txn.date, value, now)
+	).length;
+	await expect(page.locator('tbody tr')).toHaveCount(expectedVisibleCount);
+	for (const txn of transactions) {
+		await expectRowVisibility(page, txn.description, isWithinPeriod(txn.date, value, now));
 	}
 }
 
