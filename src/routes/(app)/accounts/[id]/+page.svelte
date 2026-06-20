@@ -6,6 +6,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import { getAccountCashflowContext } from '$lib/account-cashflow.svelte';
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAuthContext } from '$lib/auth.svelte';
 	import { getBalanceTypesContext } from '$lib/balance-types.svelte';
@@ -19,6 +20,7 @@
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
+	import TrailingCashflow from '$lib/components/trailing-cashflow.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -60,6 +62,7 @@
 	const accountsContext = getAccountsContext();
 	const balanceTypesContext = getBalanceTypesContext();
 	const securitiesContext = getSecuritiesContext();
+	const accountCashflow = getAccountCashflowContext();
 
 	const accountId = $derived(page.params.id);
 	const ownerId = $derived(auth.currentUser?.record?.id);
@@ -637,6 +640,21 @@
 					</Table.Body>
 				</Table.Root>
 			</div>
+		</Section>
+	{/if}
+
+	{#if !isLoading && account}
+		<Section>
+			{#if accountCashflow.isLoading}
+				<Skeleton class="h-32" />
+			{:else}
+				<TrailingCashflow
+					avg3m={accountCashflow.avg3m}
+					avg6m={accountCashflow.avg6m}
+					avgYtd={accountCashflow.avgYtd}
+					avg1y={accountCashflow.avg1y}
+				/>
+			{/if}
 		</Section>
 	{/if}
 
