@@ -10,7 +10,7 @@ import {
 	type CashflowAverages,
 	type CashflowPeriod,
 	type CashflowWindow
-} from './cashflow-math';
+} from './cashflow-utils';
 import { AccountSharesPerspectiveOptions, type TransactionsResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
 

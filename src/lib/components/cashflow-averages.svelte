@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { CashflowAverages } from '$lib/cashflow-math';
+	import type { CashflowAverages } from '$lib/cashflow-utils';
 	import KeyValue from '$lib/components/key-value.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import * as Tabs from '$lib/components/ui/tabs/index';

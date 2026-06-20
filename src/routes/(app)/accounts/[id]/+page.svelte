@@ -10,6 +10,7 @@
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAuthContext } from '$lib/auth.svelte';
 	import { getBalanceTypesContext } from '$lib/balance-types.svelte';
+	import CashflowAverages from '$lib/components/cashflow-averages.svelte';
 	import CheckboxLabel from '$lib/components/checkbox-label.svelte';
 	import Currency from '$lib/components/currency.svelte';
 	import Fieldset from '$lib/components/fieldset.svelte';
@@ -20,7 +21,6 @@
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
-	import TrailingCashflow from '$lib/components/trailing-cashflow.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -648,7 +648,7 @@
 			{#if accountCashflow.isLoading}
 				<Skeleton class="h-32" />
 			{:else}
-				<TrailingCashflow
+				<CashflowAverages
 					avg3m={accountCashflow.avg3m}
 					avg6m={accountCashflow.avg6m}
 					avgYtd={accountCashflow.avgYtd}

@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { getCashflowContext } from '$lib/cashflow.svelte';
-	import TrailingCashflow from '$lib/components/trailing-cashflow.svelte';
+	import CashflowAverages from '$lib/components/cashflow-averages.svelte';
 
 	const cashflow = getCashflowContext();
 </script>
 
-<TrailingCashflow
+<CashflowAverages
 	avg3m={cashflow.avg3m}
 	avg6m={cashflow.avg6m}
 	avgYtd={cashflow.avgYtd}

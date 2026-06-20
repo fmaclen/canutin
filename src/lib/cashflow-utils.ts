@@ -96,22 +96,22 @@ export function computeAveragesFromTransactions(
 
 	const monthsYtd = window.startOfThisMonth.getUTCMonth() + 1;
 
-	const avg3m: CashflowAverages = {
+	const avg3m = {
 		income: sums3m.income / 3,
 		expenses: sums3m.expenses / 3,
 		surplus: sums3m.surplus / 3
 	};
-	const avg6m: CashflowAverages = {
+	const avg6m = {
 		income: sums6m.income / 6,
 		expenses: sums6m.expenses / 6,
 		surplus: sums6m.surplus / 6
 	};
-	const avgYtd: CashflowAverages = {
+	const avgYtd = {
 		income: sumsYtd.income / monthsYtd,
 		expenses: sumsYtd.expenses / monthsYtd,
 		surplus: sumsYtd.surplus / monthsYtd
 	};
-	const avg1y: CashflowAverages = {
+	const avg1y = {
 		income: sums1y.income / 12,
 		expenses: sums1y.expenses / 12,
 		surplus: sums1y.surplus / 12
