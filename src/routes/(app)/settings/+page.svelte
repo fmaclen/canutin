@@ -50,14 +50,20 @@
 
 	type SessionRow = Pick<
 		ImportSessionsResponse,
-		'id' | 'label' | 'status' | 'recordsCreated' | 'recordsSkipped' | 'created'
+		'id' | 'label' | 'status' | 'recordsCreated' | 'recordsSkipped' | 'recordsFailed' | 'created'
 	>;
 
-	type SessionSortColumn = 'label' | 'recordsCreated' | 'recordsSkipped' | 'created';
+	type SessionSortColumn =
+		| 'label'
+		| 'recordsCreated'
+		| 'recordsSkipped'
+		| 'recordsFailed'
+		| 'created';
 	const validSortColumns: SessionSortColumn[] = [
 		'label',
 		'recordsCreated',
 		'recordsSkipped',
+		'recordsFailed',
 		'created'
 	];
 
@@ -88,6 +94,7 @@
 			status: session.status,
 			recordsCreated: session.recordsCreated,
 			recordsSkipped: session.recordsSkipped,
+			recordsFailed: session.recordsFailed,
 			created: session.created
 		}));
 
@@ -95,6 +102,7 @@
 			label: (r) => r.label,
 			recordsCreated: (r) => r.recordsCreated,
 			recordsSkipped: (r) => r.recordsSkipped,
+			recordsFailed: (r) => r.recordsFailed,
 			created: (r) => r.created
 		});
 		return rows.sort(comparator);
@@ -293,6 +301,15 @@
 								</Table.SortableHead>
 								<Table.SortableHead
 									class="text-right whitespace-nowrap"
+									column="recordsFailed"
+									sortColumn={sortState.column}
+									sortDirection={sortState.direction}
+									onSort={handleSort}
+								>
+									{m.settings_imports_table_header_failed()}
+								</Table.SortableHead>
+								<Table.SortableHead
+									class="text-right whitespace-nowrap"
 									column="created"
 									sortColumn={sortState.column}
 									sortDirection={sortState.direction}
@@ -316,6 +333,18 @@
 											<Badge variant="cash">
 												{m.settings_imports_status_completed()}
 											</Badge>
+										{:else if row.status === 'completed_with_errors'}
+											<Badge variant="secondary">
+												{m.settings_imports_status_completed_with_errors()}
+											</Badge>
+										{:else if row.status === 'failed'}
+											<Badge variant="destructive">
+												{m.settings_imports_status_failed()}
+											</Badge>
+										{:else if row.status === 'pending'}
+											<Badge variant="outline">
+												{m.settings_imports_status_pending()}
+											</Badge>
 										{:else}
 											<Badge variant="outline">
 												{m.settings_imports_status_rolled_back()}
@@ -328,11 +357,18 @@
 									<Table.Cell class="text-foreground/80 text-right text-sm tabular-nums">
 										{row.recordsSkipped}
 									</Table.Cell>
+									<Table.Cell
+										class="text-right text-sm tabular-nums {row.recordsFailed
+											? 'text-destructive font-medium'
+											: 'text-foreground/80'}"
+									>
+										{row.recordsFailed ?? 0}
+									</Table.Cell>
 									<Table.Cell class="text-muted-foreground text-right text-sm">
 										{formatDate(row.created)}
 									</Table.Cell>
 									<Table.Cell class="text-right">
-										{#if row.status === 'completed'}
+										{#if row.status === 'completed' || row.status === 'completed_with_errors'}
 											<AlertDialog.Root>
 												<AlertDialog.Trigger disabled={revertingSessionId === row.id}>
 													<Button

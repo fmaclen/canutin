@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"regexp"
 	"strings"
@@ -109,6 +111,8 @@ type importCounts struct {
 
 type importResult struct {
 	SessionID            string       `json:"sessionId"`
+	Status               string       `json:"status"`
+	RecordsFailed        int          `json:"recordsFailed"`
 	Accounts             importCounts `json:"accounts"`
 	Assets               importCounts `json:"assets"`
 	Securities           importCounts `json:"securities"`
@@ -117,6 +121,238 @@ type importResult struct {
 	AssetBalances        importCounts `json:"assetBalances"`
 	SecurityBalances     importCounts `json:"securityBalances"`
 	SecurityTransactions importCounts `json:"securityTransactions"`
+}
+
+// Import session status values. These mirror the importSessions.status select options in the
+// schema migration. pending is set when the session record is created; the value is finalized
+// after every collection loop runs.
+const (
+	importStatusCompleted           = "completed"
+	importStatusCompletedWithErrors = "completed_with_errors"
+	importStatusFailed              = "failed"
+	importStatusPending             = "pending"
+)
+
+// Import payload limits. These bound an authenticated import request before the body is
+// decoded or any record is written, so a single request cannot exhaust memory or flood the
+// database. Values are deliberately generous for real personal-finance imports (years of
+// transactions across many accounts) while still rejecting clearly abusive payloads. Future
+// import sources that need higher ceilings should raise these intentionally, not silently.
+const (
+	// maxImportBodyBytes caps the raw request body. A transaction encodes to a few hundred
+	// bytes of JSON, so 64 MiB comfortably covers maxImportTotalRecords with headroom.
+	maxImportBodyBytes = 64 << 20
+
+	// maxImportTotalRecords caps the sum of records across every collection in one request.
+	maxImportTotalRecords = 200_000
+
+	// maxImportRecordsPerCollection caps any single collection array in one request.
+	maxImportRecordsPerCollection = 100_000
+
+	// String-length limits, in runes. Labels, names, and symbols are short identifiers;
+	// descriptions and notes hold free-form text but are still bounded.
+	maxImportSessionLabelLength = 256
+	maxImportNameLength         = 256
+	maxImportLabelLength        = 256
+	maxImportSymbolLength       = 32
+	maxImportDescriptionLength  = 2_000
+	maxImportNotesLength        = 5_000
+)
+
+type importValidationError struct {
+	Field   string `json:"field"`
+	Message string `json:"message"`
+}
+
+func runeLen(s string) int {
+	return len([]rune(s))
+}
+
+// validateImportDate accepts the ISO date forms the write path already parses with datePart:
+// a bare "2006-01-02" or a longer timestamp whose date portion parses. An empty date is left to
+// the per-collection required-field checks so the error message can name the field.
+func validateImportDate(value string) bool {
+	if value == "" {
+		return false
+	}
+	_, err := time.Parse("2006-01-02", datePart(value))
+	return err == nil
+}
+
+func validateImportNumber(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0)
+}
+
+func validateOptionalImportNumber(value *float64) bool {
+	return value == nil || validateImportNumber(*value)
+}
+
+// validateImportPayload runs before any importSessions record is created. It rejects payloads
+// that are structurally invalid: missing required fields, oversized collections, over-length
+// strings, unparseable dates, or non-finite numbers. Duplicate detection stays in the write
+// path because it depends on existing database state.
+func validateImportPayload(payload importPayload) []importValidationError {
+	var validationErrors []importValidationError
+
+	if strings.TrimSpace(payload.SessionLabel) == "" {
+		validationErrors = append(validationErrors, importValidationError{Field: "sessionLabel", Message: "sessionLabel is required"})
+	} else if runeLen(payload.SessionLabel) > maxImportSessionLabelLength {
+		validationErrors = append(validationErrors, importValidationError{Field: "sessionLabel", Message: fmt.Sprintf("sessionLabel exceeds %d characters", maxImportSessionLabelLength)})
+	}
+
+	collectionSizes := []struct {
+		field string
+		size  int
+	}{
+		{"accounts", len(payload.Accounts)},
+		{"assets", len(payload.Assets)},
+		{"securities", len(payload.Securities)},
+		{"transactions", len(payload.Transactions)},
+		{"securityBalances", len(payload.SecurityBalances)},
+		{"securityTransactions", len(payload.SecurityTransactions)},
+	}
+
+	total := 0
+	for _, c := range collectionSizes {
+		total += c.size
+		if c.size > maxImportRecordsPerCollection {
+			validationErrors = append(validationErrors, importValidationError{Field: c.field, Message: fmt.Sprintf("%s exceeds %d records", c.field, maxImportRecordsPerCollection)})
+		}
+	}
+	if total == 0 {
+		validationErrors = append(validationErrors, importValidationError{Field: "collections", Message: "At least one import collection is required"})
+	}
+	if total > maxImportTotalRecords {
+		validationErrors = append(validationErrors, importValidationError{Field: "collections", Message: fmt.Sprintf("total records exceed %d", maxImportTotalRecords)})
+	}
+
+	for i, acct := range payload.Accounts {
+		if strings.TrimSpace(acct.Name) == "" {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("accounts[%d].name", i), Message: "name is required"})
+		} else if runeLen(acct.Name) > maxImportNameLength {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("accounts[%d].name", i), Message: fmt.Sprintf("name exceeds %d characters", maxImportNameLength)})
+		}
+		if runeLen(acct.Institution) > maxImportNameLength {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("accounts[%d].institution", i), Message: fmt.Sprintf("institution exceeds %d characters", maxImportNameLength)})
+		}
+		if acct.Balance != nil {
+			if !validateImportDate(acct.Balance.AsOf) {
+				validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("accounts[%d].balance.asOf", i), Message: "asOf is not a valid date"})
+			}
+			if !validateImportNumber(acct.Balance.Value) {
+				validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("accounts[%d].balance.value", i), Message: "value is not a finite number"})
+			}
+		}
+	}
+
+	for i, asset := range payload.Assets {
+		if strings.TrimSpace(asset.Name) == "" {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("assets[%d].name", i), Message: "name is required"})
+		} else if runeLen(asset.Name) > maxImportNameLength {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("assets[%d].name", i), Message: fmt.Sprintf("name exceeds %d characters", maxImportNameLength)})
+		}
+		if asset.Balance != nil {
+			if !validateImportDate(asset.Balance.AsOf) {
+				validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("assets[%d].balance.asOf", i), Message: "asOf is not a valid date"})
+			}
+			if !validateImportNumber(asset.Balance.MarketValue) {
+				validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("assets[%d].balance.marketValue", i), Message: "marketValue is not a finite number"})
+			}
+			if !validateImportNumber(asset.Balance.BookValue) {
+				validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("assets[%d].balance.bookValue", i), Message: "bookValue is not a finite number"})
+			}
+		}
+	}
+
+	for i, security := range payload.Securities {
+		if strings.TrimSpace(security.Name) == "" {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securities[%d].name", i), Message: "name is required"})
+		} else if runeLen(security.Name) > maxImportNameLength {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securities[%d].name", i), Message: fmt.Sprintf("name exceeds %d characters", maxImportNameLength)})
+		}
+		if runeLen(security.Symbol) > maxImportSymbolLength {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securities[%d].symbol", i), Message: fmt.Sprintf("symbol exceeds %d characters", maxImportSymbolLength)})
+		}
+	}
+
+	for i, tx := range payload.Transactions {
+		if strings.TrimSpace(tx.AccountName) == "" {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("transactions[%d].accountName", i), Message: "accountName is required"})
+		} else if runeLen(tx.AccountName) > maxImportNameLength {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("transactions[%d].accountName", i), Message: fmt.Sprintf("accountName exceeds %d characters", maxImportNameLength)})
+		}
+		if !validateImportDate(tx.Date) {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("transactions[%d].date", i), Message: "date is not a valid date"})
+		}
+		if runeLen(tx.Description) > maxImportDescriptionLength {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("transactions[%d].description", i), Message: fmt.Sprintf("description exceeds %d characters", maxImportDescriptionLength)})
+		}
+		if !validateImportNumber(tx.Value) {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("transactions[%d].value", i), Message: "value is not a finite number"})
+		}
+		for j, lbl := range tx.Labels {
+			if runeLen(lbl) > maxImportLabelLength {
+				validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("transactions[%d].labels[%d]", i, j), Message: fmt.Sprintf("label exceeds %d characters", maxImportLabelLength)})
+			}
+		}
+	}
+
+	for i, balance := range payload.SecurityBalances {
+		if strings.TrimSpace(balance.AccountID) == "" && strings.TrimSpace(balance.AccountName) == "" {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityBalances[%d]", i), Message: "accountId or accountName is required"})
+		}
+		if runeLen(balance.AccountName) > maxImportNameLength {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityBalances[%d].accountName", i), Message: fmt.Sprintf("accountName exceeds %d characters", maxImportNameLength)})
+		}
+		if runeLen(balance.SecurityName) > maxImportNameLength {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityBalances[%d].securityName", i), Message: fmt.Sprintf("securityName exceeds %d characters", maxImportNameLength)})
+		}
+		if runeLen(balance.SecuritySymbol) > maxImportSymbolLength {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityBalances[%d].securitySymbol", i), Message: fmt.Sprintf("securitySymbol exceeds %d characters", maxImportSymbolLength)})
+		}
+		if !validateImportDate(balance.AsOf) {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityBalances[%d].asOf", i), Message: "asOf is not a valid date"})
+		}
+		for field, value := range map[string]*float64{"quantity": balance.Quantity, "price": balance.Price, "value": balance.Value, "costBasis": balance.CostBasis} {
+			if !validateOptionalImportNumber(value) {
+				validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityBalances[%d].%s", i, field), Message: field + " is not a finite number"})
+			}
+		}
+	}
+
+	for i, tx := range payload.SecurityTransactions {
+		if strings.TrimSpace(tx.AccountID) == "" && strings.TrimSpace(tx.AccountName) == "" {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityTransactions[%d]", i), Message: "accountId or accountName is required"})
+		}
+		if runeLen(tx.AccountName) > maxImportNameLength {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityTransactions[%d].accountName", i), Message: fmt.Sprintf("accountName exceeds %d characters", maxImportNameLength)})
+		}
+		if runeLen(tx.SecurityName) > maxImportNameLength {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityTransactions[%d].securityName", i), Message: fmt.Sprintf("securityName exceeds %d characters", maxImportNameLength)})
+		}
+		if runeLen(tx.SecuritySymbol) > maxImportSymbolLength {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityTransactions[%d].securitySymbol", i), Message: fmt.Sprintf("securitySymbol exceeds %d characters", maxImportSymbolLength)})
+		}
+		if runeLen(tx.Name) > maxImportNameLength {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityTransactions[%d].name", i), Message: fmt.Sprintf("name exceeds %d characters", maxImportNameLength)})
+		}
+		if runeLen(tx.Description) > maxImportDescriptionLength {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityTransactions[%d].description", i), Message: fmt.Sprintf("description exceeds %d characters", maxImportDescriptionLength)})
+		}
+		if runeLen(tx.Notes) > maxImportNotesLength {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityTransactions[%d].notes", i), Message: fmt.Sprintf("notes exceeds %d characters", maxImportNotesLength)})
+		}
+		if !validateImportDate(tx.Date) {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityTransactions[%d].date", i), Message: "date is not a valid date"})
+		}
+		for field, value := range map[string]*float64{"quantity": tx.Quantity, "price": tx.Price, "amount": tx.Amount, "fees": tx.Fees} {
+			if !validateOptionalImportNumber(value) {
+				validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityTransactions[%d].%s", i, field), Message: field + " is not a finite number"})
+			}
+		}
+	}
+
+	return validationErrors
 }
 
 func normalizeDescription(desc string) string {
@@ -306,16 +542,19 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 	info, _ := re.RequestInfo()
 	auth := info.Auth
 
+	re.Request.Body = http.MaxBytesReader(re.Response, re.Request.Body, maxImportBodyBytes)
+
 	var payload importPayload
 	if err := json.NewDecoder(re.Request.Body).Decode(&payload); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			return re.JSON(http.StatusRequestEntityTooLarge, map[string]string{"error": fmt.Sprintf("Request body exceeds %d bytes", maxImportBodyBytes)})
+		}
 		return re.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON body"})
 	}
 
-	if payload.SessionLabel == "" {
-		return re.JSON(http.StatusBadRequest, map[string]string{"error": "sessionLabel is required"})
-	}
-	if len(payload.Accounts) == 0 && len(payload.Assets) == 0 && len(payload.Securities) == 0 && len(payload.Transactions) == 0 && len(payload.SecurityBalances) == 0 && len(payload.SecurityTransactions) == 0 {
-		return re.JSON(http.StatusBadRequest, map[string]string{"error": "At least one import collection is required"})
+	if validationErrors := validateImportPayload(payload); len(validationErrors) > 0 {
+		return re.JSON(http.StatusBadRequest, map[string]any{"error": "Invalid import payload", "errors": validationErrors})
 	}
 
 	ownerID := auth.Id
@@ -331,7 +570,8 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 	session.Set("owner", ownerID)
 	session.Set("recordsCreated", 0)
 	session.Set("recordsSkipped", 0)
-	session.Set("status", "pending")
+	session.Set("recordsFailed", 0)
+	session.Set("status", importStatusPending)
 	if err := app.Save(session); err != nil {
 		return re.JSON(http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("Failed to create import session: %v", err)})
 	}
@@ -341,6 +581,12 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 	lblCache := map[string]string{}
 	securityCache := map[string]string{}
 	acctIndex := map[string]string{}
+
+	// errorCount tracks rows that failed to write because of an error (a failed lookup, a failed
+	// account resolution, or a failed save) as opposed to duplicate rows that were intentionally
+	// skipped. It drives the final session status so a partial import is never indistinguishable
+	// from a clean one. Per-row detail lives in the [import] operational logs.
+	errorCount := 0
 
 	for _, acct := range payload.Accounts {
 		institution := acct.Institution
@@ -353,6 +599,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		)
 		if err != nil {
 			log.Printf("[import] failed to find or create balanceTypes record (name=%q): %v", acct.BalanceType, err)
+			errorCount++
 			continue
 		}
 
@@ -376,6 +623,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		})
 		if err != nil {
 			log.Printf("[import] failed to find or create accounts record (name=%q): %v", acct.Name, err)
+			errorCount++
 			continue
 		}
 
@@ -405,6 +653,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 					result.AccountBalances.Created++
 				} else {
 					log.Printf("[import] failed to save accountBalances record (account=%s, asOf=%s): %v", rec.Id, acct.Balance.AsOf, err)
+					errorCount++
 				}
 			} else {
 				result.AccountBalances.Skipped++
@@ -421,6 +670,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		)
 		if err != nil {
 			log.Printf("[import] failed to find or create balanceTypes record (name=%q): %v", asset.BalanceType, err)
+			errorCount++
 			continue
 		}
 
@@ -438,6 +688,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		})
 		if err != nil {
 			log.Printf("[import] failed to find or create assets record (name=%q): %v", asset.Name, err)
+			errorCount++
 			continue
 		}
 
@@ -467,6 +718,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 					result.AssetBalances.Created++
 				} else {
 					log.Printf("[import] failed to save assetBalances record (asset=%s, asOf=%s): %v", rec.Id, asset.Balance.AsOf, err)
+					errorCount++
 				}
 			} else {
 				result.AssetBalances.Skipped++
@@ -477,7 +729,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 	for _, security := range payload.Securities {
 		if _, err := findOrCreateImportSecurity(app, ownerID, securityCache, "", security.Name, security.Symbol, session.Id, &result.Securities); err != nil {
 			log.Printf("[import] failed to find or create securities record (name=%q, symbol=%q): %v", security.Name, security.Symbol, err)
-			result.Securities.Skipped++
+			errorCount++
 			continue
 		}
 	}
@@ -486,7 +738,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		accountID, err := resolveImportAccount(app, ownerID, acctIndex, "", tx.AccountName)
 		if err != nil {
 			log.Printf("[import] failed to resolve account for transactions record (accountName=%q): %v", tx.AccountName, err)
-			result.Transactions.Skipped++
+			errorCount++
 			continue
 		}
 
@@ -534,6 +786,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 				labelIDs = append(labelIDs, lblID)
 			} else {
 				log.Printf("[import] failed to find or create transactionLabels record (name=%q): %v", lbl, err)
+				errorCount++
 			}
 		}
 
@@ -552,6 +805,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			result.Transactions.Created++
 		} else {
 			log.Printf("[import] failed to save transactions record (account=%s, date=%s): %v", accountID, tx.Date, err)
+			errorCount++
 		}
 	}
 
@@ -559,11 +813,13 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		accountID, err := resolveImportAccount(app, ownerID, acctIndex, balance.AccountID, balance.AccountName)
 		if err != nil {
 			log.Printf("[import] failed to resolve account for securityBalances record (accountName=%q): %v", balance.AccountName, err)
+			errorCount++
 			continue
 		}
 		securityID, err := findOrCreateImportSecurity(app, ownerID, securityCache, balance.SecurityID, balance.SecurityName, balance.SecuritySymbol, session.Id, &result.Securities)
 		if err != nil {
 			log.Printf("[import] failed to find or create securities record for securityBalances (name=%q, symbol=%q): %v", balance.SecurityName, balance.SecuritySymbol, err)
+			errorCount++
 			continue
 		}
 
@@ -602,6 +858,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			result.SecurityBalances.Created++
 		} else {
 			log.Printf("[import] failed to save securityBalances record (account=%s, security=%s, asOf=%s): %v", accountID, securityID, balance.AsOf, err)
+			errorCount++
 		}
 	}
 
@@ -609,11 +866,13 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		accountID, err := resolveImportAccount(app, ownerID, acctIndex, tx.AccountID, tx.AccountName)
 		if err != nil {
 			log.Printf("[import] failed to resolve account for securityTransactions record (accountName=%q): %v", tx.AccountName, err)
+			errorCount++
 			continue
 		}
 		securityID, err := findOrCreateImportSecurity(app, ownerID, securityCache, tx.SecurityID, tx.SecurityName, tx.SecuritySymbol, session.Id, &result.Securities)
 		if err != nil {
 			log.Printf("[import] failed to find or create securities record for securityTransactions (name=%q, symbol=%q): %v", tx.SecurityName, tx.SecuritySymbol, err)
+			errorCount++
 			continue
 		}
 
@@ -662,6 +921,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			result.SecurityTransactions.Created++
 		} else {
 			log.Printf("[import] failed to save securityTransactions record (account=%s, security=%s, date=%s): %v", accountID, securityID, tx.Date, err)
+			errorCount++
 		}
 	}
 
@@ -669,12 +929,24 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		result.Securities.Created + result.AccountBalances.Created + result.AssetBalances.Created +
 		result.SecurityBalances.Created + result.SecurityTransactions.Created
 	totalSkipped := result.Accounts.Existing + result.Assets.Existing + result.Transactions.Skipped +
-		result.Securities.Existing + result.Securities.Skipped + result.AccountBalances.Skipped +
+		result.Securities.Existing + result.AccountBalances.Skipped +
 		result.AssetBalances.Skipped + result.SecurityBalances.Skipped + result.SecurityTransactions.Skipped
 
-	session.Set("status", "completed")
+	status := importStatusCompleted
+	if errorCount > 0 {
+		if totalCreated > 0 {
+			status = importStatusCompletedWithErrors
+		} else {
+			status = importStatusFailed
+		}
+	}
+	result.Status = status
+	result.RecordsFailed = errorCount
+
+	session.Set("status", status)
 	session.Set("recordsCreated", totalCreated)
 	session.Set("recordsSkipped", totalSkipped)
+	session.Set("recordsFailed", errorCount)
 	if err := app.Save(session); err != nil {
 		log.Printf("[import] failed to save importSessions record (session=%s): %v", session.Id, err)
 	}
@@ -766,6 +1038,7 @@ func handleRevert(app core.App, re *core.RequestEvent) error {
 		session.Set("status", "rolled_back")
 		session.Set("recordsCreated", 0)
 		session.Set("recordsSkipped", 0)
+		session.Set("recordsFailed", 0)
 		return txApp.Save(session)
 	})
 
