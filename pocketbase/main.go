@@ -127,6 +127,26 @@ func main() {
 		return e.Next()
 	})
 
+	app.OnRecordValidate("transactions", "accountBalances").BindFunc(func(e *core.RecordEvent) error {
+		if err := validateSecurityOwnerImmutable(e.Record); err != nil {
+			return err
+		}
+		if err := validateParentOwner(e.App, e.Record, "accounts", "account"); err != nil {
+			return err
+		}
+		return e.Next()
+	})
+
+	app.OnRecordValidate("assetBalances").BindFunc(func(e *core.RecordEvent) error {
+		if err := validateSecurityOwnerImmutable(e.Record); err != nil {
+			return err
+		}
+		if err := validateParentOwner(e.App, e.Record, "assets", "asset"); err != nil {
+			return err
+		}
+		return e.Next()
+	})
+
 	app.OnRecordAfterCreateSuccess("transactions").BindFunc(func(e *core.RecordEvent) error {
 		if aid := e.Record.GetString("account"); aid != "" {
 			enqueueBalance(aid)

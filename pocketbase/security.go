@@ -175,6 +175,14 @@ func validateSecurityOwnerImmutable(record *core.Record) error {
 	return nil
 }
 
+func validateParentOwner(app core.App, record *core.Record, parentCollection, relationField string) error {
+	parent, err := app.FindRecordById(parentCollection, record.GetString(relationField))
+	if err != nil || parent.GetString("owner") != record.GetString("owner") {
+		return apis.NewNotFoundError(relationField+" not found", nil)
+	}
+	return nil
+}
+
 func validateOptionalJSONNumbers(record *core.Record, fields ...string) error {
 	for _, field := range fields {
 		if _, _, err := optionalJSONNumber(record, field); err != nil {
