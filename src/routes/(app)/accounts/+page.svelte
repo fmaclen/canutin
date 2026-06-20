@@ -240,9 +240,7 @@
 <Page pageTitle={m.sidebar_accounts()}>
 	<Section>
 		{#if !isLoaded}
-			<div class="bg-background overflow-hidden rounded-sm shadow-md">
-				<Skeleton class="h-64" showSpinner />
-			</div>
+			<Skeleton class="h-64" showSpinner />
 		{:else}
 			<Tabs.Root bind:value={filter}>
 				<nav class="flex items-center justify-between space-x-2">

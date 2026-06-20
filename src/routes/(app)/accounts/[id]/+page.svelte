@@ -6,9 +6,11 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import { getAccountCashflowContext } from '$lib/account-cashflow.svelte';
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAuthContext } from '$lib/auth.svelte';
 	import { getBalanceTypesContext } from '$lib/balance-types.svelte';
+	import CashflowAverages from '$lib/components/cashflow-averages.svelte';
 	import CheckboxLabel from '$lib/components/checkbox-label.svelte';
 	import Currency from '$lib/components/currency.svelte';
 	import Fieldset from '$lib/components/fieldset.svelte';
@@ -60,6 +62,7 @@
 	const accountsContext = getAccountsContext();
 	const balanceTypesContext = getBalanceTypesContext();
 	const securitiesContext = getSecuritiesContext();
+	const accountCashflow = getAccountCashflowContext();
 
 	const accountId = $derived(page.params.id);
 	const ownerId = $derived(auth.currentUser?.record?.id);
@@ -637,6 +640,21 @@
 					</Table.Body>
 				</Table.Root>
 			</div>
+		</Section>
+	{/if}
+
+	{#if !isLoading && account}
+		<Section>
+			{#if accountCashflow.isLoading}
+				<Skeleton class="h-32" />
+			{:else}
+				<CashflowAverages
+					avg3m={accountCashflow.avg3m}
+					avg6m={accountCashflow.avg6m}
+					avgYtd={accountCashflow.avgYtd}
+					avg1y={accountCashflow.avg1y}
+				/>
+			{/if}
 		</Section>
 	{/if}
 

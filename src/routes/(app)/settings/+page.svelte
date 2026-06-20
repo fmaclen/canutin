@@ -248,9 +248,7 @@
 
 	<Section>
 		{#if importSessionsContext.isLoading}
-			<div class="bg-background overflow-hidden rounded-sm shadow-md">
-				<Skeleton class="h-64" showSpinner />
-			</div>
+			<Skeleton class="h-64" showSpinner />
 		{:else}
 			<SectionTitle title={m.settings_imports_section_title()} />
 
