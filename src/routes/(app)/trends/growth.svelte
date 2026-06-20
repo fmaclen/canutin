@@ -28,6 +28,7 @@
 
 	let {
 		period = $bindable(),
+		isLoading,
 		prepared,
 		rawAccounts,
 		rawAssets,
@@ -36,6 +37,7 @@
 		rawAssetBalances
 	}: {
 		period: PeriodKey;
+		isLoading: boolean;
 		prepared: PreparedTrendMaps;
 		rawAccounts: AccountsResponse[];
 		rawAssets: AssetsResponse[];
@@ -107,7 +109,10 @@
 	});
 
 	function recomputeSeries() {
-		if (!rawAccounts.length && !rawAssets.length) return;
+		if (!rawAccounts.length && !rawAssets.length) {
+			series = [];
+			return;
+		}
 		const { start, end } = computeRangeForPeriod(
 			period,
 			rawAccountBalances,
@@ -214,7 +219,9 @@
 	$effect(() => recomputeSeries());
 </script>
 
-{#if series.length}
+{#if isLoading}
+	<Skeleton class="h-96" showSpinner />
+{:else}
 	<div
 		class="bg-background overflow-visible rounded-sm shadow-md"
 		data-growth-period={period}
@@ -268,6 +275,4 @@
 			</LineChart>
 		</Chart.Container>
 	</div>
-{:else}
-	<Skeleton class="h-96" showSpinner />
 {/if}
