@@ -134,6 +134,13 @@ func main() {
 		if err := validateParentOwner(e.App, e.Record, "accounts", "account"); err != nil {
 			return err
 		}
+		// NOTE: the only programmatic creator that tags a balance derived is the balance worker;
+		// imports tag import. Any other write (the manual balance form, ad-hoc API clients) is
+		// user-entered, so an untagged accountBalances row defaults to manual rather than being
+		// mistaken for a worker-derived snapshot that revert cleanup may delete.
+		if e.Record.Collection().Name == "accountBalances" && e.Record.GetString("source") == "" {
+			e.Record.Set("source", "manual")
+		}
 		return e.Next()
 	})
 
@@ -148,6 +155,12 @@ func main() {
 	})
 
 	app.OnRecordAfterCreateSuccess("transactions").BindFunc(func(e *core.RecordEvent) error {
+		// NOTE: imported transactions skip the async enqueue because the import writes its own derived
+		// snapshot synchronously (tagged with the import session) once all rows are saved. Letting the
+		// worker fire too would append an untagged orphan that revert cannot identify and clean up.
+		if e.Record.GetString("importSession") != "" {
+			return e.Next()
+		}
 		if aid := e.Record.GetString("account"); aid != "" {
 			enqueueBalance(aid)
 		}

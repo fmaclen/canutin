@@ -35,6 +35,7 @@
 	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import {
+		AccountBalancesSourceOptions,
 		AccountsBalanceGroupOptions,
 		AccountSharesPerspectiveOptions
 	} from '$lib/pocketbase.schema';
@@ -270,7 +271,8 @@
 				account: currentAccountId,
 				owner: currentOwnerId,
 				asOf: new Date().toISOString(),
-				value: formData.value ? parseFloat(formData.value) : undefined
+				value: formData.value ? parseFloat(formData.value) : undefined,
+				source: AccountBalancesSourceOptions.manual
 			};
 
 			syncState.justSaved = true;
