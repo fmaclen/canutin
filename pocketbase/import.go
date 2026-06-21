@@ -8,12 +8,28 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pocketbase/pocketbase/core"
 )
 
 var spaceRe = regexp.MustCompile(`\s+`)
+
+var revertingSessions sync.Map
+
+func markSessionReverting(sessionID string) {
+	revertingSessions.Store(sessionID, struct{}{})
+}
+
+func unmarkSessionReverting(sessionID string) {
+	revertingSessions.Delete(sessionID)
+}
+
+func isSessionReverting(sessionID string) bool {
+	_, ok := revertingSessions.Load(sessionID)
+	return ok
+}
 
 type importPayload struct {
 	SessionLabel         string                      `json:"sessionLabel"`
@@ -1045,6 +1061,9 @@ func handleRevert(app core.App, re *core.RequestEvent) error {
 	if session.GetString("status") == "rolled_back" {
 		return re.JSON(http.StatusBadRequest, map[string]string{"error": "Session already reverted"})
 	}
+
+	markSessionReverting(body.SessionID)
+	defer unmarkSessionReverting(body.SessionID)
 
 	collections := []string{"transactions", "securityTransactions", "accountBalances", "assetBalances", "securityBalances", "accounts", "assets", "securities"}
 	totalDeleted := 0

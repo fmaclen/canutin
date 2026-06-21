@@ -180,6 +180,14 @@ func main() {
 	})
 
 	app.OnRecordAfterDeleteSuccess("transactions").BindFunc(func(e *core.RecordEvent) error {
+		// NOTE: skip the async enqueue only for deletes that belong to an in-flight import revert,
+		// which recomputes affected accounts synchronously inside its transaction; letting the worker
+		// also fire would race that recompute (appending a duplicate snapshot) and run against
+		// import-created accounts cascade-deleted in the same revert. importSession alone is permanent,
+		// so a user deleting a single imported transaction outside revert must still enqueue.
+		if isSessionReverting(e.Record.GetString("importSession")) {
+			return e.Next()
+		}
 		if aid := e.Record.GetString("account"); aid != "" {
 			enqueueBalance(aid)
 		}

@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -55,6 +57,11 @@ func calculateBalance(app *pocketbase.PocketBase, accountID string) {
 func recomputeDerivedBalance(app core.App, accountID string, importSession string) error {
 	account, err := app.FindRecordById("accounts", accountID)
 	if err != nil {
+		// NOTE: a cascade-deleted account (e.g. an import-created account removed during revert)
+		// has no balance to compute, so a missing record is a quiet no-op rather than a failure.
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
 		return fmt.Errorf("find account: %w", err)
 	}
 

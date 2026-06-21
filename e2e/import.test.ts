@@ -876,6 +876,65 @@ test('reverting an import into an existing account leaves no stale derived balan
 	expect(balances.map((balance) => balance.value)).toEqual(balances.map(() => 100));
 });
 
+test('deleting a single imported transaction outside revert recomputes the derived balance', async () => {
+	const user = await seedUser('seamus');
+	const account = await seedAccount({
+		name: 'Seamus Checking',
+		balanceGroup: 'CASH',
+		balanceType: 'Checking',
+		owner: user.id,
+		autoCalculated: new Date().toISOString()
+	});
+
+	const pb = await getUserPB(user.email);
+
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: '2025-06-01T00:00:00.000Z',
+		description: 'Pre-existing deposit',
+		value: 100
+	});
+
+	await expect.poll(async () => (await listAccountBalances(pb, account.id))[0]?.value).toBe(100);
+
+	const result = await (
+		await pbSend(
+			IMPORT_PATH,
+			{
+				sessionLabel: 'seamus-into-existing',
+				transactions: [
+					{
+						accountId: account.id,
+						accountName: 'Seamus Checking',
+						date: '2025-06-10T00:00:00.000Z',
+						description: 'Imported deposit',
+						value: 900,
+						externalId: 'seamus-txn-001'
+					}
+				]
+			},
+			user.email
+		)
+	).json();
+	expect(result.status).toBe('completed');
+	expect(result.transactions.created).toBe(1);
+
+	await expect.poll(async () => (await listAccountBalances(pb, account.id))[0]?.value).toBe(1000);
+
+	const imported = await pb
+		.collection('transactions')
+		.getFirstListItem(`externalId = "seamus-txn-001" && owner = "${user.id}"`);
+	await pb.collection('transactions').delete(imported.id);
+
+	const remainingTransactions = await pb.collection('transactions').getFullList({
+		filter: `account = "${account.id}"`
+	});
+	expect(remainingTransactions.map((tx) => tx.description)).toEqual(['Pre-existing deposit']);
+
+	await expect.poll(async () => (await listAccountBalances(pb, account.id))[0]?.value).toBe(100);
+});
+
 test('reverting an import preserves a manual balance on the account', async () => {
 	const user = await seedUser('serena');
 	const account = await seedAccount({
