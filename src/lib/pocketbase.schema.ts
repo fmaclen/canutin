@@ -220,6 +220,8 @@ export enum ImportSessionsStatusOptions {
 	"pending" = "pending",
 	"completed" = "completed",
 	"rolled_back" = "rolled_back",
+	"completed_with_errors" = "completed_with_errors",
+	"failed" = "failed",
 }
 export type ImportSessionsRecord = {
 	created: IsoAutoDateString
@@ -227,6 +229,7 @@ export type ImportSessionsRecord = {
 	label: string
 	owner: RecordIdString
 	recordsCreated?: number
+	recordsFailed?: number
 	recordsSkipped?: number
 	status: ImportSessionsStatusOptions
 	updated: IsoAutoDateString

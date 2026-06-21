@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
-import { getUserPB, pbSend, seedUser } from './pocketbase.helpers';
+import { getUserPB, PB_URL, pbSend, seedUser } from './pocketbase.helpers';
 
 function importPayload(sessionLabel: string) {
 	return {
@@ -371,10 +371,201 @@ test('import rejects requests without auth', async () => {
 	expect(response.status).toBe(401);
 });
 
-test('import rejects empty payload', async () => {
+test('import rejects empty payload and creates no session', async () => {
 	const user = await seedUser('rachel');
 	const response = await pbSend(IMPORT_PATH, { sessionLabel: 'empty-import' }, user.email);
 	expect(response.status).toBe(400);
+
+	const pb = await getUserPB(user.email);
+	const sessions = await pb.collection('importSessions').getFullList({
+		filter: `owner = "${user.id}"`
+	});
+	expect(sessions.length).toBe(0);
+});
+
+test('import rejects invalid preflight payload and creates no session', async () => {
+	const user = await seedUser('rebecca');
+	const response = await pbSend(
+		IMPORT_PATH,
+		{
+			sessionLabel: 'invalid-preflight',
+			accounts: [{ name: 'Rebecca Checking', balanceGroup: 'CASH', balanceType: 'Checking' }],
+			transactions: [{ accountName: 'Rebecca Checking', description: 'Missing date', value: 5 }]
+		},
+		user.email
+	);
+	const result = await response.json();
+
+	expect(response.status).toBe(400);
+	expect(result.errors).toContainEqual(expect.objectContaining({ field: 'transactions[0].date' }));
+
+	const pb = await getUserPB(user.email);
+	const sessions = await pb.collection('importSessions').getFullList({
+		filter: `owner = "${user.id}"`
+	});
+	expect(sessions.length).toBe(0);
+});
+
+test('import rejects too many records and creates no session', async () => {
+	const user = await seedUser('reuben');
+	const transactions = Array.from({ length: 100_001 }, () => ({
+		accountName: 'Reuben Checking',
+		date: '2025-01-01T00:00:00.000Z',
+		description: 'Bulk',
+		value: 1
+	}));
+	const response = await pbSend(
+		IMPORT_PATH,
+		{
+			sessionLabel: 'too-many-records',
+			accounts: [{ name: 'Reuben Checking', balanceGroup: 'CASH', balanceType: 'Checking' }],
+			transactions
+		},
+		user.email
+	);
+	const result = await response.json();
+
+	expect(response.status).toBe(400);
+	expect(result.errors).toContainEqual(expect.objectContaining({ field: 'transactions' }));
+
+	const pb = await getUserPB(user.email);
+	const sessions = await pb.collection('importSessions').getFullList({
+		filter: `owner = "${user.id}"`
+	});
+	expect(sessions.length).toBe(0);
+});
+
+test('import rejects an oversized body and creates no session', async () => {
+	const user = await seedUser('rhonda');
+	const pb = await getUserPB(user.email);
+
+	// A description larger than the 64 MiB body cap trips http.MaxBytesReader during decode,
+	// before any importSessions record is created.
+	const oversized = 'x'.repeat(64 * 1024 * 1024 + 1024);
+	// HACK: An oversized body is refused either way. The server may finish reading and return a
+	// clean 413, or it may stop reading after the limit and reset the socket mid-write, which the
+	// client sees as a connection-level error (ECONNRESET / "fetch failed"). Both prove the body
+	// was refused, so we accept either outcome and reject only an unexpected success status.
+	// Connection: close keeps the failed request from poisoning a keep-alive socket.
+	let status: number | null = null;
+	try {
+		const response = await fetch(`${PB_URL}${IMPORT_PATH}`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${pb.authStore.token}`,
+				Connection: 'close'
+			},
+			body: JSON.stringify({
+				sessionLabel: 'oversized-body',
+				transactions: [
+					{
+						accountName: 'Rhonda Checking',
+						date: '2025-01-01T00:00:00.000Z',
+						value: 1,
+						description: oversized
+					}
+				]
+			})
+		});
+		await response.arrayBuffer();
+		status = response.status;
+	} catch {
+		// Connection-level rejection counts as the body being refused.
+	}
+
+	if (status !== null) expect(status).toBe(413);
+
+	// Fresh connection: the oversized request may have torn down its socket, so reuse nothing.
+	const freshPB = await getUserPB(user.email);
+	const sessions = await freshPB.collection('importSessions').getFullList({
+		filter: `owner = "${user.id}"`
+	});
+	expect(sessions.length).toBe(0);
+});
+
+test('mixed valid and invalid rows complete with errors and persist the valid rows', async () => {
+	const user = await seedUser('ricardo');
+	const response = await pbSend(
+		IMPORT_PATH,
+		{
+			sessionLabel: 'ricardo-partial',
+			accounts: [{ name: 'Ricardo Checking', balanceGroup: 'CASH', balanceType: 'Checking' }],
+			transactions: [
+				{
+					accountName: 'Ricardo Checking',
+					date: '2025-06-10T00:00:00.000Z',
+					description: 'Valid deposit',
+					value: 100
+				},
+				{
+					accountName: 'Ghost Account',
+					date: '2025-06-11T00:00:00.000Z',
+					description: 'Unresolvable account',
+					value: -50
+				}
+			]
+		},
+		user.email
+	);
+	const result = await response.json();
+
+	expect(response.status).toBe(200);
+	expect(result.status).toBe('completed_with_errors');
+	expect(result.recordsFailed).toBe(1);
+	expect(result.transactions.created).toBe(1);
+
+	const pb = await getUserPB(user.email);
+	const session = await pb.collection('importSessions').getOne(result.sessionId);
+	expect(session.status).toBe('completed_with_errors');
+	expect(session.recordsFailed).toBe(1);
+	expect(session.recordsCreated).toBeGreaterThan(0);
+
+	const transactions = await pb.collection('transactions').getFullList({
+		filter: `owner = "${user.id}"`
+	});
+	expect(transactions.length).toBe(1);
+	expect(transactions[0].description).toBe('Valid deposit');
+});
+
+test('settings shows the completed-with-errors status and failed count', async ({ page }) => {
+	const user = await seedUser('rosa');
+	const result = await (
+		await pbSend(
+			IMPORT_PATH,
+			{
+				sessionLabel: 'rosa-partial-import',
+				accounts: [{ name: 'Rosa Checking', balanceGroup: 'CASH', balanceType: 'Checking' }],
+				transactions: [
+					{
+						accountName: 'Rosa Checking',
+						date: '2025-06-10T00:00:00.000Z',
+						description: 'Valid deposit',
+						value: 100
+					},
+					{
+						accountName: 'Ghost Account',
+						date: '2025-06-11T00:00:00.000Z',
+						description: 'Unresolvable account',
+						value: -50
+					}
+				]
+			},
+			user.email
+		)
+	).json();
+	expect(result.status).toBe('completed_with_errors');
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Settings');
+
+	await expect(page.getByText('rosa-partial-import')).toBeVisible();
+	await expect(page.getByText('Completed with errors')).toBeVisible();
+
+	const row = page.getByRole('row').filter({ hasText: 'rosa-partial-import' });
+	const failedCell = row.getByRole('cell').nth(4);
+	await expect(failedCell).toHaveText('1');
 });
 
 test('import accepts security and cryptocurrency balance types in assets payload', async () => {
