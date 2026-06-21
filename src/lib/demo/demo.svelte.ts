@@ -3,6 +3,7 @@ import { toast } from 'svelte-sonner';
 
 import { env } from '$env/dynamic/public';
 import type { AuthContext } from '$lib/auth.svelte';
+import { logError } from '$lib/logger';
 import { m } from '$lib/paraglide/messages.js';
 import type { TypedPocketBase } from '$lib/pocketbase.schema';
 
@@ -43,7 +44,7 @@ export class DemoContext {
 
 	async startDemo() {
 		if (!this.isEnabled) {
-			console.error('[demo] Demo mode is not enabled');
+			logError('demo', 'start', 'Demo mode is not enabled');
 			return { success: false };
 		}
 
@@ -66,7 +67,7 @@ export class DemoContext {
 
 				const loginResult = await this._auth.login(email, DEMO_PASSWORD);
 				if (!loginResult.success) {
-					console.error('[demo] Failed to login after user creation');
+					logError('demo', 'start', 'Failed to login after user creation');
 					toast.error(m.demo_seeding_failed());
 					return { success: false };
 				}
@@ -78,7 +79,7 @@ export class DemoContext {
 			}
 
 			if (!userId) {
-				console.error('[demo] No user ID after authentication');
+				logError('demo', 'start', 'No user ID after authentication');
 				toast.error(m.demo_seeding_failed());
 				return { success: false };
 			}
@@ -90,7 +91,7 @@ export class DemoContext {
 			await this.seed(userId);
 			return { success: true };
 		} catch (error) {
-			console.error('[demo] Failed to start demo:', error);
+			logError('demo', 'start', error);
 			toast.error(m.demo_seeding_failed());
 			return { success: false };
 		} finally {
@@ -107,7 +108,7 @@ export class DemoContext {
 			this.markAsSeeded(userId);
 			toast.success(m.demo_seeding_complete(), { id: TOAST_ID });
 		} catch (error) {
-			console.error('[demo:seed]', error);
+			logError('demo', 'seed', error);
 			toast.error(m.demo_seeding_failed(), { id: TOAST_ID });
 			throw error;
 		} finally {

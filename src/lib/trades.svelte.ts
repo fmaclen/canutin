@@ -9,6 +9,7 @@ import { page } from '$app/state';
 
 import { getAccountsContext } from './accounts.svelte';
 import { getAuthContext } from './auth.svelte';
+import { logError } from './logger';
 import {
 	SecurityTransactionsTypeOptions,
 	type AccountsResponse,
@@ -423,7 +424,7 @@ class TradesContext {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'securityTransactions', 'subscribe_transactions');
 				} else {
-					console.error('[tradesStore] Stale subscription failed:', error);
+					logError('tradesStore', 'stale_subscription', error);
 				}
 			});
 		this._isSubscribed = true;

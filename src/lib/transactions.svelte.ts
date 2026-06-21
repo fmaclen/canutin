@@ -9,6 +9,7 @@ import { page } from '$app/state';
 
 import { getAccountsContext } from './accounts.svelte';
 import { getAuthContext } from './auth.svelte';
+import { logError } from './logger';
 import type {
 	AccountsResponse,
 	TransactionLabelsResponse,
@@ -547,7 +548,7 @@ class TransactionsContext {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'transactions', 'subscribe_transactions');
 				} else {
-					console.error('[transactionsStore] Stale transaction subscription failed:', error);
+					logError('transactionsStore', 'stale_transaction_subscription', error);
 				}
 			});
 		this._isSubscribed = true;
@@ -570,7 +571,7 @@ class TransactionsContext {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'transactionLabels', 'subscribe_labels');
 				} else {
-					console.error('[transactionsStore] Stale label subscription failed:', error);
+					logError('transactionsStore', 'stale_label_subscription', error);
 				}
 			});
 	}

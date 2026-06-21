@@ -21,6 +21,7 @@
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import { SecurityTransactionsTypeOptions } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
@@ -99,7 +100,7 @@
 			toast.success(m.trades_add_success());
 			await goto(resolve('/trades'));
 		} catch (error) {
-			console.error('[tradesAdd]', error);
+			logError('tradesAdd', 'create', error);
 			toast.error(m.trades_add_failed());
 		} finally {
 			isSaving = false;

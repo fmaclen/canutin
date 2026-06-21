@@ -20,6 +20,7 @@
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 
@@ -77,7 +78,7 @@
 			toast.success(m.transactions_add_success());
 			await goto(resolve('/transactions'));
 		} catch (error) {
-			console.error('Failed to create transaction:', error);
+			logError('addTransaction', 'create', error);
 			toast.error(m.transactions_add_failed());
 		}
 	}

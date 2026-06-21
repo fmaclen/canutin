@@ -21,6 +21,7 @@
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import { AccountsBalanceGroupOptions } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
@@ -78,7 +79,7 @@
 			toast.success(m.accounts_add_success());
 			await goto(resolve('/accounts'));
 		} catch (error) {
-			console.error('Failed to create account:', error);
+			logError('addAccount', 'create', error);
 			toast.error(m.accounts_add_failed());
 		}
 	}

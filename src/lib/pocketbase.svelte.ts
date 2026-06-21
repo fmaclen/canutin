@@ -4,6 +4,7 @@ import { toast } from 'svelte-sonner';
 
 import { env } from '$env/dynamic/public';
 
+import { logError } from './logger';
 import { m } from './paraglide/messages';
 import type { TypedPocketBase } from './pocketbase.schema';
 
@@ -83,7 +84,7 @@ export class PocketBaseContext {
 	}
 
 	private captureError(error: unknown, context: string, operation: string) {
-		console.error(`[${context}:${operation}]`, error);
+		logError(context, operation, error);
 	}
 
 	private isTransientError(error: unknown) {

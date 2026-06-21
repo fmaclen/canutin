@@ -11,6 +11,7 @@ import {
 	type CashflowPeriod,
 	type CashflowWindow
 } from './cashflow-utils';
+import { logError } from './logger';
 import { AccountSharesPerspectiveOptions, type TransactionsResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
 
@@ -144,7 +145,7 @@ class CashflowContext {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'cashflow', 'subscribe');
 				} else {
-					console.error('[cashflowStore] Stale subscription failed:', error);
+					logError('cashflowStore', 'stale_subscription', error);
 				}
 			});
 	}
@@ -215,7 +216,7 @@ class CashflowContext {
 		this._debounceTimer = setTimeout(() => {
 			this._debounceTimer = null;
 			void this.recomputeAll(this._accountsContext.accounts).catch((error) => {
-				console.error('[cashflow:recompute_on_event]', error);
+				logError('cashflow', 'recompute_on_event', error);
 			});
 		}, DEBOUNCE_MS);
 	}

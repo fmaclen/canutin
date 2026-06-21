@@ -32,6 +32,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Table from '$lib/components/ui/table/index';
 	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
+	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import {
 		AccountsBalanceGroupOptions,
@@ -286,7 +287,7 @@
 				await goto(from);
 			}
 		} catch (error) {
-			console.error('Failed to update balance:', error);
+			logError('accountDetail', 'update_balance', error);
 			toast.error(m.accounts_balance_failed());
 			syncState.justSaved = false;
 		}
@@ -330,7 +331,7 @@
 				await goto(from);
 			}
 		} catch (error) {
-			console.error('Failed to update account:', error);
+			logError('accountDetail', 'update', error);
 			toast.error(m.accounts_edit_failed());
 			syncState.justSaved = false;
 		}
@@ -345,7 +346,7 @@
 			toast.success(m.accounts_delete_success());
 			goto(resolve('/accounts'));
 		} catch (error) {
-			console.error('Failed to delete account:', error);
+			logError('accountDetail', 'delete', error);
 			toast.error(m.accounts_delete_failed());
 		}
 	}
@@ -359,7 +360,7 @@
 			sharePerspective = AccountSharesPerspectiveOptions.NORMAL;
 			toast.success(m.accounts_share_created());
 		} catch (error) {
-			console.error('Failed to create share:', error);
+			logError('accountDetail', 'create_share', error);
 			toast.error(error instanceof Error ? error.message : m.accounts_share_create_failed());
 		}
 	}
@@ -371,7 +372,7 @@
 			await accountsContext.updateShareIncludeInNetWorth(incomingShare.id, includeInNetWorth);
 			toast.success(m.accounts_share_preferences_updated());
 		} catch (error) {
-			console.error('Failed to update share preferences:', error);
+			logError('accountDetail', 'update_share_preferences', error);
 			toast.error(m.accounts_share_preferences_failed());
 		}
 	}
@@ -381,7 +382,7 @@
 			await accountsContext.revokeShare(shareId);
 			toast.success(m.accounts_share_removed());
 		} catch (error) {
-			console.error('Failed to revoke share:', error);
+			logError('accountDetail', 'revoke_share', error);
 			toast.error(m.accounts_share_remove_failed());
 		}
 	}
@@ -393,7 +394,7 @@
 			toast.success(m.accounts_share_left());
 			goto(resolve('/accounts'));
 		} catch (error) {
-			console.error('Failed to leave share:', error);
+			logError('accountDetail', 'leave_share', error);
 			toast.error(m.accounts_share_leave_failed());
 		}
 	}

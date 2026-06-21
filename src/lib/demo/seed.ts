@@ -1,3 +1,4 @@
+import { logWarn } from '$lib/logger';
 import type { TypedPocketBase } from '$lib/pocketbase.schema';
 
 import {
@@ -204,7 +205,7 @@ async function waitForAutoCalculatedBalances(pb: TypedPocketBase, accountIds: st
 		await new Promise((resolve) => setTimeout(resolve, pollInterval));
 	}
 
-	console.warn('[demo:seed] Timed out waiting for auto-calculated balances to stabilize');
+	logWarn('demo', 'seed', 'Timed out waiting for auto-calculated balances to stabilize');
 }
 
 export async function seedDemoData(pb: TypedPocketBase, userId: string) {

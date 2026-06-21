@@ -25,6 +25,7 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import type { TransactionsResponse } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
@@ -93,7 +94,7 @@
 				excluded: Boolean(result.excluded)
 			};
 		} catch (error) {
-			console.error('Failed to load transaction:', error);
+			logError('transactionDetail', 'load', error);
 			toast.error(m.transactions_edit_error_loading());
 		} finally {
 			isLoading = false;
@@ -147,7 +148,7 @@
 				await goto(from);
 			}
 		} catch (error) {
-			console.error('Failed to update transaction:', error);
+			logError('transactionDetail', 'update', error);
 			toast.error(m.transactions_edit_failed());
 		}
 	}
@@ -161,7 +162,7 @@
 			toast.success(m.transactions_delete_success());
 			goto(resolve('/transactions'));
 		} catch (error) {
-			console.error('Failed to delete transaction:', error);
+			logError('transactionDetail', 'delete', error);
 			toast.error(m.transactions_delete_failed());
 		}
 	}

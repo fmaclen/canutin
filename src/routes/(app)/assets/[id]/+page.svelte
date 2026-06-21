@@ -24,6 +24,7 @@
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import { AssetsBalanceGroupOptions, AssetSharesPerspectiveOptions } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
@@ -185,7 +186,7 @@
 				await goto(from);
 			}
 		} catch (error) {
-			console.error('Failed to update balance:', error);
+			logError('assetDetail', 'update_balance', error);
 			toast.error(m.assets_balance_failed());
 			syncState.justSaved = false;
 		}
@@ -228,7 +229,7 @@
 				await goto(from);
 			}
 		} catch (error) {
-			console.error('Failed to update asset:', error);
+			logError('assetDetail', 'update', error);
 			toast.error(m.assets_edit_failed());
 			syncState.justSaved = false;
 		}
@@ -243,7 +244,7 @@
 			toast.success(m.assets_delete_success());
 			goto(resolve('/assets'));
 		} catch (error) {
-			console.error('Failed to delete asset:', error);
+			logError('assetDetail', 'delete', error);
 			toast.error(m.assets_delete_failed());
 		}
 	}
@@ -257,7 +258,7 @@
 			sharePerspective = AssetSharesPerspectiveOptions.NORMAL;
 			toast.success(m.assets_share_created());
 		} catch (error) {
-			console.error('Failed to create share:', error);
+			logError('assetDetail', 'create_share', error);
 			toast.error(error instanceof Error ? error.message : m.assets_share_create_failed());
 		}
 	}
@@ -269,7 +270,7 @@
 			await assetsContext.updateShareIncludeInNetWorth(incomingShare.id, includeInNetWorth);
 			toast.success(m.assets_share_preferences_updated());
 		} catch (error) {
-			console.error('Failed to update share preferences:', error);
+			logError('assetDetail', 'update_share_preferences', error);
 			toast.error(m.assets_share_preferences_failed());
 		}
 	}
@@ -279,7 +280,7 @@
 			await assetsContext.revokeShare(shareId);
 			toast.success(m.assets_share_removed());
 		} catch (error) {
-			console.error('Failed to revoke share:', error);
+			logError('assetDetail', 'revoke_share', error);
 			toast.error(m.assets_share_remove_failed());
 		}
 	}
@@ -291,7 +292,7 @@
 			toast.success(m.assets_share_left());
 			goto(resolve('/assets'));
 		} catch (error) {
-			console.error('Failed to leave share:', error);
+			logError('assetDetail', 'leave_share', error);
 			toast.error(m.assets_share_leave_failed());
 		}
 	}

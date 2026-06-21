@@ -7,6 +7,7 @@ import { getContext, setContext } from 'svelte';
 import { toast } from 'svelte-sonner';
 import { SvelteSet } from 'svelte/reactivity';
 
+import { logError } from '$lib/logger';
 import { m } from '$lib/paraglide/messages.js';
 import type { UsersResponse } from '$lib/pocketbase.schema';
 
@@ -61,7 +62,7 @@ export class AuthContext {
 		this._pb
 			.collection('users')
 			.subscribe(userId, this.onCurrentUserEvent.bind(this))
-			.catch((error) => console.error('[auth:subscribe]', error));
+			.catch((error) => logError('auth', 'subscribe', error));
 	}
 
 	private unsubscribeFromCurrentUser() {
@@ -71,7 +72,7 @@ export class AuthContext {
 		this._pb
 			.collection('users')
 			.unsubscribe(userId)
-			.catch((error) => console.error('[auth:unsubscribe]', error));
+			.catch((error) => logError('auth', 'unsubscribe', error));
 	}
 
 	private runRealtimeTeardowns() {
@@ -79,7 +80,7 @@ export class AuthContext {
 			try {
 				teardown();
 			} catch (error) {
-				console.error('[auth:teardown]', error);
+				logError('auth', 'teardown', error);
 			}
 		}
 	}

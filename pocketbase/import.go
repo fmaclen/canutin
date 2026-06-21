@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"math"
 	"net/http"
 	"regexp"
@@ -436,7 +435,7 @@ type optionalImportNumber struct {
 func hasMatchingSecurityImportRecord(app core.App, collectionName string, filter string, params map[string]any, label string, fields []optionalImportNumber) bool {
 	candidates, err := app.FindRecordsByFilter(collectionName, filter, "", 0, 0, params)
 	if err != nil {
-		log.Printf("[import] failed to find duplicate %s records: %v", collectionName, err)
+		logEvent("import", fmt.Sprintf("failed to find duplicate %s records", collectionName), err)
 		return false
 	}
 
@@ -592,7 +591,7 @@ func findOrCreateImportSecurity(app core.App, ownerID string, securityCache map[
 // the format arguments and the error they pass: the resolver and the per-collection loops construct
 // errors that name only operational identifiers (record ids, dates) or generic failure classes.
 func logImportError(sessionID, collection string, rowIndex int, operation string, err error) {
-	log.Printf("[import] session=%s collection=%s row=%d op=%s: %v", sessionID, collection, rowIndex, operation, err)
+	logEvent("import", fmt.Sprintf("session=%s collection=%s row=%d op=%s", sessionID, collection, rowIndex, operation), err)
 }
 
 func handleImport(app core.App, re *core.RequestEvent) error {
@@ -1005,7 +1004,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 	session.Set("recordsSkipped", totalSkipped)
 	session.Set("recordsFailed", errorCount)
 	if err := app.Save(session); err != nil {
-		log.Printf("[import] failed to save importSessions record (session=%s): %v", session.Id, err)
+		logEvent("import", fmt.Sprintf("failed to save importSessions record (session=%s)", session.Id), err)
 	}
 
 	return re.JSON(http.StatusOK, result)

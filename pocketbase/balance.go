@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"sync"
 	"time"
 
@@ -49,7 +49,7 @@ func balanceWorker(ctx context.Context, app *pocketbase.PocketBase) {
 func calculateBalance(app *pocketbase.PocketBase, accountID string) {
 	account, err := app.FindRecordById("accounts", accountID)
 	if err != nil {
-		log.Printf("Failed to find account %s: %v", accountID, err)
+		logEvent("balance", fmt.Sprintf("failed to find account %s", accountID), err)
 		return
 	}
 
@@ -63,7 +63,7 @@ func calculateBalance(app *pocketbase.PocketBase, accountID string) {
 		map[string]any{"aid": accountID, "owner": owner},
 	)
 	if err != nil {
-		log.Printf("Failed to fetch transactions for account %s: %v", accountID, err)
+		logEvent("balance", fmt.Sprintf("failed to fetch transactions for account %s", accountID), err)
 		return
 	}
 
@@ -77,7 +77,7 @@ func calculateBalance(app *pocketbase.PocketBase, accountID string) {
 
 	collection, err := app.FindCollectionByNameOrId("accountBalances")
 	if err != nil {
-		log.Printf("Failed to find accountBalances collection: %v", err)
+		logEvent("balance", "failed to find accountBalances collection", err)
 		return
 	}
 
@@ -88,6 +88,6 @@ func calculateBalance(app *pocketbase.PocketBase, accountID string) {
 	balance.Set("owner", account.GetString("owner"))
 
 	if err := app.Save(balance); err != nil {
-		log.Printf("Failed to save balance for account %s: %v", accountID, err)
+		logEvent("balance", fmt.Sprintf("failed to save balance for account %s", accountID), err)
 	}
 }

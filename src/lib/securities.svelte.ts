@@ -4,6 +4,7 @@ import { SvelteMap } from 'svelte/reactivity';
 
 import { getAccountsContext } from './accounts.svelte';
 import { getAuthContext } from './auth.svelte';
+import { logError } from './logger';
 import type { SecuritiesResponse, SecurityBalancesResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
 import {
@@ -232,7 +233,7 @@ class SecuritiesContext {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'securities', 'subscribe');
 				} else {
-					console.error('[securitiesStore] Stale subscription failed:', error);
+					logError('securitiesStore', 'stale_subscription', error);
 				}
 			});
 		this._pb.authedClient
@@ -242,7 +243,7 @@ class SecuritiesContext {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'securities', 'subscribe_balances');
 				} else {
-					console.error('[securitiesStore] Stale subscription failed:', error);
+					logError('securitiesStore', 'stale_subscription', error);
 				}
 			});
 		this._isSubscribed = true;
