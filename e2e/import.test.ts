@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
-import { getUserPB, PB_URL, pbSend, seedUser } from './pocketbase.helpers';
+import { getUserPB, PB_URL, pbSend, seedAccount, seedUser } from './pocketbase.helpers';
 
 function importPayload(sessionLabel: string) {
 	return {
@@ -298,7 +298,7 @@ test('revert non-existent session returns 404', async () => {
 	expect(response.status).toBe(404);
 });
 
-test('same-name accounts at different institutions resolve correctly', async () => {
+test('same-name accounts resolve by institution and balance group tuple', async () => {
 	const user = await seedUser('victor');
 
 	const payload = {
@@ -320,17 +320,212 @@ test('same-name accounts at different institutions resolve correctly', async () 
 		transactions: [
 			{
 				accountName: 'Savings',
+				institution: 'Bank B',
+				balanceGroup: 'CASH',
 				date: '2025-09-01T00:00:00.000Z',
-				description: 'Deposit at Bank A',
+				description: 'Deposit at Bank B',
 				value: 100,
-				externalId: 'bankA-001'
+				externalId: 'bankB-001'
 			}
 		]
 	};
 
 	const result = await (await pbSend(IMPORT_PATH, payload, user.email)).json();
+	expect(result.status).toBe('completed');
 	expect(result.accounts.created).toBe(2);
+	expect(result.recordsFailed).toBe(0);
 	expect(result.transactions.created).toBe(1);
+
+	const pb = await getUserPB(user.email);
+	const bankB = await pb
+		.collection('accounts')
+		.getFirstListItem(`name = "Savings" && institution = "Bank B" && owner = "${user.id}"`);
+	const transactions = await pb.collection('transactions').getFullList({
+		filter: `owner = "${user.id}"`
+	});
+	expect(transactions.length).toBe(1);
+	expect(transactions[0].account).toBe(bankB.id);
+});
+
+test('same-name accounts resolve by explicit accountId', async () => {
+	const user = await seedUser('vincent');
+	const bankA = await seedAccount({
+		name: 'Savings',
+		institution: 'Bank A',
+		balanceGroup: 'CASH',
+		balanceType: 'Savings',
+		owner: user.id
+	});
+	const bankB = await seedAccount({
+		name: 'Savings',
+		institution: 'Bank B',
+		balanceGroup: 'CASH',
+		balanceType: 'Savings',
+		owner: user.id
+	});
+
+	const result = await (
+		await pbSend(
+			IMPORT_PATH,
+			{
+				sessionLabel: 'vincent-account-id',
+				transactions: [
+					{
+						accountId: bankB.id,
+						accountName: 'Savings',
+						date: '2025-09-02T00:00:00.000Z',
+						description: 'Deposit by id',
+						value: 250,
+						externalId: 'vincent-001'
+					}
+				]
+			},
+			user.email
+		)
+	).json();
+	expect(result.status).toBe('completed');
+	expect(result.recordsFailed).toBe(0);
+	expect(result.transactions.created).toBe(1);
+
+	const pb = await getUserPB(user.email);
+	const transactions = await pb.collection('transactions').getFullList({
+		filter: `owner = "${user.id}"`
+	});
+	expect(transactions.length).toBe(1);
+	expect(transactions[0].account).toBe(bankB.id);
+
+	const onBankA = await pb.collection('transactions').getFullList({
+		filter: `account = "${bankA.id}"`
+	});
+	expect(onBankA.length).toBe(0);
+});
+
+test('ambiguous same-name transaction becomes a row error and is not created', async () => {
+	const user = await seedUser('valerie');
+	await seedAccount({
+		name: 'Savings',
+		institution: 'Bank A',
+		balanceGroup: 'CASH',
+		balanceType: 'Savings',
+		owner: user.id
+	});
+	await seedAccount({
+		name: 'Savings',
+		institution: 'Bank B',
+		balanceGroup: 'CASH',
+		balanceType: 'Savings',
+		owner: user.id
+	});
+
+	const result = await (
+		await pbSend(
+			IMPORT_PATH,
+			{
+				sessionLabel: 'valerie-ambiguous',
+				transactions: [
+					{
+						accountName: 'Savings',
+						date: '2025-09-03T00:00:00.000Z',
+						description: 'Ambiguous deposit',
+						value: 75
+					}
+				]
+			},
+			user.email
+		)
+	).json();
+	expect(result.status).toBe('failed');
+	expect(result.recordsFailed).toBe(1);
+	expect(result.transactions.created).toBe(0);
+
+	const pb = await getUserPB(user.email);
+	const transactions = await pb.collection('transactions').getFullList({
+		filter: `owner = "${user.id}"`
+	});
+	expect(transactions.length).toBe(0);
+});
+
+test('legacy single-name transaction resolves to its only owned account', async () => {
+	const user = await seedUser('valentina');
+	const checking = await seedAccount({
+		name: 'Valentina Checking',
+		balanceGroup: 'CASH',
+		balanceType: 'Checking',
+		owner: user.id
+	});
+
+	const result = await (
+		await pbSend(
+			IMPORT_PATH,
+			{
+				sessionLabel: 'valentina-legacy',
+				transactions: [
+					{
+						accountName: 'Valentina Checking',
+						date: '2025-09-04T00:00:00.000Z',
+						description: 'Legacy deposit',
+						value: 500
+					}
+				]
+			},
+			user.email
+		)
+	).json();
+	expect(result.status).toBe('completed');
+	expect(result.recordsFailed).toBe(0);
+	expect(result.transactions.created).toBe(1);
+
+	const pb = await getUserPB(user.email);
+	const transactions = await pb.collection('transactions').getFullList({
+		filter: `owner = "${user.id}"`
+	});
+	expect(transactions.length).toBe(1);
+	expect(transactions[0].account).toBe(checking.id);
+});
+
+test('foreign accountId is rejected and nothing lands on the other user account', async () => {
+	const owner = await seedUser('victoria');
+	const intruder = await seedUser('vladimir');
+	const ownerAccount = await seedAccount({
+		name: 'Victoria Checking',
+		balanceGroup: 'CASH',
+		balanceType: 'Checking',
+		owner: owner.id
+	});
+
+	const result = await (
+		await pbSend(
+			IMPORT_PATH,
+			{
+				sessionLabel: 'vladimir-foreign-id',
+				transactions: [
+					{
+						accountId: ownerAccount.id,
+						accountName: 'Victoria Checking',
+						date: '2025-09-05T00:00:00.000Z',
+						description: 'Cross-owner deposit',
+						value: 999
+					}
+				]
+			},
+			intruder.email
+		)
+	).json();
+	expect(result.status).toBe('failed');
+	expect(result.recordsFailed).toBe(1);
+	expect(result.transactions.created).toBe(0);
+
+	const pb = await getUserPB(owner.email);
+	const onOwnerAccount = await pb.collection('transactions').getFullList({
+		filter: `account = "${ownerAccount.id}"`
+	});
+	expect(onOwnerAccount.length).toBe(0);
+
+	const intruderPB = await getUserPB(intruder.email);
+	const intruderTransactions = await intruderPB.collection('transactions').getFullList({
+		filter: `owner = "${intruder.id}"`
+	});
+	expect(intruderTransactions.length).toBe(0);
 });
 
 test('revert cleans up orphaned labels and balance types', async () => {

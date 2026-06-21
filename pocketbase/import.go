@@ -63,13 +63,16 @@ type importAssetBal struct {
 }
 
 type importTransaction struct {
-	AccountName string   `json:"accountName"`
-	Date        string   `json:"date"`
-	Description string   `json:"description"`
-	Value       float64  `json:"value"`
-	ExternalID  string   `json:"externalId"`
-	Labels      []string `json:"labels"`
-	Excluded    bool     `json:"excluded"`
+	AccountID    string   `json:"accountId"`
+	AccountName  string   `json:"accountName"`
+	Institution  string   `json:"institution"`
+	BalanceGroup string   `json:"balanceGroup"`
+	Date         string   `json:"date"`
+	Description  string   `json:"description"`
+	Value        float64  `json:"value"`
+	ExternalID   string   `json:"externalId"`
+	Labels       []string `json:"labels"`
+	Excluded     bool     `json:"excluded"`
 }
 
 type importSecurityBalance struct {
@@ -465,26 +468,70 @@ func hasMatchingSecurityImportRecord(app core.App, collectionName string, filter
 	return false
 }
 
-func resolveImportAccount(app core.App, ownerID string, acctIndex map[string]string, accountID string, accountName string) (string, error) {
-	if strings.TrimSpace(accountID) != "" {
-		return strings.TrimSpace(accountID), nil
+func acctIndexKey(name, institution, balanceGroup string) string {
+	return name + "|" + institution + "|" + balanceGroup
+}
+
+// resolveImportAccount maps a row's account reference to an owned account id deterministically.
+// Resolution order: a provided accountId is loaded and accepted only when it belongs to ownerID; an
+// exact name|institution|balanceGroup tuple is matched against acctIndex then the database; a bare
+// accountName succeeds only when it resolves to exactly one owned account. A foreign/missing id or
+// an ambiguous name is returned as an error so the caller records it as a row-level failure.
+func resolveImportAccount(app core.App, ownerID string, acctIndex map[string]string, accountID, accountName, institution, balanceGroup string) (string, error) {
+	if id := strings.TrimSpace(accountID); id != "" {
+		account, err := app.FindRecordById("accounts", id)
+		if err != nil {
+			return "", fmt.Errorf("accountId %q not found", id)
+		}
+		if account.GetString("owner") != ownerID {
+			return "", fmt.Errorf("accountId %q is not owned by the importing user", id)
+		}
+		return account.Id, nil
 	}
 
-	for key, id := range acctIndex {
-		if strings.HasPrefix(key, accountName+"|") {
+	if institution != "" || balanceGroup != "" {
+		key := acctIndexKey(accountName, institution, balanceGroup)
+		if id, ok := acctIndex[key]; ok {
 			return id, nil
 		}
+		found, err := app.FindFirstRecordByFilter("accounts",
+			"name = {:name} && institution = {:institution} && balanceGroup = {:balanceGroup} && owner = {:owner}",
+			map[string]any{"name": accountName, "institution": institution, "balanceGroup": balanceGroup, "owner": ownerID},
+		)
+		if err != nil {
+			return "", fmt.Errorf("no account matches name %q with the provided institution and balance group", accountName)
+		}
+		acctIndex[key] = found.Id
+		return found.Id, nil
 	}
 
-	found, err := app.FindFirstRecordByFilter("accounts",
+	matchIDs := map[string]struct{}{}
+	for key, id := range acctIndex {
+		if name, _, found := strings.Cut(key, "|"); found && name == accountName {
+			matchIDs[id] = struct{}{}
+		}
+	}
+	dbMatches, err := app.FindRecordsByFilter("accounts",
 		"name = {:name} && owner = {:owner}",
+		"", 0, 0,
 		map[string]any{"name": accountName, "owner": ownerID},
 	)
 	if err != nil {
 		return "", err
 	}
-	acctIndex[accountName+"||"] = found.Id
-	return found.Id, nil
+	for _, match := range dbMatches {
+		matchIDs[match.Id] = struct{}{}
+	}
+
+	switch len(matchIDs) {
+	case 0:
+		return "", fmt.Errorf("no account matches name %q", accountName)
+	case 1:
+		for id := range matchIDs {
+			return id, nil
+		}
+	}
+	return "", fmt.Errorf("account name %q is ambiguous; %d owned accounts match", accountName, len(matchIDs))
 }
 
 // NOTE: counts is the single place securities are tallied for the import summary, so that
@@ -627,7 +674,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			continue
 		}
 
-		acctIndex[acct.Name+"|"+institution+"|"+acct.BalanceGroup] = rec.Id
+		acctIndex[acctIndexKey(acct.Name, institution, acct.BalanceGroup)] = rec.Id
 
 		if created {
 			result.Accounts.Created++
@@ -735,7 +782,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 	}
 
 	for _, tx := range payload.Transactions {
-		accountID, err := resolveImportAccount(app, ownerID, acctIndex, "", tx.AccountName)
+		accountID, err := resolveImportAccount(app, ownerID, acctIndex, tx.AccountID, tx.AccountName, tx.Institution, tx.BalanceGroup)
 		if err != nil {
 			log.Printf("[import] failed to resolve account for transactions record (accountName=%q): %v", tx.AccountName, err)
 			errorCount++
@@ -810,7 +857,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 	}
 
 	for _, balance := range payload.SecurityBalances {
-		accountID, err := resolveImportAccount(app, ownerID, acctIndex, balance.AccountID, balance.AccountName)
+		accountID, err := resolveImportAccount(app, ownerID, acctIndex, balance.AccountID, balance.AccountName, "", "")
 		if err != nil {
 			log.Printf("[import] failed to resolve account for securityBalances record (accountName=%q): %v", balance.AccountName, err)
 			errorCount++
@@ -863,7 +910,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 	}
 
 	for _, tx := range payload.SecurityTransactions {
-		accountID, err := resolveImportAccount(app, ownerID, acctIndex, tx.AccountID, tx.AccountName)
+		accountID, err := resolveImportAccount(app, ownerID, acctIndex, tx.AccountID, tx.AccountName, "", "")
 		if err != nil {
 			log.Printf("[import] failed to resolve account for securityTransactions record (accountName=%q): %v", tx.AccountName, err)
 			errorCount++

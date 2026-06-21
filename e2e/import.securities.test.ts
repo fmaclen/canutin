@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
-import { getUserPB, pbSend, seedUser } from './pocketbase.helpers';
+import { getUserPB, pbSend, seedAccount, seedUser } from './pocketbase.helpers';
 
 const IMPORT_PATH = '/api/canutin/import';
 const REVERT_PATH = '/api/canutin/import/revert';
@@ -342,4 +342,145 @@ test('reverting an import deletes securities, balances, and transactions', async
 
 	const session = await pb.collection('importSessions').getOne(result.sessionId);
 	expect(session.status).toBe('rolled_back');
+});
+
+test('security balance with a foreign accountId is rejected for ownership', async () => {
+	const owner = await seedUser('grace');
+	const intruder = await seedUser('gregory');
+	const ownerAccount = await seedAccount({
+		name: 'Grace Brokerage',
+		balanceGroup: 'INVESTMENT',
+		balanceType: 'Brokerage',
+		owner: owner.id
+	});
+
+	const result = await (
+		await pbSend(
+			IMPORT_PATH,
+			{
+				sessionLabel: 'gregory-foreign-balance',
+				securityBalances: [
+					{
+						accountId: ownerAccount.id,
+						accountName: 'Grace Brokerage',
+						securityName: 'Apple Inc',
+						securitySymbol: 'AAPL',
+						asOf: '2025-06-15T00:00:00.000Z',
+						quantity: 5,
+						price: 100,
+						value: 500,
+						costBasis: 450
+					}
+				]
+			},
+			intruder.email
+		)
+	).json();
+	expect(result.status).toBe('failed');
+	expect(result.recordsFailed).toBe(1);
+	expect(result.securityBalances.created).toBe(0);
+
+	const ownerPB = await getUserPB(owner.email);
+	const onOwnerAccount = await ownerPB.collection('securityBalances').getFullList({
+		filter: `account = "${ownerAccount.id}"`
+	});
+	expect(onOwnerAccount.length).toBe(0);
+
+	const intruderPB = await getUserPB(intruder.email);
+	const intruderBalances = await intruderPB.collection('securityBalances').getFullList({
+		filter: `owner = "${intruder.id}"`
+	});
+	expect(intruderBalances.length).toBe(0);
+});
+
+test('ambiguous account name in a security transaction becomes a row error', async () => {
+	const user = await seedUser('greta');
+	await seedAccount({
+		name: 'Brokerage',
+		institution: 'Fidelity',
+		balanceGroup: 'INVESTMENT',
+		balanceType: 'Brokerage',
+		owner: user.id
+	});
+	await seedAccount({
+		name: 'Brokerage',
+		institution: 'Schwab',
+		balanceGroup: 'INVESTMENT',
+		balanceType: 'Brokerage',
+		owner: user.id
+	});
+
+	const result = await (
+		await pbSend(
+			IMPORT_PATH,
+			{
+				sessionLabel: 'greta-ambiguous-trade',
+				securityTransactions: [
+					{
+						accountName: 'Brokerage',
+						securityName: 'Tesla Inc',
+						securitySymbol: 'TSLA',
+						date: '2025-06-10T00:00:00.000Z',
+						type: 'buy',
+						description: 'Bought Tesla shares',
+						quantity: 2,
+						price: 250,
+						amount: 500
+					}
+				]
+			},
+			user.email
+		)
+	).json();
+	expect(result.status).toBe('failed');
+	expect(result.recordsFailed).toBe(1);
+	expect(result.securityTransactions.created).toBe(0);
+
+	const pb = await getUserPB(user.email);
+	const trades = await pb.collection('securityTransactions').getFullList({
+		filter: `owner = "${user.id}"`
+	});
+	expect(trades.length).toBe(0);
+});
+
+test('security balance with a unique account name resolves to that account', async () => {
+	const user = await seedUser('gerald');
+	const brokerage = await seedAccount({
+		name: 'Gerald Brokerage',
+		balanceGroup: 'INVESTMENT',
+		balanceType: 'Brokerage',
+		owner: user.id
+	});
+
+	const result = await (
+		await pbSend(
+			IMPORT_PATH,
+			{
+				sessionLabel: 'gerald-unique-balance',
+				securityBalances: [
+					{
+						accountName: 'Gerald Brokerage',
+						securityName: 'Apple Inc',
+						securitySymbol: 'AAPL',
+						asOf: '2025-06-15T00:00:00.000Z',
+						quantity: 5,
+						price: 100,
+						value: 500,
+						costBasis: 450
+					}
+				]
+			},
+			user.email
+		)
+	).json();
+	expect(result.status).toBe('completed');
+	expect(result.recordsFailed).toBe(0);
+	expect(result.securityBalances.created).toBe(1);
+
+	const pb = await getUserPB(user.email);
+	const balances = await pb.collection('securityBalances').getFullList({
+		filter: `owner = "${user.id}"`
+	});
+	expect(balances.length).toBe(1);
+	expect(balances[0].account).toBe(brokerage.id);
 });
