@@ -4,6 +4,7 @@ import { SvelteMap } from 'svelte/reactivity';
 
 import { getAuthContext } from './auth.svelte';
 import { setBalanceTypesContext } from './balance-types.svelte';
+import { logError } from './logger';
 import {
 	AssetSharesAccessRoleOptions,
 	AssetSharesPerspectiveOptions,
@@ -222,7 +223,7 @@ class AssetsContext {
 					if (userId === this.currentUserId) {
 						this._pb.handleConnectionError(error, 'assets', 'asset_event');
 					} else {
-						console.error('[assetsStore] Stale event failed:', error);
+						logError('assetsStore', 'stale_event', error);
 					}
 				});
 			})
@@ -230,7 +231,7 @@ class AssetsContext {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'assets', 'subscribe_assets');
 				} else {
-					console.error('[assetsStore] Stale subscription failed:', error);
+					logError('assetsStore', 'stale_subscription', error);
 				}
 			});
 		this._pb.authedClient
@@ -240,7 +241,7 @@ class AssetsContext {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'assets', 'subscribe_balances');
 				} else {
-					console.error('[assetsStore] Stale subscription failed:', error);
+					logError('assetsStore', 'stale_subscription', error);
 				}
 			});
 		this._pb.authedClient
@@ -250,7 +251,7 @@ class AssetsContext {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'assets', 'subscribe_shares');
 				} else {
-					console.error('[assetsStore] Stale subscription failed:', error);
+					logError('assetsStore', 'stale_subscription', error);
 				}
 			});
 		this._isSubscribed = true;
@@ -318,7 +319,7 @@ class AssetsContext {
 						if (userId === this.currentUserId) {
 							this._pb.handleConnectionError(error, 'assets', 'balance');
 						} else {
-							console.error('[assetsStore] Stale event failed:', error);
+							logError('assetsStore', 'stale_event', error);
 						}
 					});
 				return;
@@ -359,7 +360,7 @@ class AssetsContext {
 				if (userId === this.currentUserId) {
 					this._pb.handleConnectionError(error, 'assets', 'share');
 				} else {
-					console.error('[assetsStore] Stale event failed:', error);
+					logError('assetsStore', 'stale_event', error);
 				}
 			});
 	}
@@ -422,9 +423,9 @@ class AssetsContext {
 			this.lastBalanceEvent = Date.now();
 		} catch (error) {
 			if (userId === this.currentUserId) {
-				console.error('[assets:refetch_balance]', error);
+				logError('assets', 'refetch_balance', error);
 			} else {
-				console.error('[assetsStore] Stale event failed:', error);
+				logError('assetsStore', 'stale_event', error);
 			}
 		}
 	}

@@ -21,6 +21,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Table from '$lib/components/ui/table/index';
 	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
+	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import { getSecuritiesContext, type SecurityAccountBalance } from '$lib/securities.svelte';
 	import {
@@ -189,7 +190,7 @@
 			});
 			toast.success(m.securities_edit_success());
 		} catch (error) {
-			console.error('[securityDetail]', error);
+			logError('securityDetail', 'update', error);
 			syncState.justSaved = false;
 			toast.error(m.securities_edit_failed());
 		}
@@ -213,7 +214,7 @@
 			balanceFormData = createSecurityBalanceFormData();
 			toast.success(m.securities_balance_updated());
 		} catch (error) {
-			console.error('[securityDetail]', error);
+			logError('securityDetail', 'add_balance', error);
 			toast.error(m.securities_balance_failed());
 		} finally {
 			isSavingBalance = false;

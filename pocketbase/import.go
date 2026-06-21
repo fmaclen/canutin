@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"math"
 	"net/http"
 	"regexp"
@@ -436,7 +435,7 @@ type optionalImportNumber struct {
 func hasMatchingSecurityImportRecord(app core.App, collectionName string, filter string, params map[string]any, label string, fields []optionalImportNumber) bool {
 	candidates, err := app.FindRecordsByFilter(collectionName, filter, "", 0, 0, params)
 	if err != nil {
-		log.Printf("[import] failed to find duplicate %s records: %v", collectionName, err)
+		logEvent("import", fmt.Sprintf("failed to find duplicate %s records", collectionName), err)
 		return false
 	}
 
@@ -481,10 +480,10 @@ func resolveImportAccount(app core.App, ownerID string, acctIndex map[string]str
 	if id := strings.TrimSpace(accountID); id != "" {
 		account, err := app.FindRecordById("accounts", id)
 		if err != nil {
-			return "", fmt.Errorf("accountId %q not found", id)
+			return "", errors.New("provided accountId not found")
 		}
 		if account.GetString("owner") != ownerID {
-			return "", fmt.Errorf("accountId %q is not owned by the importing user", id)
+			return "", errors.New("provided accountId is not owned by the importing user")
 		}
 		return account.Id, nil
 	}
@@ -499,7 +498,7 @@ func resolveImportAccount(app core.App, ownerID string, acctIndex map[string]str
 			map[string]any{"name": accountName, "institution": institution, "balanceGroup": balanceGroup, "owner": ownerID},
 		)
 		if err != nil {
-			return "", fmt.Errorf("no account matches name %q with the provided institution and balance group", accountName)
+			return "", errors.New("no account matches the provided name, institution and balance group")
 		}
 		acctIndex[key] = found.Id
 		return found.Id, nil
@@ -525,13 +524,13 @@ func resolveImportAccount(app core.App, ownerID string, acctIndex map[string]str
 
 	switch len(matchIDs) {
 	case 0:
-		return "", fmt.Errorf("no account matches name %q", accountName)
+		return "", errors.New("no account matches the provided name")
 	case 1:
 		for id := range matchIDs {
 			return id, nil
 		}
 	}
-	return "", fmt.Errorf("account name %q is ambiguous; %d owned accounts match", accountName, len(matchIDs))
+	return "", fmt.Errorf("provided account name is ambiguous; %d owned accounts match", len(matchIDs))
 }
 
 // NOTE: counts is the single place securities are tallied for the import summary, so that
@@ -585,6 +584,16 @@ func findOrCreateImportSecurity(app core.App, ownerID string, securityCache map[
 	return rec.Id, nil
 }
 
+// logImportError records an operational diagnostic for a failed import row. It deliberately logs
+// only non-sensitive context — session id, collection, row index, operation, and the error — so
+// server logs never carry user-supplied finance metadata (account/balance-type/security names,
+// symbols, transaction labels, descriptions, or notes). Callers must keep raw metadata out of both
+// the format arguments and the error they pass: the resolver and the per-collection loops construct
+// errors that name only operational identifiers (record ids, dates) or generic failure classes.
+func logImportError(sessionID, collection string, rowIndex int, operation string, err error) {
+	logEvent("import", fmt.Sprintf("session=%s collection=%s row=%d op=%s", sessionID, collection, rowIndex, operation), err)
+}
+
 func handleImport(app core.App, re *core.RequestEvent) error {
 	info, _ := re.RequestInfo()
 	auth := info.Auth
@@ -635,7 +644,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 	// from a clean one. Per-row detail lives in the [import] operational logs.
 	errorCount := 0
 
-	for _, acct := range payload.Accounts {
+	for i, acct := range payload.Accounts {
 		institution := acct.Institution
 
 		btKey := acct.BalanceType + "::" + ownerID
@@ -645,7 +654,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			map[string]any{"name": acct.BalanceType, "owner": ownerID},
 		)
 		if err != nil {
-			log.Printf("[import] failed to find or create balanceTypes record (name=%q): %v", acct.BalanceType, err)
+			logImportError(session.Id, "balanceTypes", i, "findOrCreate", err)
 			errorCount++
 			continue
 		}
@@ -669,7 +678,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			"importSession":  session.Id,
 		})
 		if err != nil {
-			log.Printf("[import] failed to find or create accounts record (name=%q): %v", acct.Name, err)
+			logImportError(session.Id, "accounts", i, "findOrCreate", err)
 			errorCount++
 			continue
 		}
@@ -699,7 +708,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 				if err := app.Save(ab); err == nil {
 					result.AccountBalances.Created++
 				} else {
-					log.Printf("[import] failed to save accountBalances record (account=%s, asOf=%s): %v", rec.Id, acct.Balance.AsOf, err)
+					logImportError(session.Id, "accountBalances", i, "save", err)
 					errorCount++
 				}
 			} else {
@@ -708,7 +717,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		}
 	}
 
-	for _, asset := range payload.Assets {
+	for i, asset := range payload.Assets {
 		btKey := asset.BalanceType + "::" + ownerID
 		btID, err := cachedFindOrCreate(btCache, btKey, app,
 			"balanceTypes", "name = {:name} && owner = {:owner}",
@@ -716,7 +725,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			map[string]any{"name": asset.BalanceType, "owner": ownerID},
 		)
 		if err != nil {
-			log.Printf("[import] failed to find or create balanceTypes record (name=%q): %v", asset.BalanceType, err)
+			logImportError(session.Id, "balanceTypes", i, "findOrCreate", err)
 			errorCount++
 			continue
 		}
@@ -734,7 +743,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			"importSession": session.Id,
 		})
 		if err != nil {
-			log.Printf("[import] failed to find or create assets record (name=%q): %v", asset.Name, err)
+			logImportError(session.Id, "assets", i, "findOrCreate", err)
 			errorCount++
 			continue
 		}
@@ -764,7 +773,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 				if err := app.Save(asb); err == nil {
 					result.AssetBalances.Created++
 				} else {
-					log.Printf("[import] failed to save assetBalances record (asset=%s, asOf=%s): %v", rec.Id, asset.Balance.AsOf, err)
+					logImportError(session.Id, "assetBalances", i, "save", err)
 					errorCount++
 				}
 			} else {
@@ -773,18 +782,18 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		}
 	}
 
-	for _, security := range payload.Securities {
+	for i, security := range payload.Securities {
 		if _, err := findOrCreateImportSecurity(app, ownerID, securityCache, "", security.Name, security.Symbol, session.Id, &result.Securities); err != nil {
-			log.Printf("[import] failed to find or create securities record (name=%q, symbol=%q): %v", security.Name, security.Symbol, err)
+			logImportError(session.Id, "securities", i, "findOrCreate", err)
 			errorCount++
 			continue
 		}
 	}
 
-	for _, tx := range payload.Transactions {
+	for i, tx := range payload.Transactions {
 		accountID, err := resolveImportAccount(app, ownerID, acctIndex, tx.AccountID, tx.AccountName, tx.Institution, tx.BalanceGroup)
 		if err != nil {
-			log.Printf("[import] failed to resolve account for transactions record (accountName=%q): %v", tx.AccountName, err)
+			logImportError(session.Id, "transactions", i, "resolveAccount", err)
 			errorCount++
 			continue
 		}
@@ -832,7 +841,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			if err == nil {
 				labelIDs = append(labelIDs, lblID)
 			} else {
-				log.Printf("[import] failed to find or create transactionLabels record (name=%q): %v", lbl, err)
+				logImportError(session.Id, "transactionLabels", i, "findOrCreate", err)
 				errorCount++
 			}
 		}
@@ -851,21 +860,21 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		if err := app.Save(txRec); err == nil {
 			result.Transactions.Created++
 		} else {
-			log.Printf("[import] failed to save transactions record (account=%s, date=%s): %v", accountID, tx.Date, err)
+			logImportError(session.Id, "transactions", i, "save", err)
 			errorCount++
 		}
 	}
 
-	for _, balance := range payload.SecurityBalances {
+	for i, balance := range payload.SecurityBalances {
 		accountID, err := resolveImportAccount(app, ownerID, acctIndex, balance.AccountID, balance.AccountName, "", "")
 		if err != nil {
-			log.Printf("[import] failed to resolve account for securityBalances record (accountName=%q): %v", balance.AccountName, err)
+			logImportError(session.Id, "securityBalances", i, "resolveAccount", err)
 			errorCount++
 			continue
 		}
 		securityID, err := findOrCreateImportSecurity(app, ownerID, securityCache, balance.SecurityID, balance.SecurityName, balance.SecuritySymbol, session.Id, &result.Securities)
 		if err != nil {
-			log.Printf("[import] failed to find or create securities record for securityBalances (name=%q, symbol=%q): %v", balance.SecurityName, balance.SecuritySymbol, err)
+			logImportError(session.Id, "securityBalances", i, "findOrCreateSecurity", err)
 			errorCount++
 			continue
 		}
@@ -904,21 +913,21 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		if err := app.Save(rec); err == nil {
 			result.SecurityBalances.Created++
 		} else {
-			log.Printf("[import] failed to save securityBalances record (account=%s, security=%s, asOf=%s): %v", accountID, securityID, balance.AsOf, err)
+			logImportError(session.Id, "securityBalances", i, "save", err)
 			errorCount++
 		}
 	}
 
-	for _, tx := range payload.SecurityTransactions {
+	for i, tx := range payload.SecurityTransactions {
 		accountID, err := resolveImportAccount(app, ownerID, acctIndex, tx.AccountID, tx.AccountName, "", "")
 		if err != nil {
-			log.Printf("[import] failed to resolve account for securityTransactions record (accountName=%q): %v", tx.AccountName, err)
+			logImportError(session.Id, "securityTransactions", i, "resolveAccount", err)
 			errorCount++
 			continue
 		}
 		securityID, err := findOrCreateImportSecurity(app, ownerID, securityCache, tx.SecurityID, tx.SecurityName, tx.SecuritySymbol, session.Id, &result.Securities)
 		if err != nil {
-			log.Printf("[import] failed to find or create securities record for securityTransactions (name=%q, symbol=%q): %v", tx.SecurityName, tx.SecuritySymbol, err)
+			logImportError(session.Id, "securityTransactions", i, "findOrCreateSecurity", err)
 			errorCount++
 			continue
 		}
@@ -967,7 +976,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		if err := app.Save(rec); err == nil {
 			result.SecurityTransactions.Created++
 		} else {
-			log.Printf("[import] failed to save securityTransactions record (account=%s, security=%s, date=%s): %v", accountID, securityID, tx.Date, err)
+			logImportError(session.Id, "securityTransactions", i, "save", err)
 			errorCount++
 		}
 	}
@@ -995,7 +1004,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 	session.Set("recordsSkipped", totalSkipped)
 	session.Set("recordsFailed", errorCount)
 	if err := app.Save(session); err != nil {
-		log.Printf("[import] failed to save importSessions record (session=%s): %v", session.Id, err)
+		logEvent("import", fmt.Sprintf("failed to save importSessions record (session=%s)", session.Id), err)
 	}
 
 	return re.JSON(http.StatusOK, result)

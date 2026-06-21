@@ -20,6 +20,7 @@
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import { AssetsBalanceGroupOptions } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
@@ -71,7 +72,7 @@
 			toast.success(m.assets_add_success());
 			await goto(resolve('/assets'));
 		} catch (error) {
-			console.error('[addAsset] Failed to create asset:', error);
+			logError('addAsset', 'create', error);
 			toast.error(m.assets_add_failed());
 		}
 	}

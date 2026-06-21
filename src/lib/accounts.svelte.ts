@@ -4,6 +4,7 @@ import { SvelteMap } from 'svelte/reactivity';
 
 import { getAuthContext } from './auth.svelte';
 import { setBalanceTypesContext } from './balance-types.svelte';
+import { logError } from './logger';
 import {
 	AccountSharesAccessRoleOptions,
 	AccountSharesPerspectiveOptions,
@@ -243,7 +244,7 @@ class AccountsContext {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'accounts', 'subscribe_accounts');
 				} else {
-					console.error('[accountsStore] Stale subscription failed:', error);
+					logError('accountsStore', 'stale_subscription', error);
 				}
 			});
 		this._pb.authedClient
@@ -259,7 +260,7 @@ class AccountsContext {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'accounts', 'subscribe_balances');
 				} else {
-					console.error('[accountsStore] Stale subscription failed:', error);
+					logError('accountsStore', 'stale_subscription', error);
 				}
 			});
 		this._pb.authedClient
@@ -269,7 +270,7 @@ class AccountsContext {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'accounts', 'subscribe_shares');
 				} else {
-					console.error('[accountsStore] Stale subscription failed:', error);
+					logError('accountsStore', 'stale_subscription', error);
 				}
 			});
 		this._isSubscribed = true;

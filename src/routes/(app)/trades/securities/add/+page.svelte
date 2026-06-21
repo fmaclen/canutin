@@ -18,6 +18,7 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
 	import { securityComboboxLabel } from '$lib/trade-display';
@@ -92,7 +93,7 @@
 			toast.success(m.securities_add_success());
 			await goto(resolve('/trades/securities'));
 		} catch (error) {
-			console.error('[securitiesAdd]', error);
+			logError('securitiesAdd', 'create', error);
 			toast.error(m.securities_add_failed());
 		} finally {
 			isSaving = false;

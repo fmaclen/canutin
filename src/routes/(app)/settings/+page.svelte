@@ -27,6 +27,7 @@
 		setInterfaceLocale,
 		type InterfaceThemeMode
 	} from '$lib/interface-preferences.svelte';
+	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import type { ImportSessionsResponse } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
@@ -144,7 +145,7 @@
 			}
 			toast.success(m.settings_interface_success());
 		} catch (error) {
-			console.error('[settings] Failed to update interface preferences:', error);
+			logError('settings', 'update_interface_preferences', error);
 			toast.error(m.settings_interface_language_failed());
 		}
 	}
@@ -161,7 +162,7 @@
 
 			toast.success(m.settings_imports_revert_success());
 		} catch (error) {
-			console.error('Failed to revert import:', error);
+			logError('settings', 'revert_import', error);
 			toast.error(m.settings_imports_revert_failed());
 		} finally {
 			revertingSessionId = null;

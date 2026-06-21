@@ -2,6 +2,7 @@ import { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 
 import { getAuthContext } from './auth.svelte';
+import { logError } from './logger';
 import type { BalanceTypesResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
 
@@ -61,7 +62,7 @@ class BalanceTypesContext {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'balance_types', 'subscribe');
 				} else {
-					console.error('[balanceTypesStore] Stale subscription failed:', error);
+					logError('balanceTypesStore', 'stale_subscription', error);
 				}
 			});
 	}
@@ -95,7 +96,7 @@ class BalanceTypesContext {
 				.getOne<BalanceTypesResponse>(id);
 			this.byId = { ...this.byId, [bt.id]: bt };
 		} catch (error) {
-			console.error('[balance_types:ensure_loaded]', error);
+			logError('balanceTypes', 'ensure_loaded', error);
 		}
 	}
 

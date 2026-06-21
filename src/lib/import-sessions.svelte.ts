@@ -2,6 +2,7 @@ import { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 
 import { getAuthContext } from './auth.svelte';
+import { logError } from './logger';
 import type { ImportSessionsResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
 
@@ -69,7 +70,7 @@ class ImportSessionsContext {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'importSessions', 'subscribe');
 				} else {
-					console.error('[importSessionsStore] Stale subscription failed:', error);
+					logError('importSessionsStore', 'stale_subscription', error);
 				}
 			});
 		this._isSubscribed = true;

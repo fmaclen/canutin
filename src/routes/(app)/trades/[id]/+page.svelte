@@ -26,6 +26,7 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import {
 		SecurityTransactionsTypeOptions,
@@ -149,7 +150,7 @@
 				notes: result.notes ?? ''
 			};
 		} catch (error) {
-			console.error('[tradeDetail] Failed to load trade:', error);
+			logError('tradeDetail', 'load', error);
 			toast.error(m.trades_edit_error_loading());
 		} finally {
 			isLoading = false;
@@ -201,7 +202,7 @@
 				await goto(from);
 			}
 		} catch (error) {
-			console.error('[tradeDetail] Failed to update trade:', error);
+			logError('tradeDetail', 'update', error);
 			toast.error(m.trades_edit_failed());
 		}
 	}
@@ -215,7 +216,7 @@
 			toast.success(m.trades_delete_success());
 			goto(resolve('/trades'));
 		} catch (error) {
-			console.error('[tradeDetail] Failed to delete trade:', error);
+			logError('tradeDetail', 'delete', error);
 			toast.error(m.trades_delete_failed());
 		}
 	}

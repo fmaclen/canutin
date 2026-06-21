@@ -3,6 +3,7 @@
 
 	import { getAuthContext } from '$lib/auth.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import { logError } from '$lib/logger';
 	import type { UsersResponse } from '$lib/pocketbase.schema';
 
 	const auth = getAuthContext();
@@ -44,15 +45,15 @@
 				adminPb
 					.collection('users')
 					.subscribe('*', onUserEvent)
-					.catch((error) => console.error('[dev-auth-shortcuts:subscribe]', error));
+					.catch((error) => logError('devAuthShortcuts', 'subscribe', error));
 			})
-			.catch((error) => console.error('[dev-auth-shortcuts:auth]', error));
+			.catch((error) => logError('devAuthShortcuts', 'auth', error));
 
 		return () => {
 			adminPb
 				.collection('users')
 				.unsubscribe('*')
-				.catch((error) => console.error('[dev-auth-shortcuts:unsubscribe]', error));
+				.catch((error) => logError('devAuthShortcuts', 'unsubscribe', error));
 		};
 	});
 

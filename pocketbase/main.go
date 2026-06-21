@@ -34,7 +34,7 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-sigChan
-		log.Println("Shutting down balance worker...")
+		logEvent("server", "shutting down balance worker", nil)
 		cancel()
 	}()
 
@@ -174,6 +174,6 @@ func main() {
 	})
 
 	if err := app.Start(); err != nil {
-		log.Fatal(err)
+		log.Fatalf("[server] failed to start: %v", err)
 	}
 }

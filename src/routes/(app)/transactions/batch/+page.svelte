@@ -20,6 +20,7 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { getTransactionsContext, type TransactionRow } from '$lib/transactions.svelte';
@@ -175,7 +176,7 @@
 
 			goto(resolve('/transactions'));
 		} catch (error) {
-			console.error('Failed to batch update transactions:', error);
+			logError('transactionsBatch', 'update', error);
 			toast.dismiss(loadingToast);
 			toast.error(m.transactions_edit_failed());
 		} finally {
@@ -213,7 +214,7 @@
 
 			goto(resolve('/transactions'));
 		} catch (error) {
-			console.error('Failed to batch delete transactions:', error);
+			logError('transactionsBatch', 'delete', error);
 			toast.dismiss(loadingToast);
 			toast.error(m.transactions_delete_failed());
 		} finally {
