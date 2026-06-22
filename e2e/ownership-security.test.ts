@@ -7,7 +7,6 @@ import {
 import {
 	getUserPB,
 	pbSend,
-	resetDatabase,
 	seedAccount,
 	seedAsset,
 	seedTransaction,
@@ -22,10 +21,6 @@ async function latestAccountBalance(email: string, accountId: string) {
 	});
 	return balances.items[0]?.value ?? null;
 }
-
-test.beforeEach(async () => {
-	await resetDatabase();
-});
 
 test('rejects foreign-parent writes and preserves owner balance', async () => {
 	const alice = await seedUser('alice');
