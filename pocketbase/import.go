@@ -8,12 +8,28 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pocketbase/pocketbase/core"
 )
 
 var spaceRe = regexp.MustCompile(`\s+`)
+
+var revertingSessions sync.Map
+
+func markSessionReverting(sessionID string) {
+	revertingSessions.Store(sessionID, struct{}{})
+}
+
+func unmarkSessionReverting(sessionID string) {
+	revertingSessions.Delete(sessionID)
+}
+
+func isSessionReverting(sessionID string) bool {
+	_, ok := revertingSessions.Load(sessionID)
+	return ok
+}
 
 type importPayload struct {
 	SessionLabel         string                      `json:"sessionLabel"`
@@ -705,6 +721,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 				ab.Set("asOf", acct.Balance.AsOf)
 				ab.Set("owner", ownerID)
 				ab.Set("importSession", session.Id)
+				ab.Set("source", "import")
 				if err := app.Save(ab); err == nil {
 					result.AccountBalances.Created++
 				} else {
@@ -790,6 +807,8 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		}
 	}
 
+	accountsWithImportedTransactions := map[string]struct{}{}
+
 	for i, tx := range payload.Transactions {
 		accountID, err := resolveImportAccount(app, ownerID, acctIndex, tx.AccountID, tx.AccountName, tx.Institution, tx.BalanceGroup)
 		if err != nil {
@@ -859,8 +878,16 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		txRec.Set("importSession", session.Id)
 		if err := app.Save(txRec); err == nil {
 			result.Transactions.Created++
+			accountsWithImportedTransactions[accountID] = struct{}{}
 		} else {
 			logImportError(session.Id, "transactions", i, "save", err)
+			errorCount++
+		}
+	}
+
+	for accountID := range accountsWithImportedTransactions {
+		if err := recomputeDerivedBalance(app, accountID, session.Id); err != nil {
+			logEvent("import", fmt.Sprintf("failed to recompute derived balance for account %s (session=%s)", accountID, session.Id), err)
 			errorCount++
 		}
 	}
@@ -1035,10 +1062,37 @@ func handleRevert(app core.App, re *core.RequestEvent) error {
 		return re.JSON(http.StatusBadRequest, map[string]string{"error": "Session already reverted"})
 	}
 
+	markSessionReverting(body.SessionID)
+	defer unmarkSessionReverting(body.SessionID)
+
 	collections := []string{"transactions", "securityTransactions", "accountBalances", "assetBalances", "securityBalances", "accounts", "assets", "securities"}
 	totalDeleted := 0
 
 	err = app.RunInTransaction(func(txApp core.App) error {
+		affectedAccounts := map[string]struct{}{}
+		importedTransactions, err := txApp.FindRecordsByFilter("transactions",
+			"importSession = {:sid} && owner = {:owner}",
+			"", 0, 0,
+			map[string]any{"sid": body.SessionID, "owner": auth.Id},
+		)
+		if err != nil {
+			return err
+		}
+		for _, tx := range importedTransactions {
+			accountID := tx.GetString("account")
+			if accountID == "" {
+				continue
+			}
+			account, err := txApp.FindRecordById("accounts", accountID)
+			if err != nil || account.GetString("importSession") == body.SessionID {
+				continue
+			}
+			if account.GetDateTime("autoCalculated").IsZero() {
+				continue
+			}
+			affectedAccounts[accountID] = struct{}{}
+		}
+
 		for _, coll := range collections {
 			for {
 				records, err := txApp.FindRecordsByFilter(coll,
@@ -1055,6 +1109,12 @@ func handleRevert(app core.App, re *core.RequestEvent) error {
 					}
 					totalDeleted++
 				}
+			}
+		}
+
+		for accountID := range affectedAccounts {
+			if err := recomputeDerivedBalance(txApp, accountID, ""); err != nil {
+				return err
 			}
 		}
 

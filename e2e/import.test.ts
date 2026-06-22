@@ -1,7 +1,16 @@
 import { expect, test } from '@playwright/test';
 
+import type { TypedPocketBase } from '../src/lib/pocketbase.schema';
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
-import { getUserPB, PB_URL, pbSend, seedAccount, seedUser } from './pocketbase.helpers';
+import {
+	getUserPB,
+	PB_URL,
+	pbSend,
+	seedAccount,
+	seedAccountBalance,
+	seedTransaction,
+	seedUser
+} from './pocketbase.helpers';
 
 function importPayload(sessionLabel: string) {
 	return {
@@ -801,4 +810,277 @@ test('import accepts security and cryptocurrency balance types in assets payload
 		filter: `owner = "${user.id}"`
 	});
 	expect(securities.length).toBe(0);
+});
+
+async function listAccountBalances(pb: TypedPocketBase, account: string) {
+	return pb.collection('accountBalances').getFullList({
+		filter: `account = "${account}"`,
+		sort: '-asOf,-created,-id'
+	});
+}
+
+test('reverting an import into an existing account leaves no stale derived balance', async () => {
+	const user = await seedUser('sabrina');
+	const account = await seedAccount({
+		name: 'Sabrina Checking',
+		balanceGroup: 'CASH',
+		balanceType: 'Checking',
+		owner: user.id,
+		autoCalculated: new Date().toISOString()
+	});
+
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: '2025-06-01T00:00:00.000Z',
+		description: 'Pre-existing deposit',
+		value: 100
+	});
+
+	const pb = await getUserPB(user.email);
+
+	const result = await (
+		await pbSend(
+			IMPORT_PATH,
+			{
+				sessionLabel: 'sabrina-into-existing',
+				transactions: [
+					{
+						accountId: account.id,
+						accountName: 'Sabrina Checking',
+						date: '2025-06-10T00:00:00.000Z',
+						description: 'Imported deposit',
+						value: 900,
+						externalId: 'sabrina-txn-001'
+					}
+				]
+			},
+			user.email
+		)
+	).json();
+	expect(result.status).toBe('completed');
+	expect(result.transactions.created).toBe(1);
+
+	await expect.poll(async () => (await listAccountBalances(pb, account.id))[0]?.value).toBe(1000);
+
+	await pbSend('/api/canutin/import/revert', { sessionId: result.sessionId }, user.email);
+
+	const remainingTransactions = await pb.collection('transactions').getFullList({
+		filter: `account = "${account.id}"`
+	});
+	expect(remainingTransactions.map((tx) => tx.description)).toEqual(['Pre-existing deposit']);
+
+	await expect.poll(async () => (await listAccountBalances(pb, account.id))[0]?.value).toBe(100);
+
+	const balances = await listAccountBalances(pb, account.id);
+	expect(balances.map((balance) => balance.value)).toEqual(balances.map(() => 100));
+});
+
+test('deleting a single imported transaction outside revert recomputes the derived balance', async () => {
+	const user = await seedUser('seamus');
+	const account = await seedAccount({
+		name: 'Seamus Checking',
+		balanceGroup: 'CASH',
+		balanceType: 'Checking',
+		owner: user.id,
+		autoCalculated: new Date().toISOString()
+	});
+
+	const pb = await getUserPB(user.email);
+
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: '2025-06-01T00:00:00.000Z',
+		description: 'Pre-existing deposit',
+		value: 100
+	});
+
+	await expect.poll(async () => (await listAccountBalances(pb, account.id))[0]?.value).toBe(100);
+
+	const result = await (
+		await pbSend(
+			IMPORT_PATH,
+			{
+				sessionLabel: 'seamus-into-existing',
+				transactions: [
+					{
+						accountId: account.id,
+						accountName: 'Seamus Checking',
+						date: '2025-06-10T00:00:00.000Z',
+						description: 'Imported deposit',
+						value: 900,
+						externalId: 'seamus-txn-001'
+					}
+				]
+			},
+			user.email
+		)
+	).json();
+	expect(result.status).toBe('completed');
+	expect(result.transactions.created).toBe(1);
+
+	await expect.poll(async () => (await listAccountBalances(pb, account.id))[0]?.value).toBe(1000);
+
+	const imported = await pb
+		.collection('transactions')
+		.getFirstListItem(`externalId = "seamus-txn-001" && owner = "${user.id}"`);
+	await pb.collection('transactions').delete(imported.id);
+
+	const remainingTransactions = await pb.collection('transactions').getFullList({
+		filter: `account = "${account.id}"`
+	});
+	expect(remainingTransactions.map((tx) => tx.description)).toEqual(['Pre-existing deposit']);
+
+	await expect.poll(async () => (await listAccountBalances(pb, account.id))[0]?.value).toBe(100);
+});
+
+test('reverting an import preserves a manual balance on the account', async () => {
+	const user = await seedUser('serena');
+	const account = await seedAccount({
+		name: 'Serena Checking',
+		balanceGroup: 'CASH',
+		balanceType: 'Checking',
+		owner: user.id,
+		autoCalculated: new Date().toISOString()
+	});
+
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: '2025-06-01T00:00:00.000Z',
+		description: 'Pre-existing deposit',
+		value: 100
+	});
+
+	const manualBalance = await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: '2025-05-01T00:00:00.000Z',
+		value: 777
+	});
+
+	const pb = await getUserPB(user.email);
+
+	const result = await (
+		await pbSend(
+			IMPORT_PATH,
+			{
+				sessionLabel: 'serena-into-existing',
+				transactions: [
+					{
+						accountId: account.id,
+						accountName: 'Serena Checking',
+						date: '2025-06-10T00:00:00.000Z',
+						description: 'Imported deposit',
+						value: 900,
+						externalId: 'serena-txn-001'
+					}
+				]
+			},
+			user.email
+		)
+	).json();
+	expect(result.status).toBe('completed');
+	expect(result.transactions.created).toBe(1);
+
+	await expect.poll(async () => (await listAccountBalances(pb, account.id))[0]?.value).toBe(1000);
+
+	await pbSend('/api/canutin/import/revert', { sessionId: result.sessionId }, user.email);
+
+	const remainingTransactions = await pb.collection('transactions').getFullList({
+		filter: `account = "${account.id}"`
+	});
+	expect(remainingTransactions.map((tx) => tx.description)).toEqual(['Pre-existing deposit']);
+
+	await expect
+		.poll(async () =>
+			(await listAccountBalances(pb, account.id))
+				.filter((balance) => balance.source === 'derived')
+				.map((balance) => balance.value)
+		)
+		.toEqual(expect.arrayContaining([100]));
+
+	const derivedBalances = (await listAccountBalances(pb, account.id)).filter(
+		(balance) => balance.source === 'derived'
+	);
+	expect(derivedBalances.map((balance) => balance.value)).toEqual(derivedBalances.map(() => 100));
+
+	const preservedManual = await pb.collection('accountBalances').getOne(manualBalance.id);
+	expect(preservedManual.source).toBe('manual');
+	expect(preservedManual.value).toBe(777);
+});
+
+test('reverting an import preserves pre-existing derived balance history', async () => {
+	const user = await seedUser('sienna');
+	const account = await seedAccount({
+		name: 'Sienna Checking',
+		balanceGroup: 'CASH',
+		balanceType: 'Checking',
+		owner: user.id,
+		autoCalculated: new Date().toISOString()
+	});
+
+	const pb = await getUserPB(user.email);
+
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: '2025-04-01T00:00:00.000Z',
+		description: 'First pre-existing deposit',
+		value: 250
+	});
+	await expect.poll(async () => (await listAccountBalances(pb, account.id))[0]?.value).toBe(250);
+	const historicalSnapshot = (await listAccountBalances(pb, account.id)).find(
+		(balance) => balance.source === 'derived' && balance.value === 250
+	)!;
+
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: '2025-05-01T00:00:00.000Z',
+		description: 'Second pre-existing deposit',
+		value: 100
+	});
+	await expect.poll(async () => (await listAccountBalances(pb, account.id))[0]?.value).toBe(350);
+
+	const result = await (
+		await pbSend(
+			IMPORT_PATH,
+			{
+				sessionLabel: 'sienna-into-existing',
+				transactions: [
+					{
+						accountId: account.id,
+						accountName: 'Sienna Checking',
+						date: '2025-06-10T00:00:00.000Z',
+						description: 'Imported deposit',
+						value: 900,
+						externalId: 'sienna-txn-001'
+					}
+				]
+			},
+			user.email
+		)
+	).json();
+	expect(result.status).toBe('completed');
+	expect(result.transactions.created).toBe(1);
+
+	await expect.poll(async () => (await listAccountBalances(pb, account.id))[0]?.value).toBe(1250);
+
+	await pbSend('/api/canutin/import/revert', { sessionId: result.sessionId }, user.email);
+
+	const remainingTransactions = await pb.collection('transactions').getFullList({
+		filter: `account = "${account.id}"`
+	});
+	expect(remainingTransactions.map((tx) => tx.description)).toEqual([
+		'First pre-existing deposit',
+		'Second pre-existing deposit'
+	]);
+
+	const preservedHistory = await pb.collection('accountBalances').getOne(historicalSnapshot.id);
+	expect(preservedHistory.source).toBe('derived');
+	expect(preservedHistory.value).toBe(250);
+
+	await expect.poll(async () => (await listAccountBalances(pb, account.id))[0]?.value).toBe(350);
 });

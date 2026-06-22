@@ -105,6 +105,11 @@ export type SuperusersRecord = {
 	verified?: boolean
 }
 
+export enum AccountBalancesSourceOptions {
+	"derived" = "derived",
+	"manual" = "manual",
+	"import" = "import",
+}
 export type AccountBalancesRecord = {
 	account: RecordIdString
 	asOf: IsoDateString
@@ -112,6 +117,7 @@ export type AccountBalancesRecord = {
 	id: string
 	importSession?: RecordIdString
 	owner: RecordIdString
+	source?: AccountBalancesSourceOptions
 	updated: IsoAutoDateString
 	value?: number
 }

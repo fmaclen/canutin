@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -47,14 +49,24 @@ func balanceWorker(ctx context.Context, app *pocketbase.PocketBase) {
 }
 
 func calculateBalance(app *pocketbase.PocketBase, accountID string) {
+	if err := recomputeDerivedBalance(app, accountID, ""); err != nil {
+		logEvent("balance", fmt.Sprintf("failed to recompute balance for account %s", accountID), err)
+	}
+}
+
+func recomputeDerivedBalance(app core.App, accountID string, importSession string) error {
 	account, err := app.FindRecordById("accounts", accountID)
 	if err != nil {
-		logEvent("balance", fmt.Sprintf("failed to find account %s", accountID), err)
-		return
+		// NOTE: a cascade-deleted account (e.g. an import-created account removed during revert)
+		// has no balance to compute, so a missing record is a quiet no-op rather than a failure.
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		return fmt.Errorf("find account: %w", err)
 	}
 
 	if account.GetDateTime("autoCalculated").IsZero() {
-		return
+		return nil
 	}
 
 	owner := account.GetString("owner")
@@ -63,8 +75,7 @@ func calculateBalance(app *pocketbase.PocketBase, accountID string) {
 		map[string]any{"aid": accountID, "owner": owner},
 	)
 	if err != nil {
-		logEvent("balance", fmt.Sprintf("failed to fetch transactions for account %s", accountID), err)
-		return
+		return fmt.Errorf("fetch transactions: %w", err)
 	}
 
 	var sum float64
@@ -77,17 +88,21 @@ func calculateBalance(app *pocketbase.PocketBase, accountID string) {
 
 	collection, err := app.FindCollectionByNameOrId("accountBalances")
 	if err != nil {
-		logEvent("balance", "failed to find accountBalances collection", err)
-		return
+		return fmt.Errorf("find accountBalances collection: %w", err)
 	}
 
 	balance := core.NewRecord(collection)
 	balance.Set("account", accountID)
 	balance.Set("value", sum)
 	balance.Set("asOf", time.Now().UTC())
-	balance.Set("owner", account.GetString("owner"))
+	balance.Set("owner", owner)
+	balance.Set("source", "derived")
+	if importSession != "" {
+		balance.Set("importSession", importSession)
+	}
 
 	if err := app.Save(balance); err != nil {
-		logEvent("balance", fmt.Sprintf("failed to save balance for account %s", accountID), err)
+		return fmt.Errorf("save balance: %w", err)
 	}
+	return nil
 }
