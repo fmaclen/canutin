@@ -886,7 +886,11 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 	}
 
 	for accountID := range accountsWithImportedTransactions {
-		if err := recomputeDerivedBalance(app, accountID, session.Id); err != nil {
+		// NOTE: serialize with the async balance worker so a concurrent edit on the same account
+		// can't overlap this inline snapshot and clobber it with a stale value.
+		if err := withAccountCalcLock(accountID, func() error {
+			return recomputeDerivedBalance(app, accountID, session.Id)
+		}); err != nil {
 			logEvent("import", fmt.Sprintf("failed to recompute derived balance for account %s (session=%s)", accountID, session.Id), err)
 			errorCount++
 		}
@@ -1068,6 +1072,11 @@ func handleRevert(app core.App, re *core.RequestEvent) error {
 	collections := []string{"transactions", "securityTransactions", "accountBalances", "assetBalances", "securityBalances", "accounts", "assets", "securities"}
 	totalDeleted := 0
 
+	// NOTE: accounts re-dirtied during the inline revert recompute; their follow-up is deferred until
+	// after commit so the worker recomputes against committed state, not the transaction's uncommitted
+	// rows.
+	var reenqueueAfterCommit []string
+
 	err = app.RunInTransaction(func(txApp core.App) error {
 		affectedAccounts := map[string]struct{}{}
 		importedTransactions, err := txApp.FindRecordsByFilter("transactions",
@@ -1113,8 +1122,16 @@ func handleRevert(app core.App, re *core.RequestEvent) error {
 		}
 
 		for accountID := range affectedAccounts {
-			if err := recomputeDerivedBalance(txApp, accountID, ""); err != nil {
+			// NOTE: serialize with the async balance worker so a concurrent edit can't overlap this
+			// revert recompute and clobber it with a stale value.
+			wentDirty, err := withAccountCalcLockReportDirty(accountID, func() error {
+				return recomputeDerivedBalance(txApp, accountID, "")
+			})
+			if err != nil {
 				return err
+			}
+			if wentDirty {
+				reenqueueAfterCommit = append(reenqueueAfterCommit, accountID)
 			}
 		}
 
@@ -1160,6 +1177,10 @@ func handleRevert(app core.App, re *core.RequestEvent) error {
 
 	if err != nil {
 		return re.JSON(http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("Revert failed: %v", err)})
+	}
+
+	for _, accountID := range reenqueueAfterCommit {
+		enqueueBalance(accountID)
 	}
 
 	return re.JSON(http.StatusOK, map[string]any{"sessionId": body.SessionID, "deleted": totalDeleted})

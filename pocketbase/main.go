@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -37,6 +38,14 @@ func main() {
 		logEvent("server", "shutting down balance worker", nil)
 		cancel()
 	}()
+
+	// NOTE: publish recompute here, before balanceWorker and the request-path goroutines that read it
+	// start; assigning it later would be an unsynchronized write racing those readers.
+	recompute = func(accountID string) {
+		if err := recomputeDerivedBalance(app, accountID, ""); err != nil {
+			logEvent("balance", fmt.Sprintf("failed to recompute balance for account %s", accountID), err)
+		}
+	}
 
 	go balanceWorker(ctx, app)
 

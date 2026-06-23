@@ -2,10 +2,12 @@ import { UTCDate } from '@date-fns/utc';
 import { expect, test, type Page } from '@playwright/test';
 import { setHours, subDays } from 'date-fns';
 
-import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
+import { AccountsBalanceGroupOptions, type TypedPocketBase } from '../src/lib/pocketbase.schema';
 import { formatDateForInput, goToPageViaSidebar, signIn } from './playwright.helpers';
 import {
 	getTransactionLabelsByName,
+	getUserPB,
+	listAccountBalances,
 	seedAccount,
 	seedAccountBalance,
 	seedAccountShare,
@@ -539,4 +541,65 @@ test('reuses existing labels instead of creating duplicates', async ({ page }) =
 
 	expect(await getTransactionLabelsByName(user.id, 'Groceries')).toHaveLength(1);
 	expect(await getTransactionLabelsByName(user.id, 'Dining')).toHaveLength(1);
+});
+
+async function latestBalanceValue(pb: TypedPocketBase, account: string) {
+	return (await listAccountBalances(pb, account))[0]?.value;
+}
+
+test('derived balance updates across the transaction lifecycle', async () => {
+	const user = await seedUser('gemma');
+	const accountA = await seedAccount({
+		name: 'Gemma Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		balanceType: 'Checking',
+		owner: user.id,
+		autoCalculated: new Date().toISOString()
+	});
+	const accountB = await seedAccount({
+		name: 'Gemma Savings',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		balanceType: 'Savings',
+		owner: user.id,
+		autoCalculated: new Date().toISOString()
+	});
+
+	const pb = await getUserPB(user.email);
+
+	const transaction = await seedTransaction({
+		account: accountA.id,
+		owner: user.id,
+		date: '2025-06-01T00:00:00.000Z',
+		description: 'Opening deposit',
+		value: 100
+	});
+	await expect
+		.poll(async () => latestBalanceValue(pb, accountA.id), { message: 'create' })
+		.toBe(100);
+
+	await pb.collection('transactions').update(transaction.id, { value: 250 });
+	await expect.poll(async () => latestBalanceValue(pb, accountA.id), { message: 'edit' }).toBe(250);
+
+	await pb
+		.collection('transactions')
+		.update(transaction.id, { excluded: new Date().toISOString() });
+	await expect
+		.poll(async () => latestBalanceValue(pb, accountA.id), { message: 'exclude on' })
+		.toBe(0);
+
+	await pb.collection('transactions').update(transaction.id, { excluded: '' });
+	await expect
+		.poll(async () => latestBalanceValue(pb, accountA.id), { message: 'exclude off' })
+		.toBe(250);
+
+	await pb.collection('transactions').update(transaction.id, { account: accountB.id });
+	await expect
+		.poll(async () => latestBalanceValue(pb, accountA.id), { message: 'reassign source' })
+		.toBe(0);
+	await expect
+		.poll(async () => latestBalanceValue(pb, accountB.id), { message: 'reassign target' })
+		.toBe(250);
+
+	await pb.collection('transactions').delete(transaction.id);
+	await expect.poll(async () => latestBalanceValue(pb, accountB.id), { message: 'delete' }).toBe(0);
 });

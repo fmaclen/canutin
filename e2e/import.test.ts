@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
 
-import type { TypedPocketBase } from '../src/lib/pocketbase.schema';
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
 import {
 	getUserPB,
+	listAccountBalances,
 	PB_URL,
 	pbSend,
 	seedAccount,
@@ -811,13 +811,6 @@ test('import accepts security and cryptocurrency balance types in assets payload
 	});
 	expect(securities.length).toBe(0);
 });
-
-async function listAccountBalances(pb: TypedPocketBase, account: string) {
-	return pb.collection('accountBalances').getFullList({
-		filter: `account = "${account}"`,
-		sort: '-asOf,-created,-id'
-	});
-}
 
 test('reverting an import into an existing account leaves no stale derived balance', async () => {
 	const user = await seedUser('sabrina');

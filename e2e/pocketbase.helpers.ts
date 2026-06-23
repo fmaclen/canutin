@@ -346,3 +346,10 @@ export async function getTransactionLabelsByName(owner: string, name: string) {
 		filter: `owner = "${owner}" && name = "${name}"`
 	});
 }
+
+export async function listAccountBalances(pb: TypedPocketBase, account: string) {
+	return pb.collection('accountBalances').getFullList({
+		filter: `account = "${account}"`,
+		sort: '-asOf,-created,-id'
+	});
+}
