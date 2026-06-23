@@ -7,11 +7,22 @@ import {
 import {
 	getUserPB,
 	pbSend,
+	PB_URL,
 	seedAccount,
+	seedAccountBalance,
 	seedAsset,
+	seedAssetBalance,
 	seedTransaction,
 	seedUser
 } from './pocketbase.helpers';
+
+async function getLatestBalances(email: string, path: string) {
+	const pb = await getUserPB(email);
+	const response = await fetch(`${PB_URL}${path}`, {
+		headers: { Authorization: `Bearer ${pb.authStore.token}` }
+	});
+	return response.json() as Promise<Record<string, { id: string }>>;
+}
 
 async function latestAccountBalance(email: string, accountId: string) {
 	const pb = await getUserPB(email);
@@ -132,6 +143,71 @@ test('rejects reparenting a transaction to a foreign account or changing its own
 	await expect(changeOwner).rejects.toMatchObject({ status: 403 });
 
 	expect(await latestAccountBalance(carol.email, carolAccount.id)).toBe(balanceBeforeAttack);
+});
+
+test('bulk latest-balance endpoints never expose another owner balances', async () => {
+	const frank = await seedUser('frank');
+	const grace = await seedUser('grace');
+
+	const frankAccount = await seedAccount({
+		name: 'Frank Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: frank.id,
+		balanceType: 'Checking'
+	});
+	const frankAsset = await seedAsset({
+		name: 'Frank Collectible',
+		balanceGroup: AssetsBalanceGroupOptions.OTHER,
+		owner: frank.id,
+		balanceType: 'Collectible'
+	});
+	await seedAccountBalance({
+		account: frankAccount.id,
+		owner: frank.id,
+		asOf: new Date().toISOString(),
+		value: 4200
+	});
+	await seedAssetBalance({
+		asset: frankAsset.id,
+		owner: frank.id,
+		asOf: new Date().toISOString(),
+		bookValue: 1000,
+		marketValue: 1500
+	});
+
+	const graceAccount = await seedAccount({
+		name: 'Grace Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: grace.id,
+		balanceType: 'Checking'
+	});
+	const graceAsset = await seedAsset({
+		name: 'Grace Collectible',
+		balanceGroup: AssetsBalanceGroupOptions.OTHER,
+		owner: grace.id,
+		balanceType: 'Collectible'
+	});
+	await seedAccountBalance({
+		account: graceAccount.id,
+		owner: grace.id,
+		asOf: new Date().toISOString(),
+		value: 99
+	});
+	await seedAssetBalance({
+		asset: graceAsset.id,
+		owner: grace.id,
+		asOf: new Date().toISOString(),
+		bookValue: 50,
+		marketValue: 50
+	});
+
+	const accountBalances = await getLatestBalances(grace.email, '/api/balances/accounts/latest');
+	expect(accountBalances[graceAccount.id]).toBeDefined();
+	expect(accountBalances[frankAccount.id]).toBeUndefined();
+
+	const assetBalances = await getLatestBalances(grace.email, '/api/balances/assets/latest');
+	expect(assetBalances[graceAsset.id]).toBeDefined();
+	expect(assetBalances[frankAsset.id]).toBeUndefined();
 });
 
 test('owner can create a transaction on their own account', async () => {

@@ -215,14 +215,15 @@ class AccountsContext {
 		for (const account of accounts) {
 			await this.balanceTypesContext.ensureLoaded(account.balanceType);
 		}
-		const latestBalances = await Promise.all(
-			accounts.map((account) => this.getLatestAccountBalance(account.id))
+		const latestBalances = await this._pb.getJson<Record<string, LatestAccountBalance>>(
+			'/api/balances/accounts/latest'
 		);
 		if (userId !== this.currentUserId || token !== this.refreshSequence) return;
 
 		this.latestCashByAccount.clear();
-		for (const balance of latestBalances) {
-			if (balance) this.latestCashByAccount.set(balance.account, balance);
+		for (const account of accounts) {
+			const balance = latestBalances[account.id];
+			if (balance) this.latestCashByAccount.set(account.id, balance);
 		}
 		this.rawAccounts = accounts;
 		this.accountsLoaded = true;

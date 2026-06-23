@@ -28,6 +28,15 @@ type LatestAssetBalance = AssetBalanceData & {
 	created: string;
 };
 
+type LatestAssetBalanceResponse = {
+	id: string;
+	asset: string;
+	marketValue: number;
+	bookValue: number;
+	asOf: string;
+	created: string;
+};
+
 const DEFAULT_BALANCE_DATA: AssetBalanceData = {
 	marketValue: 0,
 	bookValue: 0,
@@ -196,18 +205,18 @@ class AssetsContext {
 		const list = await this._pb.authedClient.collection('assets').getFullList<AssetsResponse>({
 			requestKey: null
 		});
-		const latestBalances = new SvelteMap<string, LatestAssetBalance>();
 		for (const asset of list) {
 			await this.balanceTypesContext.ensureLoaded(asset.balanceType);
 			if (refreshId !== this._refreshAssetsSequence) return false;
-			const balanceData = await this.getLatestAssetBalance(asset.id);
-			if (refreshId !== this._refreshAssetsSequence) return false;
-			if (balanceData) latestBalances.set(asset.id, balanceData);
 		}
+		const latestBalances = await this._pb.getJson<Record<string, LatestAssetBalanceResponse>>(
+			'/api/balances/assets/latest'
+		);
 		if (refreshId !== this._refreshAssetsSequence) return false;
 		this.latestBalanceByAsset.clear();
-		for (const [assetId, balance] of latestBalances) {
-			this.latestBalanceByAsset.set(assetId, balance);
+		for (const asset of list) {
+			const balance = latestBalances[asset.id];
+			if (balance) this.latestBalanceByAsset.set(asset.id, this.toLatestAssetBalance(balance));
 		}
 		this.rawAssets = list;
 		return true;
@@ -472,7 +481,13 @@ class AssetsContext {
 		return balance ? this.toLatestAssetBalance(balance) : null;
 	}
 
-	private toLatestAssetBalance(balance: AssetBalancesResponse) {
+	private toLatestAssetBalance(balance: {
+		id: string;
+		marketValue?: number;
+		bookValue?: number;
+		asOf: string;
+		created: string;
+	}) {
 		return {
 			id: balance.id,
 			marketValue: balance.marketValue ?? 0,

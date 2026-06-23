@@ -83,6 +83,13 @@ func main() {
 			apis.RequireAuth("users"),
 		)
 
+		e.Router.GET("/api/balances/accounts/latest", latestAccountBalancesHandler(e.App)).Bind(
+			apis.RequireAuth("users"),
+		)
+		e.Router.GET("/api/balances/assets/latest", latestAssetBalancesHandler(e.App)).Bind(
+			apis.RequireAuth("users"),
+		)
+
 		return e.Next()
 	})
 

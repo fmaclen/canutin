@@ -60,6 +60,26 @@ export class PocketBaseContext {
 		return label.id;
 	}
 
+	async getJson<T>(path: string) {
+		const token = this.authedClient.authStore.token;
+		const response = await fetch(`${this.backendUrl}${path}`, {
+			headers: {
+				Authorization: `Bearer ${token}`
+			}
+		});
+
+		const data = (await response.json().catch(() => null)) as T | { message?: string } | null;
+		if (!response.ok) {
+			const message =
+				data && typeof data === 'object' && 'message' in data && typeof data.message === 'string'
+					? data.message
+					: `Request failed with status ${response.status}`;
+			throw new Error(message);
+		}
+
+		return data as T;
+	}
+
 	async postJson<T>(path: string, body: Record<string, unknown>) {
 		const token = this.authedClient.authStore.token;
 		const response = await fetch(`${this.backendUrl}${path}`, {
