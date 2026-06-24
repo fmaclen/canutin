@@ -29,9 +29,11 @@ jobs:
         run: bunx playwright install --with-deps chromium webkit
 
       - name: Run Playwright tests
-        run: bun run test
+        run: xvfb-run -a bun run test
         env:
           CI: true
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          GALLIUM_DRIVER: llvmpipe
 
       - name: Upload test results
         uses: actions/upload-artifact@v4

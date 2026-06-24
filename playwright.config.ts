@@ -46,7 +46,8 @@ export default defineConfig({
 			use: {
 				...devices['iPhone 13'],
 				baseURL: BASE_URL,
-				trace: 'retain-on-failure'
+				trace: 'retain-on-failure',
+				headless: !isCI
 			}
 		}
 	]
