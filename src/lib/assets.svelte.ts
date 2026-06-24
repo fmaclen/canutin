@@ -14,6 +14,7 @@ import {
 } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
 import { participantExcluded, projectAssetFinancials } from './sharing';
+import { isUnavailableRecordError, removeById, upsertById } from './utils';
 
 type AssetBalanceData = {
 	marketValue: number;
@@ -65,7 +66,7 @@ class AssetsContext {
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
 	private balanceTypesContext: ReturnType<typeof setBalanceTypesContext>;
-	private _refreshAssetsSequence = 0;
+	private refreshSequence = 0;
 	private mutationEpoch = 0;
 	private _activeUserId = '';
 	private _isSubscribed = false;
@@ -151,7 +152,7 @@ class AssetsContext {
 			this.unsubscribeRealtime();
 			this._activeUserId = userId;
 			if (!userId) {
-				this._refreshAssetsSequence++;
+				this.refreshSequence++;
 				this.rawAssets = [];
 				this.latestBalanceByAsset.clear();
 				this.shares = [];
@@ -168,32 +169,31 @@ class AssetsContext {
 
 	private async refreshForCurrentUser() {
 		const userId = this.currentUserId;
+		const token = ++this.refreshSequence;
 		try {
-			await this.refreshShares(userId);
-			await this.refreshAssets();
+			await this.refreshShares(userId, token);
+			await this.refreshAssets(userId, token);
 			this.lastBalanceEvent = Date.now();
 		} catch (error) {
-			if (userId !== this.currentUserId) return;
+			if (userId !== this.currentUserId || token !== this.refreshSequence) return;
 			this._pb.handleConnectionError(error, 'assets', 'init');
 		} finally {
-			if (userId === this.currentUserId) this.isLoading = false;
+			if (userId === this.currentUserId && token === this.refreshSequence) this.isLoading = false;
 		}
 	}
 
-	private async refreshShares(userId: string) {
-		if (userId !== this.currentUserId) return false;
-
+	private async refreshShares(userId = this.currentUserId, token = this.refreshSequence) {
+		if (!userId || userId !== this.currentUserId || token !== this.refreshSequence) return;
 		const shares = await this._pb.authedClient.collection('assetShares').getFullList({
 			sort: 'recipientEmail',
 			requestKey: null
 		});
-		if (userId !== this.currentUserId) return false;
+		if (userId !== this.currentUserId || token !== this.refreshSequence) return;
 		this.shares = shares;
-		return true;
 	}
 
-	private async refreshAssets() {
-		const refreshId = ++this._refreshAssetsSequence;
+	private async refreshAssets(userId = this.currentUserId, token = this.refreshSequence) {
+		if (!userId || userId !== this.currentUserId || token !== this.refreshSequence) return;
 		const epoch = this.mutationEpoch;
 		const list = await this._pb.authedClient.collection('assets').getFullList<AssetsResponse>({
 			requestKey: null
@@ -204,7 +204,7 @@ class AssetsContext {
 		const latestBalances = await Promise.all(
 			list.map((asset) => this.getLatestAssetBalance(asset.id))
 		);
-		if (refreshId !== this._refreshAssetsSequence) return false;
+		if (userId !== this.currentUserId || token !== this.refreshSequence) return;
 
 		// NOTE: A targeted membership mutation landed while this list was in
 		// flight, so the fetched snapshot is stale; leave membership and
@@ -217,7 +217,6 @@ class AssetsContext {
 			});
 			this.rawAssets = list;
 		}
-		return true;
 	}
 
 	private realtimeSubscribe(userId = this._activeUserId) {
@@ -438,17 +437,15 @@ class AssetsContext {
 	// refreshAssets that fetched its list before this mutation aborts its
 	// commit and can't overwrite newer state with a stale snapshot.
 	private upsertAssetRecord(asset: AssetsResponse) {
-		const exists = this.rawAssets.some((record) => record.id === asset.id);
-		this.rawAssets = exists
-			? this.rawAssets.map((record) => (record.id === asset.id ? asset : record))
-			: [...this.rawAssets, asset];
-		if (!exists) this.mutationEpoch++;
+		const { list, inserted } = upsertById(this.rawAssets, asset);
+		this.rawAssets = list;
+		if (inserted) this.mutationEpoch++;
 	}
 
 	private removeAssetRecord(assetId: string) {
-		if (!this.rawAssets.some((record) => record.id === assetId)) return;
-		this.rawAssets = this.rawAssets.filter((record) => record.id !== assetId);
-		this.mutationEpoch++;
+		const { list, removed } = removeById(this.rawAssets, assetId);
+		this.rawAssets = list;
+		if (removed) this.mutationEpoch++;
 	}
 
 	private async refreshAsset(assetId: string, userId: string) {
@@ -469,7 +466,7 @@ class AssetsContext {
 			return true;
 		} catch (error) {
 			if (userId !== this.currentUserId) return false;
-			if (this.isUnavailableRecordError(error)) {
+			if (isUnavailableRecordError(error)) {
 				this.removeAssetRecord(assetId);
 				this.latestBalanceByAsset.delete(assetId);
 				return true;
@@ -516,17 +513,8 @@ class AssetsContext {
 		return balance.id >= current.id;
 	}
 
-	private isUnavailableRecordError(error: unknown) {
-		return (
-			typeof error === 'object' &&
-			error !== null &&
-			'status' in error &&
-			(error.status === 403 || error.status === 404)
-		);
-	}
-
 	dispose() {
-		this._refreshAssetsSequence++;
+		this.refreshSequence++;
 		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
 		this.unsubscribeRealtime();
 	}
