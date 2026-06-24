@@ -15,6 +15,7 @@ import {
 import type { PocketBaseContext } from './pocketbase.svelte';
 import { sumOrUnknown } from './security-balance-values';
 import { participantExcluded, projectSignedValue } from './sharing';
+import { isUnavailableRecordError, removeById, upsertById } from './utils';
 
 export type AccountWithBalance = AccountsResponse & {
 	balance: number | null;
@@ -381,17 +382,15 @@ class AccountsContext {
 	// refreshAccounts that fetched its list before this mutation aborts its
 	// commit and can't overwrite newer state with a stale snapshot.
 	private upsertAccountRecord(account: AccountsResponse) {
-		const exists = this.rawAccounts.some((record) => record.id === account.id);
-		this.rawAccounts = exists
-			? this.rawAccounts.map((record) => (record.id === account.id ? account : record))
-			: [...this.rawAccounts, account];
-		if (!exists) this.mutationEpoch++;
+		const { list, inserted } = upsertById(this.rawAccounts, account);
+		this.rawAccounts = list;
+		if (inserted) this.mutationEpoch++;
 	}
 
 	private removeAccountRecord(accountId: string) {
-		if (!this.rawAccounts.some((record) => record.id === accountId)) return;
-		this.rawAccounts = this.rawAccounts.filter((record) => record.id !== accountId);
-		this.mutationEpoch++;
+		const { list, removed } = removeById(this.rawAccounts, accountId);
+		this.rawAccounts = list;
+		if (removed) this.mutationEpoch++;
 	}
 
 	async refreshAccount(accountId: string, userId: string) {
@@ -408,7 +407,7 @@ class AccountsContext {
 			else this.latestCashByAccount.delete(accountId);
 			return true;
 		} catch (error) {
-			if (this.isUnavailableRecordError(error)) {
+			if (isUnavailableRecordError(error)) {
 				this.removeAccountRecord(accountId);
 				this.latestCashByAccount.delete(accountId);
 				return true;
@@ -460,15 +459,6 @@ class AccountsContext {
 		if (balance.asOf !== current.asOf) return balance.asOf > current.asOf;
 		if (balance.created !== current.created) return balance.created > current.created;
 		return balance.id >= current.id;
-	}
-
-	private isUnavailableRecordError(error: unknown) {
-		return (
-			typeof error === 'object' &&
-			error !== null &&
-			'status' in error &&
-			(error.status === 403 || error.status === 404)
-		);
 	}
 
 	private toAccountWithBalance(

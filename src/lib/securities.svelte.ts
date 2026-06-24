@@ -14,7 +14,7 @@ import {
 	type SecurityBalanceResolvedValue
 } from './security-balance-values';
 import { projectSignedValue } from './sharing';
-import { toNumber } from './utils';
+import { toNumber, upsertById } from './utils';
 
 type SecurityBalance = SecurityBalancesResponse<number, number, number, number>;
 
@@ -339,12 +339,9 @@ class SecuritiesContext {
 	}
 
 	private upsertSecurity(security: SecuritiesResponse) {
-		const exists = this.securities.some((record) => record.id === security.id);
-		this.securities = (
-			exists
-				? this.securities.map((record) => (record.id === security.id ? security : record))
-				: [...this.securities, security]
-		).toSorted((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+		this.securities = upsertById(this.securities, security).list.toSorted((a, b) =>
+			a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+		);
 	}
 
 	private clearPositionRefreshTimers() {
