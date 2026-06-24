@@ -66,6 +66,7 @@ class AssetsContext {
 	private _auth: ReturnType<typeof getAuthContext>;
 	private balanceTypesContext: ReturnType<typeof setBalanceTypesContext>;
 	private _refreshAssetsSequence = 0;
+	private mutationEpoch = 0;
 	private _activeUserId = '';
 	private _isSubscribed = false;
 	private _teardownCallback = () => this.unsubscribeRealtime();
@@ -193,23 +194,29 @@ class AssetsContext {
 
 	private async refreshAssets() {
 		const refreshId = ++this._refreshAssetsSequence;
+		const epoch = this.mutationEpoch;
 		const list = await this._pb.authedClient.collection('assets').getFullList<AssetsResponse>({
 			requestKey: null
 		});
-		const latestBalances = new SvelteMap<string, LatestAssetBalance>();
 		for (const asset of list) {
 			await this.balanceTypesContext.ensureLoaded(asset.balanceType);
-			if (refreshId !== this._refreshAssetsSequence) return false;
-			const balanceData = await this.getLatestAssetBalance(asset.id);
-			if (refreshId !== this._refreshAssetsSequence) return false;
-			if (balanceData) latestBalances.set(asset.id, balanceData);
 		}
+		const latestBalances = await Promise.all(
+			list.map((asset) => this.getLatestAssetBalance(asset.id))
+		);
 		if (refreshId !== this._refreshAssetsSequence) return false;
-		this.latestBalanceByAsset.clear();
-		for (const [assetId, balance] of latestBalances) {
-			this.latestBalanceByAsset.set(assetId, balance);
+
+		// NOTE: A targeted membership mutation landed while this list was in
+		// flight, so the fetched snapshot is stale; leave membership and
+		// balances to the mutation rather than overwriting with stale state.
+		if (epoch === this.mutationEpoch) {
+			this.latestBalanceByAsset.clear();
+			list.forEach((asset, index) => {
+				const balance = latestBalances[index];
+				if (balance) this.latestBalanceByAsset.set(asset.id, balance);
+			});
+			this.rawAssets = list;
 		}
-		this.rawAssets = list;
 		return true;
 	}
 
@@ -272,22 +279,19 @@ class AssetsContext {
 			await this.balanceTypesContext.ensureLoaded(e.record.balanceType);
 			const balanceData = await this.getLatestAssetBalance(e.record.id);
 			if (userId !== this.currentUserId) return;
-			this.rawAssets = [...this.rawAssets, e.record];
+			this.upsertAssetRecord(e.record);
 			if (balanceData) this.latestBalanceByAsset.set(e.record.id, balanceData);
 		} else if (e.action === 'update') {
 			await this.balanceTypesContext.ensureLoaded(e.record.balanceType);
 			if (userId !== this.currentUserId) return;
-			const exists = this.rawAssets.some((asset) => asset.id === e.record.id);
-			this.rawAssets = exists
-				? this.rawAssets.map((asset) => (asset.id === e.record.id ? e.record : asset))
-				: [...this.rawAssets, e.record];
+			this.upsertAssetRecord(e.record);
 			if (!this.latestBalanceByAsset.has(e.record.id)) {
 				const balanceData = await this.getLatestAssetBalance(e.record.id);
 				if (userId !== this.currentUserId) return;
 				if (balanceData) this.latestBalanceByAsset.set(e.record.id, balanceData);
 			}
 		} else if (e.action === 'delete') {
-			this.rawAssets = this.rawAssets.filter((x) => x.id !== e.record.id);
+			this.removeAssetRecord(e.record.id);
 			this.latestBalanceByAsset.delete(e.record.id);
 		}
 	}
@@ -430,6 +434,23 @@ class AssetsContext {
 		}
 	}
 
+	// NOTE: Targeted membership changes bump mutationEpoch so an in-flight
+	// refreshAssets that fetched its list before this mutation aborts its
+	// commit and can't overwrite newer state with a stale snapshot.
+	private upsertAssetRecord(asset: AssetsResponse) {
+		const exists = this.rawAssets.some((record) => record.id === asset.id);
+		this.rawAssets = exists
+			? this.rawAssets.map((record) => (record.id === asset.id ? asset : record))
+			: [...this.rawAssets, asset];
+		if (!exists) this.mutationEpoch++;
+	}
+
+	private removeAssetRecord(assetId: string) {
+		if (!this.rawAssets.some((record) => record.id === assetId)) return;
+		this.rawAssets = this.rawAssets.filter((record) => record.id !== assetId);
+		this.mutationEpoch++;
+	}
+
 	private async refreshAsset(assetId: string, userId: string) {
 		if (userId !== this.currentUserId) return false;
 
@@ -442,17 +463,14 @@ class AssetsContext {
 			if (userId !== this.currentUserId) return false;
 			const balanceData = await this.getLatestAssetBalance(assetId);
 			if (userId !== this.currentUserId) return false;
-			const exists = this.rawAssets.some((record) => record.id === asset.id);
-			this.rawAssets = exists
-				? this.rawAssets.map((record) => (record.id === asset.id ? asset : record))
-				: [...this.rawAssets, asset];
+			this.upsertAssetRecord(asset);
 			if (balanceData) this.latestBalanceByAsset.set(assetId, balanceData);
 			else this.latestBalanceByAsset.delete(assetId);
 			return true;
 		} catch (error) {
 			if (userId !== this.currentUserId) return false;
 			if (this.isUnavailableRecordError(error)) {
-				this.rawAssets = this.rawAssets.filter((asset) => asset.id !== assetId);
+				this.removeAssetRecord(assetId);
 				this.latestBalanceByAsset.delete(assetId);
 				return true;
 			}

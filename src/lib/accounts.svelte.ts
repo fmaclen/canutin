@@ -66,6 +66,7 @@ class AccountsContext {
 	private _auth: ReturnType<typeof getAuthContext>;
 	private balanceTypesContext: ReturnType<typeof setBalanceTypesContext>;
 	private refreshSequence = 0;
+	private mutationEpoch = 0;
 	private _activeUserId = '';
 	private _isSubscribed = false;
 	private _teardownCallback = () => this.unsubscribeRealtime();
@@ -206,6 +207,7 @@ class AccountsContext {
 
 	private async refreshAccounts(userId = this.currentUserId, token = this.refreshSequence) {
 		if (!userId || userId !== this.currentUserId || token !== this.refreshSequence) return;
+		const epoch = this.mutationEpoch;
 		const accounts = await this._pb.authedClient
 			.collection('accounts')
 			.getFullList<AccountsResponse>({
@@ -220,11 +222,16 @@ class AccountsContext {
 		);
 		if (userId !== this.currentUserId || token !== this.refreshSequence) return;
 
-		this.latestCashByAccount.clear();
-		for (const balance of latestBalances) {
-			if (balance) this.latestCashByAccount.set(balance.account, balance);
+		// NOTE: A targeted membership mutation landed while this list was
+		// in flight, so the fetched snapshot is stale; leave membership and
+		// balances to the mutation but still mark the store loaded.
+		if (epoch === this.mutationEpoch) {
+			this.latestCashByAccount.clear();
+			for (const balance of latestBalances) {
+				if (balance) this.latestCashByAccount.set(balance.account, balance);
+			}
+			this.rawAccounts = accounts;
 		}
-		this.rawAccounts = accounts;
 		this.accountsLoaded = true;
 	}
 
@@ -319,7 +326,7 @@ class AccountsContext {
 
 	private async onAccountEvent(action: string, account: AccountsResponse, userId: string) {
 		if (action === 'delete') {
-			this.rawAccounts = this.rawAccounts.filter((record) => record.id !== account.id);
+			this.removeAccountRecord(account.id);
 			this.latestCashByAccount.delete(account.id);
 			this.notifyBalancesChanged();
 			return;
@@ -327,10 +334,7 @@ class AccountsContext {
 
 		await this.balanceTypesContext.ensureLoaded(account.balanceType);
 		if (userId !== this.currentUserId) return;
-		const exists = this.rawAccounts.some((record) => record.id === account.id);
-		this.rawAccounts = exists
-			? this.rawAccounts.map((record) => (record.id === account.id ? account : record))
-			: [...this.rawAccounts, account];
+		this.upsertAccountRecord(account);
 		if (!this.latestCashByAccount.has(account.id)) {
 			await this.refreshAccountBalance(account.id, userId);
 		}
@@ -373,6 +377,23 @@ class AccountsContext {
 		}
 	}
 
+	// NOTE: Targeted membership changes bump mutationEpoch so an in-flight
+	// refreshAccounts that fetched its list before this mutation aborts its
+	// commit and can't overwrite newer state with a stale snapshot.
+	private upsertAccountRecord(account: AccountsResponse) {
+		const exists = this.rawAccounts.some((record) => record.id === account.id);
+		this.rawAccounts = exists
+			? this.rawAccounts.map((record) => (record.id === account.id ? account : record))
+			: [...this.rawAccounts, account];
+		if (!exists) this.mutationEpoch++;
+	}
+
+	private removeAccountRecord(accountId: string) {
+		if (!this.rawAccounts.some((record) => record.id === accountId)) return;
+		this.rawAccounts = this.rawAccounts.filter((record) => record.id !== accountId);
+		this.mutationEpoch++;
+	}
+
 	async refreshAccount(accountId: string, userId: string) {
 		if (!userId || userId !== this.currentUserId) return false;
 		try {
@@ -382,16 +403,13 @@ class AccountsContext {
 			await this.balanceTypesContext.ensureLoaded(account.balanceType);
 			const balance = await this.getLatestAccountBalance(accountId);
 			if (userId !== this.currentUserId) return false;
-			const exists = this.rawAccounts.some((record) => record.id === account.id);
-			this.rawAccounts = exists
-				? this.rawAccounts.map((record) => (record.id === account.id ? account : record))
-				: [...this.rawAccounts, account];
+			this.upsertAccountRecord(account);
 			if (balance) this.latestCashByAccount.set(accountId, balance);
 			else this.latestCashByAccount.delete(accountId);
 			return true;
 		} catch (error) {
 			if (this.isUnavailableRecordError(error)) {
-				this.rawAccounts = this.rawAccounts.filter((account) => account.id !== accountId);
+				this.removeAccountRecord(accountId);
 				this.latestCashByAccount.delete(accountId);
 				return true;
 			}
