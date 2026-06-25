@@ -29,7 +29,9 @@ jobs:
         run: bunx playwright install --with-deps chromium webkit
 
       - name: Run Playwright tests
-        run: xvfb-run -a bun run test -- --project=mobile e2e/transactions.filtering.test.ts e2e/transactions.crud.test.ts e2e/securities.sorting.test.ts --repeat-each=3
+        # xvfb-run provides the virtual display WebKit needs to run headed on Linux CI;
+        # headless WebKit crashes here (EGL_NOT_INITIALIZED at page.goto). See playwright.config.ts.
+        run: xvfb-run -a bun run test
         env:
           CI: true
 

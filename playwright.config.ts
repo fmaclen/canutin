@@ -47,6 +47,8 @@ export default defineConfig({
 				...devices['iPhone 13'],
 				baseURL: BASE_URL,
 				trace: 'retain-on-failure',
+				// WebKit crashes on headless Linux CI (EGL_NOT_INITIALIZED at page.goto); run it
+				// headed under xvfb instead (see .github/workflows/test.yml).
 				headless: !isCI
 			}
 		}
