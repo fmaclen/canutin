@@ -29,11 +29,11 @@ jobs:
         run: bunx playwright install --with-deps chromium webkit
 
       - name: Run Playwright tests
+        # xvfb-run provides the virtual display WebKit needs to run headed on Linux CI;
+        # headless WebKit crashes here (EGL_NOT_INITIALIZED at page.goto). See playwright.config.ts.
         run: xvfb-run -a bun run test
         env:
           CI: true
-          LIBGL_ALWAYS_SOFTWARE: '1'
-          GALLIUM_DRIVER: llvmpipe
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
