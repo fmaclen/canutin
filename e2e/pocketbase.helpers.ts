@@ -22,7 +22,7 @@ export const DEFAULT_PASSWORD = '123qweasdzxc';
 export const PB_URL = process.env.PUBLIC_PB_URL ?? 'http://127.0.0.1:42070';
 const SUPERADMIN_EMAIL = 'superadmin@example.com';
 
-async function getAdminPB(): Promise<TypedPocketBase> {
+export async function getAdminPB(): Promise<TypedPocketBase> {
 	const pb = new PocketBase(PB_URL) as TypedPocketBase;
 	await pb.collection('_superusers').authWithPassword(SUPERADMIN_EMAIL, DEFAULT_PASSWORD);
 	return pb;
