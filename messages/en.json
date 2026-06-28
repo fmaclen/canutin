@@ -423,10 +423,6 @@
 	"trailing_cashflow_expenses_label": "Expenses per month",
 	"trailing_cashflow_surplus_label": "Surplus per month",
 	"demo_try_as_guest": "Try as guest",
-	"demo_seeding_in_progress": "Setting up your demo",
-	"demo_seeding_complete": "Your demo is ready",
-	"demo_seeding_failed": "Couldn't set up demo",
-
 	"setup_title": "Setup required",
 	"setup_description": "Check your server logs for the setup link",
 	"setup_unreachable_title": "Can't connect",

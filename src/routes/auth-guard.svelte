@@ -23,8 +23,8 @@
 		const isRoot = pathname === '/';
 		const isAuthenticated = Boolean(auth.currentUserId);
 
-		// Don't redirect away from /demo while demo is starting or seeding
-		if (isDemo && (demo.isStarting || demo.isSeeding)) {
+		// Don't redirect away from /demo while demo is starting
+		if (isDemo && demo.isStarting) {
 			return;
 		}
 
