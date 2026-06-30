@@ -32,18 +32,18 @@ var demoWipeCollections = []string{
 var demoResetMu sync.Mutex
 
 func demoEnabled() bool {
-	return os.Getenv("DEMO_ENABLED") == "true"
+	return os.Getenv("PUBLIC_DEMO_ENABLED") == "true"
 }
 
 func demoEmail() string {
-	if v := os.Getenv("DEMO_EMAIL"); v != "" {
+	if v := os.Getenv("PUBLIC_DEMO_EMAIL"); v != "" {
 		return v
 	}
 	return demoDefaultEmail
 }
 
 func demoPassword() string {
-	if v := os.Getenv("DEMO_PASSWORD"); v != "" {
+	if v := os.Getenv("PUBLIC_DEMO_PASSWORD"); v != "" {
 		return v
 	}
 	return demoDefaultPassword

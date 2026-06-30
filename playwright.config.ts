@@ -20,7 +20,7 @@ export default defineConfig({
 			reuseExistingServer: true,
 			env: {
 				...process.env,
-				DEMO_ENABLED: 'true'
+				PUBLIC_DEMO_ENABLED: 'true'
 			}
 		},
 		{
