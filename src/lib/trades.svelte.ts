@@ -517,9 +517,11 @@ class TradesContext {
 	}
 
 	private getPeriodRange(option: PeriodOption) {
-		const now = new UTCDate();
-		const currentYear = now.getUTCFullYear();
-		const currentMonth = now.getUTCMonth();
+		// NOTE: Read LOCAL date components, not UTC, so presets match the calendar grid and the
+		// picker's date-only storage; UTC drifts a month at boundaries (Tokyo July 1 vs UTC June 30).
+		const now = new Date();
+		const currentYear = now.getFullYear();
+		const currentMonth = now.getMonth();
 		const startOfThisMonth = new UTCDate(currentYear, currentMonth, 1, 0, 0, 0, 0);
 
 		switch (option) {
