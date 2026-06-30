@@ -50,6 +50,8 @@ func main() {
 	go balanceWorker(ctx, app)
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
+		registerDemo(e.App)
+
 		e.Router.GET("/api/setup-status", func(re *core.RequestEvent) error {
 			superusers, err := e.App.FindAllRecords("_superusers")
 			if err != nil {

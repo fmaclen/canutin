@@ -877,13 +877,13 @@ test('date range picker allows selecting custom range via calendar', async ({ pa
 	await expect(page.getByText('This Month Payment')).not.toBeVisible();
 });
 
-// Regression test for the date-range picker storing the wrong day for users ahead of
-// UTC. The picker builds the picked day in UTC field-space; a viewer in Asia/Tokyo
-// (UTC+9) picking day 10 must round-trip to periodFrom=...-10, not ...-09.
 test.describe('date range picker in a UTC+ timezone', () => {
 	test.use({ timezoneId: 'Asia/Tokyo' });
 
-	test('picked range round-trips to the same days', async ({ page }) => {
+	test('picking the local day stores that local date, not the prior UTC day', async ({ page }) => {
+		// 2025-06-14T20:00:00Z is June 15 in Tokyo (UTC+9) but June 14 in UTC.
+		await page.clock.setFixedTime(new Date('2025-06-14T20:00:00Z'));
+
 		const user = await seedUser('tokyo');
 
 		const account = await seedAccount({
@@ -899,21 +899,45 @@ test.describe('date range picker in a UTC+ timezone', () => {
 			value: 5000
 		});
 
-		const now = new UTCDate();
-		const lastMonth = addMonths(startOfMonth(now), -1);
-		const lastMonthYear = lastMonth.getUTCFullYear();
-		const lastMonthIndex = lastMonth.getUTCMonth() + 1;
-		const pad = (value: number) => String(value).padStart(2, '0');
-		const expectedFrom = `${lastMonthYear}-${pad(lastMonthIndex)}-10`;
-		// End is exclusive: clicking day 20 (inclusive) stores the next UTC day, day 21.
-		const expectedTo = `${lastMonthYear}-${pad(lastMonthIndex)}-21`;
+		await page.goto('/');
+		await signIn(page, user.email);
+		await goToPageViaSidebar(page, 'Transactions');
 
-		await seedTransaction({
+		await page.getByLabel('Period').click();
+		await page
+			.getByRole('button', { name: /June 15,/ })
+			.first()
+			.click();
+		await page
+			.getByRole('button', { name: /June 16,/ })
+			.first()
+			.click();
+
+		await expect(page).toHaveURL(/periodFrom=2025-06-15/);
+		await expect(page).toHaveURL(/periodTo=2025-06-17/);
+	});
+});
+
+test.describe('date range picker in a UTC- timezone', () => {
+	test.use({ timezoneId: 'Pacific/Honolulu' });
+
+	test('picking the local day stores that local date, not the later UTC day', async ({ page }) => {
+		// 2025-06-16T05:00:00Z is June 15 in Honolulu (UTC-10) but June 16 in UTC.
+		await page.clock.setFixedTime(new Date('2025-06-16T05:00:00Z'));
+
+		const user = await seedUser('honolulu');
+
+		const account = await seedAccount({
+			name: 'Honolulu Checking',
+			balanceGroup: AccountsBalanceGroupOptions.CASH,
+			owner: user.id,
+			balanceType: 'Checking'
+		});
+		await seedAccountBalance({
 			account: account.id,
 			owner: user.id,
-			date: new UTCDate(lastMonthYear, lastMonth.getUTCMonth(), 15, 12, 0, 0, 0).toISOString(),
-			description: 'In Range Payment',
-			value: 200
+			asOf: new Date().toISOString(),
+			value: 5000
 		});
 
 		await page.goto('/');
@@ -921,13 +945,67 @@ test.describe('date range picker in a UTC+ timezone', () => {
 		await goToPageViaSidebar(page, 'Transactions');
 
 		await page.getByLabel('Period').click();
-		await page.getByRole('button', { name: 'Previous' }).click();
-		await page.getByRole('button', { name: /10,/ }).first().click();
-		await page.getByRole('button', { name: /20,/ }).first().click();
+		await page
+			.getByRole('button', { name: /June 15,/ })
+			.first()
+			.click();
+		await page
+			.getByRole('button', { name: /June 16,/ })
+			.first()
+			.click();
 
-		await expect(page).toHaveURL(new RegExp(`periodFrom=${expectedFrom}`));
-		await expect(page).toHaveURL(new RegExp(`periodTo=${expectedTo}`));
-		await expect(page.getByText('In Range Payment')).toBeVisible();
+		await expect(page).toHaveURL(/periodFrom=2025-06-15/);
+		await expect(page).toHaveURL(/periodTo=2025-06-17/);
+	});
+});
+
+test.describe('period presets in a UTC+ timezone at a month boundary', () => {
+	test.use({ timezoneId: 'Asia/Tokyo' });
+
+	test('"This month" uses the local month, not the UTC month', async ({ page }) => {
+		// 2025-06-30T20:00:00Z is July 1 in Tokyo (UTC+9) but June 30 in UTC.
+		await page.clock.setFixedTime(new Date('2025-06-30T20:00:00Z'));
+
+		const user = await seedUser('boundary');
+
+		const account = await seedAccount({
+			name: 'Boundary Checking',
+			balanceGroup: AccountsBalanceGroupOptions.CASH,
+			owner: user.id,
+			balanceType: 'Checking'
+		});
+		await seedAccountBalance({
+			account: account.id,
+			owner: user.id,
+			asOf: new Date().toISOString(),
+			value: 5000
+		});
+
+		await seedTransaction({
+			account: account.id,
+			owner: user.id,
+			date: new UTCDate(2025, 6, 1, 12, 0, 0, 0).toISOString(),
+			description: 'July Payment',
+			value: 200
+		});
+		await seedTransaction({
+			account: account.id,
+			owner: user.id,
+			date: new UTCDate(2025, 5, 20, 12, 0, 0, 0).toISOString(),
+			description: 'June Payment',
+			value: 100
+		});
+
+		await page.goto('/');
+		await signIn(page, user.email);
+		await goToPageViaSidebar(page, 'Transactions');
+
+		await page.getByLabel('Period').click();
+		await page.getByRole('button', { name: 'This month' }).click();
+		await expect(page.getByLabel('Period')).toContainText('This month');
+
+		await expect(page.getByText('July Payment')).toBeVisible();
+		await expect(page.getByText('June Payment')).not.toBeVisible();
 	});
 });
 

@@ -71,7 +71,7 @@
 		"test": "playwright test",
 		"verify": "bun run lint && bun run check && bun run build",
 		"quality": "bun run format && bun run eslint . && bun run check",
-		"pb": "IS_DEV=true bun scripts/pb-server.ts",
+		"pb": "IS_DEV=true PUBLIC_DEMO_ENABLED=true bun scripts/pb-server.ts",
 		"pb:import": "bun scripts/pb-import.ts",
 		"pb:reset": "bun scripts/pb-reset.ts",
 		"worktree:setup": "bun scripts/worktree-setup.ts",

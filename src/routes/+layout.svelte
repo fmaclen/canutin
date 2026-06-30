@@ -20,7 +20,7 @@
 
 	const pb = getPocketBaseContext();
 	const auth = setAuthContext(pb.authedClient);
-	setDemoContext(pb.authedClient, auth);
+	setDemoContext(auth);
 
 	pb.onAuthInvalidated = () => auth.invalidateSession();
 

@@ -17,7 +17,11 @@ export default defineConfig({
 		{
 			command: 'bun run pb',
 			port: PB_PORT,
-			reuseExistingServer: true
+			reuseExistingServer: true,
+			env: {
+				...process.env,
+				PUBLIC_DEMO_ENABLED: 'true'
+			}
 		},
 		{
 			command: 'bun run build && bun run preview',
@@ -25,7 +29,9 @@ export default defineConfig({
 			env: {
 				...process.env,
 				PUBLIC_PLAYWRIGHT_TESTING: 'true',
-				PUBLIC_DEMO_ENABLED: 'true'
+				PUBLIC_DEMO_ENABLED: 'true',
+				PUBLIC_DEMO_EMAIL: 'demo@canutin.com',
+				PUBLIC_DEMO_PASSWORD: '123qweasdzxc'
 			}
 		}
 	],

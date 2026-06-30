@@ -21,6 +21,7 @@ export const DEFAULT_PASSWORD = '123qweasdzxc';
 
 export const PB_URL = process.env.PUBLIC_PB_URL ?? 'http://127.0.0.1:42070';
 const SUPERADMIN_EMAIL = 'superadmin@example.com';
+const DEMO_EMAIL = process.env.PUBLIC_DEMO_EMAIL ?? 'demo@canutin.com';
 
 async function getAdminPB(): Promise<TypedPocketBase> {
 	const pb = new PocketBase(PB_URL) as TypedPocketBase;
@@ -55,6 +56,31 @@ export async function resetDatabase() {
 	} catch {
 		// HACK: PB may 400 during cascade but deletions still apply; ignore.
 	}
+}
+
+// Triggers the server's `demoReset` cron so the shared demo account and its data exist.
+// PocketBase v0.39 runs a registered cron on demand via `POST /api/crons/{id}` with
+// superuser auth (apis/cron.go: `subGroup.POST("/{id}", cronRun)`). The handler is
+// fire-and-forget and returns 204, so poll until the seeded account's data has committed.
+export async function seedDemoAccount() {
+	const pbAdmin = await getAdminPB();
+	await pbAdmin.send('/api/crons/demoReset', { method: 'POST' });
+
+	for (let attempt = 0; attempt < 60; attempt++) {
+		const demoUser = await pbAdmin
+			.collection('users')
+			.getFirstListItem(`email='${DEMO_EMAIL}'`)
+			.catch(() => null);
+		if (demoUser) {
+			const accounts = await pbAdmin
+				.collection('accounts')
+				.getList(1, 1, { filter: `owner='${demoUser.id}'` });
+			if (accounts.totalItems > 0) return;
+		}
+		await new Promise((resolve) => setTimeout(resolve, 500));
+	}
+
+	throw new Error('Demo account was not seeded after triggering demoReset');
 }
 
 export async function seedUser(name: string) {
