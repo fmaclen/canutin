@@ -2,11 +2,10 @@ import PocketBase, { ClientResponseError } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 import { toast } from 'svelte-sonner';
 
-import { env } from '$env/dynamic/public';
-
 import { logError } from './logger';
 import { m } from './paraglide/messages';
 import type { TypedPocketBase } from './pocketbase.schema';
+import { getBackendUrl } from './utils';
 
 export type SetupStatus = 'checking' | 'ready' | 'needs-setup' | 'unreachable';
 
@@ -22,11 +21,11 @@ export class PocketBaseContext {
 	onAuthInvalidated?: () => void;
 
 	constructor() {
-		this.authedClient = new PocketBase(env.PUBLIC_PB_URL || 'http://127.0.0.1:42070');
+		this.authedClient = new PocketBase(getBackendUrl());
 	}
 
 	get backendUrl(): string {
-		return env.PUBLIC_PB_URL || 'http://127.0.0.1:42070';
+		return getBackendUrl();
 	}
 
 	async checkSetup(): Promise<SetupStatus> {

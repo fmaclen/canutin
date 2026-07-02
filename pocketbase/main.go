@@ -66,6 +66,8 @@ func main() {
 			return re.JSON(200, map[string]bool{"ready": false})
 		})
 
+		e.Router.GET("/api/canutin/skill", canutinSkillHandler(e.App))
+
 		e.Router.POST("/api/canutin/import", func(re *core.RequestEvent) error {
 			return handleImport(e.App, re)
 		}).Bind(apis.RequireAuth())

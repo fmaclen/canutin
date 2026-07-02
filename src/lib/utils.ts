@@ -1,11 +1,14 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+import { env } from '$env/dynamic/public';
 import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 
 export function cn(...inputs: ClassValue[]) {
 	return twMerge(clsx(inputs));
 }
+
+export const getBackendUrl = () => env.PUBLIC_PB_URL || 'http://127.0.0.1:42070';
 
 export function toNumber(value: unknown) {
 	if (value === null || value === undefined || value === '') return null;

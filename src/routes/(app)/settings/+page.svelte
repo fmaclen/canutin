@@ -14,6 +14,7 @@
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
@@ -41,6 +42,7 @@
 
 	const importSessionsContext = getImportSessionsContext();
 	const pb = getPocketBaseContext();
+	const agentAccessUrl = $derived(`${pb.backendUrl}/api/canutin/skill`);
 
 	let themeDraft = $state<InterfaceThemeMode>(userPrefersMode.current);
 	let localeDraft = $state<'en' | 'es'>(interfacePreferences.locale);
@@ -408,5 +410,29 @@
 				</div>
 			{/if}
 		{/if}
+	</Section>
+
+	<Section>
+		<SectionTitle title={m.settings_agent_access_section_title()} />
+		<div class="bg-muted border-border overflow-hidden rounded border">
+			<Fieldset isFirst={true}>
+				<FormFieldRow itemsAlignment="items-start">
+					<Label for="agent-access-url" class="justify-start pr-0 md:justify-end md:pt-2"
+						>{m.settings_agent_access_url_label()}</Label
+					>
+					<div class="space-y-1.5">
+						<p class="text-muted-foreground text-sm">
+							{m.settings_agent_access_description()}
+						</p>
+						<Input
+							id="agent-access-url"
+							readonly
+							value={agentAccessUrl}
+							class="bg-background font-mono"
+						/>
+					</div>
+				</FormFieldRow>
+			</Fieldset>
+		</div>
 	</Section>
 </Page>

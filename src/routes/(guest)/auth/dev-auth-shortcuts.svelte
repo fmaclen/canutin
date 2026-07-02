@@ -5,13 +5,13 @@
 	import { Button } from '$lib/components/ui/button';
 	import { logError } from '$lib/logger';
 	import type { UsersResponse } from '$lib/pocketbase.schema';
+	import { getBackendUrl } from '$lib/utils';
 
 	const auth = getAuthContext();
 
 	type DevUser = { id: string; email: string };
 	let users: DevUser[] = $state([]);
 
-	const DEV_PB_URL = 'http://127.0.0.1:42070';
 	const DEV_SUPERADMIN_EMAIL = 'superadmin@example.com';
 	const DEV_SUPERADMIN_PASSWORD = '123qweasdzxc';
 
@@ -31,7 +31,7 @@
 	}
 
 	$effect(() => {
-		const adminPb = new PocketBase(DEV_PB_URL);
+		const adminPb = new PocketBase(getBackendUrl());
 
 		adminPb
 			.collection('_superusers')

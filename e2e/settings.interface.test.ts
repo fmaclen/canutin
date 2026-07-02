@@ -53,6 +53,8 @@ test('settings switches theme only after clicking Save and persists after reload
 
 	await expect(page.locator('html')).not.toHaveClass(/dark/);
 	await expect(page.getByRole('button', { name: 'Save' })).toBeDisabled();
+	await expect(page.getByText('AI agent access')).toBeVisible();
+	await expect(page.getByLabel('URL')).toHaveValue(/\/api\/canutin\/skill$/);
 
 	await page.getByLabel('Theme').click();
 	await page.getByRole('option', { name: 'Dark' }).click();
