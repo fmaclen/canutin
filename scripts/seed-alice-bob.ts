@@ -1,8 +1,8 @@
 import PocketBase from 'pocketbase';
 
+import { PB_URL } from '../e2e/pocketbase.helpers';
 import type { TypedPocketBase } from '../src/lib/pocketbase.schema';
 
-const PB_URL = process.env.PUBLIC_PB_URL ?? 'http://127.0.0.1:42070';
 const PASSWORD = '123qweasdzxc';
 
 async function admin(): Promise<TypedPocketBase> {
