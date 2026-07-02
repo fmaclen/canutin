@@ -458,5 +458,8 @@
 	"settings_imports_revert_confirm_cancel": "Cancel",
 	"settings_imports_revert_confirm_continue": "Revert",
 	"settings_imports_revert_success": "Import reverted",
-	"settings_imports_revert_failed": "Couldn't revert import"
+	"settings_imports_revert_failed": "Couldn't revert import",
+	"settings_agent_access_section_title": "AI agent access",
+	"settings_agent_access_description": "Give this URL to an AI agent to teach it how to read and write your Canutin data",
+	"settings_agent_access_url_label": "URL"
 }

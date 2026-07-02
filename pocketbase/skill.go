@@ -10,7 +10,7 @@ import (
 )
 
 const skillFrontmatter = `---
-name: skill
+name: canutin-api
 description: 'Live reference for reading and writing Canutin data through its PocketBase API'
 ---
 `
@@ -133,20 +133,8 @@ func canutinSkillHandler(app core.App) func(*core.RequestEvent) error {
 		}
 
 		collectionNameByID := map[string]string{}
-		resolveCollectionName := func(id string) string {
-			if id == "" {
-				return ""
-			}
-			if name, ok := collectionNameByID[id]; ok {
-				return name
-			}
-			related, err := app.FindCollectionByNameOrId(id)
-			if err != nil {
-				collectionNameByID[id] = id
-				return id
-			}
-			collectionNameByID[id] = related.Name
-			return related.Name
+		for _, collection := range collections {
+			collectionNameByID[collection.Id] = collection.Name
 		}
 
 		var doc strings.Builder
@@ -168,7 +156,7 @@ func canutinSkillHandler(app core.App) func(*core.RequestEvent) error {
 			if collection.System {
 				continue
 			}
-			if err := writeCollectionReference(&doc, collection, resolveCollectionName); err != nil {
+			if err := writeCollectionReference(&doc, collection, collectionNameByID); err != nil {
 				return re.InternalServerError("Failed to render schema", err)
 			}
 		}
@@ -183,12 +171,16 @@ func canutinSkillHandler(app core.App) func(*core.RequestEvent) error {
 	}
 }
 
-func writeCollectionReference(doc *strings.Builder, collection *core.Collection, resolveCollectionName func(string) string) error {
+func writeCollectionReference(doc *strings.Builder, collection *core.Collection, collectionNameByID map[string]string) error {
 	fmt.Fprintf(doc, "### %s (%s)\n\n", collection.Name, collection.Type)
 	doc.WriteString("| Field | Type | Required | Relation / values |\n")
 	doc.WriteString("| --- | --- | --- | --- |\n")
 
 	for _, field := range collection.Fields {
+		if field.Type() == core.FieldTypeAutodate {
+			continue
+		}
+
 		marshaled, err := json.Marshal(field)
 		if err != nil {
 			return err
@@ -209,7 +201,7 @@ func writeCollectionReference(doc *strings.Builder, collection *core.Collection,
 			required = "yes"
 		}
 
-		fmt.Fprintf(doc, "| %s | %s | %s | %s |\n", name, fieldType, required, relationOrValues(meta, resolveCollectionName))
+		fmt.Fprintf(doc, "| %s | %s | %s | %s |\n", name, fieldType, required, relationOrValues(meta, collectionNameByID))
 	}
 
 	doc.WriteString("\n")
@@ -223,10 +215,13 @@ func writeCollectionReference(doc *strings.Builder, collection *core.Collection,
 	return nil
 }
 
-func relationOrValues(meta map[string]any, resolveCollectionName func(string) string) string {
+func relationOrValues(meta map[string]any, collectionNameByID map[string]string) string {
 	if collectionID := asString(meta["collectionId"]); collectionID != "" {
-		target := resolveCollectionName(collectionID)
-		if asNumber(meta["maxSelect"]) == 1 {
+		target, ok := collectionNameByID[collectionID]
+		if !ok {
+			target = collectionID
+		}
+		if maxSelect, ok := meta["maxSelect"].(float64); ok && maxSelect == 1 {
 			return "→ " + target
 		}
 		return "→ " + target + " (multiple)"
@@ -263,11 +258,4 @@ func asString(value any) string {
 func asBool(value any) bool {
 	b, ok := value.(bool)
 	return ok && b
-}
-
-func asNumber(value any) float64 {
-	if n, ok := value.(float64); ok {
-		return n
-	}
-	return 0
 }

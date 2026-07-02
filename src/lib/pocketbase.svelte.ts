@@ -2,11 +2,10 @@ import PocketBase, { ClientResponseError } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 import { toast } from 'svelte-sonner';
 
-import { getBackendUrl } from '$lib/pocketbase-url';
-
 import { logError } from './logger';
 import { m } from './paraglide/messages';
 import type { TypedPocketBase } from './pocketbase.schema';
+import { getBackendUrl } from './utils';
 
 export type SetupStatus = 'checking' | 'ready' | 'needs-setup' | 'unreachable';
 

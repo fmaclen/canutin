@@ -8,10 +8,13 @@ test('skill route serves live markdown schema reference', async () => {
 	expect(response.headers.get('content-type')).toContain('text/markdown');
 
 	const body = await response.text();
-	expect(body.startsWith('---\nname: skill')).toBe(true);
+	expect(body.startsWith('---\nname: canutin-api')).toBe(true);
 	expect(body).toContain('### accounts');
 
 	const accountsSection = body.slice(body.indexOf('### accounts'));
 	const nameRow = accountsSection.split('\n').find((line) => line.startsWith('| name |'));
 	expect(nameRow).toContain('| name | text |');
+
+	expect(body).not.toContain('| created |');
+	expect(body).not.toContain('| updated |');
 });

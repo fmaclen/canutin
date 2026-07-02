@@ -72,3 +72,7 @@ Load when your tool list matches the harness. The agent must check tool availabi
 | ---------------------------------------------------------------------------------------- | -------- |
 | Harness-specific quirks for Codex sessions - spawn_agent rules and validation gotchas    | codex    |
 | Harness-specific quirks for opencode sessions - plan mode rules and delegation reminders | opencode |
+
+> `pocketbase/skill.go` hand-maintains the custom endpoints, behavioral constraints, and auth
+> sections of the `/api/canutin/skill` reference. Update them whenever custom routes or
+> backend hooks change - nothing enforces this automatically.
