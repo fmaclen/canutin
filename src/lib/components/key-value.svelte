@@ -11,13 +11,15 @@
 		value = null,
 		variant = 'filled',
 		format = 'currency',
-		decimalScale = 0
+		decimalScale = 0,
+		isUnconverted = false
 	}: {
 		title: string;
 		value: number | null;
 		variant?: Variant;
 		format?: 'currency' | 'number' | 'percent';
 		decimalScale?: number;
+		isUnconverted?: boolean;
 	} = $props();
 
 	const variantClasses: Record<Variant, string> = {
@@ -44,7 +46,7 @@
 		{:else if format === 'number'}
 			<Number value={value.toLocaleString(getFormattingLocale())} />
 		{:else}
-			<Currency {value} {decimalScale} />
+			<Currency {value} {decimalScale} {isUnconverted} />
 		{/if}
 	</div>
 </div>

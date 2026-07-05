@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import Currency from '$lib/components/currency.svelte';
+	import Currency, { getCurrencyFxLabel } from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
 	import Link from '$lib/components/link.svelte';
 	import RecordLink from '$lib/components/record-link.svelte';
@@ -190,23 +190,51 @@
 						</Table.Cell>
 						<Table.Cell
 							class={'text-right whitespace-nowrap tabular-nums ' +
-								(row.excluded ? 'text-muted-foreground' : amountClass(row.value))}
+								(row.excluded ? 'text-muted-foreground' : amountClass(row.displayValue))}
 						>
 							{#if row.excluded}
 								<Tooltip.Root>
 									<Tooltip.Trigger
 										class="border-border inline-block border-b border-dashed leading-none hover:border-current"
 									>
-										<Currency value={row.value} decimalScale={2} />
+										<Currency
+											value={row.displayValue}
+											decimalScale={2}
+											isConverted={row.isConverted}
+											isUnconverted={row.isUnconverted}
+											missingCurrency={row.missingCurrency}
+											nativeCurrency={row.nativeCurrency}
+											nativeValue={row.value}
+											showFxTooltip={false}
+										/>
 									</Tooltip.Trigger>
 									<Tooltip.Content sideOffset={6}>
 										<p class="text-xs leading-snug font-normal">
 											{m.transactions_amount_tooltip_excluded()}
 										</p>
+										{#if row.isConverted || row.isUnconverted}
+											<p class="text-xs leading-snug font-normal">
+												{getCurrencyFxLabel({
+													decimalScale: 2,
+													isUnconverted: row.isUnconverted,
+													missingCurrency: row.missingCurrency,
+													nativeCurrency: row.nativeCurrency,
+													nativeValue: row.value
+												})}
+											</p>
+										{/if}
 									</Tooltip.Content>
 								</Tooltip.Root>
 							{:else}
-								<Currency value={row.value} decimalScale={2} />
+								<Currency
+									value={row.displayValue}
+									decimalScale={2}
+									isConverted={row.isConverted}
+									isUnconverted={row.isUnconverted}
+									missingCurrency={row.missingCurrency}
+									nativeCurrency={row.nativeCurrency}
+									nativeValue={row.value}
+								/>
 							{/if}
 						</Table.Cell>
 					</Table.Row>

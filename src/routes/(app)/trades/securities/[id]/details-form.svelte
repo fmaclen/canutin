@@ -11,10 +11,11 @@
 			name: string;
 			symbol: string;
 		};
+		currency: string;
 		onSubmit: () => void;
 	}
 
-	let { formData, onSubmit }: Props = $props();
+	let { formData, currency, onSubmit }: Props = $props();
 </script>
 
 <div class="bg-muted border-border overflow-hidden rounded border">
@@ -31,6 +32,13 @@
 					{m.securities_label_name()}
 				</Label>
 				<Input id="security-name" bind:value={formData.name} required />
+			</FormFieldRow>
+
+			<FormFieldRow>
+				<Label for="security-currency" class="justify-start pr-0 md:justify-end">
+					{m.securities_label_currency()}
+				</Label>
+				<Input id="security-currency" value={currency} disabled />
 			</FormFieldRow>
 
 			<FormFieldRow>

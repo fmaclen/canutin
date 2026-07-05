@@ -12,12 +12,13 @@
 			marketValue: string;
 			bookValue: string;
 		};
+		currency: string;
 		balanceAsOf?: string;
 		onSubmit: () => void;
 		disabled?: boolean;
 	}
 
-	let { formData, balanceAsOf = '', onSubmit, disabled = false }: Props = $props();
+	let { formData, currency, balanceAsOf = '', onSubmit, disabled = false }: Props = $props();
 
 	const parsedAsOf = $derived.by(() => {
 		if (!balanceAsOf) return null;
@@ -83,6 +84,7 @@
 					id="market-value"
 					name="market-value"
 					bind:value={formData.marketValue}
+					{currency}
 					{disabled}
 				/>
 			</FormFieldRow>
@@ -98,6 +100,7 @@
 					id="book-value"
 					name="book-value"
 					bind:value={formData.bookValue}
+					{currency}
 					{disabled}
 				/>
 			</FormFieldRow>

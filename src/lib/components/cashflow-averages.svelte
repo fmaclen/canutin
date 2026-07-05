@@ -34,33 +34,81 @@
 
 	<Tabs.Content value="three-months">
 		<div class="grid gap-2 lg:grid-cols-[1.3fr_1fr_1fr]">
-			<KeyValue title={m.trailing_cashflow_income_label()} value={avg3m.income} />
-			<KeyValue title={m.trailing_cashflow_expenses_label()} value={Math.abs(avg3m.expenses)} />
-			<KeyValue title={m.trailing_cashflow_surplus_label()} value={avg3m.surplus} />
+			<KeyValue
+				title={m.trailing_cashflow_income_label()}
+				value={avg3m.income}
+				isUnconverted={avg3m.isUnconverted}
+			/>
+			<KeyValue
+				title={m.trailing_cashflow_expenses_label()}
+				value={Math.abs(avg3m.expenses)}
+				isUnconverted={avg3m.isUnconverted}
+			/>
+			<KeyValue
+				title={m.trailing_cashflow_surplus_label()}
+				value={avg3m.surplus}
+				isUnconverted={avg3m.isUnconverted}
+			/>
 		</div>
 	</Tabs.Content>
 
 	<Tabs.Content value="six-months">
 		<div class="grid gap-2 lg:grid-cols-[1.3fr_1fr_1fr]">
-			<KeyValue title={m.trailing_cashflow_income_label()} value={avg6m.income} />
-			<KeyValue title={m.trailing_cashflow_expenses_label()} value={Math.abs(avg6m.expenses)} />
-			<KeyValue title={m.trailing_cashflow_surplus_label()} value={avg6m.surplus} />
+			<KeyValue
+				title={m.trailing_cashflow_income_label()}
+				value={avg6m.income}
+				isUnconverted={avg6m.isUnconverted}
+			/>
+			<KeyValue
+				title={m.trailing_cashflow_expenses_label()}
+				value={Math.abs(avg6m.expenses)}
+				isUnconverted={avg6m.isUnconverted}
+			/>
+			<KeyValue
+				title={m.trailing_cashflow_surplus_label()}
+				value={avg6m.surplus}
+				isUnconverted={avg6m.isUnconverted}
+			/>
 		</div>
 	</Tabs.Content>
 
 	<Tabs.Content value="year-to-date">
 		<div class="grid gap-2 lg:grid-cols-[1.3fr_1fr_1fr]">
-			<KeyValue title={m.trailing_cashflow_income_label()} value={avgYtd.income} />
-			<KeyValue title={m.trailing_cashflow_expenses_label()} value={Math.abs(avgYtd.expenses)} />
-			<KeyValue title={m.trailing_cashflow_surplus_label()} value={avgYtd.surplus} />
+			<KeyValue
+				title={m.trailing_cashflow_income_label()}
+				value={avgYtd.income}
+				isUnconverted={avgYtd.isUnconverted}
+			/>
+			<KeyValue
+				title={m.trailing_cashflow_expenses_label()}
+				value={Math.abs(avgYtd.expenses)}
+				isUnconverted={avgYtd.isUnconverted}
+			/>
+			<KeyValue
+				title={m.trailing_cashflow_surplus_label()}
+				value={avgYtd.surplus}
+				isUnconverted={avgYtd.isUnconverted}
+			/>
 		</div>
 	</Tabs.Content>
 
 	<Tabs.Content value="one-year">
 		<div class="grid gap-2 lg:grid-cols-[1.3fr_1fr_1fr]">
-			<KeyValue title={m.trailing_cashflow_income_label()} value={avg1y.income} />
-			<KeyValue title={m.trailing_cashflow_expenses_label()} value={Math.abs(avg1y.expenses)} />
-			<KeyValue title={m.trailing_cashflow_surplus_label()} value={avg1y.surplus} />
+			<KeyValue
+				title={m.trailing_cashflow_income_label()}
+				value={avg1y.income}
+				isUnconverted={avg1y.isUnconverted}
+			/>
+			<KeyValue
+				title={m.trailing_cashflow_expenses_label()}
+				value={Math.abs(avg1y.expenses)}
+				isUnconverted={avg1y.isUnconverted}
+			/>
+			<KeyValue
+				title={m.trailing_cashflow_surplus_label()}
+				value={avg1y.surplus}
+				isUnconverted={avg1y.isUnconverted}
+			/>
 		</div>
 	</Tabs.Content>
 </Tabs.Root>

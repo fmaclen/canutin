@@ -11,6 +11,7 @@
 		formData: {
 			value: string;
 		};
+		currency: string;
 		balanceAsOf?: string;
 		onSubmit: () => void;
 		disabled?: boolean;
@@ -19,6 +20,7 @@
 
 	let {
 		formData,
+		currency,
 		balanceAsOf = '',
 		onSubmit,
 		disabled = false,
@@ -85,7 +87,7 @@
 						</span>
 					{/if}
 				</div>
-				<CurrencyField id="value" name="value" bind:value={formData.value} {disabled} />
+				<CurrencyField id="value" name="value" bind:value={formData.value} {currency} {disabled} />
 			</FormFieldRow>
 		</Fieldset>
 

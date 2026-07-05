@@ -1,7 +1,11 @@
 package main
 
 import (
+	"database/sql"
+	"errors"
+	"fmt"
 	"strings"
+	"time"
 
 	"github.com/pocketbase/pocketbase/core"
 )
@@ -131,9 +135,44 @@ func createShare(
 		return re.BadRequestError("Failed to create share", err)
 	}
 
+	if err := ensureSharedCurrency(app, recipient.Id, parent.GetString("currency")); err != nil {
+		logEvent("shares", fmt.Sprintf("failed to ensure recipient currency %s", parent.GetString("currency")), err)
+	}
+
 	return re.JSON(200, map[string]any{
 		"id": share.Id,
 	})
+}
+
+func ensureSharedCurrency(app core.App, ownerID, currency string) error {
+	if currency == "" {
+		currency = "USD"
+	}
+	_, err := app.FindFirstRecordByFilter("currencies",
+		"owner = {:owner} && code = {:code}",
+		map[string]any{"owner": ownerID, "code": currency},
+	)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+
+	autoUpdate := false
+	if currency != "USD" {
+		autoUpdate = true
+		if !fxFetchDisabled() {
+			err := ensureRate(app, currency, time.Now().UTC().Format("2006-01-02"), true)
+			if errors.Is(err, errFXCodeUnavailable) {
+				autoUpdate = false
+			} else if err != nil && !errors.Is(err, errFXRequestFailed) {
+				return err
+			}
+		}
+	}
+	_, _, err = ensureCurrencyRecord(app, ownerID, currency, "", autoUpdate)
+	return err
 }
 
 func validateShareUpdateRequest(e *core.RecordRequestEvent) error {

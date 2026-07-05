@@ -8,6 +8,7 @@
 	import RecordLink from '$lib/components/record-link.svelte';
 	import * as Pagination from '$lib/components/ui/pagination/index';
 	import * as Table from '$lib/components/ui/table/index';
+	import { getExchangeRatesContext } from '$lib/exchange-rates.svelte';
 	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { formatSecurityQuantity } from '$lib/security-balance-values';
@@ -15,6 +16,7 @@
 	import { getTradesContext } from '$lib/trades.svelte';
 
 	const tradesContext = getTradesContext();
+	const fx = getExchangeRatesContext();
 
 	async function openTrade(event: MouseEvent, id: string) {
 		event.preventDefault();
@@ -158,14 +160,40 @@
 						</Table.Cell>
 						<Table.Cell class="text-right whitespace-nowrap tabular-nums">
 							{#if row.price !== null}
-								<Currency value={row.price} decimalScale={2} />
+								{@const priceConversion = fx.convert(
+									row.price,
+									row.securityCurrency,
+									row.date.toISOString()
+								)}
+								<Currency
+									value={priceConversion.value}
+									decimalScale={2}
+									isConverted={priceConversion.isConverted}
+									isUnconverted={priceConversion.isUnconverted}
+									missingCurrency={priceConversion.missingCurrency}
+									nativeCurrency={row.securityCurrency}
+									nativeValue={row.price}
+								/>
 							{:else}
 								<span class="text-muted-foreground text-sm">~</span>
 							{/if}
 						</Table.Cell>
 						<Table.Cell class="text-right whitespace-nowrap tabular-nums">
 							{#if row.fees !== null}
-								<Currency value={row.fees} decimalScale={2} />
+								{@const feesConversion = fx.convert(
+									row.fees,
+									row.securityCurrency,
+									row.date.toISOString()
+								)}
+								<Currency
+									value={feesConversion.value}
+									decimalScale={2}
+									isConverted={feesConversion.isConverted}
+									isUnconverted={feesConversion.isUnconverted}
+									missingCurrency={feesConversion.missingCurrency}
+									nativeCurrency={row.securityCurrency}
+									nativeValue={row.fees}
+								/>
 							{:else}
 								<span class="text-muted-foreground text-sm">~</span>
 							{/if}
@@ -175,7 +203,20 @@
 								(row.amount !== null ? amountClass(row.amount) : '')}
 						>
 							{#if row.amount !== null}
-								<Currency value={row.amount} decimalScale={2} />
+								{@const amountConversion = fx.convert(
+									row.amount,
+									row.securityCurrency,
+									row.date.toISOString()
+								)}
+								<Currency
+									value={amountConversion.value}
+									decimalScale={2}
+									isConverted={amountConversion.isConverted}
+									isUnconverted={amountConversion.isUnconverted}
+									missingCurrency={amountConversion.missingCurrency}
+									nativeCurrency={row.securityCurrency}
+									nativeValue={row.amount}
+								/>
 							{:else}
 								<span class="text-muted-foreground text-sm">~</span>
 							{/if}

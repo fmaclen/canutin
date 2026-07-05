@@ -4,6 +4,7 @@ import { SvelteMap } from 'svelte/reactivity';
 
 import { getAccountsContext } from './accounts.svelte';
 import { getAuthContext } from './auth.svelte';
+import { getExchangeRatesContext } from './exchange-rates.svelte';
 import { logError } from './logger';
 import type { SecuritiesResponse, SecurityBalancesResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
@@ -39,6 +40,12 @@ export type SecurityAccountBalance = {
 	costBasis: number | null;
 	gainLoss: number | null;
 	asOf: string;
+	isConverted: boolean;
+	isUnconverted: boolean;
+	missingCurrency: string | null;
+	nativeValue: number | null;
+	nativeCostBasis: number | null;
+	nativeGainLoss: number | null;
 };
 
 export type SecurityAggregate = {
@@ -50,6 +57,29 @@ export type SecurityAggregate = {
 	value: number | null;
 	costBasis: number | null;
 	gainLoss: number | null;
+	isConverted: boolean;
+	isUnconverted: boolean;
+};
+
+// NOTE: `value` is the account's positions summed in the display currency (each position converted
+// at its own currency/date); `nativeValue` is the same sum in the account's own currency, and is
+// null when the account holds any foreign-currency security (no single native figure exists then).
+// accounts.svelte.ts adds this to separately-converted cash - it must not convert `value` again.
+export type AccountPositionsValue = {
+	value: number | null;
+	nativeValue: number | null;
+	isConverted: boolean;
+	isUnconverted: boolean;
+	missingCurrency: string | null;
+};
+
+type PositionsAccumulator = {
+	displayValues: Array<number | null>;
+	nativeValues: Array<number | null>;
+	hasForeign: boolean;
+	isConverted: boolean;
+	isUnconverted: boolean;
+	missingCurrency: string | null;
 };
 
 const DEBOUNCE_MS = 200;
@@ -60,21 +90,46 @@ class SecuritiesContext {
 	positionsLoaded = false;
 
 	positionsValueByAccount = $derived.by(() => {
-		const eligibleAccountIds = new Set(
+		const currencyByAccount = new Map(
 			this._accounts.accountRecords
 				.filter((account) => !account.closed)
-				.map((account) => account.id)
+				.map((account) => [account.id, account.currency] as const)
 		);
-		const valuesByAccount = new SvelteMap<string, Array<number | null>>();
+		const securitiesById = this.securitiesById;
+		const accumulators = new SvelteMap<string, PositionsAccumulator>();
 		for (const resolved of this.currentPositions.values()) {
 			const accountId = resolved.balance.account;
-			if (!eligibleAccountIds.has(accountId)) continue;
-			const values = valuesByAccount.get(accountId) ?? [];
-			values.push(resolved.value);
-			valuesByAccount.set(accountId, values);
+			const accountCurrency = currencyByAccount.get(accountId);
+			if (accountCurrency === undefined) continue;
+			const currency = securitiesById.get(resolved.balance.security)?.currency ?? '';
+			const converted = this.convertOrNull(resolved.value, currency, resolved.balance.asOf);
+			const accumulator = accumulators.get(accountId) ?? {
+				displayValues: [],
+				nativeValues: [],
+				hasForeign: false,
+				isConverted: false,
+				isUnconverted: false,
+				missingCurrency: null
+			};
+			accumulator.displayValues.push(converted.isUnconverted ? 0 : converted.value);
+			accumulator.nativeValues.push(resolved.value);
+			if (currency !== accountCurrency) accumulator.hasForeign = true;
+			accumulator.isConverted ||= converted.isConverted;
+			accumulator.isUnconverted ||= converted.isUnconverted;
+			accumulator.missingCurrency ??= converted.missingCurrency;
+			accumulators.set(accountId, accumulator);
 		}
-		return new Map(
-			[...valuesByAccount].map(([accountId, values]) => [accountId, sumOrUnknown(values)])
+		return new Map<string, AccountPositionsValue>(
+			[...accumulators].map(([accountId, accumulator]) => [
+				accountId,
+				{
+					value: sumOrUnknown(accumulator.displayValues),
+					nativeValue: accumulator.hasForeign ? null : sumOrUnknown(accumulator.nativeValues),
+					isConverted: accumulator.isConverted,
+					isUnconverted: accumulator.isUnconverted,
+					missingCurrency: accumulator.missingCurrency
+				}
+			])
 		);
 	});
 
@@ -82,6 +137,7 @@ class SecuritiesContext {
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
 	private _accounts: ReturnType<typeof getAccountsContext>;
+	private _fx: ReturnType<typeof getExchangeRatesContext>;
 	private positionRefreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
 	private refreshSequence = 0;
 	private _activeUserId = '';
@@ -93,6 +149,7 @@ class SecuritiesContext {
 		this._auth = getAuthContext();
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
 		this._accounts = getAccountsContext();
+		this._fx = getExchangeRatesContext();
 		this.init();
 	}
 
@@ -120,7 +177,7 @@ class SecuritiesContext {
 	}
 
 	async createSecurityWithBalance(
-		securityData: { name: string; symbol?: string; owner: string },
+		securityData: { name: string; symbol?: string; owner: string; currency: string },
 		balanceData: SecurityBalanceInput
 	) {
 		const security = await this._pb.postJson<SecuritiesResponse>(
@@ -357,14 +414,20 @@ class SecuritiesContext {
 				.filter((account) => !account.closed)
 				.map((account) => [account.id, account])
 		);
+		const securitiesById = this.securitiesById;
 		const rows: SecurityAccountBalance[] = [];
 		for (const resolved of this.currentPositions.values()) {
 			const balance = resolved.balance;
 			const account = accounts.get(balance.account);
 			if (!account) continue;
 
-			const value = projectSignedValue(resolved.value, account.perspective);
-			const costBasis = projectSignedValue(resolved.costBasis, account.perspective);
+			const currency = securitiesById.get(balance.security)?.currency ?? '';
+			const valueConversion = this.convertOrNull(resolved.value, currency, balance.asOf);
+			const costBasisConversion = this.convertOrNull(resolved.costBasis, currency, balance.asOf);
+			const value = projectSignedValue(valueConversion.value, account.perspective);
+			const costBasis = projectSignedValue(costBasisConversion.value, account.perspective);
+			const nativeValue = projectSignedValue(resolved.value, account.perspective);
+			const nativeCostBasis = projectSignedValue(resolved.costBasis, account.perspective);
 			rows.push({
 				id: balance.id,
 				accountId: account.id,
@@ -375,14 +438,34 @@ class SecuritiesContext {
 				value,
 				costBasis,
 				gainLoss: value === null || costBasis === null ? null : value - costBasis,
-				asOf: balance.asOf
+				asOf: balance.asOf,
+				isConverted: valueConversion.isConverted || costBasisConversion.isConverted,
+				isUnconverted: valueConversion.isUnconverted || costBasisConversion.isUnconverted,
+				missingCurrency: valueConversion.missingCurrency ?? costBasisConversion.missingCurrency,
+				nativeValue,
+				nativeCostBasis,
+				nativeGainLoss:
+					nativeValue === null || nativeCostBasis === null ? null : nativeValue - nativeCostBasis
 			});
 		}
 		return rows;
 	}
 
+	private get securitiesById() {
+		return new Map(this.securities.map((security) => [security.id, security]));
+	}
+
+	// NOTE: securityBalances' value/costBasis are JSON-typed where `null` means UNKNOWN (see
+	// resolveSecurityBalanceValues) - conversion must leave that `null` untouched rather than
+	// coercing it into a native-vs-converted value.
+	private convertOrNull(value: number | null, currency: string, date: string) {
+		if (value === null)
+			return { value: null, isConverted: false, isUnconverted: false, missingCurrency: null };
+		return this._fx.convert(value, currency, date);
+	}
+
 	private computeAggregateRows() {
-		const securitiesById = new Map(this.securities.map((security) => [security.id, security]));
+		const securitiesById = this.securitiesById;
 		const balancesBySecurity = new SvelteMap<string, SecurityAccountBalance[]>();
 		for (const row of this.getLatestAccountBalanceRows()) {
 			if (row.quantity === 0) continue;
@@ -417,14 +500,20 @@ class SecuritiesContext {
 
 	private summarizeBalances(balances: SecurityAccountBalance[]) {
 		const quantity = sumOrUnknown(balances.map((balance) => balance.quantity));
-		const value = sumOrUnknown(balances.map((balance) => balance.value));
-		const costBasis = sumOrUnknown(balances.map((balance) => balance.costBasis));
+		const value = sumOrUnknown(
+			balances.map((balance) => (balance.isUnconverted ? 0 : balance.value))
+		);
+		const costBasis = sumOrUnknown(
+			balances.map((balance) => (balance.isUnconverted ? 0 : balance.costBasis))
+		);
 
 		return {
 			quantity,
 			value,
 			costBasis,
-			gainLoss: value === null || costBasis === null ? null : value - costBasis
+			gainLoss: value === null || costBasis === null ? null : value - costBasis,
+			isConverted: balances.some((balance) => balance.isConverted),
+			isUnconverted: balances.some((balance) => balance.isUnconverted)
 		};
 	}
 

@@ -6,7 +6,10 @@
 	import { getAuthContext } from '$lib/auth.svelte';
 	import { setBalanceTypesContext } from '$lib/balance-types.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import { setCurrenciesContext } from '$lib/currencies.svelte';
+	import { setExchangeRatesContext } from '$lib/exchange-rates.svelte';
 	import { setImportSessionsContext } from '$lib/import-sessions.svelte';
+	import { connectDisplayCurrencyRegistry } from '$lib/interface-preferences.svelte';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { setSecuritiesContext } from '$lib/securities.svelte';
 
@@ -17,6 +20,9 @@
 	const pb = getPocketBaseContext();
 	const auth = getAuthContext();
 	const balanceTypesContext = setBalanceTypesContext(pb);
+	const currenciesContext = setCurrenciesContext(pb);
+	connectDisplayCurrencyRegistry(currenciesContext);
+	const exchangeRatesContext = setExchangeRatesContext(pb, currenciesContext);
 	const accountsContext = setAccountsContext(pb, balanceTypesContext);
 	const assetsContext = setAssetsContext(pb, balanceTypesContext);
 	const securitiesContext = setSecuritiesContext(pb);
@@ -25,6 +31,8 @@
 
 	onDestroy(() => {
 		balanceTypesContext.dispose();
+		exchangeRatesContext.dispose();
+		currenciesContext.dispose();
 		accountsContext.dispose();
 		assetsContext.dispose();
 		securitiesContext.dispose();

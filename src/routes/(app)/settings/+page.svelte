@@ -21,10 +21,12 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index';
 	import * as Table from '$lib/components/ui/table/index';
+	import { getCurrenciesContext } from '$lib/currencies.svelte';
 	import { getImportSessionsContext } from '$lib/import-sessions.svelte';
 	import {
 		getFormattingLocale,
 		interfacePreferences,
+		setDisplayCurrency,
 		setInterfaceLocale,
 		type InterfaceThemeMode
 	} from '$lib/interface-preferences.svelte';
@@ -41,15 +43,24 @@
 	} from '$lib/utils';
 
 	const importSessionsContext = getImportSessionsContext();
+	const currenciesContext = getCurrenciesContext();
 	const pb = getPocketBaseContext();
 	const agentAccessUrl = $derived(`${pb.backendUrl}/api/canutin/skill`);
 
 	let themeDraft = $state<InterfaceThemeMode>(userPrefersMode.current);
 	let localeDraft = $state<'en' | 'es'>(interfacePreferences.locale);
+	let currencyDraft = $state(interfacePreferences.preferredDisplayCurrency);
 
 	const currentTheme = $derived(userPrefersMode.current);
 	const currentLocale = $derived(interfacePreferences.locale);
-	const interfaceIsDirty = $derived(themeDraft !== currentTheme || localeDraft !== currentLocale);
+	const currentPreferredDisplayCurrency = $derived(interfacePreferences.preferredDisplayCurrency);
+	const currencyOptions = $derived(currenciesContext.currencyOptions);
+	const selectedCurrency = $derived(currenciesContext.getCurrency(currencyDraft));
+	const interfaceIsDirty = $derived(
+		themeDraft !== currentTheme ||
+			localeDraft !== currentLocale ||
+			currencyDraft !== currentPreferredDisplayCurrency
+	);
 
 	type SessionRow = Pick<
 		ImportSessionsResponse,
@@ -137,6 +148,13 @@
 
 	async function handleInterfaceSubmit() {
 		if (!interfaceIsDirty) return;
+		if (
+			currencyDraft !== currentPreferredDisplayCurrency &&
+			!currenciesContext.hasCurrency(currencyDraft)
+		) {
+			toast.error(m.currency_required());
+			return;
+		}
 
 		try {
 			if (themeDraft !== currentTheme) {
@@ -144,6 +162,9 @@
 			}
 			if (localeDraft !== currentLocale) {
 				await setInterfaceLocale(localeDraft);
+			}
+			if (currencyDraft !== currentPreferredDisplayCurrency) {
+				setDisplayCurrency(currencyDraft);
 			}
 			toast.success(m.settings_interface_success());
 		} catch (error) {
@@ -241,6 +262,54 @@
 							<Select.Content>
 								<Select.Item value="en">English</Select.Item>
 								<Select.Item value="es">Español</Select.Item>
+							</Select.Content>
+						</Select.Root>
+					</FormFieldRow>
+
+					<FormFieldRow>
+						<Label id="currency-label" for="currency" class="justify-start pr-0 md:justify-end"
+							>{m.settings_interface_currency_label()}</Label
+						>
+						<Select.Root
+							type="single"
+							value={currencyDraft}
+							onValueChange={(value) => (currencyDraft = value)}
+						>
+							<Select.Trigger
+								id="currency"
+								aria-labelledby="currency-label"
+								class="bg-background w-full"
+							>
+								{#if selectedCurrency}
+									<div class="flex min-w-0 items-center gap-2">
+										<span>{selectedCurrency.code}</span>
+										{#if selectedCurrency.name}
+											<span class="text-muted-foreground truncate">{selectedCurrency.name}</span>
+										{/if}
+									</div>
+								{:else if currencyDraft}
+									{currencyDraft}
+								{:else}
+									<span class="text-muted-foreground">{m.currencies_select_placeholder()}</span>
+								{/if}
+							</Select.Trigger>
+							<Select.Content>
+								{#if currencyOptions.length === 0}
+									<Select.Item value="__no-currencies" disabled>
+										{m.currencies_select_empty()}
+									</Select.Item>
+								{:else}
+									{#each currencyOptions as option (option.value)}
+										<Select.Item value={option.value}>
+											<div class="flex min-w-0 items-center gap-2">
+												<span>{option.code}</span>
+												{#if option.name}
+													<span class="text-muted-foreground truncate">{option.name}</span>
+												{/if}
+											</div>
+										</Select.Item>
+									{/each}
+								{/if}
 							</Select.Content>
 						</Select.Root>
 					</FormFieldRow>

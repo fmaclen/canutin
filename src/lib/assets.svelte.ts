@@ -4,6 +4,7 @@ import { SvelteMap } from 'svelte/reactivity';
 
 import { getAuthContext } from './auth.svelte';
 import { setBalanceTypesContext } from './balance-types.svelte';
+import { getExchangeRatesContext } from './exchange-rates.svelte';
 import { logError } from './logger';
 import {
 	AssetSharesAccessRoleOptions,
@@ -14,7 +15,7 @@ import {
 } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
 import { participantExcluded, projectAssetFinancials } from './sharing';
-import { isUnavailableRecordError, removeById, upsertById } from './utils';
+import { isUnavailableRecordError, removeById, toPocketBaseDateString, upsertById } from './utils';
 
 type AssetBalanceData = {
 	marketValue: number;
@@ -22,6 +23,20 @@ type AssetBalanceData = {
 	gain: number;
 	gainPercent: number;
 	balanceAsOf: string;
+};
+
+// NOTE: `bookValue`/`marketValue`/`gain` above stay the native, perspective-projected amounts;
+// the `display*` counterparts are the same amounts converted to the display currency (mirrors
+// transactions.svelte.ts's value/displayValue split). `gainPercent` is a ratio, so it's
+// currency-invariant and has no display counterpart. All three conversions share the same
+// asset currency + balance date, so a single isConverted/isUnconverted pair covers all of them.
+type AssetDisplayBalanceData = AssetBalanceData & {
+	displayBookValue: number;
+	displayMarketValue: number;
+	displayGain: number;
+	isConverted: boolean;
+	isUnconverted: boolean;
+	missingCurrency: string | null;
 };
 
 type LatestAssetBalance = AssetBalanceData & {
@@ -38,7 +53,7 @@ const DEFAULT_BALANCE_DATA: AssetBalanceData = {
 };
 
 export type AssetWithBalance = AssetsResponse &
-	AssetBalanceData & {
+	AssetDisplayBalanceData & {
 		isOwner: boolean;
 		canWrite: boolean;
 		accessRole: 'OWNER' | AssetSharesAccessRoleOptions;
@@ -65,6 +80,7 @@ class AssetsContext {
 	private latestBalanceByAsset = new SvelteMap<string, LatestAssetBalance>();
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
+	private _fx: ReturnType<typeof getExchangeRatesContext>;
 	private balanceTypesContext: ReturnType<typeof setBalanceTypesContext>;
 	private refreshSequence = 0;
 	private mutationEpoch = 0;
@@ -79,6 +95,7 @@ class AssetsContext {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
+		this._fx = getExchangeRatesContext();
 		this.balanceTypesContext = balanceTypesContext;
 		this.init();
 	}
@@ -370,12 +387,34 @@ class AssetsContext {
 
 	private computeBalanceData(
 		balance: Pick<AssetBalancesResponse, 'asOf' | 'bookValue' | 'marketValue'>,
-		perspective: AssetSharesPerspectiveOptions
+		perspective: AssetSharesPerspectiveOptions,
+		currency: string
 	) {
 		const projected = projectAssetFinancials(balance.bookValue, balance.marketValue, perspective);
+		// NOTE: falls back to now when there's no balance yet (a fresh asset with no snapshot),
+		// so the row still converts at a sensible rate.
+		const date = balance.asOf || toPocketBaseDateString(new Date());
+		const bookValueConversion = this._fx.convert(projected.bookValue, currency, date);
+		const marketValueConversion = this._fx.convert(projected.marketValue, currency, date);
+		const gainConversion = this._fx.convert(projected.gain, currency, date);
 		return {
 			...projected,
-			balanceAsOf: balance.asOf
+			balanceAsOf: balance.asOf,
+			displayBookValue: bookValueConversion.isUnconverted ? 0 : bookValueConversion.value,
+			displayMarketValue: marketValueConversion.isUnconverted ? 0 : marketValueConversion.value,
+			displayGain: gainConversion.isUnconverted ? 0 : gainConversion.value,
+			isConverted:
+				bookValueConversion.isConverted ||
+				marketValueConversion.isConverted ||
+				gainConversion.isConverted,
+			isUnconverted:
+				bookValueConversion.isUnconverted ||
+				marketValueConversion.isUnconverted ||
+				gainConversion.isUnconverted,
+			missingCurrency:
+				bookValueConversion.missingCurrency ??
+				marketValueConversion.missingCurrency ??
+				gainConversion.missingCurrency
 		};
 	}
 
@@ -399,7 +438,8 @@ class AssetsContext {
 					bookValue: rawBalanceData.bookValue,
 					marketValue: rawBalanceData.marketValue
 				},
-				perspective
+				perspective,
+				asset.currency
 			),
 			isOwner,
 			canWrite: isOwner,

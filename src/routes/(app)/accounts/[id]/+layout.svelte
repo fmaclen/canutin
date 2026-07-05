@@ -21,7 +21,7 @@
 	// correct perspective on its first compute. Feeding the current id reactively
 	// also drives a refetch when navigating between two account detail pages.
 	$effect(() => {
-		if (account) ctx.setAccount(account.id, account.perspective);
+		if (account) ctx.setAccount(account.id, account.perspective, account.currency);
 	});
 
 	let { children } = $props();

@@ -6,6 +6,7 @@ import type {
 	AccountsResponse,
 	AssetBalancesResponse,
 	AssetsResponse,
+	SecuritiesResponse,
 	SecurityBalancesResponse
 } from '$lib/pocketbase.schema';
 import { toNumber } from '$lib/utils';
@@ -88,6 +89,7 @@ export function computeRangeForPeriod(
 export function buildPreparedMaps(
 	accounts: AccountsResponse[],
 	assets: AssetsResponse[],
+	securities: SecuritiesResponse[],
 	accountBalances: AccountBalancesResponse[],
 	securityBalances: TrendSecurityBalance[],
 	assetBalances: AssetBalancesResponse[]
@@ -118,7 +120,10 @@ export function buildPreparedMaps(
 		securityBalancesByAccountSecurity,
 		assetBalancesByAssetId,
 		accountById: new Map(accounts.map((a) => [a.id, a] as const)),
-		assetById
+		assetById,
+		securityCurrencyById: new Map(
+			securities.map((security) => [security.id, security.currency] as const)
+		)
 	};
 }
 

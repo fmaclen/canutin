@@ -4,6 +4,7 @@ import { SvelteMap } from 'svelte/reactivity';
 
 import { getAuthContext } from './auth.svelte';
 import { setBalanceTypesContext } from './balance-types.svelte';
+import { getExchangeRatesContext } from './exchange-rates.svelte';
 import { logError } from './logger';
 import {
 	AccountSharesAccessRoleOptions,
@@ -13,12 +14,20 @@ import {
 	type AccountsResponse
 } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
+import type { AccountPositionsValue } from './securities.svelte';
 import { sumOrUnknown } from './security-balance-values';
 import { participantExcluded, projectSignedValue } from './sharing';
-import { isUnavailableRecordError, removeById, upsertById } from './utils';
+import { isUnavailableRecordError, removeById, toPocketBaseDateString, upsertById } from './utils';
 
 export type AccountWithBalance = AccountsResponse & {
+	// NOTE: `balance` is the perspective-projected total in the account's own currency (null when
+	// foreign-currency securities make a single native figure ambiguous); `displayBalance` sums the
+	// cash and each security position converted to the display currency at each one's own date.
 	balance: number | null;
+	displayBalance: number | null;
+	isConverted: boolean;
+	isUnconverted: boolean;
+	missingCurrency: string | null;
 	cashBalance: number;
 	balanceAsOf: string;
 	isOwner: boolean;
@@ -31,7 +40,7 @@ export type AccountWithBalance = AccountsResponse & {
 };
 
 type PositionsSource = {
-	positionsValueByAccount: ReadonlyMap<string, number | null>;
+	positionsValueByAccount: ReadonlyMap<string, AccountPositionsValue>;
 	positionsLoaded: boolean;
 };
 
@@ -47,9 +56,14 @@ class AccountsContext {
 	accounts: AccountWithBalance[] = $derived.by(() =>
 		this.rawAccounts.map((record) => {
 			const cash = this.latestCashByAccount.get(record.id);
-			const positions = this.positionsSource?.positionsValueByAccount;
-			const positionsValue = positions && positions.has(record.id) ? positions.get(record.id)! : 0;
-			return this.toAccountWithBalance(record, cash?.value ?? 0, positionsValue, cash?.asOf ?? '');
+			const positions = this.positionsSource?.positionsValueByAccount.get(record.id) ?? {
+				value: 0,
+				nativeValue: 0,
+				isConverted: false,
+				isUnconverted: false,
+				missingCurrency: null
+			};
+			return this.toAccountWithBalance(record, cash?.value ?? 0, positions, cash?.asOf ?? '');
 		})
 	);
 	get accountRecords(): AccountsResponse[] {
@@ -65,6 +79,7 @@ class AccountsContext {
 	private accountsLoaded = false;
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
+	private _fx: ReturnType<typeof getExchangeRatesContext>;
 	private balanceTypesContext: ReturnType<typeof setBalanceTypesContext>;
 	private refreshSequence = 0;
 	private mutationEpoch = 0;
@@ -79,6 +94,7 @@ class AccountsContext {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
+		this._fx = getExchangeRatesContext();
 		this.balanceTypesContext = balanceTypesContext;
 		this.init();
 	}
@@ -464,7 +480,7 @@ class AccountsContext {
 	private toAccountWithBalance(
 		account: AccountsResponse,
 		rawCashBalance: number,
-		rawSecurityBalance: number | null,
+		positions: AccountPositionsValue,
 		balanceAsOf: string
 	): AccountWithBalance {
 		const incomingShare = this.getIncomingShare(account.id);
@@ -478,10 +494,28 @@ class AccountsContext {
 		const grantedShares = this.getGrantedShares(account.id);
 		const isShared = !isOwner || grantedShares.length > 0;
 
-		const rawBalance = sumOrUnknown([rawCashBalance, rawSecurityBalance]);
+		// NOTE: positions.value is already in the display currency (each position converted at its
+		// own currency/date in securities.svelte.ts), so only cash is converted here and the two
+		// display amounts are summed - converting positions.value again would double-convert it.
+		// NOTE: falls back to now when there's no dated balance yet (e.g. a positions-only
+		// account with no cash snapshot), so the row still converts at a sensible rate.
+		const conversionDate = balanceAsOf || toPocketBaseDateString(new Date());
+		const cashConversion = this._fx.convert(rawCashBalance, account.currency, conversionDate);
+		const displayCashBalance = cashConversion.isUnconverted ? 0 : cashConversion.value;
+		const balance = projectSignedValue(
+			sumOrUnknown([rawCashBalance, positions.nativeValue]),
+			perspective
+		);
 		return {
 			...account,
-			balance: projectSignedValue(rawBalance, perspective),
+			balance,
+			displayBalance: projectSignedValue(
+				sumOrUnknown([displayCashBalance, positions.value]),
+				perspective
+			),
+			isConverted: cashConversion.isConverted || positions.isConverted,
+			isUnconverted: cashConversion.isUnconverted || positions.isUnconverted,
+			missingCurrency: cashConversion.missingCurrency ?? positions.missingCurrency,
 			cashBalance: projectSignedValue(rawCashBalance, perspective),
 			balanceAsOf,
 			isOwner,

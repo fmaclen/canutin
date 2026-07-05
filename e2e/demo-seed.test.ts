@@ -8,21 +8,18 @@ test('/demo auto-logs into the seeded demo account and displays net worth', asyn
 	await expect(page.getByRole('button', { name: 'Toggle Sidebar' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Try as guest' })).not.toBeVisible();
 
-	// Seeding produces a deterministic net worth
-	await expect(page.getByRole('region', { name: 'Net worth' })).toContainText('$184,719');
+	await expect(page.getByRole('region', { name: 'Net worth' })).toContainText('$185,787');
 	await expect(page.getByRole('region', { name: 'Cash' })).toBeVisible();
 	await expect(page.getByRole('region', { name: 'Investments' })).toBeVisible();
 	await expect(page.getByRole('region', { name: 'Debt' })).toBeVisible();
 	await expect(page.getByRole('region', { name: 'Other assets' })).toBeVisible();
 
-	// Seeded trades are visible under the default "last 3 months" filter
 	await page.goto('/trades');
 	await expect(page.getByText('Sold GameStop')).toBeVisible();
 	await expect(page.getByText('Bought SPDR S&P 500').first()).toBeVisible();
 	await expect(page.getByText('Bought Bitcoin').first()).toBeVisible();
 	await expect(page.getByText('Bought Ethereum').first()).toBeVisible();
 
-	// Portfolio shows the seeded holdings
 	await page.goto('/portfolio');
 	await expect(page.getByText('SPDR S&P 500 ETF Trust')).toBeVisible();
 	await expect(page.getByText('Bitcoin')).toBeVisible();

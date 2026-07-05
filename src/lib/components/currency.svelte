@@ -1,4 +1,47 @@
+<script module lang="ts">
+	import { m } from '$lib/paraglide/messages';
+
+	import { formatNativeCurrency } from './currency';
+
+	interface CurrencyFxLabelOptions {
+		decimalScale: number;
+		isUnconverted: boolean;
+		missingCurrency: string | null;
+		nativeCurrency?: string;
+		nativeValue?: number;
+	}
+
+	export function getCurrencyFxLabel({
+		decimalScale,
+		isUnconverted,
+		missingCurrency,
+		nativeCurrency,
+		nativeValue
+	}: CurrencyFxLabelOptions) {
+		if (isUnconverted) {
+			const currency = missingCurrency ?? nativeCurrency;
+			return currency ? m.fx_no_rate_available({ currency }) : m.fx_includes_unconverted();
+		}
+		if (nativeCurrency === undefined || nativeValue === undefined) {
+			return m.fx_includes_converted();
+		}
+
+		const formattedNative = formatNativeCurrency(nativeValue, decimalScale, nativeCurrency);
+		// NOTE: whether the home locale renders the ISO code (e.g. ARS as "$") depends on the
+		// browser's CLDR version, so append it deterministically unless it's already there -
+		// appending unconditionally would double it on newer ICU versions.
+		const amount = formattedNative.includes(nativeCurrency)
+			? formattedNative
+			: `${formattedNative} ${nativeCurrency}`;
+		return m.fx_converted_from({ amount });
+	}
+</script>
+
 <script lang="ts">
+	import CoinsIcon from '@lucide/svelte/icons/coins';
+
+	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+
 	import { formatCurrency } from './currency';
 	import Number from './number.svelte';
 
@@ -8,11 +51,80 @@
 		value: number;
 		decimalScale?: number;
 		sentiment?: Sentiment;
+		isConverted?: boolean;
+		isUnconverted?: boolean;
+		missingCurrency?: string | null;
+		nativeCurrency?: string;
+		nativeValue?: number;
+		showFxTooltip?: boolean;
 	}
 
-	let { value, decimalScale = 0, sentiment = 'undefined' }: Props = $props();
+	let {
+		value,
+		decimalScale = 0,
+		sentiment = 'undefined',
+		isConverted = false,
+		isUnconverted = false,
+		missingCurrency = null,
+		nativeCurrency,
+		nativeValue,
+		showFxTooltip = true
+	}: Props = $props();
 
-	const formattedValue = $derived.by(() => formatCurrency(value, decimalScale));
+	const formattedValue = $derived.by(() => {
+		if (isUnconverted && nativeCurrency !== undefined && nativeValue !== undefined) {
+			return formatNativeCurrency(nativeValue, decimalScale, nativeCurrency);
+		}
+		return formatCurrency(value, decimalScale);
+	});
+
+	const fxLabel = $derived(
+		getCurrencyFxLabel({
+			decimalScale,
+			isUnconverted,
+			missingCurrency,
+			nativeCurrency,
+			nativeValue
+		})
+	);
 </script>
 
-<Number value={formattedValue} {sentiment} />
+{#if isUnconverted}
+	{#if showFxTooltip}
+		<Tooltip.Root>
+			<Tooltip.Trigger
+				aria-label={fxLabel}
+				class="border-border inline-block border-b border-dashed leading-none hover:border-current"
+			>
+				<Number value={formattedValue} sentiment="neutral" />
+			</Tooltip.Trigger>
+			<Tooltip.Content sideOffset={6}>
+				<p class="text-xs leading-snug font-normal">{fxLabel}</p>
+			</Tooltip.Content>
+		</Tooltip.Root>
+	{:else}
+		<span class="border-border inline-block border-b border-dashed leading-none">
+			<Number value={formattedValue} sentiment="neutral" />
+		</span>
+	{/if}
+{:else if isConverted}
+	<span class="inline-flex items-center gap-2">
+		{#if showFxTooltip}
+			<Tooltip.Root>
+				<Tooltip.Trigger class="text-muted-foreground inline-flex shrink-0">
+					<CoinsIcon class="size-3.5" aria-label={fxLabel} />
+				</Tooltip.Trigger>
+				<Tooltip.Content sideOffset={6}>
+					<p class="text-xs leading-snug font-normal">{fxLabel}</p>
+				</Tooltip.Content>
+			</Tooltip.Root>
+		{:else}
+			<span class="text-muted-foreground inline-flex shrink-0" aria-hidden="true">
+				<CoinsIcon class="size-3.5" />
+			</span>
+		{/if}
+		<Number value={formattedValue} {sentiment} />
+	</span>
+{:else}
+	<Number value={formattedValue} {sentiment} />
+{/if}

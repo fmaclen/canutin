@@ -29,6 +29,8 @@
 
 	const securitiesContext = getSecuritiesContext();
 
+	// NOTE: aggregateRows already carries its own display-currency conversion (value/costBasis/
+	// gainLoss + isConverted/isUnconverted); this just sorts and sums those.
 	const rows = $derived(securitiesContext.aggregateRows);
 
 	type PortfolioSortColumn =
@@ -102,6 +104,9 @@
 			? null
 			: (gainLossTotal / costBasisTotal) * 100
 	);
+	// NOTE: value/costBasis/gainLoss share one isConverted/isUnconverted pair per row (they're
+	// converted from the same security currency + balance date), so one pair covers every total.
+	const isTotalsUnconverted = $derived(rows.some((row) => row.isUnconverted));
 
 	function sentiment(value: number | null) {
 		if (value === null || value === 0) return 'neutral';
@@ -137,6 +142,7 @@
 					value={gainLossTotal}
 					variant="outline"
 					decimalScale={2}
+					isUnconverted={isTotalsUnconverted}
 				/>
 				<KeyValue
 					title={m.summary_net_gain_percent()}
@@ -149,6 +155,7 @@
 					value={marketValueTotal}
 					variant="outline"
 					decimalScale={2}
+					isUnconverted={isTotalsUnconverted}
 				/>
 			</div>
 			<div class="bg-background overflow-hidden rounded-sm shadow-md">
@@ -262,7 +269,12 @@
 									{#if row.costBasis === null}
 										<span class="text-muted-foreground">~</span>
 									{:else}
-										<Currency value={row.costBasis} decimalScale={2} />
+										<Currency
+											value={row.costBasis}
+											decimalScale={2}
+											isConverted={row.isConverted}
+											isUnconverted={row.isUnconverted}
+										/>
 									{/if}
 								</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">
@@ -273,6 +285,8 @@
 											value={row.gainLoss}
 											decimalScale={2}
 											sentiment={sentiment(row.gainLoss)}
+											isConverted={row.isConverted}
+											isUnconverted={row.isUnconverted}
 										/>
 									{/if}
 								</Table.Cell>
@@ -294,7 +308,13 @@
 									{#if row.value === null}
 										<span class="text-muted-foreground">~</span>
 									{:else}
-										<Currency value={row.value} decimalScale={2} sentiment={sentiment(row.value)} />
+										<Currency
+											value={row.value}
+											decimalScale={2}
+											sentiment={sentiment(row.value)}
+											isConverted={row.isConverted}
+											isUnconverted={row.isUnconverted}
+										/>
 									{/if}
 								</Table.Cell>
 							</Table.Row>

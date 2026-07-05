@@ -14,6 +14,7 @@ import {
 	seedAsset,
 	seedAssetBalance,
 	seedAssetShare,
+	seedCurrency,
 	seedTransaction,
 	seedUser
 } from './pocketbase.helpers';
@@ -192,6 +193,36 @@ test('owner creates account share via UI and recipient sees it with NORMAL persp
 
 	await goToPageViaSidebar(page, 'Accounts');
 	await expect(page.getByRole('row', { name: /Joint savings/ })).toContainText('$5,000.00');
+});
+
+test('account share API adds the parent currency to the recipient registry', async () => {
+	const owner = await seedUser('marina');
+	const recipient = await seedUser('nestor');
+
+	await seedCurrency({ owner: owner.id, code: 'ARS', name: 'Argentine peso', autoUpdate: false });
+	const account = await seedAccount({
+		name: 'Peso checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: owner.id,
+		balanceType: 'Checking',
+		currency: 'ARS'
+	});
+
+	const recipientPB = await getUserPB(recipient.email);
+	await expect(
+		recipientPB.collection('currencies').getFirstListItem("code='ARS'")
+	).rejects.toThrow();
+
+	const response = await pbSend(
+		'/api/shares/accounts',
+		{ accountId: account.id, recipientEmail: recipient.email, perspective: 'NORMAL' },
+		owner.email
+	);
+	expect(response.status).toBe(200);
+
+	const currency = await recipientPB.collection('currencies').getFirstListItem("code='ARS'");
+	expect(currency.code).toBe('ARS');
+	expect(currency.autoUpdate).toBe(true);
 });
 
 test('sharer cannot mutate an existing account share after creation', async () => {

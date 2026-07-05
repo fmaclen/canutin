@@ -12,11 +12,13 @@
 	let {
 		formData,
 		accounts,
+		currency,
 		isFirst = false,
 		disabled = false
 	}: {
 		formData: SecurityBalanceFormData;
 		accounts: AccountPickerAccount[];
+		currency?: string;
 		isFirst?: boolean;
 		disabled?: boolean;
 	} = $props();
@@ -65,6 +67,7 @@
 			id="security-balance-price"
 			name="security-balance-price"
 			bind:value={formData.price}
+			{currency}
 			{disabled}
 			required
 		/>
@@ -81,6 +84,7 @@
 			id="security-balance-value"
 			name="security-balance-value"
 			bind:value={formData.value}
+			{currency}
 			{disabled}
 		/>
 	</FormFieldRow>
@@ -96,6 +100,7 @@
 			id="security-balance-cost-basis"
 			name="security-balance-cost-basis"
 			bind:value={formData.costBasis}
+			{currency}
 			{disabled}
 		/>
 	</FormFieldRow>

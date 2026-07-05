@@ -2,11 +2,14 @@ import PocketBase from 'pocketbase';
 
 import {
 	AccountsBalanceGroupOptions,
+	ExchangeRatesSourceOptions,
 	type AccountBalancesRecord,
 	type AccountsRecord,
 	type AssetBalancesRecord,
 	type AssetsRecord,
 	type BalanceTypesRecord,
+	type CurrenciesRecord,
+	type ExchangeRatesRecord,
 	type SecuritiesRecord,
 	type SecurityBalancesRecord,
 	type SecurityTransactionsRecord,
@@ -121,6 +124,7 @@ export async function seedAccount(accountInput: {
 	closed?: AccountsRecord['closed'];
 	autoCalculated?: AccountsRecord['autoCalculated'];
 	excluded?: AccountsRecord['excluded'];
+	currency?: AccountsRecord['currency'];
 }) {
 	const pbAdmin = await getAdminPB();
 	const balanceType = await getOrCreateBalanceType(
@@ -140,6 +144,35 @@ export async function seedAccountBalance(accountBalanceInput: {
 }) {
 	const pb = await getAdminPB();
 	return await pb.collection('accountBalances').create(accountBalanceInput);
+}
+
+export async function seedExchangeRate(exchangeRateInput: {
+	currency: ExchangeRatesRecord['currency'];
+	date: ExchangeRatesRecord['date'];
+	owner: ExchangeRatesRecord['owner'];
+	rate: ExchangeRatesRecord['rate'];
+}) {
+	const pb = await getAdminPB();
+	return await pb.collection('exchangeRates').create({
+		...exchangeRateInput,
+		source: ExchangeRatesSourceOptions.manual
+	});
+}
+
+export async function seedCurrency(currencyInput: {
+	code: CurrenciesRecord['code'];
+	name?: CurrenciesRecord['name'];
+	autoUpdate?: CurrenciesRecord['autoUpdate'];
+	owner: CurrenciesRecord['owner'];
+}) {
+	const pb = await getAdminPB();
+	if (!currencyInput.autoUpdate) {
+		return await pb.collection('currencies').create(currencyInput);
+	}
+	const currency = await pb
+		.collection('currencies')
+		.create({ ...currencyInput, autoUpdate: false });
+	return await pb.collection('currencies').update(currency.id, { autoUpdate: true });
 }
 
 export async function seedAsset(assetInput: {

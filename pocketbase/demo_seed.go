@@ -1,6 +1,8 @@
 package main
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -36,14 +38,15 @@ var demoLabels = []string{
 }
 
 const (
-	demoAccountChecking   = "Bob's Laughable-Yield Checking"
-	demoAccountSavings    = "Emergency Fund"
-	demoAccountCreditCard = "Alice's Limited Rewards Credit Card"
-	demoAccountAutoLoan   = "Fiat Auto Loan"
-	demoAccountRothIra    = "Alice's Roth IRA"
-	demoAccount401k       = "Bob's 401k"
-	demoAccountWallet     = "Mattress Wallet"
-	demoAccountCrypto     = "Alice's Crypto Brokerage"
+	demoAccountChecking    = "Bob's Laughable-Yield Checking"
+	demoAccountSavings     = "Emergency Fund"
+	demoAccountCreditCard  = "Alice's Limited Rewards Credit Card"
+	demoAccountAutoLoan    = "Fiat Auto Loan"
+	demoAccountRothIra     = "Alice's Roth IRA"
+	demoAccount401k        = "Bob's 401k"
+	demoAccountWallet      = "Mattress Wallet"
+	demoAccountCrypto      = "Alice's Crypto Brokerage"
+	demoAccountArsChecking = "Alice's Peso Checking"
 
 	demoAssetCollectible = "Funko Pop Collection"
 	demoAssetVehicle     = "1998 Fiat Multipla"
@@ -60,17 +63,19 @@ type demoAccount struct {
 	balanceType    string
 	institution    string
 	autoCalculated bool
+	currency       string
 }
 
 var demoAccounts = []demoAccount{
-	{demoAccountChecking, "CASH", "Checking", "Ransack Bank", true},
-	{demoAccountSavings, "CASH", "Savings", "Ransack Bank", true},
-	{demoAccountCreditCard, "DEBT", "Credit Card", "Juggernaut Bank", true},
-	{demoAccountAutoLoan, "DEBT", "Auto Loan", "Fiat Financial Services", false},
-	{demoAccountRothIra, "INVESTMENT", "Roth IRA", "Loot Financial", false},
-	{demoAccount401k, "INVESTMENT", "401k", "Loot Financial", false},
-	{demoAccountWallet, "CASH", "Cash", "", false},
-	{demoAccountCrypto, "INVESTMENT", "Crypto", "Coinpurse", false},
+	{demoAccountChecking, "CASH", "Checking", "Ransack Bank", true, "USD"},
+	{demoAccountSavings, "CASH", "Savings", "Ransack Bank", true, "USD"},
+	{demoAccountCreditCard, "DEBT", "Credit Card", "Juggernaut Bank", true, "USD"},
+	{demoAccountAutoLoan, "DEBT", "Auto Loan", "Fiat Financial Services", false, "USD"},
+	{demoAccountRothIra, "INVESTMENT", "Roth IRA", "Loot Financial", false, "USD"},
+	{demoAccount401k, "INVESTMENT", "401k", "Loot Financial", false, "USD"},
+	{demoAccountWallet, "CASH", "Cash", "", false, "USD"},
+	{demoAccountCrypto, "INVESTMENT", "Crypto", "Coinpurse", false, "USD"},
+	{demoAccountArsChecking, "CASH", "Checking", "Banco Galicia", true, "ARS"},
 }
 
 type demoAsset struct {
@@ -337,6 +342,61 @@ func demoCreditCardTransactions(reference time.Time) []demoTransaction {
 	return txs
 }
 
+func demoArsCheckingTransactions(reference time.Time) []demoTransaction {
+	var txs []demoTransaction
+	for i := 0; i < demoMonthsInSet; i++ {
+		monthStart := demoMonthStart(i, reference)
+		day := func(d int) string { return demoISODate(monthStart.AddDate(0, 0, d)) }
+
+		rent := -750000.0
+		if i%4 == 0 {
+			rent = -780000
+		}
+		salary := 1150000.0
+		if i%6 == 0 {
+			salary = 1220000
+		}
+
+		txs = append(txs,
+			demoTransaction{"Inmobiliaria del Sur", rent, day(1), "Rent", false},
+			demoTransaction{"Estudio Contable SRL * Sueldo", salary, day(5), "Payroll & benefits", false},
+			demoTransaction{"Coto Supermercado", -95430.75, day(8), "Groceries", false},
+			demoTransaction{"Coto Supermercado", -88215.5, day(22), "Groceries", false},
+			demoTransaction{"YPF", -42600, day(12), "Gas stations", false},
+			demoTransaction{"Edenor", -28750.25, day(14), "Home maintenance", false},
+			demoTransaction{"Personal Flow", -17990, day(16), "Internet & phone", false},
+			demoTransaction{"Farmacity", -15340.8, day(18), "Health", false},
+			demoTransaction{"La Americana", -22500, day(20), "Restaurants", false},
+			demoTransaction{"Sancor Seguros", -26800, day(26), "Insurance", false},
+		)
+	}
+	return txs
+}
+
+// demoArsRate synthesizes an ARS-per-USD rate for date, interpolated linearly across the demo's
+// window to a recent peso rate without ever fetching a real rate over the network.
+func demoArsRate(date string, reference time.Time) float64 {
+	const rateOldest, rateNewest = 850.0, 1495.0
+	t, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return rateNewest
+	}
+	// NOTE: interpolate on whole calendar days between t and reference's UTC date, not the raw
+	// sub-day duration. Otherwise today's rate (and the derived ARS balance's converted contribution
+	// to net worth) drifts by ~a dollar depending on the wall-clock time the demo was seeded at,
+	// making the deterministic net worth asserted by e2e/demo-seed.test.ts flaky.
+	utc := reference.UTC()
+	refDate := time.Date(utc.Year(), utc.Month(), utc.Day(), 0, 0, 0, 0, time.UTC)
+	monthsAgo := refDate.Sub(t).Hours() / 24 / 30
+	if monthsAgo < 0 {
+		monthsAgo = 0
+	}
+	if monthsAgo > demoMonthsInSet-1 {
+		monthsAgo = demoMonthsInSet - 1
+	}
+	return demoRoundToCents(rateNewest - monthsAgo/(demoMonthsInSet-1)*(rateNewest-rateOldest))
+}
+
 func demoAutoLoanBalances(reference time.Time) []demoAccountBalance {
 	values := []float64{-21250, -23500, -24000, -25500, -27000, -29500, -30000, -32500, -33000, -34500, -36000, -37500, -38000, -39500, -40000, -41500, -42000, -42500}
 	balances := make([]demoAccountBalance, len(values))
@@ -486,10 +546,17 @@ func demoSecurityTrades(name string, reference time.Time) []demoTrade {
 }
 
 // seedDemoData reproduces the dataset the TypeScript demo seed produces, owned by userID and dated
-// relative to reference. The three auto-calculated accounts get a single derived accountBalances
+// relative to reference. The four auto-calculated accounts get a single derived accountBalances
 // snapshot computed inline so the demo shows a correct derived balance the instant it loads, rather
 // than waiting on the transactions hook's debounced async worker to catch up.
 func seedDemoData(app core.App, userID string, reference time.Time) error {
+	if _, _, err := ensureCurrencyRecord(app, userID, "USD", "", false); err != nil {
+		return err
+	}
+	if _, _, err := ensureCurrencyRecord(app, userID, "ARS", "", false); err != nil {
+		return err
+	}
+
 	balanceTypeIDs := map[string]string{}
 	ensureBalanceType := func(name string) (string, error) {
 		if id, ok := balanceTypeIDs[name]; ok {
@@ -540,6 +607,7 @@ func seedDemoData(app core.App, userID string, reference time.Time) error {
 		rec.Set("balanceType", btID)
 		rec.Set("institution", account.institution)
 		rec.Set("owner", userID)
+		rec.Set("currency", account.currency)
 		if account.autoCalculated {
 			rec.Set("autoCalculated", reference.UTC().Format(time.RFC3339Nano))
 		}
@@ -564,6 +632,7 @@ func seedDemoData(app core.App, userID string, reference time.Time) error {
 		rec.Set("balanceGroup", asset.balanceGroup)
 		rec.Set("balanceType", btID)
 		rec.Set("owner", userID)
+		rec.Set("currency", "USD")
 		if err := app.Save(rec); err != nil {
 			return err
 		}
@@ -601,6 +670,46 @@ func seedDemoData(app core.App, userID string, reference time.Time) error {
 	}
 	if err := saveTransactions(demoCreditCardTransactions(reference), accountIDs[demoAccountCreditCard]); err != nil {
 		return err
+	}
+	arsTransactions := demoArsCheckingTransactions(reference)
+	if err := saveTransactions(arsTransactions, accountIDs[demoAccountArsChecking]); err != nil {
+		return err
+	}
+
+	// The ARS checking account needs owner-scoped manual exchangeRates rows, so the demo never
+	// depends on the ensure-rates worker's network fetch.
+	ratesColl, err := app.FindCollectionByNameOrId("exchangeRates")
+	if err != nil {
+		return err
+	}
+	saveExchangeRate := func(currency, date string, rate float64) error {
+		start, end := pbDateRange(date)
+		existing, err := app.FindFirstRecordByFilter("exchangeRates",
+			"owner = {:owner} && currency = {:currency} && date >= {:start} && date < {:end}",
+			map[string]any{"owner": userID, "currency": currency, "start": start, "end": end},
+		)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		if existing != nil {
+			return nil
+		}
+		rec := core.NewRecord(ratesColl)
+		rec.Set("owner", userID)
+		rec.Set("currency", currency)
+		rec.Set("date", start)
+		rec.Set("rate", rate)
+		rec.Set("source", "manual")
+		return app.Save(rec)
+	}
+	arsRateDates := map[string]struct{}{demoISODate(reference): {}}
+	for _, tx := range arsTransactions {
+		arsRateDates[tx.date] = struct{}{}
+	}
+	for date := range arsRateDates {
+		if err := saveExchangeRate("ARS", date, demoArsRate(date, reference)); err != nil {
+			return err
+		}
 	}
 
 	abColl, err := app.FindCollectionByNameOrId("accountBalances")
@@ -667,8 +776,10 @@ func seedDemoData(app core.App, userID string, reference time.Time) error {
 	for _, security := range demoSecurities {
 		rec := core.NewRecord(securityColl)
 		rec.Set("name", security.name)
+		rec.Set("normalizedName", securityNameKey(security.name))
 		rec.Set("symbol", security.symbol)
 		rec.Set("owner", userID)
+		rec.Set("currency", "USD")
 		if err := app.Save(rec); err != nil {
 			return err
 		}

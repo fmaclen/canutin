@@ -20,9 +20,10 @@ type createSecurityWithInitialBalanceBody struct {
 }
 
 type createSecurityBody struct {
-	Name   string `json:"name"`
-	Symbol string `json:"symbol"`
-	Owner  string `json:"owner"`
+	Name     string `json:"name"`
+	Symbol   string `json:"symbol"`
+	Owner    string `json:"owner"`
+	Currency string `json:"currency"`
 }
 
 type securityBalanceBody struct {
@@ -65,6 +66,7 @@ func createSecurityWithInitialBalanceHandler(app core.App) func(*core.RequestEve
 			security.Set("name", body.Security.Name)
 			security.Set("symbol", body.Security.Symbol)
 			security.Set("owner", body.Security.Owner)
+			security.Set("currency", body.Security.Currency)
 			if err := txApp.Save(security); err != nil {
 				return err
 			}

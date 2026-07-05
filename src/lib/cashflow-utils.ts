@@ -1,12 +1,18 @@
 import { UTCDate } from '@date-fns/utc';
 import { addMonths, format, startOfMonth, startOfYear } from 'date-fns';
 
+import type { CurrencyConversion } from './exchange-rates.svelte';
 import { getFormattingLocale } from './interface-preferences.svelte';
 import { AccountSharesPerspectiveOptions, type TransactionsResponse } from './pocketbase.schema';
 import { projectSignedValue } from './sharing';
 import { toPocketBaseDateString } from './utils';
 
-export type CashflowAverages = { income: number; expenses: number; surplus: number };
+export type CashflowAverages = {
+	income: number;
+	expenses: number;
+	surplus: number;
+	isUnconverted: boolean;
+};
 
 export type CashflowWindow = {
 	startOfThisMonth: Date;
@@ -28,6 +34,7 @@ export type CashflowPeriod = {
 	income: number;
 	expenses: number;
 	surplus: number;
+	isUnconverted: boolean;
 	isCurrentPeriod: boolean;
 	periodLabel: string;
 };
@@ -57,36 +64,64 @@ export function computeAveragesFromTransactions(
 	transactions: Iterable<Pick<TransactionsResponse, 'date' | 'account' | 'value'>>,
 	{
 		window,
-		perspectiveOf
+		perspectiveOf,
+		currencyOf,
+		convert
 	}: {
 		window: CashflowWindow;
 		perspectiveOf: (accountId: string) => AccountSharesPerspectiveOptions;
+		currencyOf: (accountId: string) => string;
+		convert: (value: number, currency: string, date: string) => CurrencyConversion;
 	}
 ) {
-	const sums3m = { income: 0, expenses: 0, surplus: 0 };
-	const sums6m = { income: 0, expenses: 0, surplus: 0 };
-	const sumsYtd = { income: 0, expenses: 0, surplus: 0 };
-	const sums1y = { income: 0, expenses: 0, surplus: 0 };
-	const sumsByMonth = new Map<string, { income: number; expenses: number }>();
+	const sums3m = { income: 0, expenses: 0, surplus: 0, isUnconverted: false };
+	const sums6m = { income: 0, expenses: 0, surplus: 0, isUnconverted: false };
+	const sumsYtd = { income: 0, expenses: 0, surplus: 0, isUnconverted: false };
+	const sums1y = { income: 0, expenses: 0, surplus: 0, isUnconverted: false };
+	const sumsByMonth = new Map<
+		string,
+		{ income: number; expenses: number; isUnconverted: boolean }
+	>();
 
 	for (let i = 0; i < CASHFLOW_PERIODS; i++) {
 		const month = addMonths(window.startOfThisMonth, -(CASHFLOW_PERIODS - 1 - i));
-		sumsByMonth.set(format(month, 'yyyy-MM'), { income: 0, expenses: 0 });
+		sumsByMonth.set(format(month, 'yyyy-MM'), {
+			income: 0,
+			expenses: 0,
+			isUnconverted: false
+		});
 	}
 
 	for (const t of transactions) {
 		if (!t.date) continue;
 		const date = new Date(t.date);
-		const value = projectSignedValue(t.value ?? 0, perspectiveOf(t.account));
+		const nativeValue = projectSignedValue(t.value ?? 0, perspectiveOf(t.account));
+		const conversion = convert(nativeValue, currencyOf(t.account), t.date);
+		const value = conversion.value;
 		const bucket = value >= 0 ? 'income' : 'expenses';
 
-		if (date >= window.start3m) sums3m[bucket] += value;
-		if (date >= window.start6m) sums6m[bucket] += value;
-		if (date >= window.startYtd) sumsYtd[bucket] += value;
-		if (date >= window.start12m) sums1y[bucket] += value;
+		if (date >= window.start3m) {
+			sums3m.isUnconverted ||= conversion.isUnconverted;
+			if (!conversion.isUnconverted) sums3m[bucket] += value;
+		}
+		if (date >= window.start6m) {
+			sums6m.isUnconverted ||= conversion.isUnconverted;
+			if (!conversion.isUnconverted) sums6m[bucket] += value;
+		}
+		if (date >= window.startYtd) {
+			sumsYtd.isUnconverted ||= conversion.isUnconverted;
+			if (!conversion.isUnconverted) sumsYtd[bucket] += value;
+		}
+		if (date >= window.start12m) {
+			sums1y.isUnconverted ||= conversion.isUnconverted;
+			if (!conversion.isUnconverted) sums1y[bucket] += value;
+		}
 
 		const monthSums = sumsByMonth.get(t.date.slice(0, 7));
-		if (monthSums) monthSums[bucket] += value;
+		if (monthSums) {
+			monthSums.isUnconverted ||= conversion.isUnconverted;
+			if (!conversion.isUnconverted) monthSums[bucket] += value;
+		}
 	}
 
 	sums3m.surplus = sums3m.income + sums3m.expenses;
@@ -99,22 +134,26 @@ export function computeAveragesFromTransactions(
 	const avg3m = {
 		income: sums3m.income / 3,
 		expenses: sums3m.expenses / 3,
-		surplus: sums3m.surplus / 3
+		surplus: sums3m.surplus / 3,
+		isUnconverted: sums3m.isUnconverted
 	};
 	const avg6m = {
 		income: sums6m.income / 6,
 		expenses: sums6m.expenses / 6,
-		surplus: sums6m.surplus / 6
+		surplus: sums6m.surplus / 6,
+		isUnconverted: sums6m.isUnconverted
 	};
 	const avgYtd = {
 		income: sumsYtd.income / monthsYtd,
 		expenses: sumsYtd.expenses / monthsYtd,
-		surplus: sumsYtd.surplus / monthsYtd
+		surplus: sumsYtd.surplus / monthsYtd,
+		isUnconverted: sumsYtd.isUnconverted
 	};
 	const avg1y = {
 		income: sums1y.income / 12,
 		expenses: sums1y.expenses / 12,
-		surplus: sums1y.surplus / 12
+		surplus: sums1y.surplus / 12,
+		isUnconverted: sums1y.isUnconverted
 	};
 
 	const periods: CashflowPeriod[] = [];
@@ -125,7 +164,11 @@ export function computeAveragesFromTransactions(
 		const isCurrentPeriod = monthOffset === 0;
 
 		const periodKey = format(month, 'yyyy-MM');
-		const monthSums = sumsByMonth.get(periodKey) ?? { income: 0, expenses: 0 };
+		const monthSums = sumsByMonth.get(periodKey) ?? {
+			income: 0,
+			expenses: 0,
+			isUnconverted: false
+		};
 
 		periods.push({
 			id: i,
@@ -133,6 +176,7 @@ export function computeAveragesFromTransactions(
 			income: monthSums.income,
 			expenses: monthSums.expenses,
 			surplus: monthSums.income + monthSums.expenses,
+			isUnconverted: monthSums.isUnconverted,
 			isCurrentPeriod,
 			periodLabel: new Intl.DateTimeFormat(getFormattingLocale(), {
 				month: 'long',

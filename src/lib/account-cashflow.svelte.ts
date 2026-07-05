@@ -2,11 +2,8 @@ import { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 
 import { getAuthContext } from './auth.svelte';
-import {
-	computeAveragesFromTransactions,
-	computeCashflowWindow,
-	type CashflowAverages
-} from './cashflow-utils';
+import { computeAveragesFromTransactions, computeCashflowWindow } from './cashflow-utils';
+import { getExchangeRatesContext } from './exchange-rates.svelte';
 import { logError } from './logger';
 import { AccountSharesPerspectiveOptions, type TransactionsResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
@@ -14,15 +11,37 @@ import type { PocketBaseContext } from './pocketbase.svelte';
 const DEBOUNCE_MS = 200;
 
 class AccountCashflowContext {
-	avg3m: CashflowAverages = $state({ income: 0, expenses: 0, surplus: 0 });
-	avg6m: CashflowAverages = $state({ income: 0, expenses: 0, surplus: 0 });
-	avgYtd: CashflowAverages = $state({ income: 0, expenses: 0, surplus: 0 });
-	avg1y: CashflowAverages = $state({ income: 0, expenses: 0, surplus: 0 });
-
 	isLoading: boolean = $state(true);
+
+	// NOTE: averages derive from the cached native transactions so they reconvert whenever the
+	// exchange rates load or the display currency changes (convert() reads both reactively),
+	// without refetching. currencyOf/perspectiveOf ignore their id argument because every cached
+	// transaction belongs to this single account.
+	private _averages = $derived.by(() =>
+		computeAveragesFromTransactions(this._transactions, {
+			window: computeCashflowWindow(),
+			perspectiveOf: () => this._perspective,
+			currencyOf: () => this._currency,
+			convert: (value, currency, date) => this._fx.convert(value, currency, date)
+		})
+	);
+	get avg3m() {
+		return this._averages.avg3m;
+	}
+	get avg6m() {
+		return this._averages.avg6m;
+	}
+	get avgYtd() {
+		return this._averages.avgYtd;
+	}
+	get avg1y() {
+		return this._averages.avg1y;
+	}
 
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
+	private _fx: ReturnType<typeof getExchangeRatesContext>;
+	private _transactions: TransactionsResponse[] = $state([]);
 	private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
 	private _unsubscribe: (() => void) | null = null;
 	private _disposed = false;
@@ -30,13 +49,17 @@ class AccountCashflowContext {
 	private _isSubscribed = false;
 	private _recomputeSequence = 0;
 	private _accountId = '';
-	private _perspective: AccountSharesPerspectiveOptions = AccountSharesPerspectiveOptions.NORMAL;
+	private _currency = $state('USD');
+	private _perspective = $state<AccountSharesPerspectiveOptions>(
+		AccountSharesPerspectiveOptions.NORMAL
+	);
 	private _teardownCallback = () => this.unsubscribeRealtime();
 
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
+		this._fx = getExchangeRatesContext();
 		this.init();
 	}
 
@@ -61,10 +84,16 @@ class AccountCashflowContext {
 		});
 	}
 
-	setAccount(accountId: string, perspective: AccountSharesPerspectiveOptions) {
-		if (accountId === this._accountId && perspective === this._perspective) return;
+	setAccount(accountId: string, perspective: AccountSharesPerspectiveOptions, currency: string) {
+		if (
+			accountId === this._accountId &&
+			perspective === this._perspective &&
+			currency === this._currency
+		)
+			return;
 		this._accountId = accountId;
 		this._perspective = perspective;
+		this._currency = currency;
 		this.reset();
 		if (!accountId || !this._activeUserId) {
 			this.isLoading = false;
@@ -125,7 +154,6 @@ class AccountCashflowContext {
 
 	private async recomputeAll() {
 		const accountId = this._accountId;
-		const perspective = this._perspective;
 		const recomputeSequence = ++this._recomputeSequence;
 		const window = computeCashflowWindow();
 
@@ -140,15 +168,7 @@ class AccountCashflowContext {
 
 			if (recomputeSequence !== this._recomputeSequence) return;
 
-			const { avg3m, avg6m, avgYtd, avg1y } = computeAveragesFromTransactions(transactions, {
-				window,
-				perspectiveOf: () => perspective
-			});
-
-			this.avg3m = avg3m;
-			this.avg6m = avg6m;
-			this.avgYtd = avgYtd;
-			this.avg1y = avg1y;
+			this._transactions = transactions;
 		} finally {
 			if (!this._disposed && recomputeSequence === this._recomputeSequence) this.isLoading = false;
 		}
@@ -160,10 +180,7 @@ class AccountCashflowContext {
 			clearTimeout(this._debounceTimer);
 			this._debounceTimer = null;
 		}
-		this.avg3m = { income: 0, expenses: 0, surplus: 0 };
-		this.avg6m = { income: 0, expenses: 0, surplus: 0 };
-		this.avgYtd = { income: 0, expenses: 0, surplus: 0 };
-		this.avg1y = { income: 0, expenses: 0, surplus: 0 };
+		this._transactions = [];
 	}
 
 	dispose() {

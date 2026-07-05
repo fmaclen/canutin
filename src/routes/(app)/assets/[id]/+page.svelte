@@ -367,6 +367,7 @@
 		{:else}
 			<BalanceForm
 				{formData}
+				currency={asset.currency}
 				balanceAsOf={asset?.balanceAsOf ?? ''}
 				onSubmit={handleUpdateBalance}
 				disabled={!canWrite}
@@ -379,7 +380,12 @@
 		{#if isLoading || !asset}
 			<Skeleton class="h-96" />
 		{:else}
-			<DetailsForm {formData} onSubmit={handleUpdateDetails} disabled={!canWrite} />
+			<DetailsForm
+				{formData}
+				currency={asset.currency}
+				onSubmit={handleUpdateDetails}
+				disabled={!canWrite}
+			/>
 		{/if}
 	</Section>
 
