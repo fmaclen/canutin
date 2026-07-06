@@ -5,8 +5,10 @@
 	import { SvelteMap } from 'svelte/reactivity';
 
 	import { formatCurrency } from '$lib/components/currency';
+	import Currency from '$lib/components/currency.svelte';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import Skeleton from '$lib/components/ui/skeleton/skeleton.svelte';
+	import { getExchangeRatesContext } from '$lib/exchange-rates.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import type {
 		AccountBalancesResponse,
@@ -46,6 +48,13 @@
 		rawAssetBalances: AssetBalancesResponse[];
 	} = $props();
 
+	type GroupKey = 'net' | 'cash' | 'debt' | 'investment' | 'other';
+	// NOTE: trends hides the converted-amount indicator (page-scoped FX rule), so only the
+	// unconvertible warning is tracked per group; the converted values themselves are unchanged.
+	type FxFlags = { isUnconverted: boolean };
+	type GroupSums = Record<Exclude<GroupKey, 'net'>, number>;
+	type GroupFxFlags = Record<Exclude<GroupKey, 'net'>, FxFlags>;
+
 	type Row = {
 		date: Date;
 		net: number;
@@ -53,11 +62,17 @@
 		debt: number;
 		investment: number;
 		other: number;
+		fx: Record<GroupKey, FxFlags>;
 	};
+
+	const fx = getExchangeRatesContext();
 
 	let series: Row[] = $state([]);
 	const firstSeriesRow = $derived(series[0] ?? null);
 	const lastSeriesRow = $derived(series.at(-1) ?? null);
+	const hasUnconverted = $derived(
+		series.some((row) => Object.values(row.fx).some((f) => f.isUnconverted))
+	);
 
 	const chartConfig = {
 		net: { label: m.trends_series_net_label(), color: '#45403C' },
@@ -108,6 +123,42 @@
 		return Math.max(48, Math.ceil(maxW) + 16);
 	});
 
+	function convertSnapshot<T extends { asOf: string }>(
+		balances: T[],
+		index: number,
+		rawValue: (balance: T) => number,
+		currency: string,
+		terminatedAt: string | undefined,
+		datePoint: Date
+	) {
+		if (index < 0 || (terminatedAt && datePoint >= new Date(terminatedAt))) {
+			return { value: 0, isConverted: false, isUnconverted: false };
+		}
+		const balance = balances[index];
+		return fx.convert(rawValue(balance), currency, balance.asOf);
+	}
+
+	function accumulateGroup(
+		sums: GroupSums,
+		flags: GroupFxFlags,
+		group: BalanceGroup,
+		value: number,
+		conversion: FxFlags
+	) {
+		const key =
+			group === 'CASH'
+				? 'cash'
+				: group === 'DEBT'
+					? 'debt'
+					: group === 'INVESTMENT'
+						? 'investment'
+						: 'other';
+		if (!conversion.isUnconverted) sums[key] += value;
+		flags[key] = {
+			isUnconverted: flags[key].isUnconverted || conversion.isUnconverted
+		};
+	}
+
 	function recomputeSeries() {
 		if (!rawAccounts.length && !rawAssets.length) {
 			series = [];
@@ -133,7 +184,8 @@
 			securityBalancesByAccountSecurity,
 			assetBalancesByAssetId,
 			accountById,
-			assetById
+			assetById,
+			securityCurrencyById
 		} = prepared;
 
 		const accountIndexPointer = new SvelteMap<string, number>();
@@ -146,10 +198,13 @@
 
 		const rows: Row[] = [];
 		for (const datePoint of datePoints) {
-			let cash = 0;
-			let debt = 0;
-			let investment = 0;
-			let other = 0;
+			const sums: GroupSums = { cash: 0, debt: 0, investment: 0, other: 0 };
+			const flags: GroupFxFlags = {
+				cash: { isUnconverted: false },
+				debt: { isUnconverted: false },
+				investment: { isUnconverted: false },
+				other: { isUnconverted: false }
+			};
 
 			for (const [accountId, balances] of accountBalancesByAccountId) {
 				const meta = accountById.get(accountId);
@@ -157,17 +212,21 @@
 				const previousIndex = accountIndexPointer.get(accountId) ?? -1;
 				const index = latestIndexBeforeOrEqual(balances, datePoint, previousIndex);
 				accountIndexPointer.set(accountId, index);
-				const value =
-					meta.closed && datePoint >= new Date(meta.closed)
-						? 0
-						: index >= 0
-							? (balances[index].value ?? 0)
-							: 0;
-				const group = meta.balanceGroup as BalanceGroup;
-				if (group === 'CASH') cash += value;
-				else if (group === 'DEBT') debt += value;
-				else if (group === 'INVESTMENT') investment += value;
-				else other += value;
+				const conversion = convertSnapshot(
+					balances,
+					index,
+					(balance) => balance.value ?? 0,
+					meta.currency,
+					meta.closed,
+					datePoint
+				);
+				accumulateGroup(
+					sums,
+					flags,
+					meta.balanceGroup as BalanceGroup,
+					conversion.value,
+					conversion
+				);
 			}
 
 			for (const [key, balances] of securityBalancesByAccountSecurity) {
@@ -181,13 +240,23 @@
 					soldOut: false
 				};
 				securityValueState.set(key, state);
-				const value = advanceTrendSecurityValue(balances, datePoint, state);
-				if (value === null) continue;
-				const group = meta.balanceGroup as BalanceGroup;
-				if (group === 'CASH') cash += value;
-				else if (group === 'DEBT') debt += value;
-				else if (group === 'INVESTMENT') investment += value;
-				else other += value;
+				const rawValue = advanceTrendSecurityValue(balances, datePoint, state);
+				if (rawValue === null) continue;
+				// NOTE: securities load from a different context than these balances, so their currency
+				// map can briefly lag; fall back to the account's currency so all-USD data stays
+				// unconverted instead of flashing an FX indicator during that window.
+				const conversion = fx.convert(
+					rawValue,
+					securityCurrencyById.get(balances[0].security) ?? meta.currency,
+					balances[state.index].asOf
+				);
+				accumulateGroup(
+					sums,
+					flags,
+					meta.balanceGroup as BalanceGroup,
+					conversion.value,
+					conversion
+				);
 			}
 
 			for (const [assetId, balances] of assetBalancesByAssetId) {
@@ -196,21 +265,40 @@
 				const previousIndex = assetIndexPointer.get(assetId) ?? -1;
 				const index = latestIndexBeforeOrEqual(balances, datePoint, previousIndex);
 				assetIndexPointer.set(assetId, index);
-				const value =
-					meta.sold && datePoint >= new Date(meta.sold)
-						? 0
-						: index >= 0
-							? (balances[index].marketValue ?? 0)
-							: 0;
-				const group = meta.balanceGroup as BalanceGroup;
-				if (group === 'CASH') cash += value;
-				else if (group === 'DEBT') debt += value;
-				else if (group === 'INVESTMENT') investment += value;
-				else other += value;
+				const conversion = convertSnapshot(
+					balances,
+					index,
+					(balance) => balance.marketValue ?? 0,
+					meta.currency,
+					meta.sold,
+					datePoint
+				);
+				accumulateGroup(
+					sums,
+					flags,
+					meta.balanceGroup as BalanceGroup,
+					conversion.value,
+					conversion
+				);
 			}
 
-			const net = cash + debt + investment + other;
-			rows.push({ date: datePoint, net, cash, debt, investment, other });
+			const net = sums.cash + sums.debt + sums.investment + sums.other;
+			const netFlags: FxFlags = {
+				isUnconverted:
+					flags.cash.isUnconverted ||
+					flags.debt.isUnconverted ||
+					flags.investment.isUnconverted ||
+					flags.other.isUnconverted
+			};
+			rows.push({
+				date: datePoint,
+				net,
+				cash: sums.cash,
+				debt: sums.debt,
+				investment: sums.investment,
+				other: sums.other,
+				fx: { net: netFlags, ...flags }
+			});
 		}
 
 		series = rows;
@@ -270,7 +358,30 @@
 				}}
 			>
 				{#snippet tooltip()}
-					<Chart.Tooltip />
+					{#if hasUnconverted}
+						<Chart.Tooltip>
+							{#snippet formatter({ value, item })}
+								{@const key = item.key as GroupKey}
+								{@const seriesConfig = chartConfig[key]}
+								{@const row = item.payload as Row}
+								{@const conversion = row.fx[key]}
+								<div
+									style="--color-bg: {seriesConfig.color}; --color-border: {seriesConfig.color};"
+									class="size-2.5 shrink-0 rounded-lg border-(--color-border) bg-(--color-bg)"
+								></div>
+								<div
+									class="flex flex-1 shrink-0 items-center justify-between gap-4 text-base leading-none"
+								>
+									<span class="text-muted-foreground text-sm">{seriesConfig.label}</span>
+									{#if typeof value === 'number'}
+										<Currency {value} isUnconverted={conversion.isUnconverted} />
+									{/if}
+								</div>
+							{/snippet}
+						</Chart.Tooltip>
+					{:else}
+						<Chart.Tooltip />
+					{/if}
 				{/snippet}
 			</LineChart>
 		</Chart.Container>

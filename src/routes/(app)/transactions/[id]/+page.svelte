@@ -224,6 +224,20 @@
 				>
 					<Fieldset isFirst={true}>
 						<FormFieldRow>
+							<Label for="account" class="justify-start pr-0 md:justify-end"
+								>{m.transactions_label_account()}</Label
+							>
+							<AccountPicker
+								accounts={editableAccounts}
+								bind:value={formData.accountId}
+								selectedAccount={selectedAccount ?? null}
+								id="account"
+								disabled={!canWrite}
+								placeholder={m.transactions_account_select_placeholder()}
+							/>
+						</FormFieldRow>
+
+						<FormFieldRow>
 							<Label for="description" class="justify-start pr-0 md:justify-end"
 								>{m.transactions_label_description()}</Label
 							>
@@ -238,6 +252,7 @@
 								id="amount"
 								name="amount"
 								bind:value={formData.amount}
+								currency={selectedAccount?.currency}
 								required
 								disabled={!canWrite}
 							/>
@@ -253,20 +268,6 @@
 								bind:value={formData.date}
 								required
 								disabled={!canWrite}
-							/>
-						</FormFieldRow>
-
-						<FormFieldRow>
-							<Label for="account" class="justify-start pr-0 md:justify-end"
-								>{m.transactions_label_account()}</Label
-							>
-							<AccountPicker
-								accounts={editableAccounts}
-								bind:value={formData.accountId}
-								selectedAccount={selectedAccount ?? null}
-								id="account"
-								disabled={!canWrite}
-								placeholder={m.transactions_account_select_placeholder()}
 							/>
 						</FormFieldRow>
 

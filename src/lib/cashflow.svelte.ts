@@ -11,6 +11,7 @@ import {
 	type CashflowPeriod,
 	type CashflowWindow
 } from './cashflow-utils';
+import { getExchangeRatesContext } from './exchange-rates.svelte';
 import { logError } from './logger';
 import { AccountSharesPerspectiveOptions, type TransactionsResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
@@ -18,16 +19,37 @@ import type { PocketBaseContext } from './pocketbase.svelte';
 const DEBOUNCE_MS = 200;
 
 class CashflowContext {
-	avg3m: CashflowAverages = $state({ income: 0, expenses: 0, surplus: 0 });
-	avg6m: CashflowAverages = $state({ income: 0, expenses: 0, surplus: 0 });
-	avgYtd: CashflowAverages = $state({ income: 0, expenses: 0, surplus: 0 });
-	avg1y: CashflowAverages = $state({ income: 0, expenses: 0, surplus: 0 });
+	avg3m: CashflowAverages = $state({
+		income: 0,
+		expenses: 0,
+		surplus: 0,
+		isUnconverted: false
+	});
+	avg6m: CashflowAverages = $state({
+		income: 0,
+		expenses: 0,
+		surplus: 0,
+		isUnconverted: false
+	});
+	avgYtd: CashflowAverages = $state({
+		income: 0,
+		expenses: 0,
+		surplus: 0,
+		isUnconverted: false
+	});
+	avg1y: CashflowAverages = $state({
+		income: 0,
+		expenses: 0,
+		surplus: 0,
+		isUnconverted: false
+	});
 
 	periods: CashflowPeriod[] = $state([]);
 	isLoading: boolean = $state(true);
 
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
+	private _fx: ReturnType<typeof getExchangeRatesContext>;
 	private _accountsContext: ReturnType<typeof getAccountsContext>;
 	private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
 	private _unsubscribe: (() => void) | null = null;
@@ -46,6 +68,7 @@ class CashflowContext {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
+		this._fx = getExchangeRatesContext();
 		this._accountsContext = getAccountsContext();
 		this.init();
 	}
@@ -67,10 +90,30 @@ class CashflowContext {
 				this._hasTransactionSnapshot = false;
 				this._watchedAccountsKey = null;
 				this.periods = [];
-				this.avg3m = { income: 0, expenses: 0, surplus: 0 };
-				this.avg6m = { income: 0, expenses: 0, surplus: 0 };
-				this.avgYtd = { income: 0, expenses: 0, surplus: 0 };
-				this.avg1y = { income: 0, expenses: 0, surplus: 0 };
+				this.avg3m = {
+					income: 0,
+					expenses: 0,
+					surplus: 0,
+					isUnconverted: false
+				};
+				this.avg6m = {
+					income: 0,
+					expenses: 0,
+					surplus: 0,
+					isUnconverted: false
+				};
+				this.avgYtd = {
+					income: 0,
+					expenses: 0,
+					surplus: 0,
+					isUnconverted: false
+				};
+				this.avg1y = {
+					income: 0,
+					expenses: 0,
+					surplus: 0,
+					isUnconverted: false
+				};
 				this.isLoading = false;
 				return;
 			}
@@ -277,13 +320,18 @@ class CashflowContext {
 		const accountPerspectiveById = new SvelteMap(
 			accounts.map((account) => [account.id, account.perspective])
 		);
+		const accountCurrencyById = new SvelteMap(
+			accounts.map((account) => [account.id, account.currency])
+		);
 
 		const { avg3m, avg6m, avgYtd, avg1y, periods } = computeAveragesFromTransactions(
 			this._transactionsById.values(),
 			{
 				window: cashflowWindow,
 				perspectiveOf: (accountId) =>
-					accountPerspectiveById.get(accountId) ?? AccountSharesPerspectiveOptions.NORMAL
+					accountPerspectiveById.get(accountId) ?? AccountSharesPerspectiveOptions.NORMAL,
+				currencyOf: (accountId) => accountCurrencyById.get(accountId) ?? 'USD',
+				convert: (value, currency, date) => this._fx.convert(value, currency, date)
 			}
 		);
 

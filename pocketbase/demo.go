@@ -14,9 +14,12 @@ const (
 	demoDefaultPassword = "123qweasdzxc"
 )
 
-// demoWipeCollections lists every collection seedDemoData writes, child-before-parent, so the wipe
-// deletes records in foreign-key-safe order. The demo user record itself is never deleted.
+// demoWipeCollections lists demo-owned rows that must be wiped, child-before-parent, so deletes
+// happen in foreign-key-safe order. Currencies are kept because seedDemoData upserts them
+// idempotently, and deleting them would cascade-delete freshly re-seeded same-code quotes after the
+// reset transaction commits.
 var demoWipeCollections = []string{
+	"exchangeRates",
 	"securityTransactions",
 	"securityBalances",
 	"securities",
@@ -52,6 +55,9 @@ func demoPassword() string {
 func ensureDemoUser(app core.App) (string, error) {
 	user, err := app.FindAuthRecordByEmail("users", demoEmail())
 	if err == nil {
+		if _, _, err := ensureCurrencyRecord(app, user.Id, "USD", "", false); err != nil {
+			return "", err
+		}
 		return user.Id, nil
 	}
 
@@ -64,6 +70,9 @@ func ensureDemoUser(app core.App) (string, error) {
 	user.SetPassword(demoPassword())
 	user.SetVerified(true)
 	if err := app.Save(user); err != nil {
+		return "", err
+	}
+	if _, _, err := ensureCurrencyRecord(app, user.Id, "USD", "", false); err != nil {
 		return "", err
 	}
 	return user.Id, nil

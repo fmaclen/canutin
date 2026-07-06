@@ -9,6 +9,7 @@ import { page } from '$app/state';
 
 import { getAccountsContext } from './accounts.svelte';
 import { getAuthContext } from './auth.svelte';
+import { getExchangeRatesContext } from './exchange-rates.svelte';
 import { logError } from './logger';
 import type {
 	AccountsResponse,
@@ -59,7 +60,14 @@ export type TransactionRow = {
 	accountName: string;
 	accountId: string | null;
 	accountIsShared: boolean;
+	// NOTE: `value` stays the native, perspective-projected amount (edit/batch flows persist
+	// only native values); `displayValue` is the same amount converted to the display currency.
 	value: number;
+	nativeCurrency: string;
+	displayValue: number;
+	isConverted: boolean;
+	isUnconverted: boolean;
+	missingCurrency: string | null;
 	hasProjectedValue: boolean;
 	excluded: boolean;
 };
@@ -116,11 +124,13 @@ class TransactionsContext {
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
 	private _accountsContext: ReturnType<typeof getAccountsContext>;
+	private _fx: ReturnType<typeof getExchangeRatesContext>;
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
 		this._accountsContext = getAccountsContext();
+		this._fx = getExchangeRatesContext();
 		this.syncFromUrl(false);
 		this.init();
 	}
@@ -674,6 +684,8 @@ class TransactionsContext {
 			const labelIds = txn.labels ?? [];
 			const rawValue = txn.value ?? 0;
 			const value = contextAccount?.perspective === 'INVERSE' ? -rawValue : rawValue;
+			const nativeCurrency = contextAccount?.currency ?? expandedAccount?.currency ?? 'USD';
+			const conversion = this._fx.convert(value, nativeCurrency, dateIso);
 			return {
 				id: txn.id,
 				date,
@@ -687,6 +699,11 @@ class TransactionsContext {
 				accountId: txn.account ?? null,
 				accountIsShared: Boolean(contextAccount?.isShared),
 				value,
+				nativeCurrency,
+				displayValue: conversion.value,
+				isConverted: conversion.isConverted,
+				isUnconverted: conversion.isUnconverted,
+				missingCurrency: conversion.missingCurrency,
 				hasProjectedValue: Boolean(contextAccount),
 				excluded: Boolean(txn.excluded)
 			};
@@ -735,7 +752,7 @@ class TransactionsContext {
 					date: (r) => r.dateValue,
 					description: (r) => r.description,
 					account: (r) => r.accountName,
-					amount: (r) => r.value
+					amount: (r) => r.displayValue
 				}
 			);
 			return filtered.sort(comparator);
@@ -743,7 +760,7 @@ class TransactionsContext {
 
 		return filtered.sort((a, b) => {
 			if (b.dateValue !== a.dateValue) return b.dateValue - a.dateValue;
-			if (b.value !== a.value) return b.value - a.value;
+			if (b.displayValue !== a.displayValue) return b.displayValue - a.displayValue;
 			return a.id.localeCompare(b.id);
 		});
 	}
@@ -766,10 +783,21 @@ class TransactionsContext {
 		return this.mapTransactions(this.rawTransactions);
 	}
 
+	private summarize(rows: TransactionRow[]) {
+		let value = 0;
+		let isUnconverted = false;
+		for (const row of rows) {
+			if (row.isUnconverted) {
+				isUnconverted = true;
+				continue;
+			}
+			value += row.displayValue;
+		}
+		return { value, isUnconverted };
+	}
+
 	get netBalance() {
-		return this.filteredRows
-			.filter((row) => !row.excluded)
-			.reduce((sum, row) => sum + row.value, 0);
+		return this.summarize(this.filteredRows.filter((row) => !row.excluded));
 	}
 
 	private get creditRows() {
@@ -785,11 +813,11 @@ class TransactionsContext {
 	}
 
 	get creditsTotal() {
-		return this.creditRows.reduce((sum, row) => sum + row.value, 0);
+		return this.summarize(this.creditRows);
 	}
 
 	get debitsTotal() {
-		return this.debitRows.reduce((sum, row) => sum + row.value, 0);
+		return this.summarize(this.debitRows);
 	}
 
 	get hasCredits() {

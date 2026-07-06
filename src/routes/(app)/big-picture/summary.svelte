@@ -9,31 +9,55 @@
 	const assetsContext = getAssetsContext();
 
 	type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
+	type GroupTotal = { value: number | null; isUnconverted: boolean };
+
+	// NOTE: big picture hides the converted-amount indicator (page-scoped FX rule), so only the
+	// unconvertible warning bubbles up here; accounts/assets still carry their own display-currency
+	// conversion (displayBalance/displayMarketValue), this just sums those.
 	const totals = $derived.by(() => {
-		const valuesByGroup: Record<BalanceGroup, Array<number | null>> = {
-			CASH: [],
-			DEBT: [],
-			INVESTMENT: [],
-			OTHER: []
+		const groups: Record<BalanceGroup, { values: Array<number | null>; isUnconverted: boolean }> = {
+			CASH: { values: [], isUnconverted: false },
+			DEBT: { values: [], isUnconverted: false },
+			INVESTMENT: { values: [], isUnconverted: false },
+			OTHER: { values: [], isUnconverted: false }
 		};
+
+		const addValue = (group: BalanceGroup, value: number | null, isUnconverted: boolean) => {
+			const bucket = groups[group];
+			bucket.values.push(value);
+			if (value === null) return;
+			bucket.isUnconverted ||= isUnconverted;
+		};
+
 		for (const a of accountsContext.accounts)
 			if (!a.participantExcluded && !a.closed)
-				valuesByGroup[a.balanceGroup as BalanceGroup].push(a.balance);
+				addValue(a.balanceGroup as BalanceGroup, a.displayBalance, a.isUnconverted);
 		for (const a of assetsContext.assets)
 			if (!a.participantExcluded && !a.sold)
-				valuesByGroup[a.balanceGroup as BalanceGroup].push(a.marketValue ?? 0);
-		const totalsByGroup = {
-			CASH: sumOrUnknown(valuesByGroup.CASH),
-			DEBT: sumOrUnknown(valuesByGroup.DEBT),
-			INVESTMENT: sumOrUnknown(valuesByGroup.INVESTMENT),
-			OTHER: sumOrUnknown(valuesByGroup.OTHER)
+				addValue(a.balanceGroup as BalanceGroup, a.displayMarketValue, a.isUnconverted);
+
+		const toGroupTotal = (group: BalanceGroup) => ({
+			value: sumOrUnknown(groups[group].values),
+			isUnconverted: groups[group].isUnconverted
+		});
+
+		const totalsByGroup: Record<BalanceGroup, GroupTotal> = {
+			CASH: toGroupTotal('CASH'),
+			DEBT: toGroupTotal('DEBT'),
+			INVESTMENT: toGroupTotal('INVESTMENT'),
+			OTHER: toGroupTotal('OTHER')
 		};
-		const netWorth = sumOrUnknown([
-			...valuesByGroup.CASH,
-			...valuesByGroup.DEBT,
-			...valuesByGroup.INVESTMENT,
-			...valuesByGroup.OTHER
-		]);
+
+		const netWorth: GroupTotal = {
+			value: sumOrUnknown([
+				...groups.CASH.values,
+				...groups.DEBT.values,
+				...groups.INVESTMENT.values,
+				...groups.OTHER.values
+			]),
+			isUnconverted: Object.values(groups).some((group) => group.isUnconverted)
+		};
+
 		return { totalsByGroup, netWorth } as const;
 	});
 </script>
@@ -46,15 +70,35 @@
 	>
 		<div class="text-sm leading-none font-semibold tracking-tight">Net worth</div>
 		<div class="translate-y-1.5 text-4xl">
-			{#if totals.netWorth === null}
+			{#if totals.netWorth.value === null}
 				<span class="text-white/70">~</span>
 			{:else}
-				<Currency value={totals.netWorth} />
+				<Currency value={totals.netWorth.value} isUnconverted={totals.netWorth.isUnconverted} />
 			{/if}
 		</div>
 	</div>
-	<KeyValue title="Cash" value={totals.totalsByGroup.CASH} variant="cash" />
-	<KeyValue title="Investments" value={totals.totalsByGroup.INVESTMENT} variant="investment" />
-	<KeyValue title="Debt" value={totals.totalsByGroup.DEBT} variant="debt" />
-	<KeyValue title="Other assets" value={totals.totalsByGroup.OTHER} variant="other" />
+	<KeyValue
+		title="Cash"
+		value={totals.totalsByGroup.CASH.value}
+		variant="cash"
+		isUnconverted={totals.totalsByGroup.CASH.isUnconverted}
+	/>
+	<KeyValue
+		title="Investments"
+		value={totals.totalsByGroup.INVESTMENT.value}
+		variant="investment"
+		isUnconverted={totals.totalsByGroup.INVESTMENT.isUnconverted}
+	/>
+	<KeyValue
+		title="Debt"
+		value={totals.totalsByGroup.DEBT.value}
+		variant="debt"
+		isUnconverted={totals.totalsByGroup.DEBT.isUnconverted}
+	/>
+	<KeyValue
+		title="Other assets"
+		value={totals.totalsByGroup.OTHER.value}
+		variant="other"
+		isUnconverted={totals.totalsByGroup.OTHER.isUnconverted}
+	/>
 </div>

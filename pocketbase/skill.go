@@ -96,13 +96,22 @@ const skillCustomEndpointsSection = "## Custom endpoints\n\n" +
 	"- `GET /api/setup-status` — public, no body. Returns `{ \"ready\": bool }` indicating " +
 	"whether a superuser account has been provisioned.\n" +
 	"- `POST /api/canutin/import` — requires any authenticated token. Body is an import " +
-	"payload: `sessionLabel` plus the arrays `accounts`, `assets`, `securities`, " +
-	"`transactions`, `securityBalances`, and `securityTransactions`. Returns " +
+	"payload: `sessionLabel` plus optional arrays `currencies`, `accounts`, `assets`, `securities`, " +
+	"`transactions`, `securityBalances`, and `securityTransactions`. Each `currencies` object is " +
+	"`{ code, name?, autoUpdate?, quotes: [{ date, rate }] }`; at least one quote is required and " +
+	"quotes are stored as owner-scoped manual `exchangeRates` rows. Each `accounts`, `assets`, " +
+	"and `securities` object accepts an optional `currency` (uppercase code matching " +
+	"`^[A-Z0-9]{2,10}$`, defaults to `USD`); the code must already exist in the importer's " +
+	"`currencies` registry or be declared in `currencies` with a quote. Transactions and balances " +
+	"inherit their parent's currency. Returns " +
 	"`{ sessionId, status, recordsFailed, … }` with per-collection `{ created, existing, skipped }` counts.\n" +
 	"- `POST /api/canutin/import/revert` — requires an authenticated token. Body is " +
-	"`{ sessionId }`. Returns `{ sessionId, deleted }`.\n" +
+	"`{ sessionId }`. Returns `{ sessionId, deleted }`. Revert deletes import-session-tagged " +
+	"financial rows, but does not remove import-created `currencies` rows or their manual " +
+	"`exchangeRates` quotes because those rows do not carry an `importSession` tag.\n" +
 	"- `POST /api/canutin/securities/with-initial-balance` — requires a `users` token. Body is " +
-	"`{ security: { name, symbol, owner }, balance: { account, owner, asOf, quantity, price, value, costBasis } }`. " +
+	"`{ security: { name, symbol, owner, currency }, balance: { account, owner, asOf, quantity, price, value, costBasis } }`. " +
+	"`security.currency` is optional (free-form uppercase code matching `^[A-Z0-9]{2,10}$`, defaults to `USD`). " +
 	"Returns the created `securities` record.\n" +
 	"- `POST /api/shares/accounts` — requires a `users` token. Body is " +
 	"`{ accountId, recipientEmail, perspective }` where perspective is `NORMAL` or `INVERSE`. " +
@@ -121,6 +130,28 @@ Backend hooks enforce invariants that are not visible in the access rules:
   a share to change anything else.
 - The ` + "`owner`" + ` of a security, balance, or transaction is immutable once set; attempting to
   change it is rejected.
+- User-token updates cannot change ` + "`owner`" + ` on ` + "`currencies`" + ` or ` + "`exchangeRates`" + ` rows;
+  attempts are rejected with a 400. Superuser and engine writes are exempt.
+- The ` + "`currency`" + ` of an account, asset, or security is immutable once set; an update that
+  changes it is rejected with a 400. It defaults to ` + "`USD`" + ` when omitted on create.
+- Currencies (` + "`currencies`" + `) are per-user registry rows. Every new user gets a deletable ` + "`USD`" + `
+  row. ` + "`code`" + ` is immutable after creation, while ` + "`name`" + ` and ` + "`autoUpdate`" + ` can be edited.
+  Creating a non-USD currency with ` + "`autoUpdate = true`" + ` validates the code by fetching the current
+  rate unless ` + "`FX_FETCH_DISABLED=true`" + ` is set. A failed upstream request rejects the create with
+  ` + "`currency_auto_update_request_failed`" + ` on ` + "`autoUpdate`" + `; an unavailable code rejects it with
+  ` + "`currency_auto_update_code_unavailable`" + `.
+  Deleting a currency is rejected with a 400 while any owned account, asset, or security references
+  its code; successful deletion also deletes that user's manual quotes for the code.
+- Exchange rates (` + "`exchangeRates`" + `) are a two-tier store. Rows with empty ` + "`owner`" + ` are the
+  global fetched cache (` + "`source = fetched`" + `) and are visible to all users but engine-written only.
+  Rows with ` + "`owner = @request.auth.id`" + ` are the user's manual quotes (` + "`source = manual`" + `).
+  A rate written through a user token is always stamped ` + "`source = manual`" + ` regardless of the
+  payload, and its ` + "`rate`" + ` must be a positive, finite number (otherwise rejected with a 400).
+  User manual rows override same-day fetched rows in conversion views.
+- Automatic exchange-rate fetching is controlled per currency by ` + "`currencies.autoUpdate`" + `. The
+  engine fetches distinct non-USD codes that at least one user has enabled, writes only global
+  fetched rows, and never updates owner-scoped manual rows. ` + "`FX_FETCH_DISABLED=true`" + ` is the only
+  runtime kill-switch.
 `
 
 // canutinSkillHandler serves a live, SKILL.md-formatted reference of the Canutin API,

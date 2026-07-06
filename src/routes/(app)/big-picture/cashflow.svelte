@@ -222,7 +222,7 @@
 										class="flex flex-1 items-center justify-between gap-4 text-base leading-none"
 									>
 										<span class="text-muted-foreground text-sm">{m.cashflow_income_label()}</span>
-										<Currency value={period.income} />
+										<Currency value={period.income} isUnconverted={period.isUnconverted} />
 									</div>
 								</div>
 								<div class="flex items-center gap-2">
@@ -231,7 +231,7 @@
 										class="flex flex-1 items-center justify-between gap-4 text-base leading-none"
 									>
 										<span class="text-muted-foreground text-sm">{m.cashflow_expenses_label()}</span>
-										<Currency value={period.expenses} />
+										<Currency value={period.expenses} isUnconverted={period.isUnconverted} />
 									</div>
 								</div>
 								<div class="flex items-center gap-2">
@@ -244,7 +244,7 @@
 										class="flex flex-1 items-center justify-between gap-4 text-base leading-none"
 									>
 										<span class="text-muted-foreground text-sm">{m.cashflow_surplus_label()}</span>
-										<Currency value={period.surplus} />
+										<Currency value={period.surplus} isUnconverted={period.isUnconverted} />
 									</div>
 								</div>
 							</div>

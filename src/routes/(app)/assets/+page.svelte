@@ -5,7 +5,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { getAssetsContext } from '$lib/assets.svelte';
-	import Currency from '$lib/components/currency.svelte';
+	import Currency, { getCurrencyFxLabel } from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
 	import KeyValue from '$lib/components/key-value.svelte';
 	import Link from '$lib/components/link.svelte';
@@ -52,14 +52,21 @@
 		id: string;
 		name: string;
 		bookValue: number;
+		nativeBookValue: number;
 		marketValue: number;
+		nativeMarketValue: number;
 		typeName: string;
 		balanceGroup: BalanceGroup;
 		participantExcluded: boolean;
 		sold: boolean;
 		gain: number;
+		nativeGain: number;
 		gainPercent: number;
 		isShared: boolean;
+		isConverted: boolean;
+		isUnconverted: boolean;
+		missingCurrency: string | null;
+		nativeCurrency: string;
 	};
 
 	const filters: Array<{
@@ -123,15 +130,22 @@
 		const rows = assetsContext.assets.map((asset) => ({
 			id: asset.id,
 			name: asset.name,
-			bookValue: asset.bookValue ?? 0,
-			marketValue: asset.marketValue ?? 0,
+			bookValue: asset.displayBookValue,
+			nativeBookValue: asset.bookValue,
+			marketValue: asset.displayMarketValue,
+			nativeMarketValue: asset.marketValue,
 			typeName: assetsContext.getTypeName(asset.balanceType),
 			balanceGroup: asset.balanceGroup as BalanceGroup,
 			participantExcluded: asset.participantExcluded,
 			sold: Boolean(asset.sold),
-			gain: asset.gain ?? 0,
+			gain: asset.displayGain,
+			nativeGain: asset.gain,
 			gainPercent: asset.gainPercent ?? 0,
-			isShared: asset.isShared
+			isShared: asset.isShared,
+			isConverted: asset.isConverted,
+			isUnconverted: asset.isUnconverted,
+			missingCurrency: asset.missingCurrency,
+			nativeCurrency: asset.currency
 		}));
 
 		const comparator = createSortComparator<AssetRow, AssetSortColumn>(sortState, {
@@ -154,16 +168,22 @@
 		return map;
 	});
 
+	type AssetsTotal = { value: number; isUnconverted: boolean };
+
 	const totalsByFilter = $derived.by(() => {
-		const totals = new SvelteMap<FilterOption, number>();
+		const totals = new SvelteMap<FilterOption, AssetsTotal>();
 		for (const option of filters) {
 			const rows = rowsByFilter.get(option.key) ?? [];
-			const total = rows.reduce(
-				(sum, row) =>
-					sum + (option.key === 'owned' && row.participantExcluded ? 0 : row.marketValue),
-				0
+			// NOTE: on the "owned" tab, excluded assets don't count toward the net market value, so
+			// they're dropped before summing/flagging rather than counted as a converted 0.
+			const contributing = rows.filter(
+				(row) => !(option.key === 'owned' && row.participantExcluded)
 			);
-			totals.set(option.key, total);
+			const value = contributing.reduce((sum, row) => sum + row.marketValue, 0);
+			totals.set(option.key, {
+				value,
+				isUnconverted: contributing.some((row) => row.isUnconverted)
+			});
 		}
 		return totals;
 	});
@@ -234,7 +254,10 @@
 				{#each filters as option (option.key)}
 					<Tabs.Content value={option.key} class="flex flex-col space-y-2">
 						{@const rowsForOption = rowsByFilter.get(option.key) ?? []}
-						{@const total = totalsByFilter.get(option.key) ?? 0}
+						{@const total = totalsByFilter.get(option.key) ?? {
+							value: 0,
+							isUnconverted: false
+						}}
 						<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
 							<KeyValue
 								title={m.sidebar_assets()}
@@ -244,9 +267,10 @@
 							/>
 							<KeyValue
 								title={m.summary_net_market_value()}
-								value={total}
+								value={total.value}
 								variant="outline"
 								decimalScale={2}
+								isUnconverted={total.isUnconverted}
 							/>
 						</div>
 						{#if rowsForOption.length === 0}
@@ -361,7 +385,16 @@
 													</div>
 												</Table.Cell>
 												<Table.Cell class="text-muted-foreground text-right tabular-nums">
-													<Currency value={row.bookValue} decimalScale={2} sentiment="neutral" />
+													<Currency
+														value={row.bookValue}
+														decimalScale={2}
+														sentiment="neutral"
+														isConverted={row.isConverted}
+														isUnconverted={row.isUnconverted}
+														missingCurrency={row.missingCurrency}
+														nativeCurrency={row.nativeCurrency}
+														nativeValue={row.nativeBookValue}
+													/>
 												</Table.Cell>
 												<Table.Cell class="text-right tabular-nums">
 													<Currency
@@ -372,6 +405,11 @@
 															: row.gain < 0
 																? 'negative'
 																: 'neutral'}
+														isConverted={row.isConverted}
+														isUnconverted={row.isUnconverted}
+														missingCurrency={row.missingCurrency}
+														nativeCurrency={row.nativeCurrency}
+														nativeValue={row.nativeGain}
 													/>
 												</Table.Cell>
 												<Table.Cell class="text-right tabular-nums">
@@ -394,6 +432,12 @@
 																	value={row.marketValue}
 																	decimalScale={2}
 																	sentiment={balanceSentiment(row)}
+																	isConverted={row.isConverted}
+																	isUnconverted={row.isUnconverted}
+																	missingCurrency={row.missingCurrency}
+																	nativeCurrency={row.nativeCurrency}
+																	nativeValue={row.nativeMarketValue}
+																	showFxTooltip={false}
 																/>
 															</Tooltip.Trigger>
 															<Tooltip.Content sideOffset={6}>
@@ -402,6 +446,17 @@
 																		? m.assets_balance_tooltip_sold()
 																		: m.assets_balance_tooltip_excluded()}
 																</p>
+																{#if row.isConverted || row.isUnconverted}
+																	<p class="text-xs leading-snug font-normal">
+																		{getCurrencyFxLabel({
+																			decimalScale: 2,
+																			isUnconverted: row.isUnconverted,
+																			missingCurrency: row.missingCurrency,
+																			nativeCurrency: row.nativeCurrency,
+																			nativeValue: row.nativeMarketValue
+																		})}
+																	</p>
+																{/if}
 															</Tooltip.Content>
 														</Tooltip.Root>
 													{:else}
@@ -409,6 +464,11 @@
 															value={row.marketValue}
 															decimalScale={2}
 															sentiment={balanceSentiment(row)}
+															isConverted={row.isConverted}
+															isUnconverted={row.isUnconverted}
+															missingCurrency={row.missingCurrency}
+															nativeCurrency={row.nativeCurrency}
+															nativeValue={row.nativeMarketValue}
 														/>
 													{/if}
 												</Table.Cell>

@@ -235,7 +235,13 @@
 							</Label>
 							<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
 						</div>
-						<CurrencyField id="price" name="price" bind:value={price} disabled={isSaving} />
+						<CurrencyField
+							id="price"
+							name="price"
+							bind:value={price}
+							disabled={isSaving}
+							currency={selectedSecurity?.currency}
+						/>
 					</FormFieldRow>
 
 					<FormFieldRow>
@@ -245,7 +251,13 @@
 							</Label>
 							<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
 						</div>
-						<CurrencyField id="amount" name="amount" bind:value={amount} disabled={isSaving} />
+						<CurrencyField
+							id="amount"
+							name="amount"
+							bind:value={amount}
+							disabled={isSaving}
+							currency={selectedSecurity?.currency}
+						/>
 					</FormFieldRow>
 
 					<FormFieldRow>
@@ -255,7 +267,13 @@
 							</Label>
 							<span class="text-muted-foreground text-sm">{m.transactions_text_optional()}</span>
 						</div>
-						<CurrencyField id="fees" name="fees" bind:value={fees} disabled={isSaving} />
+						<CurrencyField
+							id="fees"
+							name="fees"
+							bind:value={fees}
+							disabled={isSaving}
+							currency={selectedSecurity?.currency}
+						/>
 					</FormFieldRow>
 				</Fieldset>
 

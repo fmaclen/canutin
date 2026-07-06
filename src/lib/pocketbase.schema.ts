@@ -18,6 +18,8 @@ export enum Collections {
 	AssetShares = "assetShares",
 	Assets = "assets",
 	BalanceTypes = "balanceTypes",
+	Currencies = "currencies",
+	ExchangeRates = "exchangeRates",
 	ImportSessions = "importSessions",
 	Securities = "securities",
 	SecurityBalances = "securityBalances",
@@ -153,6 +155,7 @@ export type AccountsRecord = {
 	balanceType: RecordIdString
 	closed?: IsoDateString
 	created: IsoAutoDateString
+	currency: string
 	excluded?: IsoDateString
 	id: string
 	importSession?: RecordIdString
@@ -204,6 +207,7 @@ export type AssetsRecord = {
 	balanceGroup: AssetsBalanceGroupOptions
 	balanceType: RecordIdString
 	created: IsoAutoDateString
+	currency: string
 	excluded?: IsoDateString
 	id: string
 	importSession?: RecordIdString
@@ -219,6 +223,31 @@ export type BalanceTypesRecord = {
 	id: string
 	name: string
 	owner: RecordIdString
+	updated: IsoAutoDateString
+}
+
+export type CurrenciesRecord = {
+	autoUpdate?: boolean
+	code: string
+	created: IsoAutoDateString
+	id: string
+	name?: string
+	owner: RecordIdString
+	updated: IsoAutoDateString
+}
+
+export enum ExchangeRatesSourceOptions {
+	"fetched" = "fetched",
+	"manual" = "manual",
+}
+export type ExchangeRatesRecord = {
+	created: IsoAutoDateString
+	currency: string
+	date: IsoDateString
+	id: string
+	owner?: RecordIdString
+	rate: number
+	source: ExchangeRatesSourceOptions
 	updated: IsoAutoDateString
 }
 
@@ -243,6 +272,7 @@ export type ImportSessionsRecord = {
 
 export type SecuritiesRecord = {
 	created: IsoAutoDateString
+	currency: string
 	id: string
 	importSession?: RecordIdString
 	name: string
@@ -345,6 +375,8 @@ export type AssetBalancesResponse<Texpand = unknown> = Required<AssetBalancesRec
 export type AssetSharesResponse<Texpand = unknown> = Required<AssetSharesRecord> & BaseSystemFields<Texpand>
 export type AssetsResponse<Texpand = unknown> = Required<AssetsRecord> & BaseSystemFields<Texpand>
 export type BalanceTypesResponse<Texpand = unknown> = Required<BalanceTypesRecord> & BaseSystemFields<Texpand>
+export type CurrenciesResponse<Texpand = unknown> = Required<CurrenciesRecord> & BaseSystemFields<Texpand>
+export type ExchangeRatesResponse<Texpand = unknown> = Required<ExchangeRatesRecord> & BaseSystemFields<Texpand>
 export type ImportSessionsResponse<Texpand = unknown> = Required<ImportSessionsRecord> & BaseSystemFields<Texpand>
 export type SecuritiesResponse<Texpand = unknown> = Required<SecuritiesRecord> & BaseSystemFields<Texpand>
 export type SecurityBalancesResponse<TcostBasis = unknown, Tprice = unknown, Tquantity = unknown, Tvalue = unknown, Texpand = unknown> = Required<SecurityBalancesRecord<TcostBasis, Tprice, Tquantity, Tvalue>> & BaseSystemFields<Texpand>
@@ -368,6 +400,8 @@ export type CollectionRecords = {
 	assetShares: AssetSharesRecord
 	assets: AssetsRecord
 	balanceTypes: BalanceTypesRecord
+	currencies: CurrenciesRecord
+	exchangeRates: ExchangeRatesRecord
 	importSessions: ImportSessionsRecord
 	securities: SecuritiesRecord
 	securityBalances: SecurityBalancesRecord
@@ -390,6 +424,8 @@ export type CollectionResponses = {
 	assetShares: AssetSharesResponse
 	assets: AssetsResponse
 	balanceTypes: BalanceTypesResponse
+	currencies: CurrenciesResponse
+	exchangeRates: ExchangeRatesResponse
 	importSessions: ImportSessionsResponse
 	securities: SecuritiesResponse
 	securityBalances: SecurityBalancesResponse

@@ -20,6 +20,7 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Table from '$lib/components/ui/table/index';
+	import { getExchangeRatesContext } from '$lib/exchange-rates.svelte';
 	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
@@ -45,14 +46,19 @@
 	const auth = getAuthContext();
 	const accountsContext = getAccountsContext();
 	const securitiesContext = getSecuritiesContext();
+	const fx = getExchangeRatesContext();
 
 	const ownerId = $derived(auth.currentUser?.record?.id);
 	const securityId = $derived(page.params.id);
 	const security = $derived(securityId ? securitiesContext.getSecurity(securityId) : null);
+	const securityCurrency = $derived(security?.currency ?? 'USD');
 	const accountBalances = $derived(
 		securityId ? securitiesContext.getAccountBalances(securityId) : []
 	);
-	const balancesMarketValue = $derived(sumOrUnknown(accountBalances.map((row) => row.value)));
+	const balancesMarketValue = $derived({
+		value: sumOrUnknown(accountBalances.map((row) => (row.isUnconverted ? 0 : row.value))),
+		isUnconverted: accountBalances.some((row) => row.isUnconverted)
+	});
 
 	type BalanceSortColumn =
 		| 'asOf'
@@ -99,7 +105,7 @@
 			asOf: (r) => new Date(r.asOf).getTime(),
 			accountName: (r) => r.accountName,
 			quantity: (r) => r.quantity,
-			price: (r) => r.price,
+			price: (r) => (r.price === null ? null : fx.convert(r.price, securityCurrency, r.asOf).value),
 			costBasis: (r) => r.costBasis,
 			gainLoss: (r) => r.gainLoss,
 			gainLossPercent: (r) => gainLossPercentOrNull(r.gainLoss, r.costBasis),
@@ -273,9 +279,10 @@
 					/>
 					<KeyValue
 						title={m.summary_net_market_value()}
-						value={balancesMarketValue}
+						value={balancesMarketValue.value}
 						variant="outline"
 						decimalScale={2}
+						isUnconverted={balancesMarketValue.isUnconverted}
 					/>
 				</div>
 				<div class="bg-background overflow-hidden rounded-sm shadow-md">
@@ -384,14 +391,31 @@
 										{#if row.price === null}
 											<span class="text-muted-foreground">~</span>
 										{:else}
-											<Currency value={row.price} decimalScale={2} />
+											{@const priceFx = fx.convert(row.price, securityCurrency, row.asOf)}
+											<Currency
+												value={priceFx.value}
+												decimalScale={2}
+												isConverted={priceFx.isConverted}
+												isUnconverted={priceFx.isUnconverted}
+												missingCurrency={priceFx.missingCurrency}
+												nativeCurrency={securityCurrency}
+												nativeValue={row.price}
+											/>
 										{/if}
 									</Table.Cell>
 									<Table.Cell class="text-right tabular-nums">
 										{#if row.costBasis === null}
 											<span class="text-muted-foreground">~</span>
 										{:else}
-											<Currency value={row.costBasis} decimalScale={2} />
+											<Currency
+												value={row.costBasis}
+												decimalScale={2}
+												isConverted={row.isConverted}
+												isUnconverted={row.isUnconverted}
+												missingCurrency={row.missingCurrency}
+												nativeCurrency={securityCurrency}
+												nativeValue={row.nativeCostBasis ?? undefined}
+											/>
 										{/if}
 									</Table.Cell>
 									<Table.Cell class="text-right tabular-nums">
@@ -402,6 +426,11 @@
 												value={row.gainLoss}
 												decimalScale={2}
 												sentiment={sentiment(row.gainLoss)}
+												isConverted={row.isConverted}
+												isUnconverted={row.isUnconverted}
+												missingCurrency={row.missingCurrency}
+												nativeCurrency={securityCurrency}
+												nativeValue={row.nativeGainLoss ?? undefined}
 											/>
 										{/if}
 									</Table.Cell>
@@ -427,6 +456,11 @@
 												value={row.value}
 												decimalScale={2}
 												sentiment={sentiment(row.value)}
+												isConverted={row.isConverted}
+												isUnconverted={row.isUnconverted}
+												missingCurrency={row.missingCurrency}
+												nativeCurrency={securityCurrency}
+												nativeValue={row.nativeValue ?? undefined}
 											/>
 										{/if}
 									</Table.Cell>
@@ -455,6 +489,7 @@
 					<BalanceFields
 						formData={balanceFormData}
 						accounts={eligibleAccounts}
+						currency={securityCurrency}
 						isFirst={true}
 						disabled={isSavingBalance}
 					/>
@@ -476,7 +511,7 @@
 		{#if securitiesContext.isLoading || !security}
 			<Skeleton class="h-36" />
 		{:else}
-			<DetailsForm {formData} onSubmit={handleUpdateDetails} />
+			<DetailsForm {formData} currency={securityCurrency} onSubmit={handleUpdateDetails} />
 		{/if}
 	</Section>
 </Page>

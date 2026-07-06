@@ -8,7 +8,11 @@
 	import { setAuthContext } from '$lib/auth.svelte';
 	import Sonner from '$lib/components/ui/sonner/sonner.svelte';
 	import { setDemoContext } from '$lib/demo/demo.svelte';
-	import { initializeLocale, interfacePreferences } from '$lib/interface-preferences.svelte';
+	import {
+		initializeDisplayCurrency,
+		initializeLocale,
+		interfacePreferences
+	} from '$lib/interface-preferences.svelte';
 	import { getPocketBaseContext, setPocketBaseContext } from '$lib/pocketbase.svelte';
 
 	import AuthGuard from './auth-guard.svelte';
@@ -25,6 +29,7 @@
 	pb.onAuthInvalidated = () => auth.invalidateSession();
 
 	if (browser) {
+		initializeDisplayCurrency();
 		void initializeLocale();
 	}
 

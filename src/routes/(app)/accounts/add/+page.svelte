@@ -21,6 +21,8 @@
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import { getCurrenciesContext } from '$lib/currencies.svelte';
+	import { interfacePreferences } from '$lib/interface-preferences.svelte';
 	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import { AccountsBalanceGroupOptions } from '$lib/pocketbase.schema';
@@ -30,8 +32,10 @@
 	const auth = getAuthContext();
 	const accountsContext = getAccountsContext();
 	const balanceTypesContext = getBalanceTypesContext();
+	const currenciesContext = getCurrenciesContext();
 
 	const ownerId = $derived(auth.currentUser?.record?.id);
+	const currencyOptions = $derived(currenciesContext.currencyOptions);
 
 	let name = $state('');
 	let institution = $state('');
@@ -40,20 +44,34 @@
 	let notes = $state('');
 	let excluded = $state(false);
 	let closed = $state(false);
+	let currency = $state(interfacePreferences.displayCurrency);
+	let currencyWasChanged = $state(false);
 	let value = $state('');
+
+	const selectedCurrency = $derived(currenciesContext.getCurrency(currency));
+
+	$effect(() => {
+		if (!currencyWasChanged) {
+			currency = interfacePreferences.displayCurrency;
+		}
+	});
 
 	async function handleSubmit() {
 		const currentOwnerId = ownerId;
 		if (!currentOwnerId) return;
+		if (!currenciesContext.hasCurrency(currency)) {
+			toast.error(m.currency_required());
+			return;
+		}
 
 		try {
 			const balanceTypeId = await balanceTypesContext.getOrCreate(accountTypeName, currentOwnerId);
 
-			// Create account
 			const accountData: Record<string, unknown> = {
 				name: name.trim(),
 				balanceGroup: balanceGroup as AccountsBalanceGroupOptions,
 				balanceType: balanceTypeId,
+				currency,
 				owner: currentOwnerId,
 				institution: institution.trim() || undefined,
 				notes: notes.trim() || undefined,
@@ -63,7 +81,6 @@
 
 			const account = await pb.authedClient.collection('accounts').create(accountData);
 
-			// Create account balance
 			const balanceData: Record<string, unknown> = {
 				account: account.id,
 				owner: currentOwnerId,
@@ -207,6 +224,53 @@
 						</Select.Root>
 					</FormFieldRow>
 
+					<FormFieldRow>
+						<Label for="currency" class="justify-start pr-0 md:justify-end"
+							>{m.accounts_label_currency()}</Label
+						>
+						<Select.Root
+							type="single"
+							value={currency}
+							onValueChange={(value) => {
+								currency = value;
+								currencyWasChanged = true;
+							}}
+						>
+							<Select.Trigger id="currency" class="bg-background w-full">
+								{#if selectedCurrency}
+									<div class="flex min-w-0 items-center gap-2">
+										<span>{selectedCurrency.code}</span>
+										{#if selectedCurrency.name}
+											<span class="text-muted-foreground truncate">{selectedCurrency.name}</span>
+										{/if}
+									</div>
+								{:else if currency}
+									{currency}
+								{:else}
+									<span class="text-muted-foreground">{m.currencies_select_placeholder()}</span>
+								{/if}
+							</Select.Trigger>
+							<Select.Content>
+								{#if currencyOptions.length === 0}
+									<Select.Item value="__no-currencies" disabled>
+										{m.currencies_select_empty()}
+									</Select.Item>
+								{:else}
+									{#each currencyOptions as option (option.value)}
+										<Select.Item value={option.value}>
+											<div class="flex min-w-0 items-center gap-2">
+												<span>{option.code}</span>
+												{#if option.name}
+													<span class="text-muted-foreground truncate">{option.name}</span>
+												{/if}
+											</div>
+										</Select.Item>
+									{/each}
+								{/if}
+							</Select.Content>
+						</Select.Root>
+					</FormFieldRow>
+
 					<FormFieldRow itemsAlignment="items-start">
 						<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1 md:pt-2">
 							<Label for="notes" class="justify-start pr-0 md:justify-end"
@@ -223,7 +287,7 @@
 						<Label for="value" class="justify-start pr-0 md:justify-end"
 							>{m.accounts_label_balance()}</Label
 						>
-						<CurrencyField id="value" name="value" bind:value />
+						<CurrencyField id="value" name="value" bind:value {currency} />
 					</FormFieldRow>
 				</Fieldset>
 

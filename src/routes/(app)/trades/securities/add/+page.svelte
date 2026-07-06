@@ -16,8 +16,11 @@
 	import * as Command from '$lib/components/ui/command/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import * as Select from '$lib/components/ui/select/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import { getCurrenciesContext } from '$lib/currencies.svelte';
+	import { interfacePreferences } from '$lib/interface-preferences.svelte';
 	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
@@ -29,12 +32,14 @@
 	const auth = getAuthContext();
 	const accountsContext = getAccountsContext();
 	const securitiesContext = getSecuritiesContext();
+	const currenciesContext = getCurrenciesContext();
 	const newSecurityValue = '__new_security__';
 
 	let securityId = $state('');
 	let name = $state('');
 	let symbol = $state('');
 	let balanceFormData = $state(createSecurityBalanceFormData());
+	let manualCurrency = $state<string | null>(null);
 	let isSaving = $state(false);
 
 	const ownerId = $derived(auth.currentUser?.record?.id);
@@ -45,6 +50,15 @@
 		securitiesContext.securities.find((security) => security.id === securityId) ?? null
 	);
 	const isNewSecurity = $derived(securityId === newSecurityValue);
+	const selectedAccountCurrency = $derived(
+		eligibleAccounts.find((account) => account.id === balanceFormData.accountId)?.currency
+	);
+	const currency = $derived(
+		manualCurrency ?? selectedAccountCurrency ?? interfacePreferences.displayCurrency
+	);
+	const balanceCurrency = $derived(isNewSecurity ? currency : selectedSecurity?.currency);
+	const currencyOptions = $derived(currenciesContext.currencyOptions);
+	const selectedCurrency = $derived(currenciesContext.getCurrency(currency));
 	const securityItems = $derived<ComboboxItem[]>(
 		securitiesContext.securities.map((security) => ({
 			value: security.id,
@@ -69,6 +83,10 @@
 			toast.error(m.securities_name_required());
 			return;
 		}
+		if (isNewSecurity && !currenciesContext.hasCurrency(currency)) {
+			toast.error(m.currency_required());
+			return;
+		}
 
 		try {
 			isSaving = true;
@@ -78,7 +96,8 @@
 						{
 							name: securityName,
 							symbol: symbol.trim() || undefined,
-							owner: currentOwnerId
+							owner: currentOwnerId,
+							currency
 						},
 						balanceInput
 					)
@@ -191,10 +210,60 @@
 							</div>
 							<Input id="security-symbol" bind:value={symbol} disabled={isSaving} />
 						</FormFieldRow>
+
+						<FormFieldRow>
+							<Label for="security-currency" class="justify-start pr-0 md:justify-end">
+								{m.securities_label_currency()}
+							</Label>
+							<Select.Root
+								type="single"
+								value={currency}
+								disabled={isSaving}
+								onValueChange={(value) => (manualCurrency = value)}
+							>
+								<Select.Trigger id="security-currency" class="bg-background w-full">
+									{#if selectedCurrency}
+										<div class="flex min-w-0 items-center gap-2">
+											<span>{selectedCurrency.code}</span>
+											{#if selectedCurrency.name}
+												<span class="text-muted-foreground truncate">{selectedCurrency.name}</span>
+											{/if}
+										</div>
+									{:else if currency}
+										{currency}
+									{:else}
+										<span class="text-muted-foreground">{m.currencies_select_placeholder()}</span>
+									{/if}
+								</Select.Trigger>
+								<Select.Content>
+									{#if currencyOptions.length === 0}
+										<Select.Item value="__no-currencies" disabled>
+											{m.currencies_select_empty()}
+										</Select.Item>
+									{:else}
+										{#each currencyOptions as option (option.value)}
+											<Select.Item value={option.value}>
+												<div class="flex min-w-0 items-center gap-2">
+													<span>{option.code}</span>
+													{#if option.name}
+														<span class="text-muted-foreground truncate">{option.name}</span>
+													{/if}
+												</div>
+											</Select.Item>
+										{/each}
+									{/if}
+								</Select.Content>
+							</Select.Root>
+						</FormFieldRow>
 					{/if}
 				</Fieldset>
 
-				<BalanceFields formData={balanceFormData} accounts={eligibleAccounts} disabled={isSaving} />
+				<BalanceFields
+					formData={balanceFormData}
+					accounts={eligibleAccounts}
+					currency={balanceCurrency}
+					disabled={isSaving}
+				/>
 
 				<footer class="border-border bg-border border-t p-2">
 					<div class="flex justify-end">

@@ -43,6 +43,9 @@
 					: 'other';
 	}
 
+	// NOTE: accounts/assets already carry their own display-currency conversion
+	// (displayBalance/displayMarketValue + isConverted/isUnconverted); this just groups and
+	// sums those.
 	const grouped = $derived.by(() => {
 		type Item = {
 			id: string;
@@ -51,9 +54,24 @@
 			excluded: boolean;
 			type: 'account' | 'asset';
 			isShared: boolean;
+			isConverted: boolean;
+			isUnconverted: boolean;
+			missingCurrency: string | null;
+			nativeCurrency: string;
+			nativeValue: number | null;
 		};
-		type BalanceType = { id: string; name: string; total: number | null; items: Item[] };
-		type Group = { total: number | null; types: BalanceType[] };
+		type BalanceType = {
+			id: string;
+			name: string;
+			total: number | null;
+			isUnconverted: boolean;
+			items: Item[];
+		};
+		type Group = {
+			total: number | null;
+			isUnconverted: boolean;
+			types: BalanceType[];
+		};
 
 		const typeMaps: Record<BalanceGroup, Map<string, BalanceType>> = {
 			CASH: new Map(),
@@ -69,7 +87,7 @@
 				!trimmed || trimmed === '(Unknown)' ? `id:${typeId}` : `name:${trimmed.toLowerCase()}`;
 			let entry = map.get(key);
 			if (!entry) {
-				entry = { id: key, name, total: null, items: [] };
+				entry = { id: key, name, total: null, isUnconverted: false, items: [] };
 				map.set(key, entry);
 			}
 			return entry;
@@ -85,10 +103,15 @@
 			balanceType.items.push({
 				id: a.id,
 				name: a.name,
-				balance: a.balance,
+				balance: a.displayBalance,
 				excluded: a.participantExcluded,
 				type: 'account',
-				isShared: a.isShared
+				isShared: a.isShared,
+				isConverted: a.isConverted,
+				isUnconverted: a.isUnconverted,
+				missingCurrency: a.missingCurrency,
+				nativeCurrency: a.currency,
+				nativeValue: a.balance
 			});
 		}
 
@@ -102,28 +125,34 @@
 			balanceType.items.push({
 				id: a.id,
 				name: a.name,
-				balance: a.marketValue ?? 0,
+				balance: a.displayMarketValue,
 				excluded: a.participantExcluded,
 				type: 'asset',
-				isShared: a.isShared
+				isShared: a.isShared,
+				isConverted: a.isConverted,
+				isUnconverted: a.isUnconverted,
+				missingCurrency: a.missingCurrency,
+				nativeCurrency: a.currency,
+				nativeValue: a.marketValue
 			});
 		}
 
 		const groups: Record<BalanceGroup, Group> = {
-			CASH: { total: null, types: [] },
-			DEBT: { total: null, types: [] },
-			INVESTMENT: { total: null, types: [] },
-			OTHER: { total: null, types: [] }
+			CASH: { total: null, isUnconverted: false, types: [] },
+			DEBT: { total: null, isUnconverted: false, types: [] },
+			INVESTMENT: { total: null, isUnconverted: false, types: [] },
+			OTHER: { total: null, isUnconverted: false, types: [] }
 		};
 		for (const g of Object.keys(typeMaps) as BalanceGroup[]) {
 			const types = Array.from(typeMaps[g].values());
 			for (const balanceType of types) {
-				balanceType.total = sumOrUnknown(
-					balanceType.items.filter((item) => !item.excluded).map((item) => item.balance)
-				);
+				const included = balanceType.items.filter((item) => !item.excluded);
+				balanceType.total = sumOrUnknown(included.map((item) => item.balance));
+				balanceType.isUnconverted = included.some((item) => item.isUnconverted);
 			}
 			groups[g].types = types.sort((a, b) => Math.abs(b.total ?? 0) - Math.abs(a.total ?? 0));
 			groups[g].total = sumOrUnknown(types.map((balanceType) => balanceType.total));
+			groups[g].isUnconverted = types.some((balanceType) => balanceType.isUnconverted);
 		}
 
 		return groups;
@@ -154,6 +183,7 @@
 						title={groupTitle(balanceGroup)}
 						value={grouped[balanceGroup].total}
 						variant={groupVariant(balanceGroup)}
+						isUnconverted={grouped[balanceGroup].isUnconverted}
 					/>
 					{#if isLoading}
 						<Skeleton class="min-h-32" />
@@ -172,7 +202,10 @@
 										{#if balanceType.total === null}
 											<span class="text-muted-foreground">~</span>
 										{:else}
-											<Currency value={balanceType.total} />
+											<Currency
+												value={balanceType.total}
+												isUnconverted={balanceType.isUnconverted}
+											/>
 										{/if}
 									</div>
 								</div>
@@ -196,7 +229,14 @@
 												{#if item.balance === null}
 													<span class="text-muted-foreground">~</span>
 												{:else}
-													<Currency value={item.balance} />
+													<Currency
+														value={item.balance}
+														isConverted={item.isConverted}
+														isUnconverted={item.isUnconverted}
+														missingCurrency={item.missingCurrency}
+														nativeCurrency={item.nativeCurrency}
+														nativeValue={item.nativeValue ?? undefined}
+													/>
 												{/if}
 											</span>
 										</li>

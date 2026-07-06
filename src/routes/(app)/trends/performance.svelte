@@ -6,6 +6,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton/index';
 	import * as Table from '$lib/components/ui/table/index';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import { getExchangeRatesContext } from '$lib/exchange-rates.svelte';
 	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import type {
@@ -43,6 +44,77 @@
 		rawFullHistorySecurityBalances: TrendSecurityBalance[];
 		rawFullHistoryAssetBalances: AssetBalancesResponse[];
 	} = $props();
+
+	const fx = getExchangeRatesContext();
+
+	type GroupKey = 'net' | 'cash' | 'debt' | 'investment' | 'other';
+	// NOTE: trends hides the converted-amount indicator (page-scoped FX rule), so only the
+	// unconvertible warning is tracked per group; the converted values themselves are unchanged.
+	type FxFlags = { isUnconverted: boolean };
+	type Totals = Record<GroupKey, number> & { fx: Record<GroupKey, FxFlags> };
+
+	function freshTotals() {
+		return {
+			net: 0,
+			cash: 0,
+			debt: 0,
+			investment: 0,
+			other: 0,
+			fx: {
+				net: { isUnconverted: false },
+				cash: { isUnconverted: false },
+				debt: { isUnconverted: false },
+				investment: { isUnconverted: false },
+				other: { isUnconverted: false }
+			}
+		};
+	}
+
+	function convertSnapshot<T extends { asOf: string }>(
+		balances: T[],
+		index: number,
+		rawValue: (balance: T) => number,
+		currency: string,
+		terminatedAt: string | undefined,
+		datePoint: Date
+	) {
+		if (index < 0 || (terminatedAt && datePoint >= new Date(terminatedAt))) {
+			return { value: 0, isConverted: false, isUnconverted: false };
+		}
+		const balance = balances[index];
+		return fx.convert(rawValue(balance), currency, balance.asOf);
+	}
+
+	function accumulateGroup(
+		totals: Totals,
+		group: BalanceGroup,
+		value: number,
+		conversion: FxFlags
+	) {
+		const key =
+			group === 'CASH'
+				? 'cash'
+				: group === 'DEBT'
+					? 'debt'
+					: group === 'INVESTMENT'
+						? 'investment'
+						: 'other';
+		if (!conversion.isUnconverted) {
+			totals[key] += value;
+			totals.net += value;
+		}
+		for (const groupKey of [key, 'net'] as const) {
+			totals.fx[groupKey] = {
+				isUnconverted: totals.fx[groupKey].isUnconverted || conversion.isUnconverted
+			};
+		}
+	}
+
+	function combineFx(a: FxFlags, b: FxFlags) {
+		return {
+			isUnconverted: a.isUnconverted || b.isUnconverted
+		};
+	}
 
 	type PeriodOffset = {
 		days?: number;
@@ -89,19 +161,14 @@
 			securityBalancesByAccountSecurity,
 			assetBalancesByAssetId,
 			accountById,
-			assetById
+			assetById,
+			securityCurrencyById
 		} = maps;
 		const ascendingDates = [...anchorDates].sort((a, b) => a.getTime() - b.getTime());
 		const indexByTime = new Map(
 			ascendingDates.map((date, index) => [date.getTime(), index] as const)
 		);
-		const totalsAscending = ascendingDates.map(() => ({
-			net: 0,
-			cash: 0,
-			debt: 0,
-			investment: 0,
-			other: 0
-		}));
+		const totalsAscending = ascendingDates.map(() => freshTotals());
 
 		for (const [accountId, balances] of accountBalancesByAccountId) {
 			const meta = accountById.get(accountId);
@@ -111,18 +178,20 @@
 				const datePoint = ascendingDates[dateIndex];
 				while (pointer + 1 < balances.length && new Date(balances[pointer + 1].asOf) <= datePoint)
 					pointer++;
-				const value =
-					meta.closed && datePoint >= new Date(meta.closed)
-						? 0
-						: pointer >= 0
-							? (balances[pointer].value ?? 0)
-							: 0;
-				const group = meta.balanceGroup as BalanceGroup;
-				if (group === 'CASH') totalsAscending[dateIndex].cash += value;
-				else if (group === 'DEBT') totalsAscending[dateIndex].debt += value;
-				else if (group === 'INVESTMENT') totalsAscending[dateIndex].investment += value;
-				else totalsAscending[dateIndex].other += value;
-				totalsAscending[dateIndex].net += value;
+				const conversion = convertSnapshot(
+					balances,
+					pointer,
+					(balance) => balance.value ?? 0,
+					meta.currency,
+					meta.closed,
+					datePoint
+				);
+				accumulateGroup(
+					totalsAscending[dateIndex],
+					meta.balanceGroup as BalanceGroup,
+					conversion.value,
+					conversion
+				);
 			}
 		}
 		for (const balances of securityBalancesByAccountSecurity.values()) {
@@ -137,14 +206,22 @@
 			for (let dateIndex = 0; dateIndex < ascendingDates.length; dateIndex++) {
 				const datePoint = ascendingDates[dateIndex];
 				if (meta.closed && datePoint >= new Date(meta.closed)) continue;
-				const value = advanceTrendSecurityValue(balances, datePoint, securityValueState);
-				if (value === null) continue;
-				const group = meta.balanceGroup as BalanceGroup;
-				if (group === 'CASH') totalsAscending[dateIndex].cash += value;
-				else if (group === 'DEBT') totalsAscending[dateIndex].debt += value;
-				else if (group === 'INVESTMENT') totalsAscending[dateIndex].investment += value;
-				else totalsAscending[dateIndex].other += value;
-				totalsAscending[dateIndex].net += value;
+				const rawValue = advanceTrendSecurityValue(balances, datePoint, securityValueState);
+				if (rawValue === null) continue;
+				// NOTE: securities load from a different context than these balances, so their currency
+				// map can briefly lag; fall back to the account's currency so all-USD data stays
+				// unconverted instead of flashing an FX indicator during that window.
+				const conversion = fx.convert(
+					rawValue,
+					securityCurrencyById.get(balances[0].security) ?? meta.currency,
+					balances[securityValueState.index].asOf
+				);
+				accumulateGroup(
+					totalsAscending[dateIndex],
+					meta.balanceGroup as BalanceGroup,
+					conversion.value,
+					conversion
+				);
 			}
 		}
 		for (const [assetId, balances] of assetBalancesByAssetId) {
@@ -155,18 +232,20 @@
 				const datePoint = ascendingDates[dateIndex];
 				while (pointer + 1 < balances.length && new Date(balances[pointer + 1].asOf) <= datePoint)
 					pointer++;
-				const value =
-					meta.sold && datePoint >= new Date(meta.sold)
-						? 0
-						: pointer >= 0
-							? (balances[pointer].marketValue ?? 0)
-							: 0;
-				const group = meta.balanceGroup as BalanceGroup;
-				if (group === 'CASH') totalsAscending[dateIndex].cash += value;
-				else if (group === 'DEBT') totalsAscending[dateIndex].debt += value;
-				else if (group === 'INVESTMENT') totalsAscending[dateIndex].investment += value;
-				else totalsAscending[dateIndex].other += value;
-				totalsAscending[dateIndex].net += value;
+				const conversion = convertSnapshot(
+					balances,
+					pointer,
+					(balance) => balance.marketValue ?? 0,
+					meta.currency,
+					meta.sold,
+					datePoint
+				);
+				accumulateGroup(
+					totalsAscending[dateIndex],
+					meta.balanceGroup as BalanceGroup,
+					conversion.value,
+					conversion
+				);
 			}
 		}
 
@@ -181,7 +260,8 @@
 		other: m.trends_series_other_label()
 	};
 
-	const zeroTotals = { net: 0, cash: 0, debt: 0, investment: 0, other: 0 };
+	const zeroTotals = freshTotals();
+	const zeroFx: FxFlags = { isUnconverted: false };
 
 	const table = $derived.by(() => {
 		if (!rawAccounts.length && !rawAssets.length) {
@@ -190,11 +270,11 @@
 				label: periodDef.label,
 				at: new Date(),
 				values: {
-					net: { pct: null, cur: 0, prev: 0 },
-					cash: { pct: null, cur: 0, prev: 0 },
-					debt: { pct: null, cur: 0, prev: 0 },
-					investment: { pct: null, cur: 0, prev: 0 },
-					other: { pct: null, cur: 0, prev: 0 }
+					net: { pct: null, cur: 0, prev: 0, fx: zeroFx },
+					cash: { pct: null, cur: 0, prev: 0, fx: zeroFx },
+					debt: { pct: null, cur: 0, prev: 0, fx: zeroFx },
+					investment: { pct: null, cur: 0, prev: 0, fx: zeroFx },
+					other: { pct: null, cur: 0, prev: 0, fx: zeroFx }
 				}
 			}));
 			return { columns, current: zeroTotals, allocation: { ...zeroTotals } };
@@ -221,21 +301,22 @@
 			fullHistoryPrepared,
 			uniqueAscendingTimes.map((timestamp) => new Date(timestamp))
 		);
-		let baseline = { net: 0, cash: 0, debt: 0, investment: 0, other: 0 };
+		const baseline = freshTotals();
+		const baselineFilled: Record<GroupKey, boolean> = {
+			net: false,
+			cash: false,
+			debt: false,
+			investment: false,
+			other: false
+		};
 		for (const row of totalsAll) {
-			if (baseline.net === 0 && row.net !== 0) baseline.net = row.net;
-			if (baseline.cash === 0 && row.cash !== 0) baseline.cash = row.cash;
-			if (baseline.debt === 0 && row.debt !== 0) baseline.debt = row.debt;
-			if (baseline.investment === 0 && row.investment !== 0) baseline.investment = row.investment;
-			if (baseline.other === 0 && row.other !== 0) baseline.other = row.other;
-			if (
-				baseline.net !== 0 &&
-				baseline.cash !== 0 &&
-				baseline.debt !== 0 &&
-				baseline.investment !== 0 &&
-				baseline.other !== 0
-			)
-				break;
+			for (const key of Object.keys(baselineFilled) as GroupKey[]) {
+				if (baselineFilled[key] || row[key] === 0) continue;
+				baseline[key] = row[key];
+				baseline.fx[key] = row.fx[key];
+				baselineFilled[key] = true;
+			}
+			if (Object.values(baselineFilled).every(Boolean)) break;
 		}
 
 		const fullHistoryCurrent = computeTotals(fullHistoryPrepared, [now])[0];
@@ -255,27 +336,32 @@
 						net: {
 							pct: percentChange(fullHistoryCurrent.net, baseline.net),
 							cur: fullHistoryCurrent.net,
-							prev: baseline.net
+							prev: baseline.net,
+							fx: combineFx(fullHistoryCurrent.fx.net, baseline.fx.net)
 						},
 						cash: {
 							pct: percentChange(fullHistoryCurrent.cash, baseline.cash),
 							cur: fullHistoryCurrent.cash,
-							prev: baseline.cash
+							prev: baseline.cash,
+							fx: combineFx(fullHistoryCurrent.fx.cash, baseline.fx.cash)
 						},
 						debt: {
 							pct: percentChangeDebtMagnitude(fullHistoryCurrent.debt, baseline.debt),
 							cur: fullHistoryCurrent.debt,
-							prev: baseline.debt
+							prev: baseline.debt,
+							fx: combineFx(fullHistoryCurrent.fx.debt, baseline.fx.debt)
 						},
 						investment: {
 							pct: percentChange(fullHistoryCurrent.investment, baseline.investment),
 							cur: fullHistoryCurrent.investment,
-							prev: baseline.investment
+							prev: baseline.investment,
+							fx: combineFx(fullHistoryCurrent.fx.investment, baseline.fx.investment)
 						},
 						other: {
 							pct: percentChange(fullHistoryCurrent.other, baseline.other),
 							cur: fullHistoryCurrent.other,
-							prev: baseline.other
+							prev: baseline.other,
+							fx: combineFx(fullHistoryCurrent.fx.other, baseline.fx.other)
 						}
 					}
 				};
@@ -293,27 +379,32 @@
 					net: {
 						pct: percentChange(current.net, previousTotals.net),
 						cur: current.net,
-						prev: previousTotals.net
+						prev: previousTotals.net,
+						fx: combineFx(current.fx.net, previousTotals.fx.net)
 					},
 					cash: {
 						pct: percentChange(current.cash, previousTotals.cash),
 						cur: current.cash,
-						prev: previousTotals.cash
+						prev: previousTotals.cash,
+						fx: combineFx(current.fx.cash, previousTotals.fx.cash)
 					},
 					debt: {
 						pct: percentChangeDebtMagnitude(current.debt, previousTotals.debt),
 						cur: current.debt,
-						prev: previousTotals.debt
+						prev: previousTotals.debt,
+						fx: combineFx(current.fx.debt, previousTotals.fx.debt)
 					},
 					investment: {
 						pct: percentChange(current.investment, previousTotals.investment),
 						cur: current.investment,
-						prev: previousTotals.investment
+						prev: previousTotals.investment,
+						fx: combineFx(current.fx.investment, previousTotals.fx.investment)
 					},
 					other: {
 						pct: percentChange(current.other, previousTotals.other),
 						cur: current.other,
-						prev: previousTotals.other
+						prev: previousTotals.other,
+						fx: combineFx(current.fx.other, previousTotals.fx.other)
 					}
 				}
 			};
@@ -339,10 +430,7 @@
 		}).format(v);
 	}
 
-	function percentClassName(
-		v: number | null,
-		group: 'net' | 'cash' | 'debt' | 'investment' | 'other'
-	) {
+	function percentClassName(v: number | null, group: GroupKey) {
 		if (v === null) return 'text-muted-foreground';
 		if (v === 0) return '';
 		const reversed = group === 'debt';
@@ -351,6 +439,72 @@
 		return positive ? 'text-cash' : 'text-debt';
 	}
 </script>
+
+{#snippet pctCell(pct: number | null, prev: number, cur: number, flags: FxFlags)}
+	{#if pct === null}
+		<span class="text-muted-foreground">~</span>
+	{:else if flags.isUnconverted}
+		<Tooltip.Root>
+			<Tooltip.Trigger
+				class="border-border text-muted-foreground inline-block border-b border-dashed leading-none hover:border-current"
+				>{formatPercent(pct)}</Tooltip.Trigger
+			>
+			<Tooltip.Content sideOffset={6}>
+				<div class="grid gap-1">
+					<p class="text-xs leading-snug font-normal">{m.fx_includes_unconverted()}</p>
+					<p class="text-sm">
+						{m.trends_performance_tooltip_range({
+							prev: formatCurrency(prev, 2),
+							cur: formatCurrency(cur, 2)
+						})}
+					</p>
+				</div>
+			</Tooltip.Content>
+		</Tooltip.Root>
+	{:else}
+		<Tooltip.Root>
+			<Tooltip.Trigger
+				class="border-border inline-block border-b border-dashed hover:border-current"
+				>{formatPercent(pct)}</Tooltip.Trigger
+			>
+			<Tooltip.Content sideOffset={6}>
+				<p class="text-sm">
+					{m.trends_performance_tooltip_range({
+						prev: formatCurrency(prev, 2),
+						cur: formatCurrency(cur, 2)
+					})}
+				</p>
+			</Tooltip.Content>
+		</Tooltip.Root>
+	{/if}
+{/snippet}
+
+{#snippet allocationCell(pct: number, currentValue: number, flags: FxFlags, tooltipClass: string)}
+	{#if flags.isUnconverted}
+		<Tooltip.Root>
+			<Tooltip.Trigger
+				class="border-border text-muted-foreground inline-block border-b border-dashed leading-none hover:border-current"
+				>{formatPercent(pct)}</Tooltip.Trigger
+			>
+			<Tooltip.Content sideOffset={6}>
+				<div class="grid gap-1">
+					<p class="text-xs leading-snug font-normal">{m.fx_includes_unconverted()}</p>
+					<p class={tooltipClass}>{formatCurrency(currentValue, 2)}</p>
+				</div>
+			</Tooltip.Content>
+		</Tooltip.Root>
+	{:else}
+		<Tooltip.Root>
+			<Tooltip.Trigger
+				class="border-border inline-block border-b border-dashed hover:border-current"
+				>{formatPercent(pct)}</Tooltip.Trigger
+			>
+			<Tooltip.Content sideOffset={6}>
+				<p class={tooltipClass}>{formatCurrency(currentValue, 2)}</p>
+			</Tooltip.Content>
+		</Tooltip.Root>
+	{/if}
+{/snippet}
 
 {#if isLoading}
 	<Skeleton class="h-64" showSpinner />
@@ -377,38 +531,21 @@
 								<Table.Cell
 									class={'text-right font-mono ' + percentClassName(c.values.net.pct, 'net')}
 								>
-									{#if c.values.net.pct === null}
-										<span class="text-muted-foreground">~</span>
-									{:else}
-										<Tooltip.Root>
-											<Tooltip.Trigger
-												class="border-border inline-block border-b border-dashed hover:border-current"
-												>{formatPercent(c.values.net.pct)}</Tooltip.Trigger
-											>
-											<Tooltip.Content sideOffset={6}>
-												<p class="text-sm">
-													{m.trends_performance_tooltip_range({
-														prev: formatCurrency(c.values.net.prev, 2),
-														cur: formatCurrency(c.values.net.cur, 2)
-													})}
-												</p>
-											</Tooltip.Content>
-										</Tooltip.Root>
-									{/if}
+									{@render pctCell(
+										c.values.net.pct,
+										c.values.net.prev,
+										c.values.net.cur,
+										c.values.net.fx
+									)}
 								</Table.Cell>
 							{/each}
 							<Table.Cell class="text-muted-foreground text-right font-mono">
-								<Tooltip.Root>
-									<Tooltip.Trigger
-										class="border-border inline-block border-b border-dashed hover:border-current"
-										>{formatPercent(table.allocation.net)}</Tooltip.Trigger
-									>
-									<Tooltip.Content sideOffset={6}>
-										<p class="text-sm">
-											{formatCurrency(table.current.net, 2)}
-										</p>
-									</Tooltip.Content>
-								</Tooltip.Root>
+								{@render allocationCell(
+									table.allocation.net,
+									table.current.net,
+									table.current.fx.net,
+									'text-sm'
+								)}
 							</Table.Cell>
 						</Table.Row>
 						<Table.Row>
@@ -417,38 +554,21 @@
 								<Table.Cell
 									class={'text-right font-mono ' + percentClassName(c.values.cash.pct, 'cash')}
 								>
-									{#if c.values.cash.pct === null}
-										<span class="text-muted-foreground">~</span>
-									{:else}
-										<Tooltip.Root>
-											<Tooltip.Trigger
-												class="border-border inline-block border-b border-dashed hover:border-current"
-												>{formatPercent(c.values.cash.pct)}</Tooltip.Trigger
-											>
-											<Tooltip.Content sideOffset={6}>
-												<p class="text-sm">
-													{m.trends_performance_tooltip_range({
-														prev: formatCurrency(c.values.cash.prev, 2),
-														cur: formatCurrency(c.values.cash.cur, 2)
-													})}
-												</p>
-											</Tooltip.Content>
-										</Tooltip.Root>
-									{/if}
+									{@render pctCell(
+										c.values.cash.pct,
+										c.values.cash.prev,
+										c.values.cash.cur,
+										c.values.cash.fx
+									)}
 								</Table.Cell>
 							{/each}
 							<Table.Cell class="text-right font-mono">
-								<Tooltip.Root>
-									<Tooltip.Trigger
-										class="border-border inline-block border-b border-dashed hover:border-current"
-										>{formatPercent(table.allocation.cash)}</Tooltip.Trigger
-									>
-									<Tooltip.Content sideOffset={6}>
-										<p class="text-sm">
-											{formatCurrency(table.current.cash, 2)}
-										</p>
-									</Tooltip.Content>
-								</Tooltip.Root>
+								{@render allocationCell(
+									table.allocation.cash,
+									table.current.cash,
+									table.current.fx.cash,
+									'text-sm'
+								)}
 							</Table.Cell>
 						</Table.Row>
 						<Table.Row>
@@ -457,38 +577,21 @@
 								<Table.Cell
 									class={'text-right font-mono ' + percentClassName(c.values.debt.pct, 'debt')}
 								>
-									{#if c.values.debt.pct === null}
-										<span class="text-muted-foreground">~</span>
-									{:else}
-										<Tooltip.Root>
-											<Tooltip.Trigger
-												class="border-border inline-block border-b border-dashed hover:border-current"
-												>{formatPercent(c.values.debt.pct)}</Tooltip.Trigger
-											>
-											<Tooltip.Content sideOffset={6}>
-												<p class="text-sm">
-													{m.trends_performance_tooltip_range({
-														prev: formatCurrency(c.values.debt.prev, 2),
-														cur: formatCurrency(c.values.debt.cur, 2)
-													})}
-												</p>
-											</Tooltip.Content>
-										</Tooltip.Root>
-									{/if}
+									{@render pctCell(
+										c.values.debt.pct,
+										c.values.debt.prev,
+										c.values.debt.cur,
+										c.values.debt.fx
+									)}
 								</Table.Cell>
 							{/each}
 							<Table.Cell class="text-right font-mono">
-								<Tooltip.Root>
-									<Tooltip.Trigger
-										class="border-border inline-block border-b border-dashed hover:border-current"
-										>{formatPercent(table.allocation.debt)}</Tooltip.Trigger
-									>
-									<Tooltip.Content sideOffset={6}>
-										<p class="font-normal">
-											{formatCurrency(table.current.debt, 2)}
-										</p>
-									</Tooltip.Content>
-								</Tooltip.Root>
+								{@render allocationCell(
+									table.allocation.debt,
+									table.current.debt,
+									table.current.fx.debt,
+									'font-normal'
+								)}
 							</Table.Cell>
 						</Table.Row>
 						<Table.Row>
@@ -498,38 +601,21 @@
 									class={'text-right font-mono ' +
 										percentClassName(c.values.investment.pct, 'investment')}
 								>
-									{#if c.values.investment.pct === null}
-										<span class="text-muted-foreground">~</span>
-									{:else}
-										<Tooltip.Root>
-											<Tooltip.Trigger
-												class="border-border inline-block border-b border-dashed hover:border-current"
-												>{formatPercent(c.values.investment.pct)}</Tooltip.Trigger
-											>
-											<Tooltip.Content sideOffset={6}>
-												<p class="text-sm">
-													{m.trends_performance_tooltip_range({
-														prev: formatCurrency(c.values.investment.prev, 2),
-														cur: formatCurrency(c.values.investment.cur, 2)
-													})}
-												</p>
-											</Tooltip.Content>
-										</Tooltip.Root>
-									{/if}
+									{@render pctCell(
+										c.values.investment.pct,
+										c.values.investment.prev,
+										c.values.investment.cur,
+										c.values.investment.fx
+									)}
 								</Table.Cell>
 							{/each}
 							<Table.Cell class="text-right font-mono">
-								<Tooltip.Root>
-									<Tooltip.Trigger
-										class="border-border inline-block border-b border-dashed hover:border-current"
-										>{formatPercent(table.allocation.investment)}</Tooltip.Trigger
-									>
-									<Tooltip.Content sideOffset={6}>
-										<p class="font-normal">
-											{formatCurrency(table.current.investment, 2)}
-										</p>
-									</Tooltip.Content>
-								</Tooltip.Root>
+								{@render allocationCell(
+									table.allocation.investment,
+									table.current.investment,
+									table.current.fx.investment,
+									'font-normal'
+								)}
 							</Table.Cell>
 						</Table.Row>
 						<Table.Row>
@@ -538,38 +624,21 @@
 								<Table.Cell
 									class={'text-right font-mono ' + percentClassName(c.values.other.pct, 'other')}
 								>
-									{#if c.values.other.pct === null}
-										<span class="text-muted-foreground">~</span>
-									{:else}
-										<Tooltip.Root>
-											<Tooltip.Trigger
-												class="border-border inline-block border-b border-dashed hover:border-current"
-												>{formatPercent(c.values.other.pct)}</Tooltip.Trigger
-											>
-											<Tooltip.Content sideOffset={6}>
-												<p class="text-sm">
-													{m.trends_performance_tooltip_range({
-														prev: formatCurrency(c.values.other.prev, 2),
-														cur: formatCurrency(c.values.other.cur, 2)
-													})}
-												</p>
-											</Tooltip.Content>
-										</Tooltip.Root>
-									{/if}
+									{@render pctCell(
+										c.values.other.pct,
+										c.values.other.prev,
+										c.values.other.cur,
+										c.values.other.fx
+									)}
 								</Table.Cell>
 							{/each}
 							<Table.Cell class="text-right font-mono">
-								<Tooltip.Root>
-									<Tooltip.Trigger
-										class="border-border inline-block border-b border-dashed hover:border-current"
-										>{formatPercent(table.allocation.other)}</Tooltip.Trigger
-									>
-									<Tooltip.Content sideOffset={6}>
-										<p class="font-normal">
-											{formatCurrency(table.current.other, 2)}
-										</p>
-									</Tooltip.Content>
-								</Tooltip.Root>
+								{@render allocationCell(
+									table.allocation.other,
+									table.current.other,
+									table.current.fx.other,
+									'font-normal'
+								)}
 							</Table.Cell>
 						</Table.Row>
 					</Table.Body>

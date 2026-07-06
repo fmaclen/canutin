@@ -20,11 +20,12 @@
 			excluded: boolean;
 			closed: boolean;
 		};
+		currency: string;
 		onSubmit: () => void;
 		disabled?: boolean;
 	}
 
-	let { formData, onSubmit, disabled = false }: Props = $props();
+	let { formData, currency, onSubmit, disabled = false }: Props = $props();
 </script>
 
 <div class="bg-muted border-border overflow-hidden rounded border">
@@ -40,6 +41,13 @@
 				<Label for="name" class="justify-start pr-0 md:justify-end">{m.accounts_label_name()}</Label
 				>
 				<Input id="name" bind:value={formData.name} required {disabled} />
+			</FormFieldRow>
+
+			<FormFieldRow>
+				<Label for="currency" class="justify-start pr-0 md:justify-end"
+					>{m.accounts_label_currency()}</Label
+				>
+				<Input id="currency" value={currency} disabled />
 			</FormFieldRow>
 
 			<FormFieldRow>

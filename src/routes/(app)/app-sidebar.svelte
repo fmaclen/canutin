@@ -1,6 +1,7 @@
 <script lang="ts">
 	import ChartCandlestickIcon from '@lucide/svelte/icons/chart-candlestick';
 	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
+	import CoinsIcon from '@lucide/svelte/icons/coins';
 	import LandmarkIcon from '@lucide/svelte/icons/landmark';
 	import LayoutListIcon from '@lucide/svelte/icons/layout-list';
 	import PresentationIcon from '@lucide/svelte/icons/presentation';
@@ -46,7 +47,7 @@
 		return currentPath === resolve(path);
 	}
 
-	function isPrefixActive(path: '/accounts' | '/transactions' | '/trades') {
+	function isPrefixActive(path: '/accounts' | '/transactions' | '/trades' | '/currencies') {
 		const resolvedPath = resolve(path);
 		const currentPath = page.url.pathname;
 		return currentPath === resolvedPath || currentPath.startsWith(`${resolvedPath}/`);
@@ -116,6 +117,16 @@
 							<a href={resolve('/assets')} {...props}>
 								<LandmarkIcon />
 								<span>{m.sidebar_assets()}</span>
+							</a>
+						{/snippet}
+					</Sidebar.MenuButton>
+				</Sidebar.MenuItem>
+				<Sidebar.MenuItem>
+					<Sidebar.MenuButton isActive={isPrefixActive('/currencies')}>
+						{#snippet child({ props })}
+							<a href={resolve('/currencies')} {...props}>
+								<CoinsIcon />
+								<span>{m.sidebar_currencies()}</span>
 							</a>
 						{/snippet}
 					</Sidebar.MenuButton>

@@ -20,6 +20,8 @@
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import { getCurrenciesContext } from '$lib/currencies.svelte';
+	import { interfacePreferences } from '$lib/interface-preferences.svelte';
 	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import { AssetsBalanceGroupOptions } from '$lib/pocketbase.schema';
@@ -28,8 +30,10 @@
 	const pb = getPocketBaseContext();
 	const auth = getAuthContext();
 	const balanceTypesContext = getBalanceTypesContext();
+	const currenciesContext = getCurrenciesContext();
 
 	const ownerId = $derived(auth.currentUser?.record?.id);
+	const currencyOptions = $derived(currenciesContext.currencyOptions);
 
 	let name = $state('');
 	let balanceGroup: AssetsBalanceGroupOptions | '' = $state('');
@@ -37,12 +41,26 @@
 	let notes = $state('');
 	let excluded = $state(false);
 	let sold = $state(false);
+	let currency = $state(interfacePreferences.displayCurrency);
+	let currencyWasChanged = $state(false);
 	let bookValue = $state('');
 	let marketValue = $state('');
+
+	const selectedCurrency = $derived(currenciesContext.getCurrency(currency));
+
+	$effect(() => {
+		if (!currencyWasChanged) {
+			currency = interfacePreferences.displayCurrency;
+		}
+	});
 
 	async function handleSubmit() {
 		const currentOwnerId = ownerId;
 		if (!currentOwnerId) return;
+		if (!currenciesContext.hasCurrency(currency)) {
+			toast.error(m.currency_required());
+			return;
+		}
 
 		try {
 			const balanceTypeId = await balanceTypesContext.getOrCreate(balanceTypeName, currentOwnerId);
@@ -51,6 +69,7 @@
 				name: name.trim(),
 				balanceGroup: balanceGroup || undefined,
 				balanceType: balanceTypeId,
+				currency,
 				owner: currentOwnerId,
 				notes: notes.trim() || undefined,
 				excluded: excluded ? new Date().toISOString() : undefined,
@@ -190,6 +209,53 @@
 						</Select.Root>
 					</FormFieldRow>
 
+					<FormFieldRow>
+						<Label for="currency" class="justify-start pr-0 md:justify-end"
+							>{m.assets_label_currency()}</Label
+						>
+						<Select.Root
+							type="single"
+							value={currency}
+							onValueChange={(value) => {
+								currency = value;
+								currencyWasChanged = true;
+							}}
+						>
+							<Select.Trigger id="currency" class="bg-background w-full">
+								{#if selectedCurrency}
+									<div class="flex min-w-0 items-center gap-2">
+										<span>{selectedCurrency.code}</span>
+										{#if selectedCurrency.name}
+											<span class="text-muted-foreground truncate">{selectedCurrency.name}</span>
+										{/if}
+									</div>
+								{:else if currency}
+									{currency}
+								{:else}
+									<span class="text-muted-foreground">{m.currencies_select_placeholder()}</span>
+								{/if}
+							</Select.Trigger>
+							<Select.Content>
+								{#if currencyOptions.length === 0}
+									<Select.Item value="__no-currencies" disabled>
+										{m.currencies_select_empty()}
+									</Select.Item>
+								{:else}
+									{#each currencyOptions as option (option.value)}
+										<Select.Item value={option.value}>
+											<div class="flex min-w-0 items-center gap-2">
+												<span>{option.code}</span>
+												{#if option.name}
+													<span class="text-muted-foreground truncate">{option.name}</span>
+												{/if}
+											</div>
+										</Select.Item>
+									{/each}
+								{/if}
+							</Select.Content>
+						</Select.Root>
+					</FormFieldRow>
+
 					<FormFieldRow itemsAlignment="items-start">
 						<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1 md:pt-2">
 							<Label for="notes" class="justify-start pr-0 md:justify-end"
@@ -206,7 +272,12 @@
 						<Label for="market-value" class="justify-start pr-0 md:justify-end"
 							>{m.assets_label_market_value()}</Label
 						>
-						<CurrencyField id="market-value" name="market-value" bind:value={marketValue} />
+						<CurrencyField
+							id="market-value"
+							name="market-value"
+							bind:value={marketValue}
+							{currency}
+						/>
 					</FormFieldRow>
 
 					<FormFieldRow>
@@ -216,7 +287,7 @@
 							>
 							<span class="text-muted-foreground text-sm">{m.assets_text_optional()}</span>
 						</div>
-						<CurrencyField id="book-value" name="book-value" bind:value={bookValue} />
+						<CurrencyField id="book-value" name="book-value" bind:value={bookValue} {currency} />
 					</FormFieldRow>
 				</Fieldset>
 

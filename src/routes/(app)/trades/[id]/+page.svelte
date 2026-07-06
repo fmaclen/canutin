@@ -385,6 +385,7 @@
 								id="price"
 								name="price"
 								bind:value={formData.price}
+								currency={selectedSecurity?.currency}
 								disabled={!canWrite}
 							/>
 						</FormFieldRow>
@@ -400,6 +401,7 @@
 								id="amount"
 								name="amount"
 								bind:value={formData.amount}
+								currency={selectedSecurity?.currency}
 								disabled={!canWrite}
 							/>
 						</FormFieldRow>
@@ -415,6 +417,7 @@
 								id="fees"
 								name="fees"
 								bind:value={formData.fees}
+								currency={selectedSecurity?.currency}
 								disabled={!canWrite}
 							/>
 						</FormFieldRow>

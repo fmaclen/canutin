@@ -5,7 +5,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { getAccountsContext } from '$lib/accounts.svelte';
-	import Currency from '$lib/components/currency.svelte';
+	import Currency, { getCurrencyFxLabel } from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
 	import KeyValue from '$lib/components/key-value.svelte';
 	import Link from '$lib/components/link.svelte';
@@ -54,6 +54,11 @@
 		name: string;
 		institution: string | null;
 		balance: number | null;
+		isConverted: boolean;
+		isUnconverted: boolean;
+		missingCurrency: string | null;
+		nativeCurrency: string;
+		nativeBalance: number | null;
 		typeName: string;
 		balanceGroup: BalanceGroup;
 		autoCalculated: boolean;
@@ -120,7 +125,12 @@
 			id: account.id,
 			name: account.name,
 			institution: account.institution ?? null,
-			balance: account.balance,
+			balance: account.displayBalance,
+			isConverted: account.isConverted,
+			isUnconverted: account.isUnconverted,
+			missingCurrency: account.missingCurrency,
+			nativeCurrency: account.currency,
+			nativeBalance: account.balance,
 			typeName: accountsContext.getTypeName(account.balanceType),
 			balanceGroup: account.balanceGroup as BalanceGroup,
 			autoCalculated: Boolean(account.autoCalculated),
@@ -148,14 +158,22 @@
 		return map;
 	});
 
+	type AccountsTotal = { value: number | null; isUnconverted: boolean };
+
 	const totalsByFilter = $derived.by(() => {
-		const totals = new SvelteMap<FilterOption, number | null>();
+		const totals = new SvelteMap<FilterOption, AccountsTotal>();
 		for (const option of filters) {
 			const rows = rowsByFilter.get(option.key) ?? [];
-			const total = sumOrUnknown(
-				rows.map((row) => (option.key === 'open' && row.participantExcluded ? 0 : row.balance))
+			// NOTE: on the "open" tab, excluded accounts don't count toward the net balance, so
+			// they're dropped before summing/flagging rather than counted as a converted 0.
+			const contributing = rows.filter(
+				(row) => !(option.key === 'open' && row.participantExcluded)
 			);
-			totals.set(option.key, total);
+			const value = sumOrUnknown(contributing.map((row) => row.balance));
+			totals.set(option.key, {
+				value,
+				isUnconverted: contributing.some((row) => row.isUnconverted)
+			});
 		}
 		return totals;
 	});
@@ -255,7 +273,10 @@
 				{#each filters as option (option.key)}
 					<Tabs.Content value={option.key} class="flex flex-col space-y-2">
 						{@const rowsForOption = rowsByFilter.get(option.key) ?? []}
-						{@const total = totalsByFilter.get(option.key) ?? null}
+						{@const total = totalsByFilter.get(option.key) ?? {
+							value: null,
+							isUnconverted: false
+						}}
 						<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
 							<KeyValue
 								title={m.sidebar_accounts()}
@@ -265,9 +286,10 @@
 							/>
 							<KeyValue
 								title={m.summary_net_balance()}
-								value={total}
+								value={total.value}
 								variant="outline"
 								decimalScale={2}
+								isUnconverted={total.isUnconverted}
 							/>
 						</div>
 						{#if rowsForOption.length === 0}
@@ -400,6 +422,14 @@
 																	value={row.balance}
 																	decimalScale={2}
 																	sentiment={balanceSentiment(row)}
+																	isConverted={row.isConverted}
+																	isUnconverted={row.isUnconverted}
+																	missingCurrency={row.missingCurrency}
+																	nativeCurrency={row.nativeBalance === null
+																		? undefined
+																		: row.nativeCurrency}
+																	nativeValue={row.nativeBalance ?? undefined}
+																	showFxTooltip={false}
 																/>
 															</Tooltip.Trigger>
 															<Tooltip.Content sideOffset={6}>
@@ -408,6 +438,18 @@
 																		? m.accounts_balance_tooltip_closed()
 																		: m.accounts_balance_tooltip_excluded()}
 																</p>
+																{#if row.isConverted || row.isUnconverted}
+																	<p class="text-xs leading-snug font-normal">
+																		{getCurrencyFxLabel({
+																			decimalScale: 2,
+																			isUnconverted: row.isUnconverted,
+																			missingCurrency: row.missingCurrency,
+																			nativeCurrency:
+																				row.nativeBalance === null ? undefined : row.nativeCurrency,
+																			nativeValue: row.nativeBalance ?? undefined
+																		})}
+																	</p>
+																{/if}
 															</Tooltip.Content>
 														</Tooltip.Root>
 													{:else}
@@ -415,6 +457,13 @@
 															value={row.balance}
 															decimalScale={2}
 															sentiment={balanceSentiment(row)}
+															isConverted={row.isConverted}
+															isUnconverted={row.isUnconverted}
+															missingCurrency={row.missingCurrency}
+															nativeCurrency={row.nativeBalance === null
+																? undefined
+																: row.nativeCurrency}
+															nativeValue={row.nativeBalance ?? undefined}
 														/>
 													{/if}
 												</Table.Cell>

@@ -21,6 +21,7 @@
 		SecurityBalancesResponse
 	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+	import { getSecuritiesContext } from '$lib/securities.svelte';
 	import { projectSignedValue } from '$lib/sharing';
 	import { toNumber } from '$lib/utils';
 
@@ -36,6 +37,7 @@
 	const pb = getPocketBaseContext();
 	const accountsCtx = getAccountsContext();
 	const assetsCtx = getAssetsContext();
+	const securitiesCtx = getSecuritiesContext();
 
 	let bootstrapped = $state(false);
 	const isLoading = $derived(!bootstrapped);
@@ -89,6 +91,7 @@
 		buildPreparedMaps(
 			rawAccounts,
 			rawAssets,
+			securitiesCtx?.securities ?? [],
 			rawAccountBalances,
 			rawSecurityBalances,
 			rawAssetBalances
@@ -98,6 +101,7 @@
 		buildPreparedMaps(
 			rawAccounts,
 			rawAssets,
+			securitiesCtx?.securities ?? [],
 			rawFullHistoryAccountBalances,
 			rawFullHistorySecurityBalances,
 			rawFullHistoryAssetBalances

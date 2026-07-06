@@ -1,7 +1,11 @@
 <script lang="ts">
+	import CheckIcon from '@lucide/svelte/icons/check';
+
 	import { BALANCE_GROUP_ORDER, getBalanceGroupMeta } from '$lib/account-utils';
 	import ClearButton from '$lib/components/clear-button.svelte';
+	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Combobox, type ComboboxItem } from '$lib/components/ui/combobox/index.js';
+	import { interfacePreferences } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { AccountsBalanceGroupOptions } from '$lib/pocketbase.schema';
 	import { cn } from '$lib/utils';
@@ -10,6 +14,7 @@
 		id: string;
 		name: string;
 		balanceGroup: AccountsBalanceGroupOptions;
+		currency: string;
 	};
 
 	let {
@@ -85,6 +90,14 @@
 					class="size-2 shrink-0 rounded-full {groupMeta[triggerAccount.balanceGroup].color}"
 				></div>
 				<span class={cn(selectedNameClass)}>{triggerAccount.name}</span>
+				{#if triggerAccount.currency !== interfacePreferences.displayCurrency}
+					<Badge
+						variant="outline"
+						class="border-border/60 text-foreground/70 shrink-0 font-normal uppercase"
+					>
+						{triggerAccount.currency}
+					</Badge>
+				{/if}
 				{#if onClear && clearLabel}
 					<ClearButton
 						class="ml-auto"
@@ -97,6 +110,19 @@
 			</div>
 		{:else}
 			<span class="text-muted-foreground">{placeholder}</span>
+		{/if}
+	{/snippet}
+	{#snippet itemContent({ item, selected })}
+		{@const account = accounts.find((entry) => entry.id === item.value)}
+		<CheckIcon class={cn('size-4', !selected && 'text-transparent')} />
+		<span class="truncate">{item.label}</span>
+		{#if account && account.currency !== interfacePreferences.displayCurrency}
+			<Badge
+				variant="outline"
+				class="border-border/60 text-foreground/70 ml-auto shrink-0 font-normal uppercase"
+			>
+				{account.currency}
+			</Badge>
 		{/if}
 	{/snippet}
 	{#snippet groupHeading({ key })}

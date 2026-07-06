@@ -1,12 +1,14 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -15,6 +17,12 @@ import (
 )
 
 var spaceRe = regexp.MustCompile(`\s+`)
+
+// NOTE: single source of truth for the currency code rule — a free-form uppercase code (ISO 4217,
+// crypto tickers, or custom), 2-10 chars of A-Z/0-9. Must stay in sync with the identical `pattern`
+// on the currency text field of the accounts/assets/securities collections and the currencies
+// registry code field.
+var currencyRe = regexp.MustCompile(`^[A-Z0-9]{2,10}$`)
 
 var revertingSessions sync.Map
 
@@ -33,6 +41,7 @@ func isSessionReverting(sessionID string) bool {
 
 type importPayload struct {
 	SessionLabel         string                      `json:"sessionLabel"`
+	Currencies           []importCurrency            `json:"currencies"`
 	Accounts             []importAccount             `json:"accounts"`
 	Assets               []importAsset               `json:"assets"`
 	Securities           []importSecurity            `json:"securities"`
@@ -41,11 +50,24 @@ type importPayload struct {
 	SecurityTransactions []importSecurityTransaction `json:"securityTransactions"`
 }
 
+type importCurrency struct {
+	Code       string                `json:"code"`
+	Name       string                `json:"name"`
+	AutoUpdate bool                  `json:"autoUpdate"`
+	Quotes     []importCurrencyQuote `json:"quotes"`
+}
+
+type importCurrencyQuote struct {
+	Date string  `json:"date"`
+	Rate float64 `json:"rate"`
+}
+
 type importAccount struct {
 	Name           string         `json:"name"`
 	Institution    string         `json:"institution"`
 	BalanceGroup   string         `json:"balanceGroup"`
 	BalanceType    string         `json:"balanceType"`
+	Currency       string         `json:"currency"`
 	AutoCalculated bool           `json:"autoCalculated"`
 	Closed         bool           `json:"closed"`
 	Excluded       bool           `json:"excluded"`
@@ -56,14 +78,16 @@ type importAsset struct {
 	Name         string          `json:"name"`
 	BalanceGroup string          `json:"balanceGroup"`
 	BalanceType  string          `json:"balanceType"`
+	Currency     string          `json:"currency"`
 	Sold         bool            `json:"sold"`
 	Excluded     bool            `json:"excluded"`
 	Balance      *importAssetBal `json:"balance"`
 }
 
 type importSecurity struct {
-	Name   string `json:"name"`
-	Symbol string `json:"symbol"`
+	Name     string `json:"name"`
+	Symbol   string `json:"symbol"`
+	Currency string `json:"currency"`
 }
 
 type importBalance struct {
@@ -131,6 +155,8 @@ type importResult struct {
 	SessionID            string       `json:"sessionId"`
 	Status               string       `json:"status"`
 	RecordsFailed        int          `json:"recordsFailed"`
+	Currencies           importCounts `json:"currencies"`
+	ExchangeRates        importCounts `json:"exchangeRates"`
 	Accounts             importCounts `json:"accounts"`
 	Assets               importCounts `json:"assets"`
 	Securities           importCounts `json:"securities"`
@@ -211,6 +237,10 @@ func validateOptionalImportNumber(value *float64) bool {
 // path because it depends on existing database state.
 func validateImportPayload(payload importPayload) []importValidationError {
 	var validationErrors []importValidationError
+	currencyQuoteCount := 0
+	for _, currency := range payload.Currencies {
+		currencyQuoteCount += len(currency.Quotes)
+	}
 
 	if strings.TrimSpace(payload.SessionLabel) == "" {
 		validationErrors = append(validationErrors, importValidationError{Field: "sessionLabel", Message: "sessionLabel is required"})
@@ -222,6 +252,8 @@ func validateImportPayload(payload importPayload) []importValidationError {
 		field string
 		size  int
 	}{
+		{"currencies", len(payload.Currencies)},
+		{"exchangeRates", currencyQuoteCount},
 		{"accounts", len(payload.Accounts)},
 		{"assets", len(payload.Assets)},
 		{"securities", len(payload.Securities)},
@@ -244,6 +276,29 @@ func validateImportPayload(payload importPayload) []importValidationError {
 		validationErrors = append(validationErrors, importValidationError{Field: "collections", Message: fmt.Sprintf("total records exceed %d", maxImportTotalRecords)})
 	}
 
+	for i, currency := range payload.Currencies {
+		code := strings.TrimSpace(currency.Code)
+		if code == "" {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("currencies[%d].code", i), Message: "code is required"})
+		} else if !currencyRe.MatchString(code) {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("currencies[%d].code", i), Message: "code must be 2-10 uppercase letters or digits"})
+		}
+		if runeLen(currency.Name) > maxImportNameLength {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("currencies[%d].name", i), Message: fmt.Sprintf("name exceeds %d characters", maxImportNameLength)})
+		}
+		if len(currency.Quotes) == 0 {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("currencies[%d].quotes", i), Message: "at least one quote is required"})
+		}
+		for j, quote := range currency.Quotes {
+			if !validateImportDate(quote.Date) {
+				validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("currencies[%d].quotes[%d].date", i, j), Message: "date is not a valid date"})
+			}
+			if !validateImportNumber(quote.Rate) || quote.Rate <= 0 {
+				validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("currencies[%d].quotes[%d].rate", i, j), Message: "rate must be a positive finite number"})
+			}
+		}
+	}
+
 	for i, acct := range payload.Accounts {
 		if strings.TrimSpace(acct.Name) == "" {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("accounts[%d].name", i), Message: "name is required"})
@@ -252,6 +307,9 @@ func validateImportPayload(payload importPayload) []importValidationError {
 		}
 		if runeLen(acct.Institution) > maxImportNameLength {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("accounts[%d].institution", i), Message: fmt.Sprintf("institution exceeds %d characters", maxImportNameLength)})
+		}
+		if acct.Currency != "" && !currencyRe.MatchString(acct.Currency) {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("accounts[%d].currency", i), Message: "currency must be 2-10 uppercase letters or digits"})
 		}
 		if acct.Balance != nil {
 			if !validateImportDate(acct.Balance.AsOf) {
@@ -268,6 +326,9 @@ func validateImportPayload(payload importPayload) []importValidationError {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("assets[%d].name", i), Message: "name is required"})
 		} else if runeLen(asset.Name) > maxImportNameLength {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("assets[%d].name", i), Message: fmt.Sprintf("name exceeds %d characters", maxImportNameLength)})
+		}
+		if asset.Currency != "" && !currencyRe.MatchString(asset.Currency) {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("assets[%d].currency", i), Message: "currency must be 2-10 uppercase letters or digits"})
 		}
 		if asset.Balance != nil {
 			if !validateImportDate(asset.Balance.AsOf) {
@@ -290,6 +351,9 @@ func validateImportPayload(payload importPayload) []importValidationError {
 		}
 		if runeLen(security.Symbol) > maxImportSymbolLength {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securities[%d].symbol", i), Message: fmt.Sprintf("symbol exceeds %d characters", maxImportSymbolLength)})
+		}
+		if security.Currency != "" && !currencyRe.MatchString(security.Currency) {
+			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securities[%d].currency", i), Message: "currency must be 2-10 uppercase letters or digits"})
 		}
 	}
 
@@ -371,6 +435,63 @@ func validateImportPayload(payload importPayload) []importValidationError {
 	}
 
 	return validationErrors
+}
+
+func importCurrencyCode(value string) string {
+	code := strings.TrimSpace(value)
+	if code == "" {
+		return "USD"
+	}
+	return code
+}
+
+func validateImportCurrencyReferences(app core.App, ownerID string, payload importPayload) ([]string, error) {
+	declared := map[string]struct{}{}
+	for _, currency := range payload.Currencies {
+		if len(currency.Quotes) > 0 {
+			declared[strings.TrimSpace(currency.Code)] = struct{}{}
+		}
+	}
+
+	existing := map[string]struct{}{}
+	records, err := app.FindRecordsByFilter("currencies",
+		"owner = {:owner}",
+		"", 0, 0,
+		map[string]any{"owner": ownerID},
+	)
+	if err != nil {
+		return nil, err
+	}
+	for _, record := range records {
+		existing[record.GetString("code")] = struct{}{}
+	}
+
+	referenced := map[string]struct{}{}
+	for _, account := range payload.Accounts {
+		referenced[importCurrencyCode(account.Currency)] = struct{}{}
+	}
+	for _, asset := range payload.Assets {
+		referenced[importCurrencyCode(asset.Currency)] = struct{}{}
+	}
+	for _, security := range payload.Securities {
+		referenced[importCurrencyCode(security.Currency)] = struct{}{}
+	}
+	if len(payload.SecurityBalances) > 0 || len(payload.SecurityTransactions) > 0 {
+		referenced["USD"] = struct{}{}
+	}
+
+	var missing []string
+	for code := range referenced {
+		if _, ok := existing[code]; ok {
+			continue
+		}
+		if _, ok := declared[code]; ok {
+			continue
+		}
+		missing = append(missing, code)
+	}
+	sort.Strings(missing)
+	return missing, nil
 }
 
 func normalizeDescription(desc string) string {
@@ -553,7 +674,7 @@ func resolveImportAccount(app core.App, ownerID string, acctIndex map[string]str
 // securities referenced by balances/transactions are counted the same as explicitly-listed
 // ones. A securityCache hit means the security was already tallied on a prior reference, so it
 // is not counted again.
-func findOrCreateImportSecurity(app core.App, ownerID string, securityCache map[string]string, securityID string, name string, symbol string, sessionID string, counts *importCounts) (string, error) {
+func findOrCreateImportSecurity(app core.App, ownerID string, securityCache map[string]string, securityID string, name string, symbol string, currency string, sessionID string, counts *importCounts) (string, error) {
 	symbol = normalizeSecuritySymbol(symbol)
 	key := strings.TrimSpace(securityID)
 	if key == "" {
@@ -584,6 +705,7 @@ func findOrCreateImportSecurity(app core.App, ownerID string, securityCache map[
 	rec, created, err := findOrCreate(app, "securities", securityFilter, securityParams, map[string]any{
 		"name":          name,
 		"symbol":        symbol,
+		"currency":      currency,
 		"owner":         ownerID,
 		"importSession": sessionID,
 	})
@@ -630,6 +752,17 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 	}
 
 	ownerID := auth.Id
+	missingCurrencies, err := validateImportCurrencyReferences(app, ownerID, payload)
+	if err != nil {
+		return re.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to validate currencies"})
+	}
+	if len(missingCurrencies) > 0 {
+		return re.JSON(http.StatusBadRequest, map[string]any{
+			"error":             "Missing currencies",
+			"missingCurrencies": missingCurrencies,
+		})
+	}
+
 	result := importResult{}
 
 	sessColl, err := app.FindCollectionByNameOrId("importSessions")
@@ -660,6 +793,57 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 	// from a clean one. Per-row detail lives in the [import] operational logs.
 	errorCount := 0
 
+	for i, currency := range payload.Currencies {
+		code := strings.TrimSpace(currency.Code)
+		_, created, err := ensureCurrencyRecord(app, ownerID, code, strings.TrimSpace(currency.Name), currency.AutoUpdate)
+		if err != nil {
+			logImportError(session.Id, "currencies", i, "findOrCreate", err)
+			errorCount++
+			continue
+		}
+		if created {
+			result.Currencies.Created++
+		} else {
+			result.Currencies.Existing++
+		}
+
+		for j, quote := range currency.Quotes {
+			start, end := pbDateRange(quote.Date)
+			_, findErr := app.FindFirstRecordByFilter("exchangeRates",
+				"owner = {:owner} && currency = {:currency} && date >= {:start} && date < {:end}",
+				map[string]any{"owner": ownerID, "currency": code, "start": start, "end": end},
+			)
+			if findErr == nil {
+				result.ExchangeRates.Existing++
+				continue
+			}
+			if !errors.Is(findErr, sql.ErrNoRows) {
+				logImportError(session.Id, "exchangeRates", j, "find", findErr)
+				errorCount++
+				continue
+			}
+
+			ratesColl, err := app.FindCollectionByNameOrId("exchangeRates")
+			if err != nil {
+				logImportError(session.Id, "exchangeRates", j, "findCollection", err)
+				errorCount++
+				continue
+			}
+			rec := core.NewRecord(ratesColl)
+			rec.Set("owner", ownerID)
+			rec.Set("currency", code)
+			rec.Set("date", start)
+			rec.Set("rate", quote.Rate)
+			rec.Set("source", "manual")
+			if err := app.Save(rec); err == nil {
+				result.ExchangeRates.Created++
+			} else {
+				logImportError(session.Id, "exchangeRates", j, "save", err)
+				errorCount++
+			}
+		}
+	}
+
 	for i, acct := range payload.Accounts {
 		institution := acct.Institution
 
@@ -687,6 +871,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			"institution":    institution,
 			"balanceGroup":   acct.BalanceGroup,
 			"balanceType":    btID,
+			"currency":       acct.Currency,
 			"autoCalculated": boolToTimestamp(acct.AutoCalculated),
 			"closed":         boolToTimestamp(acct.Closed),
 			"excluded":       boolToTimestamp(acct.Excluded),
@@ -754,6 +939,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			"name":          asset.Name,
 			"balanceGroup":  asset.BalanceGroup,
 			"balanceType":   btID,
+			"currency":      asset.Currency,
 			"sold":          boolToTimestamp(asset.Sold),
 			"excluded":      boolToTimestamp(asset.Excluded),
 			"owner":         ownerID,
@@ -800,7 +986,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 	}
 
 	for i, security := range payload.Securities {
-		if _, err := findOrCreateImportSecurity(app, ownerID, securityCache, "", security.Name, security.Symbol, session.Id, &result.Securities); err != nil {
+		if _, err := findOrCreateImportSecurity(app, ownerID, securityCache, "", security.Name, security.Symbol, security.Currency, session.Id, &result.Securities); err != nil {
 			logImportError(session.Id, "securities", i, "findOrCreate", err)
 			errorCount++
 			continue
@@ -903,7 +1089,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			errorCount++
 			continue
 		}
-		securityID, err := findOrCreateImportSecurity(app, ownerID, securityCache, balance.SecurityID, balance.SecurityName, balance.SecuritySymbol, session.Id, &result.Securities)
+		securityID, err := findOrCreateImportSecurity(app, ownerID, securityCache, balance.SecurityID, balance.SecurityName, balance.SecuritySymbol, "", session.Id, &result.Securities)
 		if err != nil {
 			logImportError(session.Id, "securityBalances", i, "findOrCreateSecurity", err)
 			errorCount++
@@ -956,7 +1142,7 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 			errorCount++
 			continue
 		}
-		securityID, err := findOrCreateImportSecurity(app, ownerID, securityCache, tx.SecurityID, tx.SecurityName, tx.SecuritySymbol, session.Id, &result.Securities)
+		securityID, err := findOrCreateImportSecurity(app, ownerID, securityCache, tx.SecurityID, tx.SecurityName, tx.SecuritySymbol, "", session.Id, &result.Securities)
 		if err != nil {
 			logImportError(session.Id, "securityTransactions", i, "findOrCreateSecurity", err)
 			errorCount++
@@ -1012,10 +1198,12 @@ func handleImport(app core.App, re *core.RequestEvent) error {
 		}
 	}
 
-	totalCreated := result.Accounts.Created + result.Assets.Created + result.Transactions.Created +
+	totalCreated := result.Currencies.Created + result.ExchangeRates.Created +
+		result.Accounts.Created + result.Assets.Created + result.Transactions.Created +
 		result.Securities.Created + result.AccountBalances.Created + result.AssetBalances.Created +
 		result.SecurityBalances.Created + result.SecurityTransactions.Created
-	totalSkipped := result.Accounts.Existing + result.Assets.Existing + result.Transactions.Skipped +
+	totalSkipped := result.Currencies.Existing + result.ExchangeRates.Existing +
+		result.Accounts.Existing + result.Assets.Existing + result.Transactions.Skipped +
 		result.Securities.Existing + result.AccountBalances.Skipped +
 		result.AssetBalances.Skipped + result.SecurityBalances.Skipped + result.SecurityTransactions.Skipped
 

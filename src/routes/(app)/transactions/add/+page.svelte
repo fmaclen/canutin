@@ -39,6 +39,8 @@
 	let notes = $state('');
 	let excluded = $state(false);
 
+	const selectedAccount = $derived(openAccounts.find((a) => a.id === accountId));
+
 	async function handleSubmit() {
 		const currentOwnerId = ownerId;
 		if (!currentOwnerId) return;
@@ -147,7 +149,13 @@
 						<Label for="amount" class="justify-start pr-0 md:justify-end">
 							{m.transactions_label_amount()}
 						</Label>
-						<CurrencyField id="amount" name="amount" bind:value={amount} required />
+						<CurrencyField
+							id="amount"
+							name="amount"
+							bind:value={amount}
+							currency={selectedAccount?.currency}
+							required
+						/>
 					</FormFieldRow>
 
 					<FormFieldRow>

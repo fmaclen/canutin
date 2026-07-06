@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
-import { seedUser } from './pocketbase.helpers';
+import { seedCurrency, seedUser } from './pocketbase.helpers';
 
 test('settings switches language only after clicking Save and persists after reload', async ({
 	page
@@ -19,7 +19,6 @@ test('settings switches language only after clicking Save and persists after rel
 	await page.getByLabel('Language').click();
 	await page.getByRole('option', { name: 'Español', exact: true }).click();
 
-	// Selecting a new value must NOT apply the change yet.
 	await expect(page.getByText('Interface')).toBeVisible();
 	await expect(page.getByText('Interfaz')).not.toBeVisible();
 
@@ -27,7 +26,6 @@ test('settings switches language only after clicking Save and persists after rel
 	await expect(saveButton).toBeEnabled();
 	await saveButton.click();
 
-	// After saving, the UI (and the toast) render in the newly selected language.
 	await expect(page.getByText('Configuración actualizada')).toBeVisible();
 	await expect(page.getByText('Interface')).not.toBeVisible();
 	await expect(page.getByText('Interfaz')).toBeVisible();
@@ -59,7 +57,6 @@ test('settings switches theme only after clicking Save and persists after reload
 	await page.getByLabel('Theme').click();
 	await page.getByRole('option', { name: 'Dark' }).click();
 
-	// Selecting a new value must NOT apply the change yet.
 	await expect(page.locator('html')).not.toHaveClass(/dark/);
 
 	const saveButton = page.getByRole('button', { name: 'Save' });
@@ -75,6 +72,56 @@ test('settings switches theme only after clicking Save and persists after reload
 
 	await expect(page.locator('html')).toHaveClass(/dark/);
 	await expect(page.getByLabel('Theme')).toContainText('Dark');
+});
+
+test('settings exposes default currency without the old exchange-rate toggle', async ({ page }) => {
+	const user = await seedUser('diego');
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Settings');
+
+	await expect(page.getByText('Interface')).toBeVisible();
+	await expect(page.getByLabel('Default currency')).toContainText('USD');
+	await expect(page.getByText('Exchange rates', { exact: true })).toHaveCount(0);
+});
+
+test('settings switches display currency only after clicking Save and persists after reload', async ({
+	page
+}) => {
+	const user = await seedUser('cyrus');
+	await seedCurrency({ owner: user.id, code: 'EUR', name: 'Euro', autoUpdate: false });
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Settings');
+
+	const defaultCurrency = page.getByLabel('Default currency');
+	await expect(defaultCurrency).toContainText('USD');
+	await expect(page.getByRole('button', { name: 'Save' })).toBeDisabled();
+
+	await defaultCurrency.click();
+	await page.getByRole('option', { name: /EUR\s+Euro/ }).click();
+
+	await expect(defaultCurrency).toContainText('EUR');
+	await expect(page.getByRole('button', { name: 'Save' })).toBeEnabled();
+
+	await page.reload();
+
+	await expect(defaultCurrency).toContainText('USD');
+
+	await defaultCurrency.click();
+	await page.getByRole('option', { name: /EUR\s+Euro/ }).click();
+	const saveButton = page.getByRole('button', { name: 'Save' });
+	await saveButton.click();
+
+	await expect(page.getByText('Settings updated')).toBeVisible();
+	await expect(defaultCurrency).toContainText('EUR');
+	await expect(saveButton).toBeDisabled();
+
+	await page.reload();
+
+	await expect(defaultCurrency).toContainText('EUR');
 });
 
 test('locale defaults from browser locale when supported and falls back to English', async ({

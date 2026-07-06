@@ -37,6 +37,7 @@ export type TradeRow = {
 	securityId: string | null;
 	securityName: string;
 	securitySymbol: string | null;
+	securityCurrency: string;
 	type: SecurityTransactionsTypeOptions;
 	subtype: string;
 	description: string;
@@ -315,7 +316,7 @@ class TradesContext {
 
 		try {
 			const fields =
-				'id,date,security,type,subtype,description,name,account,quantity,price,amount,fees,expand.account.id,expand.account.name,expand.security.id,expand.security.name,expand.security.symbol';
+				'id,date,security,type,subtype,description,name,account,quantity,price,amount,fees,expand.account.id,expand.account.name,expand.security.id,expand.security.name,expand.security.symbol,expand.security.currency';
 			const filter = this.activeFilter;
 			if (includeSummary) {
 				const requestedPage = this.page;
@@ -571,6 +572,7 @@ class TradesContext {
 			const dateValue = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 			const account = this._accountsContext.getAccount(transaction.account);
 			const expandedAccount = transaction.expand?.account;
+			const security = this._securitiesContext.getSecurity(transaction.security);
 			const expandedSecurity = transaction.expand?.security;
 			const accountName = account?.name ?? expandedAccount?.name ?? '';
 
@@ -581,6 +583,7 @@ class TradesContext {
 				securityId: transaction.security || null,
 				securityName: expandedSecurity?.name ?? '',
 				securitySymbol: expandedSecurity?.symbol || null,
+				securityCurrency: security?.currency ?? expandedSecurity?.currency ?? 'USD',
 				type: transaction.type,
 				subtype: transaction.subtype ?? '',
 				description: (transaction.description || transaction.name || '').trim(),
