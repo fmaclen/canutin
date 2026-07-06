@@ -11,19 +11,15 @@
 	import Fieldset from '$lib/components/fieldset.svelte';
 	import FormFieldRow from '$lib/components/form-field-row.svelte';
 	import Page from '$lib/components/page.svelte';
-	import RecordLink from '$lib/components/record-link.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import SharedRecordReadonlyBanner from '$lib/components/shared-record-readonly-banner.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
-	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Combobox, type ComboboxItem } from '$lib/components/ui/combobox/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
-	import Separator from '$lib/components/ui/separator/separator.svelte';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { logError } from '$lib/logger';
@@ -95,6 +91,18 @@
 			null
 	);
 	const canWrite = $derived(Boolean(trade?.owner && ownerId && trade.owner === ownerId));
+	const canSubmit = $derived(
+		Boolean(
+			formData.accountId && formData.securityId && formData.date && formData.description.trim()
+		)
+	);
+	const crumbs = $derived([
+		{ label: m.trades_title(), href: resolve('/trades') },
+		...(selectedAccount
+			? [{ label: selectedAccount.name, href: resolve(`/accounts/${selectedAccount.id}`) }]
+			: []),
+		{ label: m.trades_edit_page_title() }
+	]);
 	const securityItems = $derived.by(() => {
 		const items = securitiesContext.securities.map(
 			(security): ComboboxItem => ({
@@ -160,19 +168,7 @@
 	async function handleSubmit() {
 		const currentTradeId = tradeId;
 		const currentOwnerId = ownerId;
-		if (!currentTradeId || !currentOwnerId || !canWrite) return;
-		if (!formData.accountId) {
-			toast.error(m.account_required());
-			return;
-		}
-		if (!formData.securityId) {
-			toast.error(m.trades_security_required());
-			return;
-		}
-		if (!formData.description.trim()) {
-			toast.error(m.trades_description_required());
-			return;
-		}
+		if (!currentTradeId || !currentOwnerId || !canWrite || !canSubmit) return;
 
 		try {
 			await pb.authedClient.collection('securityTransactions').update(currentTradeId, {
@@ -222,40 +218,7 @@
 	}
 </script>
 
-<header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
-	<div class="flex items-center gap-2">
-		<Sidebar.Trigger class="-ml-1" />
-		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
-		<Breadcrumb.Root>
-			<Breadcrumb.List>
-				<Breadcrumb.Item>
-					<Breadcrumb.Link href={resolve('/trades')}>{m.trades_title()}</Breadcrumb.Link>
-				</Breadcrumb.Item>
-				<Breadcrumb.Separator />
-				<Breadcrumb.Item>
-					{#if isLoading || !trade}
-						<Skeleton class="h-4 w-32" />
-					{:else}
-						<Breadcrumb.Page>{trade.description || m.trades_breadcrumb_fallback()}</Breadcrumb.Page>
-					{/if}
-				</Breadcrumb.Item>
-			</Breadcrumb.List>
-		</Breadcrumb.Root>
-	</div>
-	<nav class="flex items-center gap-4 px-4">
-		{#if selectedAccount}
-			<RecordLink
-				type="account"
-				id={selectedAccount.id}
-				name={selectedAccount.name}
-				isShared={selectedAccount.isShared}
-				class="text-sm"
-			/>
-		{/if}
-	</nav>
-</header>
-
-<Page pageTitle={m.trades_edit_page_title()}>
+<Page pageTitle={m.trades_edit_page_title()} {crumbs}>
 	{#if !isLoading && trade && !canWrite}
 		<Section>
 			<SharedRecordReadonlyBanner title={m.trades_readonly_title()} />
@@ -445,7 +408,7 @@
 					{#if canWrite}
 						<footer class="border-border bg-border border-t p-2">
 							<div class="flex justify-end">
-								<Button type="submit">{m.transactions_button_save()}</Button>
+								<Button type="submit" disabled={!canSubmit}>{m.transactions_button_save()}</Button>
 							</div>
 						</footer>
 					{/if}

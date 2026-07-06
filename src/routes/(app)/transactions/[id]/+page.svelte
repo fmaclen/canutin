@@ -12,17 +12,13 @@
 	import Fieldset from '$lib/components/fieldset.svelte';
 	import FormFieldRow from '$lib/components/form-field-row.svelte';
 	import Page from '$lib/components/page.svelte';
-	import RecordLink from '$lib/components/record-link.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import SharedRecordReadonlyBanner from '$lib/components/shared-record-readonly-banner.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
-	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import Separator from '$lib/components/ui/separator/separator.svelte';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { logError } from '$lib/logger';
@@ -57,6 +53,14 @@
 	const canWrite = $derived(
 		Boolean(transaction?.owner && ownerId && transaction.owner === ownerId)
 	);
+	const canSubmit = $derived(Boolean(formData.accountId && formData.date && formData.amount));
+	const crumbs = $derived([
+		{ label: m.sidebar_transactions(), href: resolve('/transactions') },
+		...(selectedAccount
+			? [{ label: selectedAccount.name, href: resolve(`/accounts/${selectedAccount.id}`) }]
+			: []),
+		{ label: m.transactions_edit_page_title() }
+	]);
 
 	$effect(() => {
 		if (transactionId && ownerId) {
@@ -104,7 +108,7 @@
 	async function handleSubmit() {
 		const currentTransactionId = transactionId;
 		const currentOwnerId = ownerId;
-		if (!currentTransactionId || !currentOwnerId || !formData.accountId || !canWrite) return;
+		if (!currentTransactionId || !currentOwnerId || !canWrite || !canSubmit) return;
 
 		try {
 			const labelIds: string[] = [];
@@ -168,42 +172,7 @@
 	}
 </script>
 
-<header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
-	<div class="flex items-center gap-2">
-		<Sidebar.Trigger class="-ml-1" />
-		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
-		<Breadcrumb.Root>
-			<Breadcrumb.List>
-				<Breadcrumb.Item>
-					<Breadcrumb.Link href="/transactions">{m.sidebar_transactions()}</Breadcrumb.Link>
-				</Breadcrumb.Item>
-				<Breadcrumb.Separator />
-				<Breadcrumb.Item>
-					{#if isLoading || !transaction}
-						<Skeleton class="h-4 w-32" />
-					{:else}
-						<Breadcrumb.Page
-							>{transaction.description || m.transactions_breadcrumb_fallback()}</Breadcrumb.Page
-						>
-					{/if}
-				</Breadcrumb.Item>
-			</Breadcrumb.List>
-		</Breadcrumb.Root>
-	</div>
-	<nav class="flex items-center gap-4 px-4">
-		{#if selectedAccount}
-			<RecordLink
-				type="account"
-				id={selectedAccount.id}
-				name={selectedAccount.name}
-				isShared={selectedAccount.isShared}
-				class="text-sm"
-			/>
-		{/if}
-	</nav>
-</header>
-
-<Page pageTitle={m.transactions_edit_page_title()}>
+<Page pageTitle={m.transactions_edit_page_title()} {crumbs}>
 	{#if !isLoading && transaction && !canWrite}
 		<Section>
 			<SharedRecordReadonlyBanner title={m.transactions_readonly_title()} />
@@ -321,7 +290,7 @@
 					{#if canWrite}
 						<footer class="border-border bg-border border-t p-2">
 							<div class="flex justify-end">
-								<Button type="submit">{m.transactions_button_save()}</Button>
+								<Button type="submit" disabled={!canSubmit}>{m.transactions_button_save()}</Button>
 							</div>
 						</footer>
 					{/if}

@@ -11,7 +11,7 @@ test('securities list: defaults to security name ascending', async ({ page }) =>
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto('/trades/securities');
+	await page.goto('/securities');
 	await expect(page.getByRole('row', { name: 'Apex Industries' })).toBeVisible();
 
 	const rows = page.getByRole('table').getByRole('row');
@@ -34,7 +34,7 @@ test('securities list: clicking Security header toggles name descending then asc
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto('/trades/securities');
+	await page.goto('/securities');
 	await expect(page.getByRole('row', { name: 'Apex Industries' })).toBeVisible();
 
 	const rows = page.getByRole('table').getByRole('row');
@@ -72,7 +72,7 @@ test('securities list: clicking Symbol header sorts by symbol descending then as
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto('/trades/securities');
+	await page.goto('/securities');
 	await expect(page.getByRole('row', { name: 'Apex Industries' })).toBeVisible();
 
 	const rows = page.getByRole('table').getByRole('row');
@@ -108,7 +108,7 @@ test('securities list: sort indicator shows on active column', async ({ page }) 
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto('/trades/securities');
+	await page.goto('/securities');
 	await expect(page.getByRole('row', { name: 'Apex Industries' })).toBeVisible();
 
 	const symbolButton = page.getByRole('button', { name: 'Symbol', exact: true });
@@ -130,7 +130,7 @@ test('securities list: sort state persists across reload', async ({ page }) => {
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto('/trades/securities');
+	await page.goto('/securities');
 	await expect(page.getByRole('row', { name: 'Apex Industries' })).toBeVisible();
 
 	const symbolHeader = page.getByRole('button', { name: 'Symbol', exact: true });
@@ -183,7 +183,7 @@ test('security detail: defaults to market value descending', async ({ page }) =>
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto(`/trades/securities/${security.id}`);
+	await page.goto(`/securities/${security.id}`);
 	await expect(page.getByRole('row', { name: /Alpha Brokerage/ })).toBeVisible();
 
 	const rows = page.getByRole('table').getByRole('row');
@@ -232,7 +232,7 @@ test('security detail: clicking Account header sorts by account name descending 
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto(`/trades/securities/${security.id}`);
+	await page.goto(`/securities/${security.id}`);
 	await expect(page.getByRole('row', { name: /Alpha Brokerage/ })).toBeVisible();
 
 	const rows = page.getByRole('table').getByRole('row');
@@ -295,7 +295,7 @@ test('security detail: clicking Market value header sorts value ascending from d
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto(`/trades/securities/${security.id}`);
+	await page.goto(`/securities/${security.id}`);
 	await expect(page.getByRole('row', { name: /Alpha Brokerage/ })).toBeVisible();
 
 	const rows = page.getByRole('table').getByRole('row');
@@ -351,7 +351,7 @@ test('security detail: clicking Gain/loss header sorts by gain amount descending
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto(`/trades/securities/${security.id}`);
+	await page.goto(`/securities/${security.id}`);
 	await expect(page.getByRole('row', { name: /Alpha Brokerage/ })).toBeVisible();
 
 	const rows = page.getByRole('table').getByRole('row');
@@ -405,7 +405,7 @@ test('security detail: sort indicator shows on active column', async ({ page }) 
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto(`/trades/securities/${security.id}`);
+	await page.goto(`/securities/${security.id}`);
 	await expect(page.getByRole('row', { name: /Alpha Brokerage/ })).toBeVisible();
 
 	const accountButton = page
@@ -459,7 +459,7 @@ test('security detail: sort state persists across reload', async ({ page }) => {
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto(`/trades/securities/${security.id}`);
+	await page.goto(`/securities/${security.id}`);
 	await expect(page.getByRole('row', { name: /Alpha Brokerage/ })).toBeVisible();
 
 	const accountHeader = page

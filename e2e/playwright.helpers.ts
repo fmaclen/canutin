@@ -33,7 +33,7 @@ const SIDEBAR_ROUTES: Record<string, string> = {
 	Accounts: '/accounts',
 	Assets: '/assets',
 	Portfolio: '/portfolio',
-	Securities: '/trades/securities',
+	Securities: '/securities',
 	Trades: '/trades',
 	Transactions: '/transactions',
 	'Balance sheet': '/balance-sheet',

@@ -43,8 +43,9 @@ test('balance sheet → account → save balance redirects back to /balance-shee
 		new RegExp(`/accounts/${account.id}\\?from=(%2Fbalance-sheet|/balance-sheet)`)
 	);
 
+	await page.getByRole('link', { name: 'Edit' }).click();
 	await page.getByLabel('Balance', { exact: true }).fill('1500');
-	await page.getByRole('button', { name: 'Update' }).click();
+	await page.getByRole('button', { name: 'Add' }).click();
 
 	await expect(page.getByText('Balance updated')).toBeVisible();
 	await expect(page).toHaveURL('/balance-sheet');
@@ -126,6 +127,7 @@ test('accounts list → account → save details redirects back to /accounts', a
 		new RegExp(`/accounts/${account.id}\\?from=(%2Faccounts|/accounts)`)
 	);
 
+	await page.getByRole('link', { name: 'Edit' }).click();
 	await page.getByLabel('Name').fill('List Redirect Renamed');
 	await page.getByRole('button', { name: 'Save' }).click();
 
@@ -160,8 +162,9 @@ test('assets list → asset → save balance redirects back to /assets', async (
 
 	await expect(page).toHaveURL(new RegExp(`/assets/${asset.id}\\?from=(%2Fassets|/assets)`));
 
+	await page.getByRole('link', { name: 'Edit' }).click();
 	await page.getByLabel('Market value', { exact: true }).fill('6000');
-	await page.getByRole('button', { name: 'Update' }).click();
+	await page.getByRole('button', { name: 'Add' }).click();
 
 	await expect(page.getByText('Balance updated')).toBeVisible();
 	await expect(page).toHaveURL('/assets');
@@ -234,9 +237,12 @@ test('deep link to account with no ?from= stays on detail page after save', asyn
 	await page.goto(`/accounts/${account.id}`);
 	await expect(page).toHaveURL(`/accounts/${account.id}`);
 
+	await page.getByRole('link', { name: 'Edit' }).click();
+	await expect(page).toHaveURL(`/accounts/${account.id}/edit`);
+
 	await page.getByLabel('Name').fill('Deep Link Renamed');
 	await page.getByRole('button', { name: 'Save' }).click();
 
 	await expect(page.getByText('Account updated')).toBeVisible();
-	await expect(page).toHaveURL(`/accounts/${account.id}`);
+	await expect(page).toHaveURL(`/accounts/${account.id}/edit`);
 });

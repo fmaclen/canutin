@@ -1,10 +1,13 @@
 <script lang="ts">
+	import ArrowLeftRightIcon from '@lucide/svelte/icons/arrow-left-right';
 	import ChartCandlestickIcon from '@lucide/svelte/icons/chart-candlestick';
 	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
 	import CoinsIcon from '@lucide/svelte/icons/coins';
 	import LandmarkIcon from '@lucide/svelte/icons/landmark';
 	import LayoutListIcon from '@lucide/svelte/icons/layout-list';
 	import PresentationIcon from '@lucide/svelte/icons/presentation';
+	import ScrollTextIcon from '@lucide/svelte/icons/scroll-text';
+	import TrendingUpIcon from '@lucide/svelte/icons/trending-up';
 	import WalletCardsIcon from '@lucide/svelte/icons/wallet-cards';
 	import type { ComponentProps } from 'svelte';
 
@@ -42,12 +45,9 @@
 		}
 	] as const);
 
-	function isActive(path: '/assets') {
-		const currentPath = page.url.pathname;
-		return currentPath === resolve(path);
-	}
-
-	function isPrefixActive(path: '/accounts' | '/transactions' | '/trades' | '/currencies') {
+	function isPrefixActive(
+		path: '/accounts' | '/transactions' | '/trades' | '/securities' | '/assets' | '/currencies'
+	) {
 		const resolvedPath = resolve(path);
 		const currentPath = page.url.pathname;
 		return currentPath === resolvedPath || currentPath.startsWith(`${resolvedPath}/`);
@@ -90,29 +90,39 @@
 							</a>
 						{/snippet}
 					</Sidebar.MenuButton>
-					<Sidebar.MenuSub class="mx-5">
-						<Sidebar.MenuSubItem>
-							<Sidebar.MenuSubButton
-								class="text-muted-foreground hover:text-foreground"
-								href={resolve('/transactions')}
-								isActive={isPrefixActive('/transactions')}
-							>
-								<span>{m.sidebar_transactions()}</span>
-							</Sidebar.MenuSubButton>
-						</Sidebar.MenuSubItem>
-						<Sidebar.MenuSubItem>
-							<Sidebar.MenuSubButton
-								class="text-muted-foreground hover:text-foreground"
-								href={resolve('/trades')}
-								isActive={isPrefixActive('/trades')}
-							>
-								<span>{m.trades_title()}</span>
-							</Sidebar.MenuSubButton>
-						</Sidebar.MenuSubItem>
-					</Sidebar.MenuSub>
 				</Sidebar.MenuItem>
 				<Sidebar.MenuItem>
-					<Sidebar.MenuButton isActive={isActive('/assets')}>
+					<Sidebar.MenuButton isActive={isPrefixActive('/transactions')}>
+						{#snippet child({ props })}
+							<a href={resolve('/transactions')} {...props}>
+								<ArrowLeftRightIcon />
+								<span>{m.sidebar_transactions()}</span>
+							</a>
+						{/snippet}
+					</Sidebar.MenuButton>
+				</Sidebar.MenuItem>
+				<Sidebar.MenuItem>
+					<Sidebar.MenuButton isActive={isPrefixActive('/trades')}>
+						{#snippet child({ props })}
+							<a href={resolve('/trades')} {...props}>
+								<TrendingUpIcon />
+								<span>{m.trades_title()}</span>
+							</a>
+						{/snippet}
+					</Sidebar.MenuButton>
+				</Sidebar.MenuItem>
+				<Sidebar.MenuItem>
+					<Sidebar.MenuButton isActive={isPrefixActive('/securities')}>
+						{#snippet child({ props })}
+							<a href={resolve('/securities')} {...props}>
+								<ScrollTextIcon />
+								<span>{m.securities_title()}</span>
+							</a>
+						{/snippet}
+					</Sidebar.MenuButton>
+				</Sidebar.MenuItem>
+				<Sidebar.MenuItem>
+					<Sidebar.MenuButton isActive={isPrefixActive('/assets')}>
 						{#snippet child({ props })}
 							<a href={resolve('/assets')} {...props}>
 								<LandmarkIcon />

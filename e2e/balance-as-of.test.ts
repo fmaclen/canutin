@@ -35,7 +35,7 @@ test('account detail page shows "As of <date>" next to the Balance label', async
 	await page.goto('/');
 	await signIn(page, user.email);
 
-	await page.goto(`/accounts/${account.id}`);
+	await page.goto(`/accounts/${account.id}/edit`);
 
 	const asOf = page.getByTestId('balance-as-of').first();
 	await expect(asOf).toBeVisible();
@@ -74,7 +74,7 @@ test('asset detail page shows "As of <date>" next to the Market value label', as
 	await page.goto('/');
 	await signIn(page, user.email);
 
-	await page.goto(`/assets/${asset.id}`);
+	await page.goto(`/assets/${asset.id}/edit`);
 
 	const asOf = page.getByTestId('balance-as-of').first();
 	await expect(asOf).toBeVisible();

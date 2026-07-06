@@ -14,12 +14,9 @@
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
-	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import Separator from '$lib/components/ui/separator/separator.svelte';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
@@ -228,25 +225,13 @@
 	}
 </script>
 
-<header class="bg-background flex h-16 shrink-0 items-center gap-2 border-b">
-	<div class="flex items-center gap-2 px-4">
-		<Sidebar.Trigger class="-ml-1" />
-		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
-		<Breadcrumb.Root>
-			<Breadcrumb.List>
-				<Breadcrumb.Item>
-					<Breadcrumb.Link href="/transactions">{m.sidebar_transactions()}</Breadcrumb.Link>
-				</Breadcrumb.Item>
-				<Breadcrumb.Separator />
-				<Breadcrumb.Item>
-					<Breadcrumb.Page>{m.transactions_batch_page_title()}</Breadcrumb.Page>
-				</Breadcrumb.Item>
-			</Breadcrumb.List>
-		</Breadcrumb.Root>
-	</div>
-</header>
-
-<Page pageTitle={m.transactions_batch_page_title()}>
+<Page
+	pageTitle={m.transactions_batch_page_title()}
+	crumbs={[
+		{ label: m.sidebar_transactions(), href: resolve('/transactions') },
+		{ label: m.transactions_batch_page_title() }
+	]}
+>
 	{#if selectedCount === 0}
 		<Section>
 			<p class="text-muted-foreground">{m.transactions_batch_no_selection()}</p>

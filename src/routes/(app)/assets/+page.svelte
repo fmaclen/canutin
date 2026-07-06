@@ -15,9 +15,6 @@
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
-	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
-	import Separator from '$lib/components/ui/separator/separator.svelte';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index';
 	import * as Table from '$lib/components/ui/table/index';
 	import * as Tabs from '$lib/components/ui/tabs/index';
@@ -219,37 +216,22 @@
 	}
 </script>
 
-<header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
-	<div class="flex items-center gap-2">
-		<Sidebar.Trigger class="-ml-1" />
-		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
-		<Breadcrumb.Root>
-			<Breadcrumb.List>
-				<Breadcrumb.Item>
-					<Breadcrumb.Page>{m.sidebar_assets()}</Breadcrumb.Page>
-				</Breadcrumb.Item>
-			</Breadcrumb.List>
-		</Breadcrumb.Root>
-	</div>
-	<nav class="flex items-center gap-4 px-4">
-		<Link href={resolve('/assets/add')} class="text-sm">{m.assets_add_page_title()}</Link>
-	</nav>
-</header>
-
 <Page pageTitle={m.assets_section_title()}>
+	{#snippet actions()}
+		<Link href={resolve('/assets/add')} class="text-sm">{m.assets_add_page_title()}</Link>
+	{/snippet}
 	<Section>
 		{#if !isLoaded}
 			<Skeleton class="h-64" showSpinner />
 		{:else}
 			<Tabs.Root bind:value={filter}>
-				<nav class="flex items-center justify-between space-x-2">
-					<SectionTitle title={m.assets_section_title()} />
+				<SectionTitle title={m.assets_section_title()}>
 					<Tabs.List>
 						{#each filters as option (option.key)}
 							<Tabs.Trigger value={option.key}>{option.label}</Tabs.Trigger>
 						{/each}
 					</Tabs.List>
-				</nav>
+				</SectionTitle>
 
 				{#each filters as option (option.key)}
 					<Tabs.Content value={option.key} class="flex flex-col space-y-2">
@@ -413,14 +395,18 @@
 													/>
 												</Table.Cell>
 												<Table.Cell class="text-right tabular-nums">
-													<Number
-														value={formatPercent(row.gainPercent)}
-														sentiment={row.gainPercent > 0
-															? 'positive'
-															: row.gainPercent < 0
-																? 'negative'
-																: 'neutral'}
-													/>
+													{#if row.nativeBookValue === 0}
+														<span class="text-muted-foreground">~</span>
+													{:else}
+														<Number
+															value={formatPercent(row.gainPercent)}
+															sentiment={row.gainPercent > 0
+																? 'positive'
+																: row.gainPercent < 0
+																	? 'negative'
+																	: 'neutral'}
+														/>
+													{/if}
 												</Table.Cell>
 												<Table.Cell class="text-right tabular-nums">
 													{#if row.participantExcluded || row.sold}

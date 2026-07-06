@@ -126,7 +126,7 @@ test('account trailing cashflow is filtered to a single account', async ({ page 
 	await page.goto('/');
 	await signIn(page, user.email);
 	await page.goto(`/accounts/${focusedAccount.id}`);
-	await expect(page.getByLabel('Name')).toHaveValue('Everyday Checking');
+	await expect(page.getByRole('heading', { name: 'Everyday Checking' })).toBeVisible();
 
 	const income = page.getByRole('region', { name: 'Income per month' });
 	const expenses = page.getByRole('region', { name: 'Expenses per month' });

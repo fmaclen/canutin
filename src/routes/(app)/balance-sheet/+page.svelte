@@ -8,9 +8,6 @@
 	import RecordLink from '$lib/components/record-link.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
-	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
-	import Separator from '$lib/components/ui/separator/separator.svelte';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/paraglide/messages';
 	import { sumOrUnknown } from '$lib/security-balance-values';
@@ -159,21 +156,7 @@
 	});
 </script>
 
-<header class="bg-background flex h-16 shrink-0 items-center gap-2 border-b">
-	<div class="flex items-center gap-2 px-4">
-		<Sidebar.Trigger class="-ml-1" />
-		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
-		<Breadcrumb.Root>
-			<Breadcrumb.List>
-				<Breadcrumb.Item>
-					<Breadcrumb.Page>{m.sidebar_balance_sheet()}</Breadcrumb.Page>
-				</Breadcrumb.Item>
-			</Breadcrumb.List>
-		</Breadcrumb.Root>
-	</div>
-</header>
-
-<Page pageTitle="Balance sheet">
+<Page pageTitle={m.sidebar_balance_sheet()}>
 	<Section>
 		<SectionTitle title="Balances" />
 		<div class="grid gap-x-6 gap-y-8 md:grid-cols-2 xl:grid-cols-4">

@@ -94,7 +94,7 @@
 		{#if !disabled}
 			<footer class="border-border bg-border border-t p-2">
 				<div class="flex justify-end">
-					<Button type="submit">{m.accounts_button_update()}</Button>
+					<Button type="submit">{m.accounts_button_add()}</Button>
 				</div>
 			</footer>
 		{/if}

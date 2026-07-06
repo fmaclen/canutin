@@ -21,13 +21,13 @@ test('trends performance table', async ({ page }) => {
 	await page.goto('/');
 	await signIn(page, user.email);
 
-	// Empty vault: trends must settle to empty visuals, not a perpetual skeleton.
+	// Empty vault: trends must settle to an explicit empty state, not a perpetual skeleton
+	// and not a misleading blank chart.
 	await goToPageViaSidebar(page, 'Trends');
 	await expect(page.locator('[data-slot="skeleton"].h-96')).toBeHidden();
 	await expect(page.locator('[data-slot="skeleton"].h-64')).toBeHidden();
-	const emptyGrowthChart = page.locator('[data-growth-period="1y"]');
-	await expect(emptyGrowthChart).toBeVisible();
-	await expect(emptyGrowthChart).toHaveAttribute('data-growth-points', '0');
+	await expect(page.getByText('No accounts or assets yet')).toHaveCount(2);
+	await expect(page.locator('[data-growth-period]')).toHaveCount(0);
 	await page.goto('/');
 
 	const cashAccount = await seedAccount({

@@ -104,9 +104,10 @@ test('the currencies ledger shows the USD pivot and seeded registry currencies',
 
 	const usdRow = currencyRow(page, 'USD');
 	await expect(usdRow).toBeVisible();
+	await expectCellText(usdRow, 1, 'US Dollar');
 	await expectCellText(usdRow, 2, '~');
 	await expectCellText(usdRow, 3, '~');
-	await expectCellText(usdRow, 4, '~');
+	await expectCellText(usdRow, 4, '$1.00');
 
 	const manualRow = currencyRow(page, manualCode);
 	await expect(manualRow).toBeVisible();
@@ -160,7 +161,7 @@ test('adding a currency previews ISO and custom codes and lists the seeded quote
 
 	await name.fill('Euro-like credits');
 	await rate.fill('1495');
-	await page.getByRole('button', { name: 'Add currency' }).click();
+	await page.getByRole('button', { name: 'Add', exact: true }).click();
 
 	await expect(page).toHaveURL('/currencies');
 
@@ -182,7 +183,7 @@ test('adding a duplicate currency shows the duplicate-code toast', async ({ page
 	await page.goto('/currencies/add');
 
 	await page.getByLabel('Code', { exact: true }).fill(code);
-	await page.getByRole('button', { name: 'Add currency' }).click();
+	await page.getByRole('button', { name: 'Add', exact: true }).click();
 
 	await expect(page.getByText('Currency already exists')).toBeVisible();
 	await expect(page).toHaveURL('/currencies/add');
@@ -205,10 +206,17 @@ test('currency detail edits registry fields and upserts same-date manual quotes'
 	await signIn(page, user.email);
 	await page.goto(`/currencies/${currency.id}`);
 
-	await expect(page.locator('div.text-muted-foreground.font-mono.uppercase')).toContainText([
+	await expect(page.locator('h2.text-muted-foreground.font-mono.uppercase')).toContainText([
+		'Quote history'
+	]);
+	await expect(page.getByText('No quotes')).toBeVisible();
+
+	await page.getByRole('link', { name: 'Edit' }).click();
+	await expect(page).toHaveURL(`/currencies/${currency.id}/edit`);
+
+	await expect(page.locator('h2.text-muted-foreground.font-mono.uppercase')).toContainText([
 		'Exchange rates',
 		'Details',
-		'Quote history',
 		'Danger zone'
 	]);
 	await expect(page.getByLabel('Code', { exact: true })).toBeDisabled();
@@ -221,7 +229,7 @@ test('currency detail edits registry fields and upserts same-date manual quotes'
 	await page.getByRole('button', { name: 'Save' }).click();
 
 	await expect(page.getByText('Currency updated')).toBeVisible();
-	await expect(page).toHaveURL(`/currencies/${currency.id}`);
+	await expect(page).toHaveURL(`/currencies/${currency.id}/edit`);
 	await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Updated detail coin');
 	await expect(page.getByLabel('Automatic updates', { exact: true })).toBeChecked();
 
@@ -231,15 +239,23 @@ test('currency detail edits registry fields and upserts same-date manual quotes'
 	await page.getByLabel('USD exchange rate', { exact: true }).fill('1.23');
 	await page.getByRole('button', { name: 'Add quote' }).click();
 	await expect(page.getByText('Quote added')).toBeVisible();
+	await expect(page).toHaveURL(`/currencies/${currency.id}/edit`);
+
+	await page.getByRole('link', { name: 'Overview' }).click();
 	await expect(page).toHaveURL(`/currencies/${currency.id}`);
 	await expect(quoteRow.getByText('Manual')).toBeVisible();
 	await expect(quoteRow.getByText(formatRate(1.23, code), { exact: true })).toBeVisible();
 
+	await page.getByRole('link', { name: 'Edit' }).click();
+	await expect(page).toHaveURL(`/currencies/${currency.id}/edit`);
 	await page.getByLabel('Date', { exact: true }).fill(quoteDate);
 	await page.getByLabel('USD exchange rate', { exact: true }).fill('1.5');
 	await page.getByRole('button', { name: 'Add quote' }).click();
 
 	await expect(page.getByText('Quote updated')).toBeVisible();
+	await expect(page).toHaveURL(`/currencies/${currency.id}/edit`);
+
+	await page.getByRole('link', { name: 'Overview' }).click();
 	await expect(page).toHaveURL(`/currencies/${currency.id}`);
 	await expect(quoteRow.getByText(formatRate(1.5, code), { exact: true })).toBeVisible();
 	await expect(quoteRow.getByText(formatRate(1.23, code), { exact: true })).not.toBeVisible();
@@ -283,6 +299,9 @@ test('currency detail actions reached from the ledger redirect back with the led
 	await currencyRow(page, code).getByRole('link', { name: code }).click();
 	await expectCurrencyDetailFrom(page, currency.id, ledgerUrl);
 
+	await page.getByRole('link', { name: 'Edit' }).click();
+	await expect(page).toHaveURL(new RegExp(`/currencies/${currency.id}/edit\\?from=`));
+
 	await page.getByLabel('Name', { exact: true }).fill('Ledger redirect coin v2');
 	await page.getByRole('button', { name: 'Save' }).click();
 
@@ -291,6 +310,9 @@ test('currency detail actions reached from the ledger redirect back with the led
 
 	await currencyRow(page, code).getByRole('link', { name: code }).click();
 	await expectCurrencyDetailFrom(page, currency.id, ledgerUrl);
+
+	await page.getByRole('link', { name: 'Edit' }).click();
+	await expect(page).toHaveURL(new RegExp(`/currencies/${currency.id}/edit\\?from=`));
 
 	await page.getByLabel('Date', { exact: true }).fill(quoteDate);
 	await page.getByLabel('USD exchange rate', { exact: true }).fill('2.25');
@@ -302,6 +324,9 @@ test('currency detail actions reached from the ledger redirect back with the led
 
 	await currencyRow(page, code).getByRole('link', { name: code }).click();
 	await expectCurrencyDetailFrom(page, currency.id, ledgerUrl);
+
+	await page.getByRole('link', { name: 'Edit' }).click();
+	await expect(page).toHaveURL(new RegExp(`/currencies/${currency.id}/edit\\?from=`));
 
 	await page.getByLabel('Date', { exact: true }).fill(quoteDate);
 	await page.getByLabel('USD exchange rate', { exact: true }).fill('2.5');
@@ -351,7 +376,7 @@ test('currency delete blocks in-use currencies and removes unused quotes', async
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto(`/currencies/${guardedCurrency.id}`);
+	await page.goto(`/currencies/${guardedCurrency.id}/edit`);
 
 	await page.getByRole('button', { name: 'Delete' }).first().click();
 	const guardedDialog = page.getByRole('alertdialog');
@@ -359,9 +384,9 @@ test('currency delete blocks in-use currencies and removes unused quotes', async
 	await guardedDialog.getByRole('button').last().click();
 
 	await expect(page.getByText('Currency is in use')).toBeVisible();
-	await expect(page).toHaveURL(`/currencies/${guardedCurrency.id}`);
+	await expect(page).toHaveURL(`/currencies/${guardedCurrency.id}/edit`);
 
-	await page.goto(`/currencies/${unusedCurrency.id}`);
+	await page.goto(`/currencies/${unusedCurrency.id}/edit`);
 	await page.getByRole('button', { name: 'Delete' }).first().click();
 	const unusedDialog = page.getByRole('alertdialog');
 	await expect(unusedDialog).toBeVisible();

@@ -13,6 +13,13 @@ export type ChartConfig = {
 	);
 };
 
+// NOTE: layerchart keys axis ticks by value, so duplicates crash the chart; a degenerate domain
+// (min === max) collapses the endpoints to a single value, so dedupe before handing off ticks.
+export function axisTicks(min: number, max: number) {
+	const ticks = min < 0 && max > 0 ? [min, 0, max] : [min, max];
+	return [...new Set(ticks)];
+}
+
 export type ExtractSnippetParams<T> = T extends Snippet<[infer P]> ? P : never;
 
 export type TooltipPayload = ExtractSnippetParams<

@@ -145,7 +145,7 @@ test('creating, editing, and deleting trades never changes a position market val
 
 	// The position market value is a manually-entered balance; trades defer to auto-calc and
 	// must never mutate it. Capture it first, then assert it survives every trade mutation.
-	await page.goto(`/trades/securities/${security.id}`);
+	await page.goto(`/securities/${security.id}`);
 	const marketValue = page.getByRole('region', { name: 'Net market value' });
 	await expect(marketValue).toContainText('$3,500.00');
 
@@ -165,7 +165,7 @@ test('creating, editing, and deleting trades never changes a position market val
 	await expect(page.getByText('Trade added')).toBeVisible();
 	await expect(page).toHaveURL('/trades');
 
-	await page.goto(`/trades/securities/${security.id}`);
+	await page.goto(`/securities/${security.id}`);
 	await expect(marketValue).toContainText('$3,500.00');
 
 	await goToPageViaSidebar(page, 'Trades');
@@ -177,7 +177,7 @@ test('creating, editing, and deleting trades never changes a position market val
 	await expect(page.getByText('Trade updated')).toBeVisible();
 	await expect(page).toHaveURL('/trades');
 
-	await page.goto(`/trades/securities/${security.id}`);
+	await page.goto(`/securities/${security.id}`);
 	await expect(marketValue).toContainText('$3,500.00');
 
 	await goToPageViaSidebar(page, 'Trades');
@@ -189,6 +189,59 @@ test('creating, editing, and deleting trades never changes a position market val
 	await expect(page.getByText('Trade deleted')).toBeVisible();
 	await expect(page).toHaveURL('/trades');
 
-	await page.goto(`/trades/securities/${security.id}`);
+	await page.goto(`/securities/${security.id}`);
 	await expect(marketValue).toContainText('$3,500.00');
+});
+
+test('user can create a new security inline while adding a trade', async ({ page }) => {
+	const user = await seedUser('viktor');
+	const account = await seedAccount({
+		name: 'Meridian Brokerage',
+		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+		owner: user.id,
+		balanceType: 'Brokerage'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: new UTCDate().toISOString(),
+		value: 5000
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Trades');
+	await page.getByRole('link', { name: 'Add trade' }).click();
+	await expect(page).toHaveURL('/trades/add');
+
+	await page.getByLabel('Account').click();
+	await page.getByRole('option', { name: 'Meridian Brokerage' }).click();
+	await page.getByLabel('Date').fill(formatDateForInput(new UTCDate()));
+
+	await page.getByLabel('Security').click();
+	await page.getByRole('option', { name: 'Create new security' }).click();
+	await expect(page.getByLabel('Name')).toBeVisible();
+	await expect(page.getByLabel('Currency')).toBeVisible();
+	await page.getByLabel('Name').fill('Thorium Yield Fund');
+	await page.getByLabel('Symbol').fill('TYF');
+
+	await page.getByLabel('Description').fill('Thorium opening position');
+	await page.getByLabel('Quantity').fill('12');
+	await page.getByLabel('Price').fill('150');
+	await page.getByLabel('Amount').fill('1800');
+	await page.getByLabel('Fees').fill('4');
+	await page.getByRole('button', { name: 'Add' }).click();
+
+	await expect(page.getByText('Trade added')).toBeVisible();
+	await expect(page).toHaveURL('/trades');
+
+	const tradeRow = page.getByRole('row', { name: /Thorium opening position/ });
+	await expect(tradeRow).toBeVisible();
+	await expect(tradeRow).toContainText('Thorium Yield Fund');
+	await expect(tradeRow).toContainText('Meridian Brokerage');
+
+	await goToPageViaSidebar(page, 'Securities');
+	const securityRow = page.getByRole('row', { name: /Thorium Yield Fund/ });
+	await expect(securityRow).toBeVisible();
+	await expect(securityRow).toContainText('TYF');
 });

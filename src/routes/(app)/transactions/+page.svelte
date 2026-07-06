@@ -7,10 +7,7 @@
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
-	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import Separator from '$lib/components/ui/separator/separator.svelte';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index';
 	import { m } from '$lib/paraglide/messages';
 	import { getTransactionsContext } from '$lib/transactions.svelte';
@@ -48,24 +45,10 @@
 	});
 </script>
 
-<header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
-	<div class="flex items-center gap-2">
-		<Sidebar.Trigger class="-ml-1" />
-		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
-		<Breadcrumb.Root>
-			<Breadcrumb.List>
-				<Breadcrumb.Item>
-					<Breadcrumb.Page>{m.sidebar_transactions()}</Breadcrumb.Page>
-				</Breadcrumb.Item>
-			</Breadcrumb.List>
-		</Breadcrumb.Root>
-	</div>
-	<nav class="flex items-center gap-4 px-4">
-		<Link href={resolve('/transactions/add')} class="text-sm">{m.transactions_add_link()}</Link>
-	</nav>
-</header>
-
 <Page pageTitle={m.sidebar_transactions()}>
+	{#snippet actions()}
+		<Link href={resolve('/transactions/add')} class="text-sm">{m.transactions_add_link()}</Link>
+	{/snippet}
 	<Section>
 		<SectionTitle title={m.transactions_section_title()} />
 		<div class="flex flex-col space-y-2">

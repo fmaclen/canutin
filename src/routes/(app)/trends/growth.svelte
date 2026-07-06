@@ -6,6 +6,8 @@
 
 	import { formatCurrency } from '$lib/components/currency';
 	import Currency from '$lib/components/currency.svelte';
+	import Empty from '$lib/components/empty.svelte';
+	import { axisTicks } from '$lib/components/ui/chart/chart-utils.js';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import Skeleton from '$lib/components/ui/skeleton/skeleton.svelte';
 	import { getExchangeRatesContext } from '$lib/exchange-rates.svelte';
@@ -66,6 +68,7 @@
 	};
 
 	const fx = getExchangeRatesContext();
+	const isEmpty = $derived(!rawAccounts.length && !rawAssets.length);
 
 	let series: Row[] = $state([]);
 	const firstSeriesRow = $derived(series[0] ?? null);
@@ -109,13 +112,7 @@
 		return ctx.measureText(text).width;
 	}
 
-	const yTickValues = $derived.by(() => {
-		if (!yDomain) return [] as number[];
-		const [min, max] = yDomain;
-		const ticks = [min, max];
-		if (min < 0 && max > 0) ticks.splice(1, 0, 0);
-		return ticks;
-	});
+	const yTickValues = $derived(yDomain ? axisTicks(yDomain[0], yDomain[1]) : ([] as number[]));
 
 	const leftPadding = $derived.by(() => {
 		const labels = yTickValues.map((v) => formatY(Math.round(v)));
@@ -309,6 +306,8 @@
 
 {#if isLoading}
 	<Skeleton class="h-96" showSpinner />
+{:else if isEmpty}
+	<Empty>{m.trends_empty()}</Empty>
 {:else}
 	<div
 		class="bg-background overflow-visible rounded-sm shadow-md"
@@ -348,9 +347,7 @@
 						format: (v: number) => formatY(Math.round(v)),
 						ticks: (scale) => {
 							const [min, max] = scale.domain();
-							const ticks = [min, max];
-							if (min < 0 && max > 0) ticks.splice(1, 0, 0);
-							return ticks;
+							return axisTicks(min, max);
 						}
 					},
 					grid: { x: true, y: true, xTicks: 6, yTicks: [0] },

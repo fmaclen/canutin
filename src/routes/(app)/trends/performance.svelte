@@ -3,6 +3,7 @@
 	import { endOfDay, startOfYear, subDays, subMonths, subYears } from 'date-fns';
 
 	import { formatCurrency } from '$lib/components/currency';
+	import Empty from '$lib/components/empty.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton/index';
 	import * as Table from '$lib/components/ui/table/index';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
@@ -46,6 +47,7 @@
 	} = $props();
 
 	const fx = getExchangeRatesContext();
+	const isEmpty = $derived(!rawAccounts.length && !rawAssets.length);
 
 	type GroupKey = 'net' | 'cash' | 'debt' | 'investment' | 'other';
 	// NOTE: trends hides the converted-amount indicator (page-scoped FX rule), so only the
@@ -260,25 +262,7 @@
 		other: m.trends_series_other_label()
 	};
 
-	const zeroTotals = freshTotals();
-	const zeroFx: FxFlags = { isUnconverted: false };
-
 	const table = $derived.by(() => {
-		if (!rawAccounts.length && !rawAssets.length) {
-			const columns = periods.map((periodDef) => ({
-				key: periodDef.key,
-				label: periodDef.label,
-				at: new Date(),
-				values: {
-					net: { pct: null, cur: 0, prev: 0, fx: zeroFx },
-					cash: { pct: null, cur: 0, prev: 0, fx: zeroFx },
-					debt: { pct: null, cur: 0, prev: 0, fx: zeroFx },
-					investment: { pct: null, cur: 0, prev: 0, fx: zeroFx },
-					other: { pct: null, cur: 0, prev: 0, fx: zeroFx }
-				}
-			}));
-			return { columns, current: zeroTotals, allocation: { ...zeroTotals } };
-		}
 		const END_OF_TIME = new Date('9999-12-31T23:59:59.999Z');
 		const now = END_OF_TIME;
 
@@ -508,6 +492,8 @@
 
 {#if isLoading}
 	<Skeleton class="h-64" showSpinner />
+{:else if isEmpty}
+	<Empty>{m.trends_empty()}</Empty>
 {:else}
 	<div class="bg-background rounded-sm shadow-md">
 		<div class="overflow-x-auto">

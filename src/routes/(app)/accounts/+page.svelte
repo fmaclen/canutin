@@ -14,9 +14,6 @@
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
-	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
-	import Separator from '$lib/components/ui/separator/separator.svelte';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index';
 	import * as Table from '$lib/components/ui/table/index';
 	import * as Tabs from '$lib/components/ui/tabs/index';
@@ -238,37 +235,22 @@
 	}
 </script>
 
-<header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
-	<div class="flex items-center gap-2">
-		<Sidebar.Trigger class="-ml-1" />
-		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
-		<Breadcrumb.Root>
-			<Breadcrumb.List>
-				<Breadcrumb.Item>
-					<Breadcrumb.Page>{m.sidebar_accounts()}</Breadcrumb.Page>
-				</Breadcrumb.Item>
-			</Breadcrumb.List>
-		</Breadcrumb.Root>
-	</div>
-	<nav class="flex items-center gap-4 px-4">
-		<Link href={resolve('/accounts/add')} class="text-sm">{m.accounts_add_page_title()}</Link>
-	</nav>
-</header>
-
 <Page pageTitle={m.sidebar_accounts()}>
+	{#snippet actions()}
+		<Link href={resolve('/accounts/add')} class="text-sm">{m.accounts_add_page_title()}</Link>
+	{/snippet}
 	<Section>
 		{#if !isLoaded}
 			<Skeleton class="h-64" showSpinner />
 		{:else}
 			<Tabs.Root bind:value={filter}>
-				<nav class="flex items-center justify-between space-x-2">
-					<SectionTitle title={m.accounts_section_title()} />
+				<SectionTitle title={m.accounts_section_title()}>
 					<Tabs.List>
 						{#each filters as option (option.key)}
 							<Tabs.Trigger value={option.key}>{option.label}</Tabs.Trigger>
 						{/each}
 					</Tabs.List>
-				</nav>
+				</SectionTitle>
 
 				{#each filters as option (option.key)}
 					<Tabs.Content value={option.key} class="flex flex-col space-y-2">
@@ -378,34 +360,31 @@
 												<Table.Cell>
 													{@const statuses = statusBadges(row)}
 													<div class="flex flex-wrap gap-2">
-														{#if statuses.length}
-															{#each statuses as status (status.id)}
-																<Tooltip.Root>
-																	<Tooltip.Trigger class="inline-flex">
-																		<Badge
-																			variant="outline"
-																			class="border-border/60 text-foreground/70 text-xs font-normal"
-																		>
-																			{status.label}
-																		</Badge>
-																	</Tooltip.Trigger>
-																	<Tooltip.Content sideOffset={6}>
-																		<p class="text-xs leading-snug font-normal">
-																			{status.description}
-																		</p>
-																	</Tooltip.Content>
-																</Tooltip.Root>
-															{/each}
-														{:else}
-															<span class="text-muted-foreground text-xs">~</span>
-														{/if}
+														{#each statuses as status (status.id)}
+															<Tooltip.Root>
+																<Tooltip.Trigger class="inline-flex">
+																	<Badge
+																		variant="outline"
+																		class="border-border/60 text-foreground/70 text-xs font-normal"
+																	>
+																		{status.label}
+																	</Badge>
+																</Tooltip.Trigger>
+																<Tooltip.Content sideOffset={6}>
+																	<p class="text-xs leading-snug font-normal">
+																		{status.description}
+																	</p>
+																</Tooltip.Content>
+															</Tooltip.Root>
+														{/each}
 													</div>
 												</Table.Cell>
 												<Table.Cell class="text-right tabular-nums">
 													{@const txnCount = transactionsCounts.get(row.id)}
-													{@const hasTxn = transactionsCounts.has(row.id)}
-													{#if hasTxn}
+													{#if txnCount !== undefined}
 														<span class="font-mono">{txnCount}</span>
+													{:else if row.autoCalculated}
+														<span class="font-mono">0</span>
 													{:else}
 														<span class="text-muted-foreground font-mono">~</span>
 													{/if}

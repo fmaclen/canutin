@@ -75,7 +75,7 @@ test('shared inverse account mirrors balances and transactions while allowing re
 	await expect(transactionRow).toBeVisible();
 	await expect(transactionRow.getByText('$200.00')).toBeVisible();
 
-	await page.goto(`/accounts/${payableAccount.id}`);
+	await page.goto(`/accounts/${payableAccount.id}/edit`);
 	await expect(page.getByLabel('Include in net worth')).toBeChecked();
 
 	await page.getByLabel('Include in net worth').uncheck();
@@ -132,7 +132,7 @@ test('shared inverse asset mirrors value fields while allowing recipient-only ne
 	await expect(assetCells.nth(4)).toContainText('-$9,000.00');
 	await expect(assetCells.nth(7)).toContainText('-$12,000.00');
 
-	await page.goto(`/assets/${receivableAsset.id}`);
+	await page.goto(`/assets/${receivableAsset.id}/edit`);
 	await expect(page.getByLabel('Include in net worth')).toBeChecked();
 
 	await page.getByLabel('Include in net worth').uncheck();
@@ -169,7 +169,7 @@ test('owner creates account share via UI and recipient sees it with NORMAL persp
 	await page.goto('/');
 	await signIn(page, owner.email);
 
-	await page.goto(`/accounts/${jointAccount.id}`);
+	await page.goto(`/accounts/${jointAccount.id}/edit`);
 	await page.getByLabel('Email').fill(recipient.email);
 	// Perspective defaults to NORMAL; no need to change it
 	await page.getByRole('button', { name: 'Share', exact: true }).click();
@@ -389,10 +389,10 @@ test('shared account and asset detail views keep currency formatting for recipie
 	await page.goto('/');
 	await signIn(page, recipient.email);
 
-	await page.goto(`/accounts/${account.id}`);
+	await page.goto(`/accounts/${account.id}/edit`);
 	await expect(page.getByLabel('Balance', { exact: true })).toHaveValue('$1,200.00');
 
-	await page.goto(`/assets/${asset.id}`);
+	await page.goto(`/assets/${asset.id}/edit`);
 	await expect(page.getByLabel('Market value', { exact: true })).toHaveValue('-$12,000.00');
 });
 
@@ -515,7 +515,7 @@ test('recipient can leave a shared account via UI', async ({ page }) => {
 	await goToPageViaSidebar(page, 'Accounts');
 	await expect(page.getByRole('row', { name: /Leavable savings/ })).toBeVisible();
 
-	await page.goto(`/accounts/${account.id}`);
+	await page.goto(`/accounts/${account.id}/edit`);
 	await page.getByRole('button', { name: 'Leave' }).first().click();
 	await page.getByRole('button', { name: 'Continue' }).click();
 
@@ -559,7 +559,7 @@ test('recipient can leave a shared asset via UI', async ({ page }) => {
 	await goToPageViaSidebar(page, 'Assets');
 	await expect(page.getByRole('row', { name: /Leavable brokerage/ })).toBeVisible();
 
-	await page.goto(`/assets/${asset.id}`);
+	await page.goto(`/assets/${asset.id}/edit`);
 	await page.getByRole('button', { name: 'Leave' }).first().click();
 	await page.getByRole('button', { name: 'Continue' }).click();
 

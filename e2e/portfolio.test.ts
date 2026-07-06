@@ -50,11 +50,9 @@ test('portfolio and trades flow covers security creation, balances, filters, and
 	await goToPageViaSidebar(page, 'Portfolio');
 	await expect(page.getByText('No positions yet')).toBeVisible();
 
-	await page.goto('/trades/securities');
+	await page.goto('/securities');
 	await page.getByRole('link', { name: 'Add security' }).click();
-	await expect(page).toHaveURL('/trades/securities/add');
-	await page.getByLabel('Security').click();
-	await page.getByRole('option', { name: 'Add security' }).click();
+	await expect(page).toHaveURL('/securities/add');
 	await page.getByLabel('Name').fill('Vanguard Total Stock Market ETF');
 	await page.getByLabel('Symbol').fill('VTI');
 	await page.getByLabel('Account').click();
@@ -64,9 +62,9 @@ test('portfolio and trades flow covers security creation, balances, filters, and
 	await page.getByLabel('Price').fill('200');
 	await page.getByLabel('Market value', { exact: true }).fill('2000');
 	await page.getByLabel('Cost basis').fill('1500');
-	await page.getByRole('button', { name: 'Add security' }).click();
+	await page.getByRole('button', { name: 'Add', exact: true }).click();
 	await expect(page.getByText('Security added')).toBeVisible();
-	await expect(page).toHaveURL('/trades/securities');
+	await expect(page).toHaveURL('/securities');
 	const securityRow = page.getByRole('row', { name: /Vanguard Total Stock Market ETF/ });
 	await expect(securityRow).toContainText('VTI');
 
@@ -81,13 +79,16 @@ test('portfolio and trades flow covers security creation, balances, filters, and
 	await expect(portfolioRow).toContainText('$500.00');
 
 	await portfolioRow.getByRole('link', { name: 'Vanguard Total Stock Market ETF' }).click();
-	await expect(page).toHaveURL(/\/trades\/securities\//);
+	await expect(page).toHaveURL(/\/securities\//);
 	const securityUrl = page.url();
-	const securityId = securityUrl.split('/trades/securities/')[1].split('?')[0];
+	const securityId = securityUrl.split('/securities/')[1].split('?')[0];
 	const firstAccountRow = page.getByRole('row', { name: /Core Brokerage/ });
 	await expect(firstAccountRow).toContainText('10');
 	await expect(firstAccountRow).toContainText('$200.00');
 	await expect(firstAccountRow).toContainText('$2,000.00');
+
+	await page.getByRole('link', { name: 'Edit' }).click();
+	await expect(page).toHaveURL(`/securities/${securityId}/edit`);
 	await page.getByLabel('Account').click();
 	await page.getByRole('option', { name: 'Roth Portfolio' }).click();
 	await page.getByLabel('As of').fill(formatDateForInput(new UTCDate()));
@@ -96,22 +97,30 @@ test('portfolio and trades flow covers security creation, balances, filters, and
 	await page.getByLabel('Market value', { exact: true }).fill('1050');
 	await page.getByLabel('Cost basis').fill('900');
 	await page.getByRole('button', { name: 'Add balance' }).click();
+	await expect(page.getByText('Balance updated')).toBeVisible();
+
+	await page.goto(`/securities/${securityId}`);
 	await expect(page.getByRole('row', { name: /Roth Portfolio/ })).toContainText('$1,050.00');
 	await expect(page.getByRole('region', { name: 'Net market value' })).toContainText('$3,050.00');
 
 	await page.goto(`/accounts/${brokerageAccount.id}`);
-	await expect(page.getByLabel('Cash', { exact: true })).toHaveValue('$1,000.00');
 	await expect(page.getByRole('row', { name: /Vanguard Total Stock Market ETF/ })).toContainText(
 		'$2,000.00'
 	);
 	await expect(page.getByRole('region', { name: 'Net market value' })).toContainText('$2,000.00');
+
+	await page.getByRole('link', { name: 'Edit' }).click();
+	await expect(page).toHaveURL(`/accounts/${brokerageAccount.id}/edit`);
+	await expect(page.getByLabel('Cash', { exact: true })).toHaveValue('$1,000.00');
+
+	await page.goto(`/accounts/${brokerageAccount.id}`);
 	await page.getByRole('main').getByRole('link', { name: 'Trades' }).click();
 	await expect(page).toHaveURL(`/trades?account=${brokerageAccount.id}`);
 	await expect(page.getByRole('button', { name: 'Account', exact: true })).toContainText(
 		'Core Brokerage'
 	);
 
-	await page.goto(`/trades/securities/${securityId}`);
+	await page.goto(`/securities/${securityId}`);
 	await page.getByRole('main').getByRole('link', { name: 'Trades' }).click();
 	await expect(page).toHaveURL(`/trades?security=${securityId}`);
 	await expect(page.getByRole('button', { name: 'Security', exact: true })).toContainText(
@@ -200,14 +209,16 @@ test('portfolio unknown values render as unknown and do not inflate account tota
 	await expect(knownZeroRow.locator('td').last()).toHaveText('$0.00');
 
 	await page.goto(`/accounts/${account.id}`);
-	await expect(page.getByLabel('Cash', { exact: true })).toHaveValue('$750.00');
 	await expect(page.getByRole('region', { name: 'Net market value' })).toHaveText(/~/);
 	const positionRow = page.getByRole('table').getByRole('row', { name: /Private Fund/ });
 	// Gain/loss % cell (index 6) and Value cell (last) both stay unknown — never coerced to 0.
 	await expect(positionRow.locator('td').nth(6)).toHaveText('~');
 	await expect(positionRow.locator('td').last()).toHaveText('~');
 
-	await page.goto(`/trades/securities/${security.id}`);
+	await page.goto(`/accounts/${account.id}/edit`);
+	await expect(page.getByLabel('Cash', { exact: true })).toHaveValue('$750.00');
+
+	await page.goto(`/securities/${security.id}`);
 	await expect(page.getByRole('region', { name: 'Net market value' })).toHaveText(/~/);
 
 	await page.goto('/accounts');
@@ -330,12 +341,12 @@ test('portfolio tables sort positions by market value descending with unknown va
 	await expect(accountPositionRows.nth(1)).toContainText('Bravo Holdings');
 	await expect(accountPositionRows.nth(2)).toContainText('Alpha Holdings');
 
-	await page.goto(`/trades/securities/${alpha.id}`);
+	await page.goto(`/securities/${alpha.id}`);
 	const alphaBalanceRows = page.getByRole('table').getByRole('row');
 	await expect(alphaBalanceRows.nth(1)).toContainText('Third Brokerage');
 	await expect(alphaBalanceRows.nth(2)).toContainText('Main Brokerage');
 
-	await page.goto(`/trades/securities/${delta.id}`);
+	await page.goto(`/securities/${delta.id}`);
 	const deltaBalanceRows = page.getByRole('table').getByRole('row');
 	await expect(deltaBalanceRows.nth(1)).toContainText('Third Brokerage');
 	await expect(deltaBalanceRows.nth(2)).toContainText('Second Brokerage');
@@ -388,7 +399,7 @@ test('portfolio hides sold-out positions while preserving activity history', asy
 	await goToPageViaSidebar(page, 'Portfolio');
 	await expect(page.getByRole('row', { name: /Round Trip Stock/ })).not.toBeVisible();
 
-	await page.goto('/trades/securities');
+	await page.goto('/securities');
 	await expect(page.getByRole('row', { name: /Round Trip Stock/ })).toBeVisible();
 
 	await page.goto('/trades');
@@ -444,7 +455,7 @@ test('portfolio carries a re-buy after a sell-out forward as unknown', async ({ 
 	await expect(row).toContainText('RBT');
 	await expect(row.locator('td').last()).toHaveText('~');
 
-	await page.goto(`/trades/securities/${security.id}`);
+	await page.goto(`/securities/${security.id}`);
 	await expect(page.getByRole('region', { name: 'Net market value' })).toHaveText(/~/);
 });
 
@@ -473,11 +484,9 @@ test('transactions and portfolio add forms show empty prerequisites with no acco
 	await expect(tradeAccountPicker.getByRole('link', { name: 'Add account' })).toHaveCount(0);
 	await page.keyboard.press('Escape');
 	await page.getByLabel('Security').click();
-	await expect(page.getByRole('option', { name: 'There are no securities' })).toBeVisible();
+	await expect(page.getByRole('option', { name: 'Create new security' })).toBeVisible();
 
-	await page.goto('/trades/securities/add');
-	await page.getByLabel('Security').click();
-	await page.getByRole('option', { name: 'Add security' }).click();
+	await page.goto('/securities/add');
 	await page.getByLabel('Account').click();
 	const balanceAccountPicker = page.getByRole('listbox');
 	await expect(
@@ -502,13 +511,11 @@ test('trades and securities empty prerequisites stay consistent', async ({ page 
 
 	await page.getByRole('link', { name: 'Add trade' }).click();
 	await page.getByLabel('Security').click();
-	await expect(page.getByRole('option', { name: 'There are no securities' })).toBeVisible();
+	await expect(page.getByRole('option', { name: 'Create new security' })).toBeVisible();
 
 	await goToPageViaSidebar(page, 'Securities');
 	await expect(page.getByText('No securities yet')).toBeVisible();
 	await page.getByRole('link', { name: 'Add security' }).click();
-	await page.getByLabel('Security').click();
-	await page.getByRole('option', { name: 'Add security' }).click();
 	await page.getByLabel('Name').fill('Empty Flow Fund');
 	await page.getByLabel('Account').click();
 	await page.getByRole('option', { name: 'Empty Prerequisite Brokerage' }).click();
@@ -516,7 +523,7 @@ test('trades and securities empty prerequisites stay consistent', async ({ page 
 	await page.getByLabel('Quantity').fill('1');
 	await page.getByLabel('Price').fill('25');
 	await page.getByLabel('Market value', { exact: true }).fill('25');
-	await page.getByRole('button', { name: 'Add security' }).click();
+	await page.getByRole('button', { name: 'Add', exact: true }).click();
 	await expect(page.getByRole('row', { name: /Empty Flow Fund/ })).toBeVisible();
 
 	await goToPageViaSidebar(page, 'Trades');

@@ -7,18 +7,16 @@
 	import Empty from '$lib/components/empty.svelte';
 	import Fieldset from '$lib/components/fieldset.svelte';
 	import FormFieldRow from '$lib/components/form-field-row.svelte';
+	import Notice from '$lib/components/notice.svelte';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
-	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
-	import Separator from '$lib/components/ui/separator/separator.svelte';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index';
 	import * as Table from '$lib/components/ui/table/index';
 	import { getCurrenciesContext } from '$lib/currencies.svelte';
@@ -192,20 +190,6 @@
 		}
 	}
 </script>
-
-<header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
-	<div class="flex items-center gap-2">
-		<Sidebar.Trigger class="-ml-1" />
-		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
-		<Breadcrumb.Root>
-			<Breadcrumb.List>
-				<Breadcrumb.Item>
-					<Breadcrumb.Page>{m.user_settings()}</Breadcrumb.Page>
-				</Breadcrumb.Item>
-			</Breadcrumb.List>
-		</Breadcrumb.Root>
-	</div>
-</header>
 
 <Page pageTitle={m.settings_page_title()}>
 	<Section>
@@ -483,7 +467,7 @@
 
 	<Section>
 		<SectionTitle title={m.settings_agent_access_section_title()} />
-		<div class="bg-muted border-border overflow-hidden rounded border">
+		<Notice variant="info">
 			<Fieldset isFirst={true}>
 				<FormFieldRow itemsAlignment="items-start">
 					<Label for="agent-access-url" class="justify-start pr-0 md:justify-end md:pt-2"
@@ -502,6 +486,6 @@
 					</div>
 				</FormFieldRow>
 			</Fieldset>
-		</div>
+		</Notice>
 	</Section>
 </Page>

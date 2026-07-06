@@ -13,12 +13,9 @@
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
-	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import Separator from '$lib/components/ui/separator/separator.svelte';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
@@ -40,6 +37,7 @@
 	const previewCode = $derived(currencyCode || 'USD');
 	const isIntlPreviewCode = $derived(isIntlCurrency(previewCode));
 	const previewValue = $derived(formatNativeCurrency(Number(previewAmount), 2, previewCode));
+	const canSubmit = $derived(codePattern.test(currencyCode));
 
 	function isRecord(value: unknown): value is Record<string, unknown> {
 		return typeof value === 'object' && value !== null;
@@ -88,11 +86,7 @@
 
 	async function handleSubmit() {
 		const currentOwnerId = ownerId;
-		if (!currentOwnerId) return;
-		if (!codePattern.test(currencyCode)) {
-			toast.error(m.currencies_code_invalid());
-			return;
-		}
+		if (!currentOwnerId || !canSubmit) return;
 
 		const trimmedRate = rate.trim();
 		const hasRate = trimmedRate.length > 0;
@@ -137,25 +131,13 @@
 	}
 </script>
 
-<header class="bg-background flex h-16 shrink-0 items-center gap-2 border-b">
-	<div class="flex items-center gap-2 px-4">
-		<Sidebar.Trigger class="-ml-1" />
-		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
-		<Breadcrumb.Root>
-			<Breadcrumb.List>
-				<Breadcrumb.Item>
-					<Breadcrumb.Link href={resolve('/currencies')}>{m.sidebar_currencies()}</Breadcrumb.Link>
-				</Breadcrumb.Item>
-				<Breadcrumb.Separator />
-				<Breadcrumb.Item>
-					<Breadcrumb.Page>{m.currencies_add_page_title()}</Breadcrumb.Page>
-				</Breadcrumb.Item>
-			</Breadcrumb.List>
-		</Breadcrumb.Root>
-	</div>
-</header>
-
-<Page pageTitle={m.currencies_add_page_title()}>
+<Page
+	pageTitle={m.currencies_add_page_title()}
+	crumbs={[
+		{ label: m.sidebar_currencies(), href: resolve('/currencies') },
+		{ label: m.currencies_add_page_title() }
+	]}
+>
 	<Section>
 		<SectionTitle title={m.currencies_section_details()} />
 
@@ -242,7 +224,7 @@
 
 				<footer class="border-border bg-border border-t p-2">
 					<div class="flex justify-end">
-						<Button type="submit">{m.currencies_button_add()}</Button>
+						<Button type="submit" disabled={!canSubmit}>{m.currencies_button_add()}</Button>
 					</div>
 				</footer>
 			</form>

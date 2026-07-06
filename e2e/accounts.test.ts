@@ -222,6 +222,9 @@ test('user can edit account details and update balance', async ({ page }) => {
 
 	await initialRow.getByRole('link', { name: 'Primary Checking' }).click();
 	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}(\\?|$)`));
+
+	await page.getByRole('link', { name: 'Edit' }).click();
+	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}/edit`));
 	await expect(page.getByLabel('Name')).toHaveValue('Primary Checking');
 	await expect(page.getByLabel('Institution')).toHaveValue('Bank of America');
 	await expect(page.getByLabel('Category')).toHaveValue('Checking');
@@ -254,6 +257,9 @@ test('user can edit account details and update balance', async ({ page }) => {
 
 	await renamedRow.getByRole('link', { name: 'Business Checking' }).click();
 	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}(\\?|$)`));
+
+	await page.getByRole('link', { name: 'Edit' }).click();
+	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}/edit`));
 	await expect(page.getByLabel('Name')).toHaveValue('Business Checking');
 	await expect(page.getByLabel('Institution')).toHaveValue('Wells Fargo');
 	await expect(page.getByLabel('Category')).toHaveValue('Checking');
@@ -262,7 +268,7 @@ test('user can edit account details and update balance', async ({ page }) => {
 	await expect(page.getByLabel('Exclude from net worth')).not.toBeChecked();
 
 	await page.getByLabel('Balance', { exact: true }).fill('4500');
-	await page.getByRole('button', { name: 'Update' }).click();
+	await page.getByRole('button', { name: 'Add' }).click();
 	await expect(page.getByText('Balance updated')).toBeVisible();
 	await expect(page).toHaveURL('/accounts');
 	await expect(
@@ -271,6 +277,10 @@ test('user can edit account details and update balance', async ({ page }) => {
 
 	await page.getByRole('row', { name: 'Business Checking' }).getByRole('link').click();
 	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}(\\?|$)`));
+
+	await page.getByRole('link', { name: 'Edit' }).click();
+	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}/edit`));
+
 	await page.getByLabel('Exclude from net worth').check();
 	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(page.getByText('Account updated').first()).toBeVisible();
@@ -278,7 +288,11 @@ test('user can edit account details and update balance', async ({ page }) => {
 
 	await page.getByRole('row', { name: 'Business Checking' }).getByRole('link').click();
 	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}(\\?|$)`));
+
+	await page.getByRole('link', { name: 'Edit' }).click();
+	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}/edit`));
 	await expect(page.getByLabel('Exclude from net worth')).toBeChecked();
+
 	await page.getByLabel('Exclude from net worth').uncheck();
 	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(page.getByText('Account updated').first()).toBeVisible();
@@ -286,6 +300,9 @@ test('user can edit account details and update balance', async ({ page }) => {
 
 	await page.getByRole('row', { name: 'Business Checking' }).getByRole('link').click();
 	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}(\\?|$)`));
+
+	await page.getByRole('link', { name: 'Edit' }).click();
+	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}/edit`));
 	await expect(page.getByLabel('Exclude from net worth')).not.toBeChecked();
 });
 
@@ -309,8 +326,8 @@ test('user can directly navigate to account edit page', async ({ page }) => {
 	await page.goto('/');
 	await signIn(page, user.email);
 
-	await page.goto(`/accounts/${savingsAccount.id}`);
-	await expect(page).toHaveURL(`/accounts/${savingsAccount.id}`);
+	await page.goto(`/accounts/${savingsAccount.id}/edit`);
+	await expect(page).toHaveURL(`/accounts/${savingsAccount.id}/edit`);
 	await expect(page.getByLabel('Name')).toHaveValue('Emergency Fund');
 	await expect(page.getByLabel('Institution')).toHaveValue('Ally Bank');
 	await expect(page.getByLabel('Category')).toHaveValue('Savings');
@@ -339,6 +356,9 @@ test('user sees stale data warning and can refresh form', async ({ page }) => {
 
 	await page.getByRole('link', { name: 'Investment Account' }).click();
 	await expect(page).toHaveURL(new RegExp(`/accounts/${investmentAccount.id}(\\?|$)`));
+
+	await page.getByRole('link', { name: 'Edit' }).click();
+	await expect(page).toHaveURL(new RegExp(`/accounts/${investmentAccount.id}/edit`));
 	await expect(page.getByLabel('Name')).toHaveValue('Investment Account');
 
 	await page.getByLabel('Name').fill('My Investment Account');
@@ -405,6 +425,9 @@ test('user can delete account and cascade deletes transactions and balances', as
 	await accountRow.getByRole('link', { name: 'Old Checking' }).click();
 	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}(\\?|$)`));
 
+	await page.getByRole('link', { name: 'Edit' }).click();
+	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}/edit`));
+
 	await page.getByRole('button', { name: 'Delete' }).first().click();
 	const dialog = page.getByRole('alertdialog');
 	await expect(dialog).toBeVisible();
@@ -418,4 +441,36 @@ test('user can delete account and cascade deletes transactions and balances', as
 	expect(await recordExists('accountBalances', balance.id)).toBe(false);
 	expect(await recordExists('transactions', transaction1.id)).toBe(false);
 	expect(await recordExists('transactions', transaction2.id)).toBe(false);
+});
+
+test('account overview shows balance history once it has at least two balances', async ({
+	page
+}) => {
+	const user = await seedUser('wanda');
+
+	const account = await seedAccount({
+		name: 'Growth Savings',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Savings'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: '2025-01-01T00:00:00.000Z',
+		value: 1000
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await page.goto(`/accounts/${account.id}`);
+	await expect(page.getByText('Balance history')).not.toBeVisible();
+
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: '2025-02-01T00:00:00.000Z',
+		value: 2000
+	});
+	await expect(page.getByText('Balance history')).toBeVisible();
 });

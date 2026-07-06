@@ -16,6 +16,8 @@
 	}
 
 	let { formData, currency, onSubmit }: Props = $props();
+
+	const canSubmit = $derived(Boolean(formData.name.trim()));
 </script>
 
 <div class="bg-muted border-border overflow-hidden rounded border">
@@ -54,7 +56,7 @@
 
 		<footer class="border-border bg-border border-t p-2">
 			<div class="flex justify-end">
-				<Button type="submit">{m.securities_button_save()}</Button>
+				<Button type="submit" disabled={!canSubmit}>{m.securities_button_save()}</Button>
 			</div>
 		</footer>
 	</form>

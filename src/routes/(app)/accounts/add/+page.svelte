@@ -12,14 +12,11 @@
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
-	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
-	import Separator from '$lib/components/ui/separator/separator.svelte';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { getCurrenciesContext } from '$lib/currencies.svelte';
 	import { interfacePreferences } from '$lib/interface-preferences.svelte';
@@ -49,6 +46,14 @@
 	let value = $state('');
 
 	const selectedCurrency = $derived(currenciesContext.getCurrency(currency));
+	const canSubmit = $derived(
+		Boolean(
+			name.trim() &&
+				accountTypeName.trim() &&
+				balanceGroup &&
+				currenciesContext.hasCurrency(currency)
+		)
+	);
 
 	$effect(() => {
 		if (!currencyWasChanged) {
@@ -58,11 +63,7 @@
 
 	async function handleSubmit() {
 		const currentOwnerId = ownerId;
-		if (!currentOwnerId) return;
-		if (!currenciesContext.hasCurrency(currency)) {
-			toast.error(m.currency_required());
-			return;
-		}
+		if (!currentOwnerId || !canSubmit) return;
 
 		try {
 			const balanceTypeId = await balanceTypesContext.getOrCreate(accountTypeName, currentOwnerId);
@@ -102,25 +103,13 @@
 	}
 </script>
 
-<header class="bg-background flex h-16 shrink-0 items-center gap-2 border-b">
-	<div class="flex items-center gap-2 px-4">
-		<Sidebar.Trigger class="-ml-1" />
-		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
-		<Breadcrumb.Root>
-			<Breadcrumb.List>
-				<Breadcrumb.Item>
-					<Breadcrumb.Link href="/accounts">{m.sidebar_accounts()}</Breadcrumb.Link>
-				</Breadcrumb.Item>
-				<Breadcrumb.Separator />
-				<Breadcrumb.Item>
-					<Breadcrumb.Page>{m.accounts_add_page_title()}</Breadcrumb.Page>
-				</Breadcrumb.Item>
-			</Breadcrumb.List>
-		</Breadcrumb.Root>
-	</div>
-</header>
-
-<Page pageTitle={m.accounts_add_page_title()}>
+<Page
+	pageTitle={m.accounts_add_page_title()}
+	crumbs={[
+		{ label: m.sidebar_accounts(), href: resolve('/accounts') },
+		{ label: m.accounts_add_page_title() }
+	]}
+>
 	<Section>
 		<SectionTitle title={m.accounts_section_details()} />
 		<div class="bg-muted border-border overflow-hidden rounded border">
@@ -317,7 +306,7 @@
 
 				<footer class="border-border bg-border border-t p-2">
 					<div class="flex justify-end">
-						<Button type="submit">{m.accounts_button_add()}</Button>
+						<Button type="submit" disabled={!canSubmit}>{m.accounts_button_add()}</Button>
 					</div>
 				</footer>
 			</form>

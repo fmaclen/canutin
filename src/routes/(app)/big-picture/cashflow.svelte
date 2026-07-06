@@ -4,7 +4,6 @@
 	import { getCashflowContext } from '$lib/cashflow.svelte';
 	import { formatCurrency } from '$lib/components/currency';
 	import Currency from '$lib/components/currency.svelte';
-	import SectionTitle from '$lib/components/section-title.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
@@ -113,8 +112,6 @@
 		return false;
 	}
 </script>
-
-<SectionTitle title={m.cashflow_section_title()} />
 
 {#if chartData.length > 0}
 	<div class="bg-background overflow-hidden rounded shadow-md">
