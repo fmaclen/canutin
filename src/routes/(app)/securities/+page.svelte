@@ -3,7 +3,6 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import Empty from '$lib/components/empty.svelte';
-	import KeyValue from '$lib/components/key-value.svelte';
 	import Link from '$lib/components/link.svelte';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
@@ -64,66 +63,56 @@
 		<SectionTitle title={m.securities_title()} />
 		{#if securitiesContext.isLoading}
 			<Skeleton class="h-64" showSpinner />
+		{:else if securitiesContext.securities.length === 0}
+			<Empty>{m.securities_empty()}</Empty>
 		{:else}
-			<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-				<KeyValue
-					title={m.securities_title()}
-					value={securitiesContext.securities.length}
-					variant="outline"
-					format="number"
-				/>
-			</div>
-			{#if securitiesContext.securities.length === 0}
-				<Empty>{m.securities_empty()}</Empty>
-			{:else}
-				<div class="bg-background overflow-hidden rounded-sm shadow-md">
-					<Table.Root>
-						<Table.Header>
+			<div class="bg-background overflow-hidden rounded-sm shadow-md">
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							<Table.SortableHead
+								class="text-left whitespace-nowrap"
+								column="name"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
+								{m.securities_table_header_security()}
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-left whitespace-nowrap"
+								column="symbol"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
+								{m.securities_table_header_symbol()}
+							</Table.SortableHead>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each sortedRows as row (row.id)}
 							<Table.Row>
-								<Table.SortableHead
-									class="text-left whitespace-nowrap"
-									column="name"
-									sortColumn={sortState.column}
-									sortDirection={sortState.direction}
-									onSort={handleSort}
-								>
-									{m.securities_table_header_security()}
-								</Table.SortableHead>
-								<Table.SortableHead
-									class="text-left whitespace-nowrap"
-									column="symbol"
-									sortColumn={sortState.column}
-									sortDirection={sortState.direction}
-									onSort={handleSort}
-								>
-									{m.securities_table_header_symbol()}
-								</Table.SortableHead>
+								<Table.Cell>
+									<Link
+										href={resolve(`/securities/${row.id}`)}
+										class="text-foreground/90 text-sm font-medium"
+									>
+										{row.name}
+									</Link>
+								</Table.Cell>
+								<Table.Cell class="text-foreground/80 text-sm tracking-wide uppercase">
+									{#if row.symbol}
+										{row.symbol}
+									{:else}
+										<span class="text-muted-foreground">~</span>
+									{/if}
+								</Table.Cell>
 							</Table.Row>
-						</Table.Header>
-						<Table.Body>
-							{#each sortedRows as row (row.id)}
-								<Table.Row>
-									<Table.Cell>
-										<Link
-											href={resolve(`/securities/${row.id}`)}
-											class="text-foreground/90 text-sm font-medium"
-										>
-											{row.name}
-										</Link>
-									</Table.Cell>
-									<Table.Cell class="text-foreground/80 text-sm tracking-wide uppercase">
-										{#if row.symbol}
-											{row.symbol}
-										{:else}
-											<span class="text-muted-foreground">~</span>
-										{/if}
-									</Table.Cell>
-								</Table.Row>
-							{/each}
-						</Table.Body>
-					</Table.Root>
-				</div>
-			{/if}
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			</div>
 		{/if}
 	</Section>
 </Page>

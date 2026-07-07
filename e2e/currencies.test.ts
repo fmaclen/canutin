@@ -336,6 +336,36 @@ test('currency detail actions reached from the ledger redirect back with the led
 	await expectCellText(currencyRow(page, code), 4, formatRate(2.5, code));
 });
 
+test('currency overview shows rate history once it has at least two quotes', async ({ page }) => {
+	const user = await seedUser('beatrix');
+	const code = uniqueCurrency('QH');
+	const currency = await seedCurrency({
+		owner: user.id,
+		code,
+		name: 'History coin',
+		autoUpdate: false
+	});
+	await seedExchangeRate({
+		owner: user.id,
+		currency: code,
+		date: utcIso('2026-01-01'),
+		rate: 1.1
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await page.goto(`/currencies/${currency.id}`);
+	await expect(page.getByText('Rate history')).not.toBeVisible();
+
+	await seedExchangeRate({
+		owner: user.id,
+		currency: code,
+		date: utcIso('2026-02-01'),
+		rate: 1.2
+	});
+	await expect(page.getByText('Rate history')).toBeVisible();
+});
+
 test('currency delete blocks in-use currencies and removes unused quotes', async ({ page }) => {
 	const user = await seedUser('octavia');
 	const guardedCode = uniqueCurrency('QG');

@@ -305,7 +305,7 @@
 </script>
 
 {#if isLoading}
-	<Skeleton class="h-96" showSpinner />
+	<Skeleton class="h-[30vh] min-h-[220px]" showSpinner />
 {:else if isEmpty}
 	<Empty>{m.trends_empty()}</Empty>
 {:else}
@@ -318,7 +318,7 @@
 		data-growth-start-net={firstSeriesRow?.net}
 		data-growth-end-net={lastSeriesRow?.net}
 	>
-		<Chart.Container config={chartConfig} class="h-96 w-full">
+		<Chart.Container config={chartConfig} class="h-[30vh] min-h-[220px] w-full">
 			<LineChart
 				data={series}
 				x="date"

@@ -176,31 +176,6 @@ class SecuritiesContext {
 		await this._pb.authedClient.collection('securities').update(id, data);
 	}
 
-	async createSecurityWithBalance(
-		securityData: { name: string; symbol?: string; owner: string; currency: string },
-		balanceData: SecurityBalanceInput
-	) {
-		const security = await this._pb.postJson<SecuritiesResponse>(
-			'/api/canutin/securities/with-initial-balance',
-			{
-				security: securityData,
-				balance: balanceData
-			}
-		);
-		this.upsertSecurity(security);
-		if (
-			await this.refreshPosition(
-				balanceData.account,
-				security.id,
-				this._auth.currentUserId,
-				this.refreshSequence
-			)
-		) {
-			this._accounts.notifyBalancesChanged();
-		}
-		return security;
-	}
-
 	async addSecurityBalance(securityId: string, balanceData: SecurityBalanceInput) {
 		await this._pb.authedClient.collection('securityBalances').create({
 			...balanceData,

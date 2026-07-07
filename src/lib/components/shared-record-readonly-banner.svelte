@@ -1,7 +1,6 @@
 <script lang="ts">
 	import UsersIcon from '@lucide/svelte/icons/users';
 
-	import Notice from '$lib/components/notice.svelte';
 	import { m } from '$lib/paraglide/messages';
 
 	interface Props {
@@ -11,7 +10,7 @@
 	let { title }: Props = $props();
 </script>
 
-<Notice variant="warning">
+<div class="bg-muted border-border overflow-hidden rounded border border-l-4 border-l-amber-500">
 	<div class="flex items-center gap-2 p-4">
 		<UsersIcon class="text-muted-foreground size-3.5" aria-hidden="true" />
 		<div>
@@ -21,4 +20,4 @@
 			</p>
 		</div>
 	</div>
-</Notice>
+</div>

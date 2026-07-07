@@ -37,7 +37,6 @@
 	const previewCode = $derived(currencyCode || 'USD');
 	const isIntlPreviewCode = $derived(isIntlCurrency(previewCode));
 	const previewValue = $derived(formatNativeCurrency(Number(previewAmount), 2, previewCode));
-	const canSubmit = $derived(codePattern.test(currencyCode));
 
 	function isRecord(value: unknown): value is Record<string, unknown> {
 		return typeof value === 'object' && value !== null;
@@ -86,7 +85,11 @@
 
 	async function handleSubmit() {
 		const currentOwnerId = ownerId;
-		if (!currentOwnerId || !canSubmit) return;
+		if (!currentOwnerId) return;
+		if (!codePattern.test(currencyCode)) {
+			toast.error(m.currencies_code_invalid());
+			return;
+		}
 
 		const trimmedRate = rate.trim();
 		const hasRate = trimmedRate.length > 0;
@@ -141,7 +144,7 @@
 	<Section>
 		<SectionTitle title={m.currencies_section_details()} />
 
-		<div class="bg-muted border-border overflow-hidden rounded border">
+		<div class="border-border overflow-hidden rounded border">
 			<form
 				onsubmit={(event) => {
 					event.preventDefault();
@@ -224,7 +227,7 @@
 
 				<footer class="border-border bg-border border-t p-2">
 					<div class="flex justify-end">
-						<Button type="submit" disabled={!canSubmit}>{m.currencies_button_add()}</Button>
+						<Button type="submit">{m.currencies_button_add()}</Button>
 					</div>
 				</footer>
 			</form>

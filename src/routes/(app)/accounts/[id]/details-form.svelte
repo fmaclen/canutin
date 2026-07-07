@@ -26,13 +26,9 @@
 	}
 
 	let { formData, currency, onSubmit, disabled = false }: Props = $props();
-
-	const canSubmit = $derived(
-		Boolean(formData.name.trim() && formData.accountTypeName.trim() && formData.balanceGroup)
-	);
 </script>
 
-<div class="bg-muted border-border overflow-hidden rounded border">
+<div class="border-border overflow-hidden rounded border">
 	<form
 		onsubmit={(e) => {
 			e.preventDefault();
@@ -184,7 +180,7 @@
 		{#if !disabled}
 			<footer class="border-border bg-border border-t p-2">
 				<div class="flex justify-end">
-					<Button type="submit" disabled={!canSubmit}>{m.accounts_button_save()}</Button>
+					<Button type="submit">{m.accounts_button_save()}</Button>
 				</div>
 			</footer>
 		{/if}

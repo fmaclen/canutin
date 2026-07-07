@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import BalanceHistoryChart from '$lib/components/balance-history-chart.svelte';
 	import { formatNativeCurrency } from '$lib/components/currency';
 	import Empty from '$lib/components/empty.svelte';
 	import KeyValue from '$lib/components/key-value.svelte';
@@ -31,6 +32,7 @@
 		recordId ? currenciesContext.currencies.find((row) => row.id === recordId) : undefined
 	);
 	const isLoaded = $derived(currenciesContext.isLoaded && exchangeRatesContext.isLoaded);
+	const loaded = $derived(currenciesContext.isLoaded && !!currency);
 	const isUsd = $derived(currency?.code === 'USD');
 
 	type QuoteRow = {
@@ -77,6 +79,16 @@
 		currency && !isUsd
 			? exchangeRatesContext.records.filter((record) => record.currency === currency.code)
 			: []
+	);
+
+	const ratePoints = $derived(
+		[...currencyQuotes]
+			.map((record) => ({ date: new Date(record.date), value: record.rate }))
+			.sort((a, b) => a.date.getTime() - b.date.getTime())
+	);
+	const rateHistoryLoading = $derived(!exchangeRatesContext.isLoaded);
+	const showRateHistory = $derived(
+		loaded && !isUsd && (rateHistoryLoading || ratePoints.length >= 2)
 	);
 
 	const latestQuote = $derived.by(() => {
@@ -126,6 +138,24 @@
 		});
 	}
 </script>
+
+{#if showRateHistory && currency}
+	<Section>
+		<SectionTitle title={m.currencies_rate_history_section_title()} />
+		{#if rateHistoryLoading}
+			<Skeleton class="h-[30vh] min-h-[220px]" showSpinner />
+		{:else}
+			<div class="bg-background overflow-visible rounded-sm shadow-md">
+				<BalanceHistoryChart
+					points={ratePoints}
+					seriesLabel={m.currencies_table_header_rate()}
+					formatAxisValue={(value) => formatNativeCurrency(value, 2, currency.code)}
+					formatTooltipValue={(value) => formatNativeCurrency(value, 2, currency.code)}
+				/>
+			</div>
+		{/if}
+	</Section>
+{/if}
 
 {#if !isUsd}
 	<Section>

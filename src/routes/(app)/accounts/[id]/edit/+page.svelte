@@ -78,7 +78,6 @@
 		AccountSharesPerspectiveOptions.NORMAL
 	);
 	let includeInNetWorth = $derived(incomingShare?.includeInNetWorth ?? true);
-	const canSubmitShare = $derived(Boolean(shareRecipientEmail.trim()));
 
 	function isDirty() {
 		if (!syncState.lastSyncedData) return false;
@@ -339,7 +338,7 @@
 	{#if isLoading || !account}
 		<Skeleton class="h-40" />
 	{:else if canWrite}
-		<div class="bg-muted border-border overflow-hidden rounded border">
+		<div class="border-border overflow-hidden rounded border">
 			<form
 				class="space-y-0"
 				onsubmit={(e) => {
@@ -403,13 +402,13 @@
 
 				<footer class="border-border bg-border border-t p-2">
 					<div class="flex justify-end">
-						<Button type="submit" disabled={!canSubmitShare}>{m.accounts_share_button()}</Button>
+						<Button type="submit">{m.accounts_share_button()}</Button>
 					</div>
 				</footer>
 			</form>
 		</div>
 	{:else}
-		<div class="bg-muted border-border overflow-hidden rounded border">
+		<div class="border-border overflow-hidden rounded border">
 			<form
 				class="space-y-0"
 				onsubmit={(e) => {

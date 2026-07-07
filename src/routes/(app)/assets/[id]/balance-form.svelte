@@ -54,7 +54,7 @@
 	const isoAsOf = $derived(parsedAsOf ? parsedAsOf.toISOString() : '');
 </script>
 
-<div class="bg-muted border-border overflow-hidden rounded border">
+<div class="border-border overflow-hidden rounded border">
 	<form
 		onsubmit={(e) => {
 			e.preventDefault();

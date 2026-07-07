@@ -3,21 +3,24 @@
 	import { curveBumpX } from 'd3-shape';
 	import { LineChart } from 'layerchart';
 
-	import { formatNativeCurrency } from '$lib/components/currency';
 	import { axisTicks } from '$lib/components/ui/chart/chart-utils.js';
 	import * as Chart from '$lib/components/ui/chart/index.js';
-	import { m } from '$lib/paraglide/messages';
 
-	let { points, currency }: { points: { date: Date; value: number }[]; currency: string } =
-		$props();
+	let {
+		points,
+		seriesLabel,
+		formatAxisValue,
+		formatTooltipValue
+	}: {
+		points: { date: Date; value: number }[];
+		seriesLabel: string;
+		formatAxisValue: (value: number) => string;
+		formatTooltipValue: (value: number) => string;
+	} = $props();
 
 	const chartConfig = {
-		balance: { label: m.balance_history_series_label(), color: '#45403C' }
+		series: { label: seriesLabel, color: '#45403C' }
 	} satisfies Chart.ChartConfig;
-
-	function formatY(value: number) {
-		return formatNativeCurrency(value, 0, currency);
-	}
 
 	const yDomain = $derived.by(() => {
 		let min = Number.POSITIVE_INFINITY;
@@ -26,32 +29,35 @@
 			min = Math.min(min, point.value);
 			max = Math.max(max, point.value);
 		}
-		const pad = Math.max(1, (max - min) * 0.05);
+		const range = max - min;
+		// NOTE: a flat series (min === max) needs a pad scaled to the value's own magnitude -
+		// a fixed pad works for money (thousands) but would swamp small units like exchange rates.
+		const pad = range > 0 ? range * 0.05 : Math.max(Math.abs(max) * 0.05, 0.01);
 		return [min - pad, max + pad] as [number, number];
 	});
 
 	const leftPadding = $derived.by(() => {
 		const longest = axisTicks(yDomain[0], yDomain[1]).reduce(
-			(width, tick) => Math.max(width, formatY(Math.round(tick)).length),
+			(width, tick) => Math.max(width, formatAxisValue(tick).length),
 			0
 		);
 		return Math.max(48, longest * 8 + 16);
 	});
 </script>
 
-<Chart.Container config={chartConfig} class="h-64 w-full">
+<Chart.Container config={chartConfig} class="h-[30vh] min-h-[220px] w-full">
 	<LineChart
 		data={points}
 		x="date"
 		xScale={scaleUtc()}
 		{yDomain}
 		padding={{ top: 16, right: 48, bottom: 24, left: leftPadding }}
-		series={[{ key: 'value', label: chartConfig.balance.label, color: chartConfig.balance.color }]}
+		series={[{ key: 'value', label: chartConfig.series.label, color: chartConfig.series.color }]}
 		props={{
 			spline: { curve: curveBumpX, motion: 'tween', strokeWidth: 1.25 },
 			xAxis: { format: (v: Date) => v.toISOString().slice(0, 10), ticks: 6 },
 			yAxis: {
-				format: (v: number) => formatY(Math.round(v)),
+				format: (v: number) => formatAxisValue(v),
 				ticks: (scale) => {
 					const [min, max] = scale.domain();
 					return axisTicks(min, max);
@@ -65,15 +71,15 @@
 			<Chart.Tooltip>
 				{#snippet formatter({ value })}
 					<div
-						style="--color-bg: {chartConfig.balance.color};"
+						style="--color-bg: {chartConfig.series.color};"
 						class="size-2.5 shrink-0 rounded-lg bg-(--color-bg)"
 					></div>
 					<div
 						class="flex flex-1 shrink-0 items-center justify-between gap-4 text-base leading-none"
 					>
-						<span class="text-muted-foreground text-sm">{chartConfig.balance.label}</span>
+						<span class="text-muted-foreground text-sm">{chartConfig.series.label}</span>
 						{#if typeof value === 'number'}
-							<span class="font-mono tabular-nums">{formatNativeCurrency(value, 2, currency)}</span>
+							<span class="font-mono tabular-nums">{formatTooltipValue(value)}</span>
 						{/if}
 					</div>
 				{/snippet}

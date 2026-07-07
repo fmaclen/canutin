@@ -128,7 +128,7 @@
 	{#if securitiesContext.isLoading}
 		<Skeleton class="h-36" />
 	{:else}
-		<div class="bg-muted border-border overflow-hidden rounded border">
+		<div class="border-border overflow-hidden rounded border">
 			<form
 				onsubmit={(event) => {
 					event.preventDefault();
@@ -146,7 +146,7 @@
 
 				<footer class="border-border bg-border border-t p-2">
 					<div class="flex justify-end">
-						<Button type="submit" disabled={isSavingBalance || !canSubmitBalance}>
+						<Button type="submit" disabled={isSavingBalance}>
 							{m.securities_button_add_balance()}
 						</Button>
 					</div>

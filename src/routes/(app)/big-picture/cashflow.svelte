@@ -114,10 +114,13 @@
 </script>
 
 {#if chartData.length > 0}
-	<div class="bg-background overflow-hidden rounded shadow-md">
+	<div class="bg-background h-[30vh] min-h-[220px] overflow-hidden rounded shadow-md">
 		<Tooltip.Provider>
 			<!-- Outer grid: one column per period -->
-			<div class="grid" style="grid-template-columns: repeat({chartData.length}, minmax(0, 1fr));">
+			<div
+				class="grid h-full"
+				style="grid-template-columns: repeat({chartData.length}, minmax(0, 1fr));"
+			>
 				{#each chartData as period, i (period.id)}
 					{@const isHovered = hoveredIndex === i}
 					{@const isDecember = period.month.getMonth() === 11}
@@ -136,7 +139,7 @@
 									{...props}
 									href={period.transactionsUrl}
 									aria-label="{period.periodLabel}: {formatCurrency(period.surplus)}"
-									class="flex flex-col pt-2 {!isLastColumn
+									class="flex h-full flex-col pt-2 {!isLastColumn
 										? isDecember
 											? 'border-border border-r border-dashed'
 											: 'border-border border-r'
@@ -144,9 +147,9 @@
 									onmouseenter={() => (hoveredIndex = i)}
 									onmouseleave={() => (hoveredIndex = null)}
 								>
-									<!-- Chart area: match old design height (50vh, min 256px, max 320px, 32px padding) -->
+									<!-- Chart area: bars scale to fill the space above the fixed-height x-axis label -->
 									<div
-										class="box-border grid h-[50vh] max-h-80 min-h-64 py-7"
+										class="box-border grid min-h-0 flex-1 py-7"
 										style="grid-template-rows: {chartRatios.positiveRatio}fr 1px {chartRatios.negativeRatio}fr;"
 									>
 										<!-- Negative trend: placeholder, hr, then bar -->
@@ -202,7 +205,9 @@
 									</div>
 
 									<!-- X-axis label -->
-									<div class="text-muted-foreground flex h-8 items-center justify-center text-xs">
+									<div
+										class="text-muted-foreground flex h-8 shrink-0 items-center justify-center text-xs"
+									>
 										{period.label}
 									</div>
 								</a>
@@ -252,5 +257,5 @@
 		</Tooltip.Provider>
 	</div>
 {:else if cashflow.isLoading}
-	<Skeleton class="h-[calc(50vh+2rem)] max-h-[22rem] min-h-72" showSpinner />
+	<Skeleton class="h-[30vh] min-h-[220px]" showSpinner />
 {/if}

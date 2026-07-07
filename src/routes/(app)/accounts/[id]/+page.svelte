@@ -7,6 +7,7 @@
 	import { createBalanceHistoryLoader } from '$lib/balance-history.svelte';
 	import BalanceHistoryChart from '$lib/components/balance-history-chart.svelte';
 	import CashflowAverages from '$lib/components/cashflow-averages.svelte';
+	import { formatNativeCurrency } from '$lib/components/currency';
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
 	import KeyValue from '$lib/components/key-value.svelte';
@@ -244,10 +245,15 @@
 	<Section>
 		<SectionTitle title={m.balance_history_section_title()} />
 		{#if balanceHistoryLoading}
-			<Skeleton class="h-64" showSpinner />
+			<Skeleton class="h-[30vh] min-h-[220px]" showSpinner />
 		{:else}
 			<div class="bg-background overflow-visible rounded-sm shadow-md">
-				<BalanceHistoryChart points={balanceHistory} currency={account.currency} />
+				<BalanceHistoryChart
+					points={balanceHistory}
+					seriesLabel={m.balance_history_series_label()}
+					formatAxisValue={(value) => formatNativeCurrency(Math.round(value), 0, account.currency)}
+					formatTooltipValue={(value) => formatNativeCurrency(value, 2, account.currency)}
+				/>
 			</div>
 		{/if}
 	</Section>

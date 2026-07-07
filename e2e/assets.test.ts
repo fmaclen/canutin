@@ -625,6 +625,11 @@ test('asset overview shows balance history once it has at least two balances', a
 	await page.goto(`/assets/${asset.id}`);
 	await expect(page.getByText('Balance history')).not.toBeVisible();
 
+	const summary = page.getByRole('region', { name: 'Summary' });
+	await expect(summary).toBeVisible();
+	await expect(summary.getByRole('region', { name: 'Market value' })).toContainText('$5,000.00');
+	await expect(summary.getByRole('region', { name: 'Book value' })).toContainText('$0.00');
+
 	await seedAssetBalance({
 		asset: asset.id,
 		owner: user.id,
@@ -632,4 +637,5 @@ test('asset overview shows balance history once it has at least two balances', a
 		marketValue: 5500
 	});
 	await expect(page.getByText('Balance history')).toBeVisible();
+	await expect(summary.getByRole('region', { name: 'Market value' })).toContainText('$5,500.00');
 });

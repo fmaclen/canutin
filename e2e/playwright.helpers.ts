@@ -28,7 +28,8 @@ export async function signOut(page: Page, userLabel: string) {
 	await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
 }
 
-// Label → route map used by goToPageViaSidebar. Keep in sync with app-sidebar.svelte.
+// Label → route map used by goToPageViaSidebar. Keep in sync with app-sidebar.svelte,
+// nav-user.svelte, and settings/+layout.svelte (Imports lives in the settings SubNav).
 const SIDEBAR_ROUTES: Record<string, string> = {
 	Accounts: '/accounts',
 	Assets: '/assets',
@@ -39,6 +40,7 @@ const SIDEBAR_ROUTES: Record<string, string> = {
 	'Balance sheet': '/balance-sheet',
 	'Big picture': '/big-picture',
 	Trends: '/trends',
+	Imports: '/settings/imports',
 	Settings: '/settings'
 };
 

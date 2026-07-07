@@ -234,5 +234,5 @@ test('balance sheet', async ({ page }) => {
 	await goToPageViaSidebar(page, 'Balance sheet');
 	await page.getByRole('link', { name: 'Las Meninas' }).click();
 	await expect(page).toHaveURL(new RegExp(`/assets/${otherAsset.id}(\\?|$)`));
-	await expect(page.getByText('Las Meninas')).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Las Meninas' })).toBeVisible();
 });

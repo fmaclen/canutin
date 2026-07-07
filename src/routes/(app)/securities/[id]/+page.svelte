@@ -2,6 +2,8 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import BalanceHistoryChart from '$lib/components/balance-history-chart.svelte';
+	import { formatNativeCurrency } from '$lib/components/currency';
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
 	import KeyValue from '$lib/components/key-value.svelte';
@@ -9,10 +11,13 @@
 	import NumberDisplay from '$lib/components/number.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
+	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Table from '$lib/components/ui/table/index';
 	import { getExchangeRatesContext } from '$lib/exchange-rates.svelte';
 	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
+	import type { SecurityBalancesResponse } from '$lib/pocketbase.schema';
+	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { getSecuritiesContext, type SecurityAccountBalance } from '$lib/securities.svelte';
 	import {
 		formatSecurityQuantity,
@@ -30,6 +35,7 @@
 
 	const securitiesContext = getSecuritiesContext();
 	const fx = getExchangeRatesContext();
+	const pb = getPocketBaseContext();
 
 	const securityId = $derived(page.params.id);
 	const security = $derived(securityId ? securitiesContext.getSecurity(securityId) : null);
@@ -38,6 +44,45 @@
 	const accountBalances = $derived(
 		securityId ? securitiesContext.getAccountBalances(securityId) : []
 	);
+
+	type SecurityPricePoint = { date: Date; value: number };
+	let priceHistory: SecurityPricePoint[] = $state([]);
+	let priceHistoryLoading = $state(true);
+
+	$effect(() => {
+		const id = securityId;
+		priceHistory = [];
+		priceHistoryLoading = true;
+		if (!id) return;
+		let cancelled = false;
+		pb.authedClient
+			.collection('securityBalances')
+			.getFullList<SecurityBalancesResponse<number, number, number, number>>({
+				filter: `security='${id}'`,
+				sort: 'asOf,created,id',
+				fields: 'id,asOf,price,created',
+				requestKey: null
+			})
+			.then((records) => {
+				if (cancelled) return;
+				// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local dedupe scratch, discarded after building priceHistory
+				const latestByDate = new Map<string, SecurityPricePoint>();
+				for (const record of records) {
+					if (record.price === null) continue;
+					latestByDate.set(record.asOf, { date: new Date(record.asOf), value: record.price });
+				}
+				priceHistory = [...latestByDate.values()];
+				priceHistoryLoading = false;
+			})
+			.catch((error) => {
+				if (cancelled) return;
+				pb.handleConnectionError(error, 'securities', 'price_history');
+				priceHistoryLoading = false;
+			});
+		return () => {
+			cancelled = true;
+		};
+	});
 	const balancesMarketValue = $derived({
 		value: sumOrUnknown(accountBalances.map((row) => (row.isUnconverted ? 0 : row.value))),
 		isUnconverted: accountBalances.some((row) => row.isUnconverted)
@@ -110,8 +155,27 @@
 	}
 
 	const showBalances = $derived(loaded && accountBalances.length > 0);
-	const showEmpty = $derived(loaded && !showBalances);
+	const showPriceHistory = $derived(loaded && (priceHistoryLoading || priceHistory.length >= 2));
+	const showEmpty = $derived(loaded && !showBalances && !showPriceHistory);
 </script>
+
+{#if showPriceHistory}
+	<Section>
+		<SectionTitle title={m.securities_section_price_history()} />
+		{#if priceHistoryLoading}
+			<Skeleton class="h-[30vh] min-h-[220px]" showSpinner />
+		{:else}
+			<div class="bg-background overflow-visible rounded-sm shadow-md">
+				<BalanceHistoryChart
+					points={priceHistory}
+					seriesLabel={m.securities_price_history_series_label()}
+					formatAxisValue={(value) => formatNativeCurrency(Math.round(value), 0, securityCurrency)}
+					formatTooltipValue={(value) => formatNativeCurrency(value, 2, securityCurrency)}
+				/>
+			</div>
+		{/if}
+	</Section>
+{/if}
 
 {#if showBalances}
 	<Section>

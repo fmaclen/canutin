@@ -37,11 +37,14 @@
 	let excluded = $state(false);
 
 	const selectedAccount = $derived(openAccounts.find((a) => a.id === accountId));
-	const canSubmit = $derived(Boolean(accountId && date && amount));
 
 	async function handleSubmit() {
 		const currentOwnerId = ownerId;
-		if (!currentOwnerId || !canSubmit) return;
+		if (!currentOwnerId) return;
+		if (!accountId) {
+			toast.error(m.account_required());
+			return;
+		}
 
 		try {
 			const labelIds: string[] = [];
@@ -90,7 +93,7 @@
 	<Section>
 		<SectionTitle title={m.transactions_section_details()} />
 
-		<div class="bg-muted border-border overflow-hidden rounded border">
+		<div class="border-border overflow-hidden rounded border">
 			<form
 				onsubmit={(event) => {
 					event.preventDefault();
@@ -178,7 +181,7 @@
 
 				<footer class="border-border bg-border border-t p-2">
 					<div class="flex justify-end">
-						<Button type="submit" disabled={!canSubmit}>{m.transactions_button_add()}</Button>
+						<Button type="submit">{m.transactions_button_add()}</Button>
 					</div>
 				</footer>
 			</form>

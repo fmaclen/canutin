@@ -3,7 +3,8 @@
 	import { getAssetsContext, type AssetWithBalance } from '$lib/assets.svelte';
 	import { createBalanceHistoryLoader } from '$lib/balance-history.svelte';
 	import BalanceHistoryChart from '$lib/components/balance-history-chart.svelte';
-	import Empty from '$lib/components/empty.svelte';
+	import { formatNativeCurrency } from '$lib/components/currency';
+	import KeyValue from '$lib/components/key-value.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import SharedRecordReadonlyBanner from '$lib/components/shared-record-readonly-banner.svelte';
@@ -42,7 +43,6 @@
 	const showBalanceHistory = $derived(
 		loaded && (balanceHistoryLoading || balanceHistory.length >= 2)
 	);
-	const showEmpty = $derived(loaded && !showBanner && !showBalanceHistory);
 </script>
 
 {#if showBanner}
@@ -51,21 +51,46 @@
 	</Section>
 {/if}
 
+{#if loaded && asset}
+	<Section>
+		<SectionTitle title={m.assets_overview_section_summary()} />
+		<div
+			role="region"
+			aria-label={m.assets_overview_section_summary()}
+			class="grid grid-cols-1 gap-2 sm:grid-cols-2"
+		>
+			<KeyValue
+				title={m.assets_label_market_value()}
+				value={asset.displayMarketValue}
+				variant="outline"
+				decimalScale={2}
+				isUnconverted={asset.isUnconverted}
+			/>
+			<KeyValue
+				title={m.assets_label_book_value()}
+				value={asset.displayBookValue}
+				variant="outline"
+				decimalScale={2}
+				isUnconverted={asset.isUnconverted}
+			/>
+		</div>
+	</Section>
+{/if}
+
 {#if showBalanceHistory && asset}
 	<Section>
 		<SectionTitle title={m.balance_history_section_title()} />
 		{#if balanceHistoryLoading}
-			<Skeleton class="h-64" showSpinner />
+			<Skeleton class="h-[30vh] min-h-[220px]" showSpinner />
 		{:else}
 			<div class="bg-background overflow-visible rounded-sm shadow-md">
-				<BalanceHistoryChart points={balanceHistory} currency={asset.currency} />
+				<BalanceHistoryChart
+					points={balanceHistory}
+					seriesLabel={m.balance_history_series_label()}
+					formatAxisValue={(value) => formatNativeCurrency(Math.round(value), 0, asset.currency)}
+					formatTooltipValue={(value) => formatNativeCurrency(value, 2, asset.currency)}
+				/>
 			</div>
 		{/if}
-	</Section>
-{/if}
-
-{#if showEmpty}
-	<Section>
-		<Empty>{m.assets_overview_empty()}</Empty>
 	</Section>
 {/if}

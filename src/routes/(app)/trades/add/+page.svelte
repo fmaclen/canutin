@@ -80,18 +80,21 @@
 			})
 		)
 	);
-	const canSubmit = $derived(
-		Boolean(
-			accountId &&
-				date &&
-				description.trim() &&
-				(isNewSecurity ? name.trim() && currenciesContext.hasCurrency(currency) : selectedSecurity)
-		)
-	);
-
 	async function handleSubmit() {
 		const currentOwnerId = ownerId;
-		if (!currentOwnerId || isSaving || !canSubmit) return;
+		if (!currentOwnerId || isSaving) return;
+		if (!accountId) {
+			toast.error(m.account_required());
+			return;
+		}
+		if (!isNewSecurity && !selectedSecurity) {
+			toast.error(m.trades_security_required());
+			return;
+		}
+		if (!description.trim()) {
+			toast.error(m.trades_description_required());
+			return;
+		}
 
 		try {
 			isSaving = true;
@@ -141,7 +144,7 @@
 	<Section>
 		<SectionTitle title={m.transactions_section_details()} />
 
-		<div class="bg-muted border-border overflow-hidden rounded border">
+		<div class="border-border overflow-hidden rounded border">
 			<form
 				onsubmit={(event) => {
 					event.preventDefault();
@@ -387,9 +390,7 @@
 
 				<footer class="border-border bg-border border-t p-2">
 					<div class="flex justify-end">
-						<Button type="submit" disabled={isSaving || !canSubmit}
-							>{m.transactions_button_add()}</Button
-						>
+						<Button type="submit" disabled={isSaving}>{m.transactions_button_add()}</Button>
 					</div>
 				</footer>
 			</form>

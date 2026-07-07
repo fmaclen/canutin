@@ -14,7 +14,9 @@ async function ensureSidebarOpen(page: Page) {
 	await expect(accounts).toBeVisible();
 }
 
-test('sidebar shows flat raw data group and highlights the active item', async ({ page }) => {
+test('sidebar shows pillars before subordinate records and highlights the active item', async ({
+	page
+}) => {
 	const user = await seedUser('wallace');
 
 	await page.goto('/');
@@ -44,10 +46,10 @@ test('sidebar shows flat raw data group and highlights the active item', async (
 	const tradesTop = await trades.evaluate((el) => el.getBoundingClientRect().top);
 	const securitiesTop = await securities.evaluate((el) => el.getBoundingClientRect().top);
 	const assetsTop = await assets.evaluate((el) => el.getBoundingClientRect().top);
-	expect(accountsTop).toBeLessThan(transactionsTop);
+	expect(accountsTop).toBeLessThan(assetsTop);
+	expect(assetsTop).toBeLessThan(transactionsTop);
 	expect(transactionsTop).toBeLessThan(tradesTop);
 	expect(tradesTop).toBeLessThan(securitiesTop);
-	expect(securitiesTop).toBeLessThan(assetsTop);
 
 	await trades.click();
 	await expect(page).toHaveURL(/\/trades$/);

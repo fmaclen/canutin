@@ -14,6 +14,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import CanutinIcon from '$lib/components/canutin-icon.svelte';
+	import CanutinWordmark from '$lib/components/canutin-wordmark.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { m } from '$lib/paraglide/messages.js';
 
@@ -55,20 +56,16 @@
 </script>
 
 <Sidebar.Root bind:ref variant="sidebar" {...restProps}>
-	<Sidebar.Header>
+	<Sidebar.Header class="h-12 border-b px-2 pt-1 pb-0">
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
-				<Sidebar.MenuButton size="lg">
+				<Sidebar.MenuButton>
 					{#snippet child({ props })}
-						<a href={resolve('/')} {...props}>
-							<div
-								class="bg-brand text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center"
-							>
-								<CanutinIcon class="size-4" />
-							</div>
-							<div class="grid flex-1 text-left text-sm leading-tight">
-								<span class="truncate font-medium">{m.app_name()}</span>
-							</div>
+						<a href={resolve('/')} aria-label={m.app_name()} {...props}>
+							<CanutinIcon class="size-4" fill="brand" />
+							<span class="flex">
+								<CanutinWordmark class="dark:text-foreground h-2.75 w-auto text-stone-700" />
+							</span>
 						</a>
 					{/snippet}
 				</Sidebar.MenuButton>
@@ -91,6 +88,22 @@
 						{/snippet}
 					</Sidebar.MenuButton>
 				</Sidebar.MenuItem>
+				<Sidebar.MenuItem>
+					<Sidebar.MenuButton isActive={isPrefixActive('/assets')}>
+						{#snippet child({ props })}
+							<a href={resolve('/assets')} {...props}>
+								<LandmarkIcon />
+								<span>{m.sidebar_assets()}</span>
+							</a>
+						{/snippet}
+					</Sidebar.MenuButton>
+				</Sidebar.MenuItem>
+			</Sidebar.Menu>
+		</Sidebar.Group>
+		<Sidebar.Group
+			class="border-t pt-6 pb-0 group-data-[collapsible=icon]:hidden first:border-t-0 first:pt-4"
+		>
+			<Sidebar.Menu>
 				<Sidebar.MenuItem>
 					<Sidebar.MenuButton isActive={isPrefixActive('/transactions')}>
 						{#snippet child({ props })}
@@ -117,16 +130,6 @@
 							<a href={resolve('/securities')} {...props}>
 								<ScrollTextIcon />
 								<span>{m.securities_title()}</span>
-							</a>
-						{/snippet}
-					</Sidebar.MenuButton>
-				</Sidebar.MenuItem>
-				<Sidebar.MenuItem>
-					<Sidebar.MenuButton isActive={isPrefixActive('/assets')}>
-						{#snippet child({ props })}
-							<a href={resolve('/assets')} {...props}>
-								<LandmarkIcon />
-								<span>{m.sidebar_assets()}</span>
 							</a>
 						{/snippet}
 					</Sidebar.MenuButton>

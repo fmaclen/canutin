@@ -3,7 +3,6 @@
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAuthContext } from '$lib/auth.svelte';
 	import Fieldset from '$lib/components/fieldset.svelte';
 	import FormFieldRow from '$lib/components/form-field-row.svelte';
@@ -18,67 +17,48 @@
 	import { interfacePreferences } from '$lib/interface-preferences.svelte';
 	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
-	import { getSecuritiesContext } from '$lib/securities.svelte';
+	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 
-	import BalanceFields from '../balance-fields.svelte';
-	import { createSecurityBalanceFormData, toSecurityBalanceInput } from '../balance-form';
-
+	const pb = getPocketBaseContext();
 	const auth = getAuthContext();
-	const accountsContext = getAccountsContext();
-	const securitiesContext = getSecuritiesContext();
 	const currenciesContext = getCurrenciesContext();
+
+	const ownerId = $derived(auth.currentUser?.record?.id);
+	const currencyOptions = $derived(currenciesContext.currencyOptions);
 
 	let name = $state('');
 	let symbol = $state('');
-	let balanceFormData = $state(createSecurityBalanceFormData());
-	let manualCurrency = $state<string | null>(null);
-	let isSaving = $state(false);
+	let currency = $state(interfacePreferences.displayCurrency);
+	let currencyWasChanged = $state(false);
 
-	const ownerId = $derived(auth.currentUser?.record?.id);
-	const eligibleAccounts = $derived(
-		accountsContext.accounts.filter((account) => !account.closed && account.canWrite)
-	);
-	const selectedAccountCurrency = $derived(
-		eligibleAccounts.find((account) => account.id === balanceFormData.accountId)?.currency
-	);
-	const currency = $derived(
-		manualCurrency ?? selectedAccountCurrency ?? interfacePreferences.displayCurrency
-	);
-	const currencyOptions = $derived(currenciesContext.currencyOptions);
 	const selectedCurrency = $derived(currenciesContext.getCurrency(currency));
-	const canSubmit = $derived(
-		Boolean(
-			name.trim() &&
-				currenciesContext.hasCurrency(currency) &&
-				balanceFormData.accountId &&
-				balanceFormData.asOf &&
-				balanceFormData.quantity &&
-				balanceFormData.price
-		)
-	);
+
+	$effect(() => {
+		if (!currencyWasChanged) {
+			currency = interfacePreferences.displayCurrency;
+		}
+	});
 
 	async function handleSubmit() {
 		const currentOwnerId = ownerId;
-		if (!currentOwnerId || isSaving || !canSubmit) return;
+		if (!currentOwnerId) return;
+		if (!currenciesContext.hasCurrency(currency)) {
+			toast.error(m.currency_required());
+			return;
+		}
 
 		try {
-			isSaving = true;
-			await securitiesContext.createSecurityWithBalance(
-				{
-					name: name.trim(),
-					symbol: symbol.trim() || undefined,
-					owner: currentOwnerId,
-					currency
-				},
-				toSecurityBalanceInput(balanceFormData, currentOwnerId)
-			);
+			await pb.authedClient.collection('securities').create({
+				name: name.trim(),
+				symbol: symbol.trim() || undefined,
+				owner: currentOwnerId,
+				currency
+			});
 			toast.success(m.securities_add_success());
 			await goto(resolve('/securities'));
 		} catch (error) {
 			logError('securitiesAdd', 'create', error);
 			toast.error(m.securities_add_failed());
-		} finally {
-			isSaving = false;
 		}
 	}
 </script>
@@ -90,22 +70,22 @@
 		{ label: m.securities_add_page_title() }
 	]}
 >
-	<form
-		onsubmit={(event) => {
-			event.preventDefault();
-			handleSubmit();
-		}}
-		class="flex w-full flex-col space-y-8"
-	>
-		<Section>
-			<SectionTitle title={m.securities_section_details()} />
-			<div class="bg-muted border-border overflow-hidden rounded border">
+	<Section>
+		<SectionTitle title={m.securities_section_details()} />
+		<div class="border-border overflow-hidden rounded border">
+			<form
+				onsubmit={(event) => {
+					event.preventDefault();
+					handleSubmit();
+				}}
+				class="space-y-0"
+			>
 				<Fieldset isFirst={true}>
 					<FormFieldRow>
 						<Label for="security-name" class="justify-start pr-0 md:justify-end">
 							{m.securities_label_name()}
 						</Label>
-						<Input id="security-name" bind:value={name} disabled={isSaving} required />
+						<Input id="security-name" bind:value={name} required />
 					</FormFieldRow>
 
 					<FormFieldRow>
@@ -115,7 +95,7 @@
 							</Label>
 							<span class="text-muted-foreground text-sm">{m.securities_text_optional()}</span>
 						</div>
-						<Input id="security-symbol" bind:value={symbol} disabled={isSaving} />
+						<Input id="security-symbol" bind:value={symbol} />
 					</FormFieldRow>
 
 					<FormFieldRow>
@@ -125,8 +105,10 @@
 						<Select.Root
 							type="single"
 							value={currency}
-							disabled={isSaving}
-							onValueChange={(value) => (manualCurrency = value)}
+							onValueChange={(value) => {
+								currency = value;
+								currencyWasChanged = true;
+							}}
 						>
 							<Select.Trigger id="security-currency" class="bg-background w-full">
 								{#if selectedCurrency}
@@ -163,28 +145,13 @@
 						</Select.Root>
 					</FormFieldRow>
 				</Fieldset>
-			</div>
-		</Section>
-
-		<Section>
-			<SectionTitle title={m.securities_section_balance()} />
-			<div class="bg-muted border-border overflow-hidden rounded border">
-				<BalanceFields
-					formData={balanceFormData}
-					accounts={eligibleAccounts}
-					{currency}
-					isFirst={true}
-					disabled={isSaving}
-				/>
 
 				<footer class="border-border bg-border border-t p-2">
 					<div class="flex justify-end">
-						<Button type="submit" disabled={isSaving || !canSubmit}>
-							{m.securities_button_add()}
-						</Button>
+						<Button type="submit">{m.securities_button_add()}</Button>
 					</div>
 				</footer>
-			</div>
-		</Section>
-	</form>
+			</form>
+		</div>
+	</Section>
 </Page>

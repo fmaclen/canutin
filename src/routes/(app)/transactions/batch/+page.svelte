@@ -243,7 +243,7 @@
 					? m.transactions_batch_section_title_one()
 					: m.transactions_batch_section_title_other({ count: selectedCount })}
 			/>
-			<div class="bg-muted border-border overflow-hidden rounded border">
+			<div class="border-border overflow-hidden rounded border">
 				<form
 					onsubmit={(e) => {
 						e.preventDefault();

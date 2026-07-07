@@ -91,11 +91,6 @@
 			null
 	);
 	const canWrite = $derived(Boolean(trade?.owner && ownerId && trade.owner === ownerId));
-	const canSubmit = $derived(
-		Boolean(
-			formData.accountId && formData.securityId && formData.date && formData.description.trim()
-		)
-	);
 	const crumbs = $derived([
 		{ label: m.trades_title(), href: resolve('/trades') },
 		...(selectedAccount
@@ -168,7 +163,19 @@
 	async function handleSubmit() {
 		const currentTradeId = tradeId;
 		const currentOwnerId = ownerId;
-		if (!currentTradeId || !currentOwnerId || !canWrite || !canSubmit) return;
+		if (!currentTradeId || !currentOwnerId || !canWrite) return;
+		if (!formData.accountId) {
+			toast.error(m.account_required());
+			return;
+		}
+		if (!formData.securityId) {
+			toast.error(m.trades_security_required());
+			return;
+		}
+		if (!formData.description.trim()) {
+			toast.error(m.trades_description_required());
+			return;
+		}
 
 		try {
 			await pb.authedClient.collection('securityTransactions').update(currentTradeId, {
@@ -229,7 +236,7 @@
 		{#if isLoading || !trade}
 			<Skeleton class="h-96" />
 		{:else}
-			<div class="bg-muted border-border overflow-hidden rounded border">
+			<div class="border-border overflow-hidden rounded border">
 				<form
 					onsubmit={(event) => {
 						event.preventDefault();
@@ -408,7 +415,7 @@
 					{#if canWrite}
 						<footer class="border-border bg-border border-t p-2">
 							<div class="flex justify-end">
-								<Button type="submit" disabled={!canSubmit}>{m.transactions_button_save()}</Button>
+								<Button type="submit">{m.transactions_button_save()}</Button>
 							</div>
 						</footer>
 					{/if}

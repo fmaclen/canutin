@@ -53,7 +53,6 @@
 	const canWrite = $derived(
 		Boolean(transaction?.owner && ownerId && transaction.owner === ownerId)
 	);
-	const canSubmit = $derived(Boolean(formData.accountId && formData.date && formData.amount));
 	const crumbs = $derived([
 		{ label: m.sidebar_transactions(), href: resolve('/transactions') },
 		...(selectedAccount
@@ -108,7 +107,7 @@
 	async function handleSubmit() {
 		const currentTransactionId = transactionId;
 		const currentOwnerId = ownerId;
-		if (!currentTransactionId || !currentOwnerId || !canWrite || !canSubmit) return;
+		if (!currentTransactionId || !currentOwnerId || !formData.accountId || !canWrite) return;
 
 		try {
 			const labelIds: string[] = [];
@@ -183,7 +182,7 @@
 		{#if isLoading || !transaction}
 			<Skeleton class="h-96" />
 		{:else}
-			<div class="bg-muted border-border overflow-hidden rounded border">
+			<div class="border-border overflow-hidden rounded border">
 				<form
 					onsubmit={(e) => {
 						e.preventDefault();
@@ -290,7 +289,7 @@
 					{#if canWrite}
 						<footer class="border-border bg-border border-t p-2">
 							<div class="flex justify-end">
-								<Button type="submit" disabled={!canSubmit}>{m.transactions_button_save()}</Button>
+								<Button type="submit">{m.transactions_button_save()}</Button>
 							</div>
 						</footer>
 					{/if}

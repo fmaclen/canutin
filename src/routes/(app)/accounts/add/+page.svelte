@@ -46,14 +46,6 @@
 	let value = $state('');
 
 	const selectedCurrency = $derived(currenciesContext.getCurrency(currency));
-	const canSubmit = $derived(
-		Boolean(
-			name.trim() &&
-				accountTypeName.trim() &&
-				balanceGroup &&
-				currenciesContext.hasCurrency(currency)
-		)
-	);
 
 	$effect(() => {
 		if (!currencyWasChanged) {
@@ -63,7 +55,11 @@
 
 	async function handleSubmit() {
 		const currentOwnerId = ownerId;
-		if (!currentOwnerId || !canSubmit) return;
+		if (!currentOwnerId) return;
+		if (!currenciesContext.hasCurrency(currency)) {
+			toast.error(m.currency_required());
+			return;
+		}
 
 		try {
 			const balanceTypeId = await balanceTypesContext.getOrCreate(accountTypeName, currentOwnerId);
@@ -112,7 +108,7 @@
 >
 	<Section>
 		<SectionTitle title={m.accounts_section_details()} />
-		<div class="bg-muted border-border overflow-hidden rounded border">
+		<div class="border-border overflow-hidden rounded border">
 			<form
 				onsubmit={(e) => {
 					e.preventDefault();
@@ -306,7 +302,7 @@
 
 				<footer class="border-border bg-border border-t p-2">
 					<div class="flex justify-end">
-						<Button type="submit" disabled={!canSubmit}>{m.accounts_button_add()}</Button>
+						<Button type="submit">{m.accounts_button_add()}</Button>
 					</div>
 				</footer>
 			</form>

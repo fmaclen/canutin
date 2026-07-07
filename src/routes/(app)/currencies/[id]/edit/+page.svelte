@@ -42,7 +42,6 @@
 	let initializedCurrencyId = $state('');
 	let quoteDate = $state(new Date().toISOString().slice(0, 10));
 	let quoteRate = $state('');
-	const canSubmitQuote = $derived(Boolean(quoteDate && quoteRate.trim()));
 
 	function isRecord(value: unknown): value is Record<string, unknown> {
 		return typeof value === 'object' && value !== null;
@@ -104,7 +103,7 @@
 
 	async function handleSaveQuote() {
 		const currentOwnerId = ownerId;
-		if (!currentOwnerId || !currency || isUsd || !canSubmitQuote) return;
+		if (!currentOwnerId || !currency || isUsd) return;
 
 		const rateValue = parseFloat(quoteRate.trim());
 		if (!Number.isFinite(rateValue) || rateValue <= 0) {
@@ -170,7 +169,7 @@
 		{#if !currenciesContext.isLoaded || !currency}
 			<Skeleton class="h-32" />
 		{:else}
-			<div class="bg-muted border-border overflow-hidden rounded border">
+			<div class="border-border overflow-hidden rounded border">
 				<form
 					onsubmit={(event) => {
 						event.preventDefault();
@@ -202,9 +201,7 @@
 
 					<footer class="border-border bg-border border-t p-2">
 						<div class="flex justify-end">
-							<Button type="submit" disabled={!canSubmitQuote}
-								>{m.currencies_button_add_quote()}</Button
-							>
+							<Button type="submit">{m.currencies_button_add_quote()}</Button>
 						</div>
 					</footer>
 				</form>
@@ -218,7 +215,7 @@
 	{#if !currenciesContext.isLoaded || !currency}
 		<Skeleton class="h-64" />
 	{:else}
-		<div class="bg-muted border-border overflow-hidden rounded border">
+		<div class="border-border overflow-hidden rounded border">
 			<form
 				onsubmit={(event) => {
 					event.preventDefault();
