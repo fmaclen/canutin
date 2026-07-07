@@ -5,7 +5,13 @@ import {
 	AccountsBalanceGroupOptions,
 	SecurityTransactionsTypeOptions
 } from '../src/lib/pocketbase.schema';
-import { formatDateForInput, goToPageViaSidebar, signIn } from './playwright.helpers';
+import {
+	formatDateForInput,
+	goToAddPage,
+	goToEditTab,
+	goToPageViaSidebar,
+	signIn
+} from './playwright.helpers';
 import {
 	getUserPB,
 	seedAccount,
@@ -45,13 +51,13 @@ test('portfolio and trades flow covers security creation, balances, filters, and
 		value: 500
 	});
 
+	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Portfolio');
 	await expect(page.getByText('No positions yet')).toBeVisible();
 
-	await page.goto('/securities');
-	await page.getByRole('link', { name: 'Add security' }).click();
+	await goToAddPage(page, 'Securities');
 	await expect(page).toHaveURL('/securities/add');
 
 	await page.getByLabel('Name').fill('Vanguard Total Stock Market ETF');
@@ -76,7 +82,7 @@ test('portfolio and trades flow covers security creation, balances, filters, and
 	await page.getByRole('button', { name: 'Add balance' }).click();
 	await expect(page.getByText('Balance updated')).toBeVisible();
 
-	await page.goto('/portfolio');
+	await goToPageViaSidebar(page, 'Portfolio');
 	const portfolioRow = page.getByRole('row', { name: /Vanguard Total Stock Market ETF/ });
 	await expect(portfolioRow).toBeVisible();
 	await expect(portfolioRow).toContainText('VTI');
@@ -107,11 +113,11 @@ test('portfolio and trades flow covers security creation, balances, filters, and
 	await page.getByRole('button', { name: 'Add balance' }).click();
 	await expect(page.getByText('Balance updated')).toBeVisible();
 
-	await page.goto(`/securities/${securityId}`);
+	await page.getByRole('link', { name: 'Overview', exact: true }).click();
 	await expect(page.getByRole('row', { name: /Roth Portfolio/ })).toContainText('$1,050.00');
 	await expect(page.getByRole('region', { name: 'Net market value' })).toContainText('$3,050.00');
 
-	await page.goto(`/accounts/${brokerageAccount.id}`);
+	await firstAccountRow.getByRole('link', { name: 'Core Brokerage' }).click();
 	await expect(page.getByRole('row', { name: /Vanguard Total Stock Market ETF/ })).toContainText(
 		'$2,000.00'
 	);
@@ -121,14 +127,17 @@ test('portfolio and trades flow covers security creation, balances, filters, and
 	await expect(page).toHaveURL(`/accounts/${brokerageAccount.id}/edit`);
 	await expect(page.getByLabel('Cash', { exact: true })).toHaveValue('$1,000.00');
 
-	await page.goto(`/accounts/${brokerageAccount.id}`);
-	await page.getByRole('main').getByRole('link', { name: 'Trades' }).click();
+	await page.getByRole('link', { name: 'Overview', exact: true }).click();
+	// No trades exist yet so the overview renders no "View all" link; the test's
+	// explicit purpose here is the ledger's account-filter URL-param initialization
+	await page.goto(`/trades?account=${brokerageAccount.id}`);
 	await expect(page).toHaveURL(`/trades?account=${brokerageAccount.id}`);
 	await expect(page.getByRole('button', { name: 'Account', exact: true })).toContainText(
 		'Core Brokerage'
 	);
 
-	await page.goto(`/securities/${securityId}`);
+	await goToPageViaSidebar(page, 'Securities');
+	await page.getByRole('link', { name: 'Vanguard Total Stock Market ETF' }).click();
 	await page.getByRole('main').getByRole('link', { name: 'Trades' }).click();
 	await expect(page).toHaveURL(`/trades?security=${securityId}`);
 	await expect(page.getByRole('button', { name: 'Security', exact: true })).toContainText(
@@ -205,6 +214,7 @@ test('portfolio unknown values render as unknown and do not inflate account tota
 		costBasis: 0
 	});
 
+	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Portfolio');
@@ -216,25 +226,26 @@ test('portfolio unknown values render as unknown and do not inflate account tota
 	await expect(knownZeroRow).toContainText('WRTH');
 	await expect(knownZeroRow.locator('td').last()).toHaveText('$0.00');
 
-	await page.goto(`/accounts/${account.id}`);
+	await row.getByRole('link', { name: 'Unknown Value Brokerage' }).click();
 	await expect(page.getByRole('region', { name: 'Net market value' })).toHaveText(/~/);
 	const positionRow = page.getByRole('table').getByRole('row', { name: /Private Fund/ });
 	// Gain/loss % cell (index 6) and Value cell (last) both stay unknown — never coerced to 0.
 	await expect(positionRow.locator('td').nth(6)).toHaveText('~');
 	await expect(positionRow.locator('td').last()).toHaveText('~');
 
-	await page.goto(`/accounts/${account.id}/edit`);
+	await goToEditTab(page);
 	await expect(page.getByLabel('Cash', { exact: true })).toHaveValue('$750.00');
 
-	await page.goto(`/securities/${security.id}`);
+	await page.getByRole('link', { name: 'Overview', exact: true }).click();
+	await positionRow.getByRole('link', { name: 'Private Fund' }).click();
 	await expect(page.getByRole('region', { name: 'Net market value' })).toHaveText(/~/);
 
-	await page.goto('/accounts');
+	await goToPageViaSidebar(page, 'Accounts');
 	const accountRow = page.getByRole('row', { name: /Unknown Value Brokerage/ });
 	await expect(accountRow.locator('td').last()).toHaveText('~');
 	await expect(page.getByRole('region', { name: 'Net balance' })).toHaveText(/~/);
 
-	await page.goto('/big-picture');
+	await goToPageViaSidebar(page, 'Big picture');
 	await expect(page.getByRole('region', { name: 'Net worth' })).toHaveText(/~/);
 	await expect(page.getByRole('region', { name: 'Investments' })).toHaveText(/~/);
 });
@@ -334,6 +345,7 @@ test('portfolio tables sort positions by market value descending with unknown va
 		costBasis: 80
 	});
 
+	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Portfolio');
@@ -344,17 +356,18 @@ test('portfolio tables sort positions by market value descending with unknown va
 	await expect(portfolioRows.nth(4)).toContainText('Delta Holdings');
 	await expect(portfolioRows.nth(4).locator('td').last()).toHaveText('~');
 
-	await page.goto(`/accounts/${mainAccount.id}`);
+	await portfolioRows.nth(1).getByRole('link', { name: 'Main Brokerage' }).click();
 	const accountPositionRows = page.getByRole('table').getByRole('row');
 	await expect(accountPositionRows.nth(1)).toContainText('Bravo Holdings');
 	await expect(accountPositionRows.nth(2)).toContainText('Alpha Holdings');
 
-	await page.goto(`/securities/${alpha.id}`);
+	await accountPositionRows.nth(2).getByRole('link', { name: 'Alpha Holdings' }).click();
 	const alphaBalanceRows = page.getByRole('table').getByRole('row');
 	await expect(alphaBalanceRows.nth(1)).toContainText('Third Brokerage');
 	await expect(alphaBalanceRows.nth(2)).toContainText('Main Brokerage');
 
-	await page.goto(`/securities/${delta.id}`);
+	await goToPageViaSidebar(page, 'Securities');
+	await page.getByRole('link', { name: 'Delta Holdings' }).click();
 	const deltaBalanceRows = page.getByRole('table').getByRole('row');
 	await expect(deltaBalanceRows.nth(1)).toContainText('Third Brokerage');
 	await expect(deltaBalanceRows.nth(2)).toContainText('Second Brokerage');
@@ -402,15 +415,16 @@ test('portfolio hides sold-out positions while preserving activity history', asy
 		amount: 480
 	});
 
+	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Portfolio');
 	await expect(page.getByRole('row', { name: /Round Trip Stock/ })).not.toBeVisible();
 
-	await page.goto('/securities');
+	await goToPageViaSidebar(page, 'Securities');
 	await expect(page.getByRole('row', { name: /Round Trip Stock/ })).toBeVisible();
 
-	await page.goto('/trades');
+	await goToPageViaSidebar(page, 'Trades');
 	await page.getByRole('button', { name: 'Period' }).click();
 	await page.getByRole('button', { name: 'Lifetime' }).click();
 	await expect(page.getByRole('row', { name: /Exit Round Trip Stock/ })).toBeVisible();
@@ -456,6 +470,7 @@ test('portfolio carries a re-buy after a sell-out forward as unknown', async ({ 
 		costBasis: null
 	});
 
+	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Portfolio');
@@ -463,7 +478,7 @@ test('portfolio carries a re-buy after a sell-out forward as unknown', async ({ 
 	await expect(row).toContainText('RBT');
 	await expect(row.locator('td').last()).toHaveText('~');
 
-	await page.goto(`/securities/${security.id}`);
+	await row.getByRole('link', { name: 'Rebought Stock' }).click();
 	await expect(page.getByRole('region', { name: 'Net market value' })).toHaveText(/~/);
 });
 
@@ -472,6 +487,7 @@ test('transactions and portfolio add forms show empty prerequisites with no acco
 }) => {
 	const user = await seedUser('opal');
 
+	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Transactions');
@@ -483,7 +499,7 @@ test('transactions and portfolio add forms show empty prerequisites with no acco
 	).toBeVisible();
 	await expect(transactionAccountPicker.getByRole('link', { name: 'Add account' })).toHaveCount(0);
 
-	await page.goto('/trades/add');
+	await goToAddPage(page, 'Trades');
 	await page.getByLabel('Account').click();
 	const tradeAccountPicker = page.getByRole('listbox');
 	await expect(
@@ -494,7 +510,7 @@ test('transactions and portfolio add forms show empty prerequisites with no acco
 	await page.getByLabel('Security').click();
 	await expect(page.getByRole('option', { name: 'Create new security' })).toBeVisible();
 
-	await page.goto('/securities/add');
+	await goToAddPage(page, 'Securities');
 	await page.getByLabel('Name').fill('Opal Fund');
 	await page.getByRole('button', { name: 'Add', exact: true }).click();
 	await expect(page).toHaveURL('/securities');
@@ -520,6 +536,7 @@ test('trades and securities empty prerequisites stay consistent', async ({ page 
 		balanceType: 'Brokerage'
 	});
 
+	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Trades');

@@ -28,7 +28,7 @@ test('trends performance table', async ({ page }) => {
 	await expect(page.locator('[data-slot="skeleton"].h-64')).toBeHidden();
 	await expect(page.getByText('No accounts or assets yet')).toHaveCount(2);
 	await expect(page.locator('[data-growth-period]')).toHaveCount(0);
-	await page.goto('/');
+	await goToPageViaSidebar(page, 'Big picture');
 
 	const cashAccount = await seedAccount({
 		name: 'Perf Test',

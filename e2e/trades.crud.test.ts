@@ -6,7 +6,12 @@ import {
 	AccountsBalanceGroupOptions,
 	SecurityTransactionsTypeOptions
 } from '../src/lib/pocketbase.schema';
-import { formatDateForInput, goToPageViaSidebar, signIn } from './playwright.helpers';
+import {
+	formatDateForInput,
+	goToPageViaSidebar,
+	goToRecordDetail,
+	signIn
+} from './playwright.helpers';
 import {
 	seedAccount,
 	seedAccountBalance,
@@ -145,7 +150,7 @@ test('creating, editing, and deleting trades never changes a position market val
 
 	// The position market value is a manually-entered balance; trades defer to auto-calc and
 	// must never mutate it. Capture it first, then assert it survives every trade mutation.
-	await page.goto(`/securities/${security.id}`);
+	await goToRecordDetail(page, 'Securities', security.name);
 	const marketValue = page.getByRole('region', { name: 'Net market value' });
 	await expect(marketValue).toContainText('$3,500.00');
 
@@ -165,7 +170,7 @@ test('creating, editing, and deleting trades never changes a position market val
 	await expect(page.getByText('Trade added')).toBeVisible();
 	await expect(page).toHaveURL('/trades');
 
-	await page.goto(`/securities/${security.id}`);
+	await goToRecordDetail(page, 'Securities', security.name);
 	await expect(marketValue).toContainText('$3,500.00');
 
 	await goToPageViaSidebar(page, 'Trades');
@@ -177,7 +182,7 @@ test('creating, editing, and deleting trades never changes a position market val
 	await expect(page.getByText('Trade updated')).toBeVisible();
 	await expect(page).toHaveURL('/trades');
 
-	await page.goto(`/securities/${security.id}`);
+	await goToRecordDetail(page, 'Securities', security.name);
 	await expect(marketValue).toContainText('$3,500.00');
 
 	await goToPageViaSidebar(page, 'Trades');
@@ -189,7 +194,7 @@ test('creating, editing, and deleting trades never changes a position market val
 	await expect(page.getByText('Trade deleted')).toBeVisible();
 	await expect(page).toHaveURL('/trades');
 
-	await page.goto(`/securities/${security.id}`);
+	await goToRecordDetail(page, 'Securities', security.name);
 	await expect(marketValue).toContainText('$3,500.00');
 });
 

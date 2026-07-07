@@ -1,7 +1,7 @@
 import { expect, test, type Locator } from '@playwright/test';
 
 import { AssetsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
-import { goToPageViaSidebar, signIn } from './playwright.helpers';
+import { goToPageViaSidebar, goToRecordDetail, signIn } from './playwright.helpers';
 import {
 	deleteAssetBalance,
 	recordExists,
@@ -482,6 +482,7 @@ test('user can directly navigate to asset edit page', async ({ page }) => {
 	await page.goto('/');
 	await signIn(page, user.email);
 
+	// Test's explicit purpose is direct-URL navigation to the edit page
 	await page.goto(`/assets/${vehicle.id}/edit`);
 	await expect(page).toHaveURL(`/assets/${vehicle.id}/edit`);
 	await expect(page.getByLabel('Name')).toHaveValue('2020 Honda Civic');
@@ -622,7 +623,7 @@ test('asset overview shows balance history once it has at least two balances', a
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto(`/assets/${asset.id}`);
+	await goToRecordDetail(page, 'Assets', 'Vintage Guitar');
 	await expect(page.getByRole('heading', { name: 'Balance history' })).toBeVisible();
 	await expect(page.getByText('No balance history yet')).toBeVisible();
 

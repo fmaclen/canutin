@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { getRowIndex, signIn } from './playwright.helpers';
+import { getRowIndex, goToPageViaSidebar, goToRecordDetail, signIn } from './playwright.helpers';
 import { seedPortfolio, seedSecurity, seedUser } from './pocketbase.helpers';
 
 test('securities list: defaults to security name ascending', async ({ page }) => {
@@ -9,9 +9,10 @@ test('securities list: defaults to security name ascending', async ({ page }) =>
 	await seedSecurity({ name: 'Midpoint Group', symbol: 'MMM', owner: user.id });
 	await seedSecurity({ name: 'Zephyr Corp', symbol: 'AAA', owner: user.id });
 
+	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto('/securities');
+	await goToPageViaSidebar(page, 'Securities');
 	await expect(page.getByRole('row', { name: 'Apex Industries' })).toBeVisible();
 
 	const rows = page.getByRole('table').getByRole('row');
@@ -32,9 +33,10 @@ test('securities list: clicking Security header toggles name descending then asc
 	await seedSecurity({ name: 'Midpoint Group', symbol: 'MMM', owner: user.id });
 	await seedSecurity({ name: 'Zephyr Corp', symbol: 'AAA', owner: user.id });
 
+	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto('/securities');
+	await goToPageViaSidebar(page, 'Securities');
 	await expect(page.getByRole('row', { name: 'Apex Industries' })).toBeVisible();
 
 	const rows = page.getByRole('table').getByRole('row');
@@ -70,9 +72,10 @@ test('securities list: clicking Symbol header sorts by symbol descending then as
 	await seedSecurity({ name: 'Midpoint Group', symbol: 'MMM', owner: user.id });
 	await seedSecurity({ name: 'Zephyr Corp', symbol: 'AAA', owner: user.id });
 
+	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto('/securities');
+	await goToPageViaSidebar(page, 'Securities');
 	await expect(page.getByRole('row', { name: 'Apex Industries' })).toBeVisible();
 
 	const rows = page.getByRole('table').getByRole('row');
@@ -106,9 +109,10 @@ test('securities list: sort indicator shows on active column', async ({ page }) 
 	await seedSecurity({ name: 'Midpoint Group', symbol: 'MMM', owner: user.id });
 	await seedSecurity({ name: 'Zephyr Corp', symbol: 'AAA', owner: user.id });
 
+	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto('/securities');
+	await goToPageViaSidebar(page, 'Securities');
 	await expect(page.getByRole('row', { name: 'Apex Industries' })).toBeVisible();
 
 	const symbolButton = page.getByRole('button', { name: 'Symbol', exact: true });
@@ -128,9 +132,10 @@ test('securities list: sort state persists across reload', async ({ page }) => {
 	await seedSecurity({ name: 'Midpoint Group', symbol: 'MMM', owner: user.id });
 	await seedSecurity({ name: 'Zephyr Corp', symbol: 'AAA', owner: user.id });
 
+	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto('/securities');
+	await goToPageViaSidebar(page, 'Securities');
 	await expect(page.getByRole('row', { name: 'Apex Industries' })).toBeVisible();
 
 	const symbolHeader = page.getByRole('button', { name: 'Symbol', exact: true });
@@ -181,9 +186,10 @@ test('security detail: defaults to market value descending', async ({ page }) =>
 		]
 	});
 
+	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto(`/securities/${security.id}`);
+	await goToRecordDetail(page, 'Securities', security.name);
 	await expect(page.getByRole('row', { name: /Alpha Brokerage/ })).toBeVisible();
 
 	const rows = page.getByRole('table').getByRole('row');
@@ -230,9 +236,10 @@ test('security detail: clicking Account header sorts by account name descending 
 		]
 	});
 
+	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto(`/securities/${security.id}`);
+	await goToRecordDetail(page, 'Securities', security.name);
 	await expect(page.getByRole('row', { name: /Alpha Brokerage/ })).toBeVisible();
 
 	const rows = page.getByRole('table').getByRole('row');
@@ -293,9 +300,10 @@ test('security detail: clicking Market value header sorts value ascending from d
 		]
 	});
 
+	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto(`/securities/${security.id}`);
+	await goToRecordDetail(page, 'Securities', security.name);
 	await expect(page.getByRole('row', { name: /Alpha Brokerage/ })).toBeVisible();
 
 	const rows = page.getByRole('table').getByRole('row');
@@ -349,9 +357,10 @@ test('security detail: clicking Gain/loss header sorts by gain amount descending
 		]
 	});
 
+	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto(`/securities/${security.id}`);
+	await goToRecordDetail(page, 'Securities', security.name);
 	await expect(page.getByRole('row', { name: /Alpha Brokerage/ })).toBeVisible();
 
 	const rows = page.getByRole('table').getByRole('row');
@@ -403,9 +412,10 @@ test('security detail: sort indicator shows on active column', async ({ page }) 
 		]
 	});
 
+	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto(`/securities/${security.id}`);
+	await goToRecordDetail(page, 'Securities', security.name);
 	await expect(page.getByRole('row', { name: /Alpha Brokerage/ })).toBeVisible();
 
 	const accountButton = page
@@ -457,9 +467,10 @@ test('security detail: sort state persists across reload', async ({ page }) => {
 		]
 	});
 
+	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto(`/securities/${security.id}`);
+	await goToRecordDetail(page, 'Securities', security.name);
 	await expect(page.getByRole('row', { name: /Alpha Brokerage/ })).toBeVisible();
 
 	const accountHeader = page
@@ -518,9 +529,10 @@ test('account positions: positions table sorts by column with order, aria-sort, 
 		]
 	});
 
+	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto(`/accounts/${account.id}`);
+	await goToRecordDetail(page, 'Accounts', account.name);
 	await expect(page.getByRole('row', { name: /Beta Position/ })).toBeVisible();
 
 	const table = page.getByRole('table');

@@ -55,3 +55,46 @@ export async function goToPageViaSidebar(page: Page, label: string) {
 	}
 	await page.goto(route);
 }
+
+// Sidebar label → header add-link text. The Accounts/Assets/etc. index pages each
+// render a single "Add …" action link in their page header. Keep in sync with the
+// `{#snippet actions()}` blocks in the corresponding index +page.svelte files.
+const ADD_LINK_LABELS: Record<string, string> = {
+	Accounts: 'Add account',
+	Assets: 'Add asset',
+	Transactions: 'Add transaction',
+	Trades: 'Add trade',
+	Securities: 'Add security',
+	Currencies: 'Add currency'
+};
+
+export async function goToRecordDetail(page: Page, sidebarLabel: string, recordName: string) {
+	await goToPageViaSidebar(page, sidebarLabel);
+	const allTab = page.getByRole('tab', { name: 'All' });
+	const recordLink = page.getByRole('link', { name: recordName });
+	// Accounts and Assets default to a filtered subset (open / owned), so a seeded
+	// record can start hidden behind a tab. Wait until the index has loaded — either
+	// the record link is already showing, or the filter tabs have rendered — then
+	// switch to "All" when tabs exist so the row is present before clicking it.
+	// Indexes without filter tabs skip the reveal entirely.
+	await expect(allTab.or(recordLink).first()).toBeVisible();
+	if (await allTab.isVisible()) {
+		await allTab.click();
+	}
+	await recordLink.click();
+}
+
+export async function goToEditTab(page: Page) {
+	// Detail pages expose Overview/Edit as a SubNav of links; exact match keeps this
+	// from catching the batch editor's "Edit N transactions" link on index pages.
+	await page.getByRole('link', { name: 'Edit', exact: true }).click();
+}
+
+export async function goToAddPage(page: Page, sidebarLabel: string) {
+	await goToPageViaSidebar(page, sidebarLabel);
+	const label = ADD_LINK_LABELS[sidebarLabel];
+	if (!label) {
+		throw new Error(`No add-link label mapped for sidebar label: ${sidebarLabel}`);
+	}
+	await page.getByRole('link', { name: label, exact: true }).click();
+}

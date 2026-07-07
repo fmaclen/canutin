@@ -3,7 +3,8 @@ import { expect, test } from '@playwright/test';
 import { DEFAULT_PASSWORD } from './pocketbase.helpers';
 
 test('sign-ups are closed by default', async ({ page }) => {
-	await page.goto('/auth/sign-up');
+	await page.goto('/');
+	await page.getByRole('link', { name: 'Sign up' }).click();
 	await expect(page.getByRole('button', { name: 'Create account' })).toBeVisible();
 
 	await page.getByLabel('Email').fill(`closed.${Date.now()}@example.com`);

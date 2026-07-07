@@ -71,6 +71,7 @@ test('foreign-currency records render in the display currency with FX indicators
 		value: -500_000
 	});
 
+	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Transactions');
@@ -149,6 +150,7 @@ test('a US-dollar account renders without any exchange-rate indicators', async (
 		value: 1500
 	});
 
+	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Transactions');
@@ -200,6 +202,7 @@ test('unconvertible balances render native amounts and are excluded from totals'
 		value: 200
 	});
 
+	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Accounts');

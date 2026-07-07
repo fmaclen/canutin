@@ -4,7 +4,7 @@ import {
 	AccountsBalanceGroupOptions,
 	SecurityTransactionsTypeOptions
 } from '../src/lib/pocketbase.schema';
-import { goToPageViaSidebar, signIn } from './playwright.helpers';
+import { goToPageViaSidebar, goToRecordDetail, signIn } from './playwright.helpers';
 import {
 	recordExists,
 	seedAccount,
@@ -331,6 +331,7 @@ test('user can directly navigate to account edit page', async ({ page }) => {
 	await page.goto('/');
 	await signIn(page, user.email);
 
+	// Test's explicit purpose is direct-URL navigation to the edit page
 	await page.goto(`/accounts/${savingsAccount.id}/edit`);
 	await expect(page).toHaveURL(`/accounts/${savingsAccount.id}/edit`);
 	await expect(page.getByLabel('Name')).toHaveValue('Emergency Fund');
@@ -468,7 +469,7 @@ test('account overview keeps the balance history section and swaps its empty sta
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto(`/accounts/${account.id}`);
+	await goToRecordDetail(page, 'Accounts', 'Growth Savings');
 	await expect(page.getByRole('heading', { name: 'Balance history' })).toBeVisible();
 	await expect(page.getByText('No balance history yet')).toBeVisible();
 
@@ -511,7 +512,7 @@ test('account overview charts an auto-calculated account from its transaction hi
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto(`/accounts/${account.id}`);
+	await goToRecordDetail(page, 'Accounts', 'Auto Checking');
 	await expect(page.getByRole('heading', { name: 'Balance history' })).toBeVisible();
 	await expect(page.getByText('No balance history yet')).not.toBeVisible();
 });
@@ -547,7 +548,7 @@ test('account overview samples transactions and trades with links to filtered le
 		amount: -500
 	});
 
-	const emptyAccount = await seedAccount({
+	await seedAccount({
 		name: 'Empty Vault',
 		balanceGroup: AccountsBalanceGroupOptions.CASH,
 		owner: user.id,
@@ -556,7 +557,7 @@ test('account overview samples transactions and trades with links to filtered le
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto(`/accounts/${brokerage.id}`);
+	await goToRecordDetail(page, 'Accounts', 'Brokerage One');
 	await expect(page.getByText('Dividend payout')).toBeVisible();
 	await expect(page.getByText('Bought Acme')).toBeVisible();
 
@@ -572,12 +573,12 @@ test('account overview samples transactions and trades with links to filtered le
 	await expect(page).toHaveURL(new RegExp(`account=${brokerage.id}`));
 	await expect(page.getByText('Dividend payout')).toBeVisible();
 
-	await page.goto(`/accounts/${brokerage.id}`);
+	await goToRecordDetail(page, 'Accounts', 'Brokerage One');
 	await page.getByRole('link', { name: 'View all 1 trade' }).click();
 	await expect(page).toHaveURL(new RegExp(`account=${brokerage.id}`));
 	await expect(page.getByText('Bought Acme')).toBeVisible();
 
-	await page.goto(`/accounts/${emptyAccount.id}`);
+	await goToRecordDetail(page, 'Accounts', 'Empty Vault');
 	await expect(page.getByText('No transactions yet')).toBeVisible();
 	await expect(page.getByText('No trades yet')).toBeVisible();
 	await expect(page.getByRole('link', { name: /View all/ })).not.toBeVisible();

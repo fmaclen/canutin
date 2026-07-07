@@ -138,6 +138,7 @@ test('locale defaults from browser locale when supported and falls back to Engli
 	const spanishContext = await browser.newContext({ locale: 'es-MX' });
 	const spanishPage = await spanishContext.newPage();
 
+	// Test's explicit purpose is direct-URL locale-detection behavior on first load
 	await spanishPage.goto('/demo/paraglide');
 
 	await expect(spanishPage.getByText('Personal finance platform')).not.toBeVisible();
@@ -148,6 +149,7 @@ test('locale defaults from browser locale when supported and falls back to Engli
 	const fallbackContext = await browser.newContext({ locale: 'fr-CA' });
 	const fallbackPage = await fallbackContext.newPage();
 
+	// Test's explicit purpose is direct-URL locale-detection behavior on first load
 	await fallbackPage.goto('/demo/paraglide');
 
 	await expect(fallbackPage.getByText('Plataforma de finanzas personales')).not.toBeVisible();

@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('paraglide demo switches language', async ({ page, context }) => {
 	await context.clearCookies();
+	// Test's explicit purpose is direct-URL locale-detection behavior on first load
 	await page.goto('/demo/paraglide');
 
 	await expect(page.getByText('Plataforma de finanzas personales')).not.toBeVisible();

@@ -4,7 +4,7 @@ import {
 	AccountsBalanceGroupOptions,
 	AssetsBalanceGroupOptions
 } from '../src/lib/pocketbase.schema';
-import { signIn } from './playwright.helpers';
+import { goToRecordDetail, signIn } from './playwright.helpers';
 import {
 	seedAccount,
 	seedAccountBalance,
@@ -35,9 +35,7 @@ test('balance sheet → account → save balance redirects back to /balance-shee
 	await page.goto('/');
 	await signIn(page, user.email);
 
-	await page.goto('/balance-sheet');
-
-	await page.getByRole('link', { name: 'Redirect Checking' }).click();
+	await goToRecordDetail(page, 'Balance sheet', 'Redirect Checking');
 
 	await expect(page).toHaveURL(
 		new RegExp(`/accounts/${account.id}\\?from=(%2Fbalance-sheet|/balance-sheet)`)
@@ -79,7 +77,8 @@ test('transactions with account filter → transaction → save preserves filter
 	await page.goto('/');
 	await signIn(page, user.email);
 
-	await page.goto(`/transactions?account=${account.id}`);
+	await goToRecordDetail(page, 'Accounts', 'Filter Checking');
+	await page.getByRole('link', { name: 'View all 1 transaction' }).click();
 
 	const row = page.getByRole('row', { name: /Redirect Coffee/ });
 	await expect(row).toBeVisible();
@@ -118,10 +117,7 @@ test('accounts list → account → save details redirects back to /accounts', a
 	await page.goto('/');
 	await signIn(page, user.email);
 
-	await page.goto('/accounts');
-
-	const row = page.getByRole('row', { name: 'List Redirect Account' });
-	await row.getByRole('link', { name: 'List Redirect Account' }).click();
+	await goToRecordDetail(page, 'Accounts', 'List Redirect Account');
 
 	await expect(page).toHaveURL(
 		new RegExp(`/accounts/${account.id}\\?from=(%2Faccounts|/accounts)`)
@@ -155,10 +151,7 @@ test('assets list → asset → save balance redirects back to /assets', async (
 	await page.goto('/');
 	await signIn(page, user.email);
 
-	await page.goto('/assets');
-
-	const row = page.getByRole('row', { name: 'List Redirect Asset' });
-	await row.getByRole('link', { name: 'List Redirect Asset' }).click();
+	await goToRecordDetail(page, 'Assets', 'List Redirect Asset');
 
 	await expect(page).toHaveURL(new RegExp(`/assets/${asset.id}\\?from=(%2Fassets|/assets)`));
 
@@ -198,11 +191,7 @@ test('transactions list (no filter) → transaction → save redirects back to /
 	await page.goto('/');
 	await signIn(page, user.email);
 
-	await page.goto('/transactions');
-
-	const row = page.getByRole('row', { name: /Plain Lunch/ });
-	await expect(row).toBeVisible();
-	await row.getByRole('link', { name: 'Plain Lunch' }).click();
+	await goToRecordDetail(page, 'Transactions', 'Plain Lunch');
 
 	await expect(page).toHaveURL(
 		new RegExp(`/transactions/${transaction.id}\\?from=(%2Ftransactions|/transactions)`)
@@ -234,6 +223,7 @@ test('deep link to account with no ?from= stays on detail page after save', asyn
 	await page.goto('/');
 	await signIn(page, user.email);
 
+	// Test's explicit purpose is direct-URL deep-link behavior with no ?from= param
 	await page.goto(`/accounts/${account.id}`);
 	await expect(page).toHaveURL(`/accounts/${account.id}`);
 

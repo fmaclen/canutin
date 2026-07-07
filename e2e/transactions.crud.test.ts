@@ -326,6 +326,7 @@ test('user can directly navigate to transaction edit page', async ({ page }) => 
 	await page.goto('/');
 	await signIn(page, user.email);
 
+	// Test's explicit purpose is direct-URL navigation to the transaction page
 	await page.goto(`/transactions/${transaction.id}`);
 	await expect(page).toHaveURL(`/transactions/${transaction.id}`);
 	await expect(page.getByLabel('Description')).toHaveValue('Greenleaf Pharmacy');

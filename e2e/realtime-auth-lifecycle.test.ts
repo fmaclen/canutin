@@ -1,6 +1,6 @@
 import { expect, Page, test } from '@playwright/test';
 
-import { signIn } from './playwright.helpers';
+import { goToPageViaSidebar, signIn } from './playwright.helpers';
 import { seedUser } from './pocketbase.helpers';
 
 function collectRealtimeAuthForbidden(page: Page) {
@@ -30,7 +30,7 @@ test('logging out from a realtime route emits no realtime authorization 403', as
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto('/big-picture');
+	await goToPageViaSidebar(page, 'Big picture');
 	await expect(page.getByRole('region', { name: 'Income per month' })).toBeVisible();
 
 	const forbidden = collectRealtimeAuthForbidden(page);
@@ -52,16 +52,16 @@ test('navigating between authenticated realtime routes emits no realtime 403', a
 
 	await expect(page.getByRole('region', { name: 'Net worth' })).toBeVisible();
 
-	await page.goto('/big-picture');
+	await goToPageViaSidebar(page, 'Big picture');
 	await expect(page.getByRole('region', { name: 'Income per month' })).toBeVisible();
 
-	await page.goto('/transactions');
+	await goToPageViaSidebar(page, 'Transactions');
 	await expect(page.getByRole('region', { name: 'Transactions summary' })).toBeVisible();
 
-	await page.goto('/trades');
+	await goToPageViaSidebar(page, 'Trades');
 	await expect(page.getByRole('region', { name: 'Trades summary' })).toBeVisible();
 
-	await page.goto('/');
+	await goToPageViaSidebar(page, 'Big picture');
 	await expect(page.getByRole('region', { name: 'Net worth' })).toBeVisible();
 	await expect(page.getByText('Your session has expired')).not.toBeVisible();
 	expect(forbidden).toEqual([]);

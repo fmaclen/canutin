@@ -37,7 +37,15 @@ Read existing nearby tests before writing a new file. Copy the shape, not the qu
 
 Key rules:
 
-- Use the helpers in [`e2e/playwright.helpers.ts`](../../../e2e/playwright.helpers.ts) for navigation and auth. Drive tests through the same happy path a real user takes when practical.
+- Use the helpers in [`e2e/playwright.helpers.ts`](../../../e2e/playwright.helpers.ts) for navigation and auth.
+- **Reach every page through the UI a real user clicks** - sidebar links, table row links, tabs, view-all links, form redirects. This happy path is mandatory, not "when practical". The navigation helpers (`goToPageViaSidebar`, `goToRecordDetail`, `goToEditTab`, `goToAddPage`) are the happy-path primitives - use them instead of hand-rolling navigation. Any `goto` a helper owns internally is already justified in the helper.
+- **`page.goto()` in a spec is a code-review block** unless it has a genuinely good reason and a one-line justification comment directly above it. The only sanctioned reasons:
+  - The app entry point at the start of a session (`goto('/')` before sign-in).
+  - Intentionally visiting a broken or direct URL the UI never links to (404 pages, auth-guard redirect checks).
+  - A test whose explicit purpose is direct-URL behavior (URL-param initialization, deep-link handling).
+
+  Every kept `goto` carries that justification comment. Navigation-only changes never weaken or change what a test asserts.
+
 - Use the helpers in [`e2e/pocketbase.helpers.ts`](../../../e2e/pocketbase.helpers.ts) for seeding (`resetDatabase`, `seedUser`, `getUserPB`, `seedAccount`, `seedTransaction`, `seedAssetBalance`).
 - Reset shared state with `resetDatabase()` in `beforeEach` when the test mutates shared state.
 - Real-name users: `alice`, `bob`, `charlie`. Never role-based names like `owner` unless the UI text itself requires that role.

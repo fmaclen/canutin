@@ -753,7 +753,7 @@ test('custom date range with periodLabel from URL displays the label and calenda
 	const toDate = `${thisMonth.getUTCFullYear()}-${String(thisMonth.getUTCMonth() + 1).padStart(2, '0')}-01`;
 	const monthLabel = lastMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-	// Navigate with periodLabel param (as would be set by cashflow chart link)
+	// Test's explicit purpose is direct-URL initialization with periodLabel (as set by cashflow chart link)
 	await page.goto(
 		`/transactions?periodFrom=${fromDate}&periodTo=${toDate}&periodLabel=${encodeURIComponent(monthLabel)}`
 	);
@@ -1089,6 +1089,7 @@ test('switching from custom range back to preset clears custom URL params and up
 	// Start with custom date range in URL (last month only)
 	const fromDate = `${lastMonth.getUTCFullYear()}-${String(lastMonth.getUTCMonth() + 1).padStart(2, '0')}-01`;
 	const toDate = `${thisMonth.getUTCFullYear()}-${String(thisMonth.getUTCMonth() + 1).padStart(2, '0')}-01`;
+	// Test's explicit purpose is direct-URL initialization with a custom periodFrom/periodTo range
 	await page.goto(`/transactions?periodFrom=${fromDate}&periodTo=${toDate}`);
 
 	// Only last month's transaction should be visible initially
@@ -1144,7 +1145,7 @@ test('invalid date range params fall back to default period', async ({ page }) =
 	await page.goto('/');
 	await signIn(page, user.email);
 
-	// Test with invalid date format
+	// Test's explicit purpose is direct-URL behavior with an invalid date format
 	await page.goto('/transactions?periodFrom=invalid-date&periodTo=2024-01-31');
 
 	// Should fall back to default period (Last 3 months) or show error
@@ -1152,7 +1153,7 @@ test('invalid date range params fall back to default period', async ({ page }) =
 	await expect(page.getByLabel('Period')).toBeVisible();
 	await expect(page.getByLabel('Period')).toContainText('Last 3 months');
 
-	// Test with end date before start date
+	// Test's explicit purpose is direct-URL behavior with an end date before the start date
 	await page.goto('/transactions?periodFrom=2024-03-01&periodTo=2024-01-01');
 
 	// Should fall back to default or show error message
