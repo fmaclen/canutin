@@ -623,7 +623,8 @@ test('asset overview shows balance history once it has at least two balances', a
 	await page.goto('/');
 	await signIn(page, user.email);
 	await page.goto(`/assets/${asset.id}`);
-	await expect(page.getByText('Balance history')).not.toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Balance history' })).toBeVisible();
+	await expect(page.getByText('No balance history yet')).toBeVisible();
 
 	const summary = page.getByRole('region', { name: 'Summary' });
 	await expect(summary).toBeVisible();
@@ -636,6 +637,7 @@ test('asset overview shows balance history once it has at least two balances', a
 		asOf: '2025-02-01T00:00:00.000Z',
 		marketValue: 5500
 	});
-	await expect(page.getByText('Balance history')).toBeVisible();
+	await expect(page.getByText('No balance history yet')).not.toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Balance history' })).toBeVisible();
 	await expect(summary.getByRole('region', { name: 'Market value' })).toContainText('$5,500.00');
 });

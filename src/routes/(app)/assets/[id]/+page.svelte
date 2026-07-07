@@ -4,6 +4,7 @@
 	import { createBalanceHistoryLoader } from '$lib/balance-history.svelte';
 	import BalanceHistoryChart from '$lib/components/balance-history-chart.svelte';
 	import { formatNativeCurrency } from '$lib/components/currency';
+	import Empty from '$lib/components/empty.svelte';
 	import KeyValue from '$lib/components/key-value.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
@@ -39,10 +40,6 @@
 	);
 	const balanceHistory = $derived(balanceHistoryLoader.history);
 	const balanceHistoryLoading = $derived(balanceHistoryLoader.isLoading);
-
-	const showBalanceHistory = $derived(
-		loaded && (balanceHistoryLoading || balanceHistory.length >= 2)
-	);
 </script>
 
 {#if showBanner}
@@ -75,14 +72,12 @@
 			/>
 		</div>
 	</Section>
-{/if}
 
-{#if showBalanceHistory && asset}
 	<Section>
 		<SectionTitle title={m.balance_history_section_title()} />
 		{#if balanceHistoryLoading}
 			<Skeleton class="h-[30vh] min-h-[220px]" showSpinner />
-		{:else}
+		{:else if balanceHistory.length >= 2}
 			<div class="bg-background overflow-visible rounded-sm shadow-md">
 				<BalanceHistoryChart
 					points={balanceHistory}
@@ -90,6 +85,10 @@
 					formatAxisValue={(value) => formatNativeCurrency(Math.round(value), 0, asset.currency)}
 					formatTooltipValue={(value) => formatNativeCurrency(value, 2, asset.currency)}
 				/>
+			</div>
+		{:else}
+			<div class="h-[30vh] min-h-[220px]">
+				<Empty class="h-full">{m.balance_history_empty()}</Empty>
 			</div>
 		{/if}
 	</Section>

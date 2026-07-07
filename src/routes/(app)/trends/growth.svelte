@@ -4,6 +4,12 @@
 	import { LineChart } from 'layerchart';
 	import { SvelteMap } from 'svelte/reactivity';
 
+	import {
+		advanceTrendSecurityValue,
+		latestIndexBeforeOrEqual,
+		type TrendSecurityBalance,
+		type TrendSecurityValueState
+	} from '$lib/balance-series';
 	import { formatCurrency } from '$lib/components/currency';
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
@@ -20,14 +26,10 @@
 	} from '$lib/pocketbase.schema';
 
 	import {
-		advanceTrendSecurityValue,
 		computeRangeForPeriod,
-		latestIndexBeforeOrEqual,
 		type BalanceGroup,
 		type PeriodKey,
-		type PreparedTrendMaps,
-		type TrendSecurityBalance,
-		type TrendSecurityValueState
+		type PreparedTrendMaps
 	} from './trends';
 
 	let {

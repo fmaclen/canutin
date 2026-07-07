@@ -235,7 +235,10 @@
 								<Table.Cell class="text-foreground/80 max-w-80 text-sm">
 									<div class="flex flex-wrap gap-x-1.5 gap-y-0.5">
 										{#each row.accounts as account (account.id)}
-											<Link href={resolve(`/accounts/${account.id}`)}>
+											<Link
+												href={resolve(`/accounts/${account.id}`)}
+												class="text-foreground/80 text-sm"
+											>
 												{account.name}
 											</Link>
 										{/each}

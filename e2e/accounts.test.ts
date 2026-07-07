@@ -1,11 +1,16 @@
 import { expect, test } from '@playwright/test';
 
-import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
+import {
+	AccountsBalanceGroupOptions,
+	SecurityTransactionsTypeOptions
+} from '../src/lib/pocketbase.schema';
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
 import {
 	recordExists,
 	seedAccount,
 	seedAccountBalance,
+	seedSecurity,
+	seedTrade,
 	seedTransaction,
 	seedUser,
 	updateAccount
@@ -443,7 +448,7 @@ test('user can delete account and cascade deletes transactions and balances', as
 	expect(await recordExists('transactions', transaction2.id)).toBe(false);
 });
 
-test('account overview shows balance history once it has at least two balances', async ({
+test('account overview keeps the balance history section and swaps its empty state for a chart', async ({
 	page
 }) => {
 	const user = await seedUser('wanda');
@@ -464,7 +469,8 @@ test('account overview shows balance history once it has at least two balances',
 	await page.goto('/');
 	await signIn(page, user.email);
 	await page.goto(`/accounts/${account.id}`);
-	await expect(page.getByText('Balance history')).not.toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Balance history' })).toBeVisible();
+	await expect(page.getByText('No balance history yet')).toBeVisible();
 
 	await seedAccountBalance({
 		account: account.id,
@@ -472,5 +478,117 @@ test('account overview shows balance history once it has at least two balances',
 		asOf: '2025-02-01T00:00:00.000Z',
 		value: 2000
 	});
-	await expect(page.getByText('Balance history')).toBeVisible();
+	await expect(page.getByText('No balance history yet')).not.toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Balance history' })).toBeVisible();
+});
+
+test('account overview charts an auto-calculated account from its transaction history', async ({
+	page
+}) => {
+	const user = await seedUser('wallace');
+
+	const account = await seedAccount({
+		name: 'Auto Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking',
+		autoCalculated: new Date().toISOString()
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: '2025-01-01T00:00:00.000Z',
+		description: 'Opening deposit',
+		value: 500
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: '2025-02-01T00:00:00.000Z',
+		description: 'Paycheck',
+		value: 750
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await page.goto(`/accounts/${account.id}`);
+	await expect(page.getByRole('heading', { name: 'Balance history' })).toBeVisible();
+	await expect(page.getByText('No balance history yet')).not.toBeVisible();
+});
+
+test('account overview samples transactions and trades with links to filtered ledgers', async ({
+	page
+}) => {
+	const user = await seedUser('nova');
+
+	const brokerage = await seedAccount({
+		name: 'Brokerage One',
+		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+		owner: user.id,
+		balanceType: 'Investment'
+	});
+	const security = await seedSecurity({ name: 'Acme Corp', symbol: 'ACME', owner: user.id });
+	await seedTransaction({
+		account: brokerage.id,
+		owner: user.id,
+		date: new Date().toISOString(),
+		description: 'Dividend payout',
+		value: 120
+	});
+	await seedTrade({
+		account: brokerage.id,
+		owner: user.id,
+		security: security.id,
+		date: new Date().toISOString(),
+		type: SecurityTransactionsTypeOptions.buy,
+		description: 'Bought Acme',
+		quantity: 5,
+		price: 100,
+		amount: -500
+	});
+
+	const emptyAccount = await seedAccount({
+		name: 'Empty Vault',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Savings'
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await page.goto(`/accounts/${brokerage.id}`);
+	await expect(page.getByText('Dividend payout')).toBeVisible();
+	await expect(page.getByText('Bought Acme')).toBeVisible();
+
+	const brokeragePositions = await page.getByRole('heading', { name: 'Positions' }).boundingBox();
+	const brokerageCashflow = await page
+		.getByRole('heading', { name: 'Trailing cashflow' })
+		.boundingBox();
+	expect(brokeragePositions).not.toBeNull();
+	expect(brokerageCashflow).not.toBeNull();
+	expect(brokeragePositions!.y).toBeLessThan(brokerageCashflow!.y);
+
+	await page.getByRole('link', { name: 'View all 1 transaction' }).click();
+	await expect(page).toHaveURL(new RegExp(`account=${brokerage.id}`));
+	await expect(page.getByText('Dividend payout')).toBeVisible();
+
+	await page.goto(`/accounts/${brokerage.id}`);
+	await page.getByRole('link', { name: 'View all 1 trade' }).click();
+	await expect(page).toHaveURL(new RegExp(`account=${brokerage.id}`));
+	await expect(page.getByText('Bought Acme')).toBeVisible();
+
+	await page.goto(`/accounts/${emptyAccount.id}`);
+	await expect(page.getByText('No transactions yet')).toBeVisible();
+	await expect(page.getByText('No trades yet')).toBeVisible();
+	await expect(page.getByRole('link', { name: /View all/ })).not.toBeVisible();
+
+	const emptyAccountPositions = await page
+		.getByRole('heading', { name: 'Positions' })
+		.boundingBox();
+	const emptyAccountCashflow = await page
+		.getByRole('heading', { name: 'Trailing cashflow' })
+		.boundingBox();
+	expect(emptyAccountPositions).not.toBeNull();
+	expect(emptyAccountCashflow).not.toBeNull();
+	expect(emptyAccountCashflow!.y).toBeLessThan(emptyAccountPositions!.y);
 });

@@ -355,7 +355,8 @@ test('currency overview shows rate history once it has at least two quotes', asy
 	await page.goto('/');
 	await signIn(page, user.email);
 	await page.goto(`/currencies/${currency.id}`);
-	await expect(page.getByText('Rate history')).not.toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Rate history' })).toBeVisible();
+	await expect(page.getByText('No rate history yet')).toBeVisible();
 
 	await seedExchangeRate({
 		owner: user.id,
@@ -363,7 +364,8 @@ test('currency overview shows rate history once it has at least two quotes', asy
 		date: utcIso('2026-02-01'),
 		rate: 1.2
 	});
-	await expect(page.getByText('Rate history')).toBeVisible();
+	await expect(page.getByText('No rate history yet')).not.toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Rate history' })).toBeVisible();
 });
 
 test('currency delete blocks in-use currencies and removes unused quotes', async ({ page }) => {

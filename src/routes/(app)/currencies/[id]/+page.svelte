@@ -87,9 +87,6 @@
 			.sort((a, b) => a.date.getTime() - b.date.getTime())
 	);
 	const rateHistoryLoading = $derived(!exchangeRatesContext.isLoaded);
-	const showRateHistory = $derived(
-		loaded && !isUsd && (rateHistoryLoading || ratePoints.length >= 2)
-	);
 
 	const latestQuote = $derived.by(() => {
 		return currencyQuotes.reduce<ExchangeRatesResponse | null>((latest, record) => {
@@ -139,12 +136,12 @@
 	}
 </script>
 
-{#if showRateHistory && currency}
+{#if !isUsd}
 	<Section>
 		<SectionTitle title={m.currencies_rate_history_section_title()} />
-		{#if rateHistoryLoading}
+		{#if !loaded || rateHistoryLoading}
 			<Skeleton class="h-[30vh] min-h-[220px]" showSpinner />
-		{:else}
+		{:else if currency && ratePoints.length >= 2}
 			<div class="bg-background overflow-visible rounded-sm shadow-md">
 				<BalanceHistoryChart
 					points={ratePoints}
@@ -153,11 +150,13 @@
 					formatTooltipValue={(value) => formatNativeCurrency(value, 2, currency.code)}
 				/>
 			</div>
+		{:else}
+			<div class="h-[30vh] min-h-[220px]">
+				<Empty class="h-full">{m.currencies_rate_history_empty()}</Empty>
+			</div>
 		{/if}
 	</Section>
-{/if}
 
-{#if !isUsd}
 	<Section>
 		<SectionTitle title={m.currencies_quote_history_section_title()} />
 		{#if !isLoaded || !currency}

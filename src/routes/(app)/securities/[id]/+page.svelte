@@ -153,18 +153,14 @@
 		if (value === null || value === 0) return 'neutral';
 		return value > 0 ? 'positive' : 'negative';
 	}
-
-	const showBalances = $derived(loaded && accountBalances.length > 0);
-	const showPriceHistory = $derived(loaded && (priceHistoryLoading || priceHistory.length >= 2));
-	const showEmpty = $derived(loaded && !showBalances && !showPriceHistory);
 </script>
 
-{#if showPriceHistory}
+{#if loaded && security}
 	<Section>
 		<SectionTitle title={m.securities_section_price_history()} />
 		{#if priceHistoryLoading}
 			<Skeleton class="h-[30vh] min-h-[220px]" showSpinner />
-		{:else}
+		{:else if priceHistory.length >= 2}
 			<div class="bg-background overflow-visible rounded-sm shadow-md">
 				<BalanceHistoryChart
 					points={priceHistory}
@@ -173,221 +169,221 @@
 					formatTooltipValue={(value) => formatNativeCurrency(value, 2, securityCurrency)}
 				/>
 			</div>
+		{:else}
+			<div class="h-[30vh] min-h-[220px]">
+				<Empty class="h-full">{m.securities_price_history_empty()}</Empty>
+			</div>
 		{/if}
 	</Section>
-{/if}
 
-{#if showBalances}
 	<Section>
 		<SectionTitle title={m.securities_section_balances()} />
-		<div
-			role="region"
-			aria-label={m.securities_section_balances()}
-			class="grid grid-cols-1 gap-2 sm:grid-cols-2"
-		>
-			<KeyValue
-				title={m.securities_section_balances()}
-				value={accountBalances.length}
-				variant="outline"
-				format="number"
-			/>
-			<KeyValue
-				title={m.summary_net_market_value()}
-				value={balancesMarketValue.value}
-				variant="outline"
-				decimalScale={2}
-				isUnconverted={balancesMarketValue.isUnconverted}
-			/>
-		</div>
-		<div class="bg-background overflow-hidden rounded-sm shadow-md">
-			<Table.Root>
-				<Table.Header>
-					<Table.Row>
-						<Table.SortableHead
-							class="text-left whitespace-nowrap"
-							column="asOf"
-							sortColumn={sortState.column}
-							sortDirection={sortState.direction}
-							onSort={handleSort}
-						>
-							{m.securities_table_header_as_of()}
-						</Table.SortableHead>
-						<Table.SortableHead
-							class="text-left whitespace-nowrap"
-							column="accountName"
-							sortColumn={sortState.column}
-							sortDirection={sortState.direction}
-							onSort={handleSort}
-						>
-							{m.securities_table_header_account()}
-						</Table.SortableHead>
-						<Table.SortableHead
-							class="text-right whitespace-nowrap"
-							column="quantity"
-							sortColumn={sortState.column}
-							sortDirection={sortState.direction}
-							onSort={handleSort}
-						>
-							{m.securities_table_header_quantity()}
-						</Table.SortableHead>
-						<Table.SortableHead
-							class="text-right whitespace-nowrap"
-							column="price"
-							sortColumn={sortState.column}
-							sortDirection={sortState.direction}
-							onSort={handleSort}
-						>
-							{m.securities_table_header_price()}
-						</Table.SortableHead>
-						<Table.SortableHead
-							class="text-right whitespace-nowrap"
-							column="costBasis"
-							sortColumn={sortState.column}
-							sortDirection={sortState.direction}
-							onSort={handleSort}
-						>
-							{m.securities_table_header_cost_basis()}
-						</Table.SortableHead>
-						<Table.SortableHead
-							class="text-right whitespace-nowrap"
-							column="gainLoss"
-							sortColumn={sortState.column}
-							sortDirection={sortState.direction}
-							onSort={handleSort}
-						>
-							{m.securities_table_header_gain_loss()}
-						</Table.SortableHead>
-						<Table.SortableHead
-							class="text-right whitespace-nowrap"
-							column="gainLossPercent"
-							sortColumn={sortState.column}
-							sortDirection={sortState.direction}
-							onSort={handleSort}
-						>
-							{m.securities_table_header_gain_loss_percent()}
-						</Table.SortableHead>
-						<Table.SortableHead
-							class="text-right whitespace-nowrap"
-							column="value"
-							sortColumn={sortState.column}
-							sortDirection={sortState.direction}
-							onSort={handleSort}
-						>
-							{m.securities_table_header_value()}
-						</Table.SortableHead>
-					</Table.Row>
-				</Table.Header>
-				<Table.Body>
-					{#each sortedBalances as row (row.id)}
-						{@const gainLossPercent = gainLossPercentOrNull(row.gainLoss, row.costBasis)}
+		{#if accountBalances.length > 0}
+			<div
+				role="region"
+				aria-label={m.securities_section_balances()}
+				class="grid grid-cols-1 gap-2 sm:grid-cols-2"
+			>
+				<KeyValue
+					title={m.securities_section_balances()}
+					value={accountBalances.length}
+					variant="outline"
+					format="number"
+				/>
+				<KeyValue
+					title={m.summary_net_market_value()}
+					value={balancesMarketValue.value}
+					variant="outline"
+					decimalScale={2}
+					isUnconverted={balancesMarketValue.isUnconverted}
+				/>
+			</div>
+			<div class="bg-background overflow-hidden rounded-sm shadow-md">
+				<Table.Root>
+					<Table.Header>
 						<Table.Row>
-							<Table.Cell
-								class="text-muted-foreground font-mono whitespace-nowrap uppercase tabular-nums"
+							<Table.SortableHead
+								class="text-left whitespace-nowrap"
+								column="asOf"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
 							>
-								{dateFormatter.format(new Date(row.asOf))}
-							</Table.Cell>
-							<Table.Cell>
-								<Link
-									href={resolve(`/accounts/${row.accountId}`)}
-									class="text-foreground/90 text-sm font-medium"
-								>
-									{row.accountName}
-								</Link>
-							</Table.Cell>
-							<Table.Cell class="text-right tabular-nums">
-								{#if row.quantity === null}
-									<span class="text-muted-foreground">~</span>
-								{:else}
-									<NumberDisplay value={formatSecurityQuantity(row.quantity)} />
-								{/if}
-							</Table.Cell>
-							<Table.Cell class="text-right tabular-nums">
-								{#if row.price === null}
-									<span class="text-muted-foreground">~</span>
-								{:else}
-									{@const priceFx = fx.convert(row.price, securityCurrency, row.asOf)}
-									<Currency
-										value={priceFx.value}
-										decimalScale={2}
-										isConverted={priceFx.isConverted}
-										isUnconverted={priceFx.isUnconverted}
-										missingCurrency={priceFx.missingCurrency}
-										nativeCurrency={securityCurrency}
-										nativeValue={row.price}
-									/>
-								{/if}
-							</Table.Cell>
-							<Table.Cell class="text-right tabular-nums">
-								{#if row.costBasis === null}
-									<span class="text-muted-foreground">~</span>
-								{:else}
-									<Currency
-										value={row.costBasis}
-										decimalScale={2}
-										isConverted={row.isConverted}
-										isUnconverted={row.isUnconverted}
-										missingCurrency={row.missingCurrency}
-										nativeCurrency={securityCurrency}
-										nativeValue={row.nativeCostBasis ?? undefined}
-									/>
-								{/if}
-							</Table.Cell>
-							<Table.Cell class="text-right tabular-nums">
-								{#if row.gainLoss === null}
-									<span class="text-muted-foreground">~</span>
-								{:else}
-									<Currency
-										value={row.gainLoss}
-										decimalScale={2}
-										sentiment={sentiment(row.gainLoss)}
-										isConverted={row.isConverted}
-										isUnconverted={row.isUnconverted}
-										missingCurrency={row.missingCurrency}
-										nativeCurrency={securityCurrency}
-										nativeValue={row.nativeGainLoss ?? undefined}
-									/>
-								{/if}
-							</Table.Cell>
-							<Table.Cell class="text-right tabular-nums">
-								{#if gainLossPercent === null}
-									<span class="text-muted-foreground">~</span>
-								{:else}
-									<NumberDisplay
-										value={formatPercent(gainLossPercent)}
-										sentiment={gainLossPercent > 0
-											? 'positive'
-											: gainLossPercent < 0
-												? 'negative'
-												: 'neutral'}
-									/>
-								{/if}
-							</Table.Cell>
-							<Table.Cell class="text-right tabular-nums">
-								{#if row.value === null}
-									<span class="text-muted-foreground">~</span>
-								{:else}
-									<Currency
-										value={row.value}
-										decimalScale={2}
-										sentiment={sentiment(row.value)}
-										isConverted={row.isConverted}
-										isUnconverted={row.isUnconverted}
-										missingCurrency={row.missingCurrency}
-										nativeCurrency={securityCurrency}
-										nativeValue={row.nativeValue ?? undefined}
-									/>
-								{/if}
-							</Table.Cell>
+								{m.securities_table_header_as_of()}
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-left whitespace-nowrap"
+								column="accountName"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
+								{m.securities_table_header_account()}
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-right whitespace-nowrap"
+								column="quantity"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
+								{m.securities_table_header_quantity()}
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-right whitespace-nowrap"
+								column="price"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
+								{m.securities_table_header_price()}
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-right whitespace-nowrap"
+								column="costBasis"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
+								{m.securities_table_header_cost_basis()}
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-right whitespace-nowrap"
+								column="gainLoss"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
+								{m.securities_table_header_gain_loss()}
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-right whitespace-nowrap"
+								column="gainLossPercent"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
+								{m.securities_table_header_gain_loss_percent()}
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-right whitespace-nowrap"
+								column="value"
+								sortColumn={sortState.column}
+								sortDirection={sortState.direction}
+								onSort={handleSort}
+							>
+								{m.securities_table_header_value()}
+							</Table.SortableHead>
 						</Table.Row>
-					{/each}
-				</Table.Body>
-			</Table.Root>
-		</div>
-	</Section>
-{/if}
-
-{#if showEmpty}
-	<Section>
-		<Empty>{m.securities_overview_empty()}</Empty>
+					</Table.Header>
+					<Table.Body>
+						{#each sortedBalances as row (row.id)}
+							{@const gainLossPercent = gainLossPercentOrNull(row.gainLoss, row.costBasis)}
+							<Table.Row>
+								<Table.Cell
+									class="text-muted-foreground font-mono whitespace-nowrap uppercase tabular-nums"
+								>
+									{dateFormatter.format(new Date(row.asOf))}
+								</Table.Cell>
+								<Table.Cell>
+									<Link
+										href={resolve(`/accounts/${row.accountId}`)}
+										class="text-foreground/90 text-sm font-medium"
+									>
+										{row.accountName}
+									</Link>
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									{#if row.quantity === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<NumberDisplay value={formatSecurityQuantity(row.quantity)} />
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									{#if row.price === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										{@const priceFx = fx.convert(row.price, securityCurrency, row.asOf)}
+										<Currency
+											value={priceFx.value}
+											decimalScale={2}
+											isConverted={priceFx.isConverted}
+											isUnconverted={priceFx.isUnconverted}
+											missingCurrency={priceFx.missingCurrency}
+											nativeCurrency={securityCurrency}
+											nativeValue={row.price}
+										/>
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									{#if row.costBasis === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<Currency
+											value={row.costBasis}
+											decimalScale={2}
+											isConverted={row.isConverted}
+											isUnconverted={row.isUnconverted}
+											missingCurrency={row.missingCurrency}
+											nativeCurrency={securityCurrency}
+											nativeValue={row.nativeCostBasis ?? undefined}
+										/>
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									{#if row.gainLoss === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<Currency
+											value={row.gainLoss}
+											decimalScale={2}
+											sentiment={sentiment(row.gainLoss)}
+											isConverted={row.isConverted}
+											isUnconverted={row.isUnconverted}
+											missingCurrency={row.missingCurrency}
+											nativeCurrency={securityCurrency}
+											nativeValue={row.nativeGainLoss ?? undefined}
+										/>
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									{#if gainLossPercent === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<NumberDisplay
+											value={formatPercent(gainLossPercent)}
+											sentiment={gainLossPercent > 0
+												? 'positive'
+												: gainLossPercent < 0
+													? 'negative'
+													: 'neutral'}
+										/>
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									{#if row.value === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<Currency
+											value={row.value}
+											decimalScale={2}
+											sentiment={sentiment(row.value)}
+											isConverted={row.isConverted}
+											isUnconverted={row.isUnconverted}
+											missingCurrency={row.missingCurrency}
+											nativeCurrency={securityCurrency}
+											nativeValue={row.nativeValue ?? undefined}
+										/>
+									{/if}
+								</Table.Cell>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			</div>
+		{:else}
+			<Empty>{m.securities_balances_empty()}</Empty>
+		{/if}
 	</Section>
 {/if}

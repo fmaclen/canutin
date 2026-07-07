@@ -5,6 +5,7 @@
 
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAssetsContext } from '$lib/assets.svelte';
+	import { type TrendSecurityBalance } from '$lib/balance-series';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
@@ -24,12 +25,7 @@
 
 	import ChartNetWorth from './growth.svelte';
 	import Performance from './performance.svelte';
-	import {
-		buildPreparedMaps,
-		computeBoundedHistoryStart,
-		type PeriodKey,
-		type TrendSecurityBalance
-	} from './trends';
+	import { buildPreparedMaps, computeBoundedHistoryStart, type PeriodKey } from './trends';
 
 	const pb = getPocketBaseContext();
 	const accountsCtx = getAccountsContext();

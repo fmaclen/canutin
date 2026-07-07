@@ -2,6 +2,11 @@
 	import { UTCDate } from '@date-fns/utc';
 	import { endOfDay, startOfYear, subDays, subMonths, subYears } from 'date-fns';
 
+	import {
+		advanceTrendSecurityValue,
+		type TrendSecurityBalance,
+		type TrendSecurityValueState
+	} from '$lib/balance-series';
 	import { formatCurrency } from '$lib/components/currency';
 	import Empty from '$lib/components/empty.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton/index';
@@ -17,14 +22,7 @@
 		AssetsResponse
 	} from '$lib/pocketbase.schema';
 
-	import {
-		advanceTrendSecurityValue,
-		findEarliestBalanceDate,
-		type BalanceGroup,
-		type PreparedTrendMaps,
-		type TrendSecurityBalance,
-		type TrendSecurityValueState
-	} from './trends';
+	import { findEarliestBalanceDate, type BalanceGroup, type PreparedTrendMaps } from './trends';
 
 	let {
 		isLoading,
