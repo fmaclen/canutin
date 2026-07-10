@@ -27,7 +27,7 @@
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
 	import { securityComboboxLabel, tradeTypeLabel } from '$lib/trade-display';
-	import { toNumber } from '$lib/utils';
+	import { isDuplicateSecurityNameError, toNumber } from '$lib/utils';
 
 	const pb = getPocketBaseContext();
 	const auth = getAuthContext();
@@ -91,6 +91,10 @@
 			toast.error(m.trades_security_required());
 			return;
 		}
+		if (isNewSecurity && !name.trim()) {
+			toast.error(m.trades_security_name_required());
+			return;
+		}
 		if (!description.trim()) {
 			toast.error(m.trades_description_required());
 			return;
@@ -98,19 +102,8 @@
 
 		try {
 			isSaving = true;
-			const security = isNewSecurity
-				? await pb.authedClient.collection('securities').create({
-						name: name.trim(),
-						symbol: symbol.trim() || undefined,
-						owner: currentOwnerId,
-						currency
-					})
-				: selectedSecurity;
-			if (!security) return;
-
-			await pb.authedClient.collection('securityTransactions').create({
+			const transaction = {
 				account: accountId,
-				security: security.id,
 				owner: currentOwnerId,
 				date: new Date(date + 'T12:00:00Z').toISOString(),
 				type,
@@ -121,11 +114,35 @@
 				amount: toNumber(amount),
 				fees: toNumber(fees),
 				notes: notes.trim() || undefined
-			});
+			};
+
+			if (isNewSecurity) {
+				await pb.authedClient.send('/api/canutin/securities/with-initial-transaction', {
+					method: 'POST',
+					body: {
+						security: {
+							name: name.trim(),
+							symbol: symbol.trim() || undefined,
+							owner: currentOwnerId,
+							currency
+						},
+						transaction
+					}
+				});
+			} else if (selectedSecurity) {
+				await pb.authedClient.collection('securityTransactions').create({
+					...transaction,
+					security: selectedSecurity.id
+				});
+			}
 
 			toast.success(m.trades_add_success());
 			await goto(resolve('/trades'));
 		} catch (error) {
+			if (isDuplicateSecurityNameError(error)) {
+				toast.error(m.securities_name_duplicate());
+				return;
+			}
 			logError('tradesAdd', 'create', error);
 			toast.error(m.trades_add_failed());
 		} finally {

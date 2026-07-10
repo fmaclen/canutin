@@ -19,6 +19,7 @@
 	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+	import { responseFieldCode } from '$lib/utils';
 
 	const pb = getPocketBaseContext();
 	const auth = getAuthContext();
@@ -37,19 +38,6 @@
 	const previewCode = $derived(currencyCode || 'USD');
 	const isIntlPreviewCode = $derived(isIntlCurrency(previewCode));
 	const previewValue = $derived(formatNativeCurrency(Number(previewAmount), 2, previewCode));
-
-	function isRecord(value: unknown): value is Record<string, unknown> {
-		return typeof value === 'object' && value !== null;
-	}
-
-	function responseFieldCode(error: ClientResponseError, field: string) {
-		const data: unknown = error.response?.data;
-		if (!isRecord(data)) return '';
-		const fieldData = data[field];
-		if (!isRecord(fieldData)) return '';
-		const errorCode = fieldData.code;
-		return typeof errorCode === 'string' ? errorCode : '';
-	}
 
 	function handleCodeInput(event: Event) {
 		const target = event.currentTarget;

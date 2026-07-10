@@ -1,7 +1,13 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
-import { goToEditTab, signIn } from './playwright.helpers';
+import {
+	goToAddPage,
+	goToEditTab,
+	goToPageViaSidebar,
+	goToRecordDetail,
+	signIn
+} from './playwright.helpers';
 import {
 	getUserPB,
 	seedAccount,
@@ -91,11 +97,9 @@ test('the currencies ledger shows the USD pivot and seeded registry currencies',
 		rate: 2.3456
 	});
 
-	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
-	// The sidebar has no "Currencies" route mapped in goToPageViaSidebar (see return notes).
-	await page.getByRole('link', { name: 'Currencies' }).click();
+	await goToPageViaSidebar(page, 'Currencies');
 
 	await expect(page.getByRole('link', { name: 'Add currency' })).toBeVisible();
 	await expect(page.getByText('Code', { exact: true })).toBeVisible();
@@ -135,12 +139,9 @@ test('adding a currency previews ISO and custom codes and lists the seeded quote
 		.toISOString()
 		.slice(0, 10);
 
-	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
-	// The sidebar has no "Currencies" route mapped in goToPageViaSidebar (see return notes).
-	await page.getByRole('link', { name: 'Currencies' }).click();
-	await page.getByRole('link', { name: 'Add currency' }).click();
+	await goToAddPage(page, 'Currencies');
 
 	const code = page.getByLabel('Code', { exact: true });
 	const name = page.getByLabel('Name', { exact: true });
@@ -183,12 +184,9 @@ test('adding a duplicate currency shows the duplicate-code toast', async ({ page
 	const code = uniqueCurrency('QD');
 	await seedCurrency({ owner: user.id, code, name: 'Duplicate coin', autoUpdate: false });
 
-	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
-	// The sidebar has no "Currencies" route mapped in goToPageViaSidebar (see return notes).
-	await page.getByRole('link', { name: 'Currencies' }).click();
-	await page.getByRole('link', { name: 'Add currency' }).click();
+	await goToAddPage(page, 'Currencies');
 
 	await page.getByLabel('Code', { exact: true }).fill(code);
 	await page.getByRole('button', { name: 'Add', exact: true }).click();
@@ -210,7 +208,6 @@ test('currency detail edits registry fields and upserts same-date manual quotes'
 		autoUpdate: false
 	});
 
-	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
 	// This test asserts the bare edit URL below with no `?from=` query param; every click-through
@@ -218,19 +215,15 @@ test('currency detail edits registry fields and upserts same-date manual quotes'
 	// is only reachable by navigating here directly.
 	await page.goto(`/currencies/${currency.id}`);
 
-	await expect(page.locator('h2.text-muted-foreground.font-mono.uppercase')).toContainText([
-		'Quote history'
-	]);
+	await expect(page.getByRole('heading', { name: 'Quote history' })).toBeVisible();
 	await expect(page.getByText('No quotes')).toBeVisible();
 
-	await page.getByRole('link', { name: 'Edit' }).click();
+	await goToEditTab(page);
 	await expect(page).toHaveURL(`/currencies/${currency.id}/edit`);
 
-	await expect(page.locator('h2.text-muted-foreground.font-mono.uppercase')).toContainText([
-		'Exchange rates',
-		'Details',
-		'Danger zone'
-	]);
+	await expect(page.getByRole('heading', { name: 'Exchange rates' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Details' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Danger zone' })).toBeVisible();
 	await expect(page.getByLabel('Code', { exact: true })).toBeDisabled();
 	await expect(page.getByLabel('Code', { exact: true })).toHaveValue(code);
 	await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Original detail coin');
@@ -258,7 +251,7 @@ test('currency detail edits registry fields and upserts same-date manual quotes'
 	await expect(quoteRow.getByText('Manual')).toBeVisible();
 	await expect(quoteRow.getByText(formatRate(1.23, code), { exact: true })).toBeVisible();
 
-	await page.getByRole('link', { name: 'Edit' }).click();
+	await goToEditTab(page);
 	await expect(page).toHaveURL(`/currencies/${currency.id}/edit`);
 	await page.getByLabel('Date', { exact: true }).fill(quoteDate);
 	await page.getByLabel('USD exchange rate', { exact: true }).fill('1.5');
@@ -272,10 +265,7 @@ test('currency detail edits registry fields and upserts same-date manual quotes'
 	await expect(quoteRow.getByText(formatRate(1.5, code), { exact: true })).toBeVisible();
 	await expect(quoteRow.getByText(formatRate(1.23, code), { exact: true })).not.toBeVisible();
 
-	// The sidebar has no "Currencies" route mapped in goToPageViaSidebar (see return notes).
-	// Scoped to the sidebar - the edit page's breadcrumb also has a "Currencies" link.
-	await page.getByLabel('Sidebar').getByRole('link', { name: 'Currencies' }).click();
-	await currencyRow(page, 'USD').getByRole('link', { name: 'USD' }).click();
+	await goToRecordDetail(page, 'Currencies', 'USD');
 
 	await expect(page.getByText('Base currency', { exact: true })).toBeVisible();
 	await expect(
@@ -306,7 +296,6 @@ test('currency detail actions reached from the ledger redirect back with the led
 		autoUpdate: false
 	});
 
-	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
 	// This test's explicit purpose is the ledger's `from=` redirect round-trip, which
@@ -316,7 +305,7 @@ test('currency detail actions reached from the ledger redirect back with the led
 	await currencyRow(page, code).getByRole('link', { name: code }).click();
 	await expectCurrencyDetailFrom(page, currency.id, ledgerUrl);
 
-	await page.getByRole('link', { name: 'Edit' }).click();
+	await goToEditTab(page);
 	await expect(page).toHaveURL(new RegExp(`/currencies/${currency.id}/edit\\?from=`));
 
 	await page.getByLabel('Name', { exact: true }).fill('Ledger redirect coin v2');
@@ -328,7 +317,7 @@ test('currency detail actions reached from the ledger redirect back with the led
 	await currencyRow(page, code).getByRole('link', { name: code }).click();
 	await expectCurrencyDetailFrom(page, currency.id, ledgerUrl);
 
-	await page.getByRole('link', { name: 'Edit' }).click();
+	await goToEditTab(page);
 	await expect(page).toHaveURL(new RegExp(`/currencies/${currency.id}/edit\\?from=`));
 
 	await page.getByLabel('Date', { exact: true }).fill(quoteDate);
@@ -342,7 +331,7 @@ test('currency detail actions reached from the ledger redirect back with the led
 	await currencyRow(page, code).getByRole('link', { name: code }).click();
 	await expectCurrencyDetailFrom(page, currency.id, ledgerUrl);
 
-	await page.getByRole('link', { name: 'Edit' }).click();
+	await goToEditTab(page);
 	await expect(page).toHaveURL(new RegExp(`/currencies/${currency.id}/edit\\?from=`));
 
 	await page.getByLabel('Date', { exact: true }).fill(quoteDate);
@@ -369,12 +358,9 @@ test('currency overview shows rate history once it has at least two quotes', asy
 		rate: 1.1
 	});
 
-	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
-	// The sidebar has no "Currencies" route mapped in goToPageViaSidebar (see return notes).
-	await page.getByRole('link', { name: 'Currencies' }).click();
-	await currencyRow(page, code).getByRole('link', { name: code }).click();
+	await goToRecordDetail(page, 'Currencies', code);
 	await expect(page.getByRole('heading', { name: 'Rate history' })).toBeVisible();
 	await expect(page.getByText('No rate history yet')).toBeVisible();
 
@@ -385,7 +371,7 @@ test('currency overview shows rate history once it has at least two quotes', asy
 		rate: 1.2
 	});
 	await expect(page.getByText('No rate history yet')).not.toBeVisible();
-	await expect(page.getByRole('heading', { name: 'Rate history' })).toBeVisible();
+	await expect(page.getByRole('img', { name: 'Rate' })).toBeVisible();
 });
 
 test('currency delete blocks in-use currencies and removes unused quotes', async ({ page }) => {
@@ -426,7 +412,6 @@ test('currency delete blocks in-use currencies and removes unused quotes', async
 		currency: guardedCode
 	});
 
-	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
 	// This test asserts the bare edit URL below with no `?from=` query param; every click-through
@@ -447,9 +432,7 @@ test('currency delete blocks in-use currencies and removes unused quotes', async
 	await guardedDialog.getByRole('button').first().click();
 	await expect(guardedDialog).not.toBeVisible();
 
-	// Scoped to the sidebar - the edit page's breadcrumb also has a "Currencies" link.
-	await page.getByLabel('Sidebar').getByRole('link', { name: 'Currencies' }).click();
-	await currencyRow(page, unusedCode).getByRole('link', { name: unusedCode }).click();
+	await goToRecordDetail(page, 'Currencies', unusedCode);
 	await goToEditTab(page);
 	await page.getByRole('button', { name: 'Delete' }).first().click();
 	const unusedDialog = page.getByRole('alertdialog');

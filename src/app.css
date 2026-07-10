@@ -33,13 +33,11 @@
 	--text-8xl: 5.9375rem;
 	--text-9xl: 7.9375rem;
 
-	--shadow-2xs: 0px 1px 1px var(--shadow-contact);
 	--shadow-xs: 0px 1px 2px var(--shadow-penumbra), 0px 1px 1px var(--shadow-contact);
 	--shadow-sm: 0px 2px 6px var(--shadow-penumbra), 0px 1px 1px var(--shadow-contact);
 	--shadow-md: 0px 4px 15px var(--shadow-umbra), 0px 1px 1px var(--shadow-contact);
 	--shadow-lg: 0px 10px 30px var(--shadow-umbra), 0px 2px 4px var(--shadow-penumbra);
 	--shadow-xl: 0px 18px 45px var(--shadow-umbra), 0px 4px 10px var(--shadow-penumbra);
-	--shadow-2xl: 0px 28px 65px var(--shadow-umbra);
 }
 
 :root {

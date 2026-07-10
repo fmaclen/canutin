@@ -1,7 +1,7 @@
 import { expect, test, type Locator } from '@playwright/test';
 
 import { AssetsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
-import { goToPageViaSidebar, goToRecordDetail, signIn } from './playwright.helpers';
+import { goToEditTab, goToPageViaSidebar, goToRecordDetail, signIn } from './playwright.helpers';
 import {
 	deleteAssetBalance,
 	recordExists,
@@ -84,6 +84,7 @@ test('assets table reflects filters and aggregate totals', async ({ page }) => {
 	);
 	await expectAssetRowCells(ownedRow, [
 		[3, '~'],
+		[6, '~'],
 		[7, '$5,000.00']
 	]);
 
@@ -309,7 +310,7 @@ test('user can add a new whole-valued asset', async ({ page }) => {
 	await page.getByLabel('Notes').fill('Stored in safety deposit box #142');
 	await page.getByLabel('Book value').fill('12000');
 	await page.getByLabel('Market value', { exact: true }).fill('15000');
-	await page.getByRole('button', { name: 'Add' }).click();
+	await page.getByRole('button', { name: 'Add', exact: true }).click();
 	await expect(page.getByText('Asset added')).toBeVisible();
 	await expect(page).toHaveURL('/assets');
 
@@ -336,12 +337,12 @@ test('optional currency fields show placeholder when not set', async ({ page }) 
 	await page.getByText('Other assets').click();
 	await page.getByLabel('Category').fill('Art');
 	await page.getByLabel('Market value', { exact: true }).fill('5000');
-	await page.getByRole('button', { name: 'Add' }).click();
+	await page.getByRole('button', { name: 'Add', exact: true }).click();
 	await expect(page.getByText('Asset added')).toBeVisible();
 	await expect(page).toHaveURL('/assets');
 
 	await page.getByRole('link', { name: 'Art Piece' }).click();
-	await page.getByRole('link', { name: 'Edit' }).click();
+	await goToEditTab(page);
 	await expect(page).toHaveURL(/\/assets\/.+\/edit/);
 	await expect(page.getByLabel('Market value', { exact: true })).toHaveValue('$5,000.00');
 	await expect(page.getByLabel('Book value')).toHaveValue('');
@@ -378,7 +379,7 @@ test('user can edit asset details and update balance', async ({ page }) => {
 	await initialRow.getByRole('link', { name: 'Vintage Watch Collection' }).click();
 	await expect(page).toHaveURL(new RegExp(`/assets/${wholeAsset.id}(\\?|$)`));
 
-	await page.getByRole('link', { name: 'Edit' }).click();
+	await goToEditTab(page);
 	await expect(page).toHaveURL(new RegExp(`/assets/${wholeAsset.id}/edit`));
 	await expect(page.getByLabel('Name')).toHaveValue('Vintage Watch Collection');
 	await expect(page.getByLabel('Category')).toHaveValue('Collectibles');
@@ -410,7 +411,7 @@ test('user can edit asset details and update balance', async ({ page }) => {
 	await renamedRow.getByRole('link', { name: 'Rare Coin Collection' }).click();
 	await expect(page).toHaveURL(new RegExp(`/assets/${wholeAsset.id}(\\?|$)`));
 
-	await page.getByRole('link', { name: 'Edit' }).click();
+	await goToEditTab(page);
 	await expect(page).toHaveURL(new RegExp(`/assets/${wholeAsset.id}/edit`));
 	await expect(page.getByLabel('Name')).toHaveValue('Rare Coin Collection');
 	await expect(page.getByLabel('Category')).toHaveValue('Collectibles');
@@ -422,7 +423,7 @@ test('user can edit asset details and update balance', async ({ page }) => {
 
 	await page.getByLabel('Market value', { exact: true }).fill('12500');
 	await page.getByLabel('Book value').fill('10000');
-	await page.getByRole('button', { name: 'Add' }).click();
+	await page.getByRole('button', { name: 'Add', exact: true }).click();
 	await expect(page.getByText('Balance updated')).toBeVisible();
 	await expect(page).toHaveURL('/assets');
 
@@ -436,7 +437,7 @@ test('user can edit asset details and update balance', async ({ page }) => {
 	await updatedRow.getByRole('link', { name: 'Rare Coin Collection' }).click();
 	await expect(page).toHaveURL(new RegExp(`/assets/${wholeAsset.id}(\\?|$)`));
 
-	await page.getByRole('link', { name: 'Edit' }).click();
+	await goToEditTab(page);
 	await expect(page).toHaveURL(new RegExp(`/assets/${wholeAsset.id}/edit`));
 	await page.getByLabel('Exclude from net worth').check();
 	await page.getByRole('button', { name: 'Save' }).click();
@@ -446,7 +447,7 @@ test('user can edit asset details and update balance', async ({ page }) => {
 	await page.getByRole('row', { name: 'Rare Coin Collection' }).getByRole('link').click();
 	await expect(page).toHaveURL(new RegExp(`/assets/${wholeAsset.id}(\\?|$)`));
 
-	await page.getByRole('link', { name: 'Edit' }).click();
+	await goToEditTab(page);
 	await expect(page).toHaveURL(new RegExp(`/assets/${wholeAsset.id}/edit`));
 	await expect(page.getByLabel('Exclude from net worth')).toBeChecked();
 	await page.getByLabel('Exclude from net worth').uncheck();
@@ -457,7 +458,7 @@ test('user can edit asset details and update balance', async ({ page }) => {
 	await page.getByRole('row', { name: 'Rare Coin Collection' }).getByRole('link').click();
 	await expect(page).toHaveURL(new RegExp(`/assets/${wholeAsset.id}(\\?|$)`));
 
-	await page.getByRole('link', { name: 'Edit' }).click();
+	await goToEditTab(page);
 	await expect(page).toHaveURL(new RegExp(`/assets/${wholeAsset.id}/edit`));
 	await expect(page.getByLabel('Exclude from net worth')).not.toBeChecked();
 });
@@ -515,7 +516,7 @@ test('user sees stale data warning and can refresh form', async ({ page }) => {
 	await page.getByRole('link', { name: 'Vanguard Total Stock Market' }).click();
 	await expect(page).toHaveURL(new RegExp(`/assets/${investment.id}(\\?|$)`));
 
-	await page.getByRole('link', { name: 'Edit' }).click();
+	await goToEditTab(page);
 	await expect(page).toHaveURL(new RegExp(`/assets/${investment.id}/edit`));
 	await expect(page.getByLabel('Name')).toHaveValue('Vanguard Total Stock Market');
 
@@ -588,7 +589,7 @@ test('asset reverts to prior balance on balance delete, then cascade deletes on 
 	await assetRow.getByRole('link', { name: 'Old Investment' }).click();
 	await expect(page).toHaveURL(new RegExp(`/assets/${asset.id}(\\?|$)`));
 
-	await page.getByRole('link', { name: 'Edit' }).click();
+	await goToEditTab(page);
 	await expect(page).toHaveURL(new RegExp(`/assets/${asset.id}/edit`));
 
 	await page.getByRole('button', { name: 'Delete' }).first().click();
@@ -606,7 +607,7 @@ test('asset reverts to prior balance on balance delete, then cascade deletes on 
 });
 
 test('asset overview shows balance history once it has at least two balances', async ({ page }) => {
-	const user = await seedUser('grace');
+	const user = await seedUser('gretchen');
 
 	const asset = await seedAsset({
 		name: 'Vintage Guitar',
@@ -639,6 +640,6 @@ test('asset overview shows balance history once it has at least two balances', a
 		marketValue: 5500
 	});
 	await expect(page.getByText('No balance history yet')).not.toBeVisible();
-	await expect(page.getByRole('heading', { name: 'Balance history' })).toBeVisible();
+	await expect(page.getByRole('img', { name: 'Balance' })).toBeVisible();
 	await expect(summary.getByRole('region', { name: 'Market value' })).toContainText('$5,500.00');
 });

@@ -14,7 +14,11 @@
 	import * as Table from '$lib/components/ui/table/index';
 	import { m } from '$lib/paraglide/messages';
 	import { getSecuritiesContext, type SecurityAggregate } from '$lib/securities.svelte';
-	import { formatSecurityQuantity, gainLossPercentOrNull } from '$lib/security-balance-values';
+	import {
+		formatSecurityQuantity,
+		gainLossPercentOrNull,
+		sentiment
+	} from '$lib/security-balance-values';
 	import {
 		createSortComparator,
 		formatPercent,
@@ -104,11 +108,6 @@
 	// NOTE: value/costBasis/gainLoss share one isConverted/isUnconverted pair per row (they're
 	// converted from the same security currency + balance date), so one pair covers every total.
 	const isTotalsUnconverted = $derived(rows.some((row) => row.isUnconverted));
-
-	function sentiment(value: number | null) {
-		if (value === null || value === 0) return 'neutral';
-		return value > 0 ? 'positive' : 'negative';
-	}
 </script>
 
 <Page pageTitle={m.portfolio_page_title()}>

@@ -22,7 +22,7 @@
 
 <Page pageTitle={m.sidebar_big_picture()}>
 	<Section>
-		<SectionTitle title="Summary" />
+		<SectionTitle title={m.big_picture_section_summary()} />
 		<Summary />
 	</Section>
 

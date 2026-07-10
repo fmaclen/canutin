@@ -59,6 +59,11 @@ export function gainLossPercentOrNull(
 	return (gainLoss / costBasis) * 100;
 }
 
+export function sentiment(value: number | null) {
+	if (value === null || value === 0) return 'neutral';
+	return value > 0 ? 'positive' : 'negative';
+}
+
 export function compareSecurityBalanceRecency(
 	a: SecurityBalanceValueInput,
 	b: SecurityBalanceValueInput

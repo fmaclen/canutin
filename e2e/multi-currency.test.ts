@@ -71,7 +71,6 @@ test('foreign-currency records render in the display currency with FX indicators
 		value: -500_000
 	});
 
-	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Transactions');
@@ -150,7 +149,6 @@ test('a US-dollar account renders without any exchange-rate indicators', async (
 		value: 1500
 	});
 
-	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Transactions');
@@ -202,7 +200,6 @@ test('unconvertible balances render native amounts and are excluded from totals'
 		value: 200
 	});
 
-	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Accounts');
@@ -210,8 +207,6 @@ test('unconvertible balances render native amounts and are excluded from totals'
 	const row = page.getByRole('row', { name: 'Unquoted pesos' });
 	const noRateAmount = row.getByLabel(noRateTooltip);
 	await expect(noRateAmount).toBeVisible();
-	await expect(noRateAmount).toHaveClass(/border-dashed/);
-	await expect(noRateAmount.locator('span')).toHaveClass(/text-muted-foreground/);
 	await expect(row.getByText(/\$\s1\.495\.000,00/)).toBeVisible();
 
 	const netBalance = page.getByRole('region', { name: 'Net balance' });

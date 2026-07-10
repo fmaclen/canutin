@@ -14,11 +14,6 @@ import (
 	"github.com/pocketbase/pocketbase/tools/types"
 )
 
-type createSecurityWithInitialBalanceBody struct {
-	Security createSecurityBody  `json:"security"`
-	Balance  securityBalanceBody `json:"balance"`
-}
-
 type createSecurityBody struct {
 	Name     string `json:"name"`
 	Symbol   string `json:"symbol"`
@@ -26,34 +21,43 @@ type createSecurityBody struct {
 	Currency string `json:"currency"`
 }
 
-type securityBalanceBody struct {
-	Account   string   `json:"account"`
-	Owner     string   `json:"owner"`
-	AsOf      string   `json:"asOf"`
-	Quantity  *float64 `json:"quantity"`
-	Price     *float64 `json:"price"`
-	Value     *float64 `json:"value"`
-	CostBasis *float64 `json:"costBasis"`
+type createSecurityWithInitialTransactionBody struct {
+	Security    createSecurityBody      `json:"security"`
+	Transaction securityTransactionBody `json:"transaction"`
 }
 
-func createSecurityWithInitialBalanceHandler(app core.App) func(*core.RequestEvent) error {
+type securityTransactionBody struct {
+	Account     string   `json:"account"`
+	Owner       string   `json:"owner"`
+	Date        string   `json:"date"`
+	Type        string   `json:"type"`
+	Subtype     string   `json:"subtype"`
+	Description string   `json:"description"`
+	Quantity    *float64 `json:"quantity"`
+	Price       *float64 `json:"price"`
+	Amount      *float64 `json:"amount"`
+	Fees        *float64 `json:"fees"`
+	Notes       string   `json:"notes"`
+}
+
+func createSecurityWithInitialTransactionHandler(app core.App) func(*core.RequestEvent) error {
 	return func(re *core.RequestEvent) error {
 		if re.Auth == nil {
 			return re.ForbiddenError("Authentication required", nil)
 		}
 
-		var body createSecurityWithInitialBalanceBody
+		var body createSecurityWithInitialTransactionBody
 		if err := re.BindBody(&body); err != nil {
 			return re.BadRequestError("Invalid request body", err)
 		}
 
-		if body.Security.Owner != re.Auth.Id || body.Balance.Owner != re.Auth.Id {
+		if body.Security.Owner != re.Auth.Id || body.Transaction.Owner != re.Auth.Id {
 			return re.ForbiddenError("Owner must match authenticated user", nil)
 		}
 
 		var security *core.Record
 		if err := app.RunInTransaction(func(txApp core.App) error {
-			if err := validateAccountOpen(txApp, body.Balance.Account, re.Auth); err != nil {
+			if err := validateAccountOpen(txApp, body.Transaction.Account, re.Auth); err != nil {
 				return err
 			}
 
@@ -71,27 +75,31 @@ func createSecurityWithInitialBalanceHandler(app core.App) func(*core.RequestEve
 				return err
 			}
 
-			balancesCollection, err := txApp.FindCollectionByNameOrId("securityBalances")
+			transactionsCollection, err := txApp.FindCollectionByNameOrId("securityTransactions")
 			if err != nil {
 				return err
 			}
 
-			balance := core.NewRecord(balancesCollection)
-			balance.Set("owner", body.Balance.Owner)
-			balance.Set("account", body.Balance.Account)
-			balance.Set("security", security.Id)
-			balance.Set("asOf", body.Balance.AsOf)
-			setOptionalNumber(balance, "quantity", body.Balance.Quantity)
-			setOptionalNumber(balance, "price", body.Balance.Price)
-			setOptionalNumber(balance, "value", body.Balance.Value)
-			setOptionalNumber(balance, "costBasis", body.Balance.CostBasis)
-			return txApp.Save(balance)
+			transaction := core.NewRecord(transactionsCollection)
+			transaction.Set("account", body.Transaction.Account)
+			transaction.Set("security", security.Id)
+			transaction.Set("owner", body.Transaction.Owner)
+			transaction.Set("date", body.Transaction.Date)
+			transaction.Set("type", body.Transaction.Type)
+			transaction.Set("subtype", body.Transaction.Subtype)
+			transaction.Set("description", body.Transaction.Description)
+			setOptionalNumber(transaction, "quantity", body.Transaction.Quantity)
+			setOptionalNumber(transaction, "price", body.Transaction.Price)
+			setOptionalNumber(transaction, "amount", body.Transaction.Amount)
+			setOptionalNumber(transaction, "fees", body.Transaction.Fees)
+			transaction.Set("notes", body.Transaction.Notes)
+			return txApp.Save(transaction)
 		}); err != nil {
 			var apiErr *router.ApiError
 			if errors.As(err, &apiErr) {
 				return apiErr
 			}
-			return re.BadRequestError("Failed to create security", err)
+			return re.BadRequestError("Failed to create security and transaction", err)
 		}
 
 		return re.JSON(http.StatusOK, security)
@@ -156,9 +164,8 @@ func validateSecurityRecordIntegrity(app core.App, record *core.Record) error {
 	return nil
 }
 
-// NOTE: bound to request-driven hooks (and the with-initial-balance endpoint) instead of
-// OnRecordValidate so that programmatic saves, like import restoring a closed account's
-// history, are not rejected.
+// NOTE: bound to request-driven hooks instead of OnRecordValidate so that programmatic
+// saves, like import restoring a closed account's history, are not rejected.
 func validateAccountOpen(app core.App, accountID string, auth *core.Record) error {
 	account, err := app.FindRecordById("accounts", accountID)
 	if err != nil || auth == nil || account.GetString("owner") != auth.Id {

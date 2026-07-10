@@ -36,11 +36,9 @@ test('settings switches language only after clicking Save and persists after rel
 	await expect(page.getByText('Agentes de IA', { exact: true })).toBeVisible();
 
 	await page.reload();
-
 	await expect(page.getByText('Agentes de IA', { exact: true })).toBeVisible();
 
 	await goToPageViaSidebar(page, 'Settings');
-
 	await expect(page.getByText('Interfaz')).toBeVisible();
 	await expect(page.getByLabel('Idioma')).toContainText('Español');
 });

@@ -18,9 +18,9 @@
 		formatTooltipValue: (value: number) => string;
 	} = $props();
 
-	const chartConfig = {
+	const chartConfig = $derived({
 		series: { label: seriesLabel, color: '#45403C' }
-	} satisfies Chart.ChartConfig;
+	} satisfies Chart.ChartConfig);
 
 	const yDomain = $derived.by(() => {
 		let min = Number.POSITIVE_INFINITY;
@@ -45,7 +45,12 @@
 	});
 </script>
 
-<Chart.Container config={chartConfig} class="h-[30vh] min-h-[220px] w-full">
+<Chart.Container
+	config={chartConfig}
+	class="h-[30vh] min-h-[220px] w-full"
+	role="img"
+	aria-label={seriesLabel}
+>
 	<LineChart
 		data={points}
 		x="date"

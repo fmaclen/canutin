@@ -28,7 +28,7 @@
 		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
 		<Breadcrumb.Root>
 			<Breadcrumb.List>
-				{#each trail as crumb, index (crumb.label)}
+				{#each trail as crumb, index (index)}
 					{#if index > 0}
 						<Breadcrumb.Separator />
 					{/if}

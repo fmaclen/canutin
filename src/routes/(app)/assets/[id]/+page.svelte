@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { getAssetsContext, type AssetWithBalance } from '$lib/assets.svelte';
-	import { createBalanceHistoryLoader } from '$lib/balance-history.svelte';
+	import { getAssetsContext } from '$lib/assets.svelte';
 	import BalanceHistoryChart from '$lib/components/balance-history-chart.svelte';
 	import { formatNativeCurrency } from '$lib/components/currency';
 	import Empty from '$lib/components/empty.svelte';
@@ -13,6 +12,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import type { AssetBalancesResponse } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+	import { projectSignedValue } from '$lib/sharing';
 
 	const assetsContext = getAssetsContext();
 	const pb = getPocketBaseContext();
@@ -25,21 +25,49 @@
 
 	const showBanner = $derived(loaded && !canWrite);
 
-	const balanceHistoryLoader = createBalanceHistoryLoader<AssetWithBalance, AssetBalancesResponse>(
-		pb,
-		'assets',
-		() => asset,
-		(current) =>
-			pb.authedClient.collection('assetBalances').getFullList<AssetBalancesResponse>({
-				filter: `asset='${current.id}'`,
+	const balanceHistoryAssetId = $derived(asset?.id ?? '');
+	const balanceHistoryPerspective = $derived(asset?.perspective);
+	let balanceHistory = $state<{ date: Date; value: number }[]>([]);
+	let balanceHistoryLoading = $state(true);
+
+	$effect(() => {
+		balanceHistory = [];
+		balanceHistoryLoading = Boolean(balanceHistoryAssetId);
+	});
+
+	$effect(() => {
+		const id = balanceHistoryAssetId;
+		const perspective = balanceHistoryPerspective;
+		const balanceEvent = assetsContext.lastBalanceEvent;
+		let cancelled = false;
+		if (!id || perspective === undefined || balanceEvent === 0) return;
+
+		void pb.authedClient
+			.collection('assetBalances')
+			.getFullList<AssetBalancesResponse>({
+				filter: `asset='${id}'`,
 				sort: 'asOf,created,id',
 				fields: 'id,marketValue,asOf',
 				requestKey: null
-			}),
-		(record) => record.marketValue ?? 0
-	);
-	const balanceHistory = $derived(balanceHistoryLoader.history);
-	const balanceHistoryLoading = $derived(balanceHistoryLoader.isLoading);
+			})
+			.then((records) => {
+				if (cancelled) return;
+				balanceHistory = records.map((record) => ({
+					date: new Date(record.asOf),
+					value: projectSignedValue(record.marketValue ?? 0, perspective)
+				}));
+				balanceHistoryLoading = false;
+			})
+			.catch((error) => {
+				if (cancelled) return;
+				pb.handleConnectionError(error, 'assets', 'balance_history');
+				balanceHistoryLoading = false;
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	});
 </script>
 
 {#if showBanner}
@@ -48,9 +76,14 @@
 	</Section>
 {/if}
 
-{#if loaded && asset}
-	<Section>
-		<SectionTitle title={m.assets_overview_section_summary()} />
+<Section>
+	<SectionTitle title={m.assets_overview_section_summary()} />
+	{#if !loaded || !asset}
+		<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+			<Skeleton class="h-14" />
+			<Skeleton class="h-14" />
+		</div>
+	{:else}
 		<div
 			role="region"
 			aria-label={m.assets_overview_section_summary()}
@@ -71,25 +104,25 @@
 				isUnconverted={asset.isUnconverted}
 			/>
 		</div>
-	</Section>
+	{/if}
+</Section>
 
-	<Section>
-		<SectionTitle title={m.balance_history_section_title()} />
-		{#if balanceHistoryLoading}
-			<Skeleton class="h-[30vh] min-h-[220px]" showSpinner />
-		{:else if balanceHistory.length >= 2}
-			<div class="bg-background overflow-visible rounded-sm shadow-md">
-				<BalanceHistoryChart
-					points={balanceHistory}
-					seriesLabel={m.balance_history_series_label()}
-					formatAxisValue={(value) => formatNativeCurrency(Math.round(value), 0, asset.currency)}
-					formatTooltipValue={(value) => formatNativeCurrency(value, 2, asset.currency)}
-				/>
-			</div>
-		{:else}
-			<div class="h-[30vh] min-h-[220px]">
-				<Empty class="h-full">{m.balance_history_empty()}</Empty>
-			</div>
-		{/if}
-	</Section>
-{/if}
+<Section>
+	<SectionTitle title={m.balance_history_section_title()} />
+	{#if !loaded || balanceHistoryLoading || !asset}
+		<Skeleton class="h-[30vh] min-h-[220px]" showSpinner />
+	{:else if balanceHistory.length >= 2}
+		<div class="bg-background overflow-visible rounded-sm shadow-md">
+			<BalanceHistoryChart
+				points={balanceHistory}
+				seriesLabel={m.balance_history_series_label()}
+				formatAxisValue={(value) => formatNativeCurrency(Math.round(value), 0, asset.currency)}
+				formatTooltipValue={(value) => formatNativeCurrency(value, 2, asset.currency)}
+			/>
+		</div>
+	{:else}
+		<div class="h-[30vh] min-h-[220px]">
+			<Empty class="h-full">{m.balance_history_empty()}</Empty>
+		</div>
+	{/if}
+</Section>

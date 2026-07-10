@@ -59,7 +59,6 @@ test('shared inverse account mirrors balances and transactions while allowing re
 		recipientPB.collection('accountShares').update(share.id, { perspective: 'NORMAL' })
 	).rejects.toThrow();
 
-	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, recipient.email);
 
@@ -122,7 +121,6 @@ test('shared inverse asset mirrors value fields while allowing recipient-only ne
 		includeInNetWorth: true
 	});
 
-	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, recipient.email);
 
@@ -171,7 +169,6 @@ test('owner creates account share via UI and recipient sees it with NORMAL persp
 		value: 5000
 	});
 
-	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, owner.email);
 
@@ -192,7 +189,6 @@ test('owner creates account share via UI and recipient sees it with NORMAL persp
 		sessionStorage.clear();
 	});
 	await page.context().clearCookies();
-	// Session entry point before signing in as the recipient.
 	await page.goto('/');
 	await signIn(page, recipient.email);
 
@@ -327,7 +323,6 @@ test('shared transaction detail page stays read-only for recipients', async ({ p
 		value: 250
 	});
 
-	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, recipient.email);
 
@@ -395,7 +390,6 @@ test('shared account and asset detail views keep currency formatting for recipie
 		includeInNetWorth: true
 	});
 
-	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, recipient.email);
 
@@ -525,7 +519,6 @@ test('recipient can leave a shared account via UI', async ({ page }) => {
 		includeInNetWorth: true
 	});
 
-	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, recipient.email);
 
@@ -572,7 +565,6 @@ test('recipient can leave a shared asset via UI', async ({ page }) => {
 		includeInNetWorth: true
 	});
 
-	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, recipient.email);
 

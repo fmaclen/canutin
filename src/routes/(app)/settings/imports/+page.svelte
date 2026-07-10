@@ -2,7 +2,7 @@
 	import { toast } from 'svelte-sonner';
 
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import Empty from '$lib/components/empty.svelte';
 	import Fieldset from '$lib/components/fieldset.svelte';
 	import FormFieldRow from '$lib/components/form-field-row.svelte';
@@ -54,7 +54,7 @@
 
 	const defaultSort: SortState<SessionSortColumn> = { column: 'created', direction: 'desc' };
 	const sortState = $derived.by(() => {
-		const urlSort = getSortFromUrl($page.url);
+		const urlSort = getSortFromUrl(page.url);
 		if (
 			urlSort.column &&
 			urlSort.direction &&
@@ -67,7 +67,7 @@
 
 	function handleSort(column: string) {
 		const newState = toggleSort(sortState, column as SessionSortColumn);
-		const newUrl = setSortInUrl($page.url, newState);
+		const newUrl = setSortInUrl(page.url, newState);
 		// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic URL computed at runtime
 		goto(newUrl, { replaceState: true, keepFocus: true });
 	}
@@ -124,157 +124,154 @@
 </script>
 
 <Section>
+	<SectionTitle title={m.settings_imports_section_title()} />
 	{#if importSessionsContext.isLoading}
 		<Skeleton class="h-64" showSpinner />
+	{:else if sortedRows.length === 0}
+		<Empty>
+			{m.settings_imports_empty()}
+		</Empty>
 	{:else}
-		<SectionTitle title={m.settings_imports_section_title()} />
-
-		{#if sortedRows.length === 0}
-			<Empty>
-				{m.settings_imports_empty()}
-			</Empty>
-		{:else}
-			<div class="bg-background overflow-hidden rounded-sm shadow-md">
-				<Table.Root>
-					<Table.Header>
-						<Table.Row>
-							<Table.SortableHead
-								class="text-left whitespace-nowrap"
-								column="label"
-								sortColumn={sortState.column}
-								sortDirection={sortState.direction}
-								onSort={handleSort}
+		<div class="bg-background overflow-hidden rounded-sm shadow-md">
+			<Table.Root>
+				<Table.Header>
+					<Table.Row>
+						<Table.SortableHead
+							class="text-left whitespace-nowrap"
+							column="label"
+							sortColumn={sortState.column}
+							sortDirection={sortState.direction}
+							onSort={handleSort}
+						>
+							{m.settings_imports_table_header_label()}
+						</Table.SortableHead>
+						<Table.Head class="text-left whitespace-nowrap">
+							{m.settings_imports_table_header_status()}
+						</Table.Head>
+						<Table.SortableHead
+							class="text-right whitespace-nowrap"
+							column="recordsCreated"
+							sortColumn={sortState.column}
+							sortDirection={sortState.direction}
+							onSort={handleSort}
+						>
+							{m.settings_imports_table_header_records()}
+						</Table.SortableHead>
+						<Table.SortableHead
+							class="text-right whitespace-nowrap"
+							column="recordsSkipped"
+							sortColumn={sortState.column}
+							sortDirection={sortState.direction}
+							onSort={handleSort}
+						>
+							{m.settings_imports_table_header_skipped()}
+						</Table.SortableHead>
+						<Table.SortableHead
+							class="text-right whitespace-nowrap"
+							column="recordsFailed"
+							sortColumn={sortState.column}
+							sortDirection={sortState.direction}
+							onSort={handleSort}
+						>
+							{m.settings_imports_table_header_failed()}
+						</Table.SortableHead>
+						<Table.SortableHead
+							class="text-right whitespace-nowrap"
+							column="created"
+							sortColumn={sortState.column}
+							sortDirection={sortState.direction}
+							onSort={handleSort}
+						>
+							{m.settings_imports_table_header_created()}
+						</Table.SortableHead>
+						<Table.Head class="w-0"></Table.Head>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					{#each sortedRows as row (row.id)}
+						<Table.Row class={row.status === 'rolled_back' ? 'bg-muted/30' : ''}>
+							<Table.Cell>
+								<span class="text-foreground/90 text-sm font-medium">
+									{row.label}
+								</span>
+							</Table.Cell>
+							<Table.Cell>
+								{#if row.status === 'completed'}
+									<Badge variant="cash">
+										{m.settings_imports_status_completed()}
+									</Badge>
+								{:else if row.status === 'completed_with_errors'}
+									<Badge variant="secondary">
+										{m.settings_imports_status_completed_with_errors()}
+									</Badge>
+								{:else if row.status === 'failed'}
+									<Badge variant="destructive">
+										{m.settings_imports_status_failed()}
+									</Badge>
+								{:else if row.status === 'pending'}
+									<Badge variant="outline">
+										{m.settings_imports_status_pending()}
+									</Badge>
+								{:else}
+									<Badge variant="outline">
+										{m.settings_imports_status_rolled_back()}
+									</Badge>
+								{/if}
+							</Table.Cell>
+							<Table.Cell class="text-foreground/80 text-right text-sm tabular-nums">
+								{row.recordsCreated}
+							</Table.Cell>
+							<Table.Cell class="text-foreground/80 text-right text-sm tabular-nums">
+								{row.recordsSkipped}
+							</Table.Cell>
+							<Table.Cell
+								class="text-right text-sm tabular-nums {row.recordsFailed
+									? 'text-destructive font-medium'
+									: 'text-foreground/80'}"
 							>
-								{m.settings_imports_table_header_label()}
-							</Table.SortableHead>
-							<Table.Head class="text-left whitespace-nowrap">
-								{m.settings_imports_table_header_status()}
-							</Table.Head>
-							<Table.SortableHead
-								class="text-right whitespace-nowrap"
-								column="recordsCreated"
-								sortColumn={sortState.column}
-								sortDirection={sortState.direction}
-								onSort={handleSort}
-							>
-								{m.settings_imports_table_header_records()}
-							</Table.SortableHead>
-							<Table.SortableHead
-								class="text-right whitespace-nowrap"
-								column="recordsSkipped"
-								sortColumn={sortState.column}
-								sortDirection={sortState.direction}
-								onSort={handleSort}
-							>
-								{m.settings_imports_table_header_skipped()}
-							</Table.SortableHead>
-							<Table.SortableHead
-								class="text-right whitespace-nowrap"
-								column="recordsFailed"
-								sortColumn={sortState.column}
-								sortDirection={sortState.direction}
-								onSort={handleSort}
-							>
-								{m.settings_imports_table_header_failed()}
-							</Table.SortableHead>
-							<Table.SortableHead
-								class="text-right whitespace-nowrap"
-								column="created"
-								sortColumn={sortState.column}
-								sortDirection={sortState.direction}
-								onSort={handleSort}
-							>
-								{m.settings_imports_table_header_created()}
-							</Table.SortableHead>
-							<Table.Head class="w-0"></Table.Head>
+								{row.recordsFailed ?? 0}
+							</Table.Cell>
+							<Table.Cell class="text-muted-foreground text-right text-sm">
+								{formatDate(row.created)}
+							</Table.Cell>
+							<Table.Cell class="text-right">
+								{#if row.status === 'completed' || row.status === 'completed_with_errors'}
+									<AlertDialog.Root>
+										<AlertDialog.Trigger disabled={revertingSessionId === row.id}>
+											<Button
+												variant="secondary"
+												size="sm"
+												disabled={revertingSessionId === row.id}
+											>
+												{m.settings_imports_revert_button()}
+											</Button>
+										</AlertDialog.Trigger>
+										<AlertDialog.Content>
+											<AlertDialog.Header>
+												<AlertDialog.Title>
+													{m.settings_imports_revert_confirm_title()}
+												</AlertDialog.Title>
+												<AlertDialog.Description>
+													{m.settings_imports_revert_confirm_description()}
+												</AlertDialog.Description>
+											</AlertDialog.Header>
+											<AlertDialog.Footer>
+												<AlertDialog.Cancel>
+													{m.settings_imports_revert_confirm_cancel()}
+												</AlertDialog.Cancel>
+												<AlertDialog.Action onclick={() => handleRevert(row.id)}>
+													{m.settings_imports_revert_confirm_continue()}
+												</AlertDialog.Action>
+											</AlertDialog.Footer>
+										</AlertDialog.Content>
+									</AlertDialog.Root>
+								{/if}
+							</Table.Cell>
 						</Table.Row>
-					</Table.Header>
-					<Table.Body>
-						{#each sortedRows as row (row.id)}
-							<Table.Row class={row.status === 'rolled_back' ? 'bg-muted/30' : ''}>
-								<Table.Cell>
-									<span class="text-foreground/90 text-sm font-medium">
-										{row.label}
-									</span>
-								</Table.Cell>
-								<Table.Cell>
-									{#if row.status === 'completed'}
-										<Badge variant="cash">
-											{m.settings_imports_status_completed()}
-										</Badge>
-									{:else if row.status === 'completed_with_errors'}
-										<Badge variant="secondary">
-											{m.settings_imports_status_completed_with_errors()}
-										</Badge>
-									{:else if row.status === 'failed'}
-										<Badge variant="destructive">
-											{m.settings_imports_status_failed()}
-										</Badge>
-									{:else if row.status === 'pending'}
-										<Badge variant="outline">
-											{m.settings_imports_status_pending()}
-										</Badge>
-									{:else}
-										<Badge variant="outline">
-											{m.settings_imports_status_rolled_back()}
-										</Badge>
-									{/if}
-								</Table.Cell>
-								<Table.Cell class="text-foreground/80 text-right text-sm tabular-nums">
-									{row.recordsCreated}
-								</Table.Cell>
-								<Table.Cell class="text-foreground/80 text-right text-sm tabular-nums">
-									{row.recordsSkipped}
-								</Table.Cell>
-								<Table.Cell
-									class="text-right text-sm tabular-nums {row.recordsFailed
-										? 'text-destructive font-medium'
-										: 'text-foreground/80'}"
-								>
-									{row.recordsFailed ?? 0}
-								</Table.Cell>
-								<Table.Cell class="text-muted-foreground text-right text-sm">
-									{formatDate(row.created)}
-								</Table.Cell>
-								<Table.Cell class="text-right">
-									{#if row.status === 'completed' || row.status === 'completed_with_errors'}
-										<AlertDialog.Root>
-											<AlertDialog.Trigger disabled={revertingSessionId === row.id}>
-												<Button
-													variant="secondary"
-													size="sm"
-													disabled={revertingSessionId === row.id}
-												>
-													{m.settings_imports_revert_button()}
-												</Button>
-											</AlertDialog.Trigger>
-											<AlertDialog.Content>
-												<AlertDialog.Header>
-													<AlertDialog.Title>
-														{m.settings_imports_revert_confirm_title()}
-													</AlertDialog.Title>
-													<AlertDialog.Description>
-														{m.settings_imports_revert_confirm_description()}
-													</AlertDialog.Description>
-												</AlertDialog.Header>
-												<AlertDialog.Footer>
-													<AlertDialog.Cancel>
-														{m.settings_imports_revert_confirm_cancel()}
-													</AlertDialog.Cancel>
-													<AlertDialog.Action onclick={() => handleRevert(row.id)}>
-														{m.settings_imports_revert_confirm_continue()}
-													</AlertDialog.Action>
-												</AlertDialog.Footer>
-											</AlertDialog.Content>
-										</AlertDialog.Root>
-									{/if}
-								</Table.Cell>
-							</Table.Row>
-						{/each}
-					</Table.Body>
-				</Table.Root>
-			</div>
-		{/if}
+					{/each}
+				</Table.Body>
+			</Table.Root>
+		</div>
 	{/if}
 </Section>
 

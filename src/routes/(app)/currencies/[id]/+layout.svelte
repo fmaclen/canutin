@@ -65,9 +65,7 @@
 </script>
 
 {#snippet subNav()}
-	{#if !isUsd}
-		<SubNav items={subNavItems} />
-	{/if}
+	<SubNav items={subNavItems} />
 {/snippet}
 
 <Page pageTitle={currency?.code ?? ''} {crumbs} subNav={isUsd ? undefined : subNav}>

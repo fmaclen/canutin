@@ -23,7 +23,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import { ExchangeRatesSourceOptions } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
-	import { sanitizeFromParam } from '$lib/utils';
+	import { responseFieldCode, sanitizeFromParam } from '$lib/utils';
 
 	const pb = getPocketBaseContext();
 	const auth = getAuthContext();
@@ -42,19 +42,6 @@
 	let initializedCurrencyId = $state('');
 	let quoteDate = $state(new Date().toISOString().slice(0, 10));
 	let quoteRate = $state('');
-
-	function isRecord(value: unknown): value is Record<string, unknown> {
-		return typeof value === 'object' && value !== null;
-	}
-
-	function responseFieldCode(error: ClientResponseError, field: string) {
-		const data: unknown = error.response?.data;
-		if (!isRecord(data)) return '';
-		const fieldData = data[field];
-		if (!isRecord(fieldData)) return '';
-		const errorCode = fieldData.code;
-		return typeof errorCode === 'string' ? errorCode : '';
-	}
 
 	$effect(() => {
 		if (!currency) return;

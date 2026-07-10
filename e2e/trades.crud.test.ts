@@ -166,7 +166,7 @@ test('creating, editing, and deleting trades never changes a position market val
 	await page.getByLabel('Quantity').fill('5');
 	await page.getByLabel('Price').fill('180');
 	await page.getByLabel('Amount').fill('900');
-	await page.getByRole('button', { name: 'Add' }).click();
+	await page.getByRole('button', { name: 'Add', exact: true }).click();
 	await expect(page.getByText('Trade added')).toBeVisible();
 	await expect(page).toHaveURL('/trades');
 
@@ -222,21 +222,19 @@ test('user can create a new security inline while adding a trade', async ({ page
 	await page.getByLabel('Account').click();
 	await page.getByRole('option', { name: 'Meridian Brokerage' }).click();
 	await page.getByLabel('Date').fill(formatDateForInput(new UTCDate()));
-
 	await page.getByLabel('Security').click();
 	await page.getByRole('option', { name: 'Create new security' }).click();
 	await expect(page.getByLabel('Name')).toBeVisible();
 	await expect(page.getByLabel('Currency')).toBeVisible();
+
 	await page.getByLabel('Name').fill('Thorium Yield Fund');
 	await page.getByLabel('Symbol').fill('TYF');
-
 	await page.getByLabel('Description').fill('Thorium opening position');
 	await page.getByLabel('Quantity').fill('12');
 	await page.getByLabel('Price').fill('150');
 	await page.getByLabel('Amount').fill('1800');
 	await page.getByLabel('Fees').fill('4');
-	await page.getByRole('button', { name: 'Add' }).click();
-
+	await page.getByRole('button', { name: 'Add', exact: true }).click();
 	await expect(page.getByText('Trade added')).toBeVisible();
 	await expect(page).toHaveURL('/trades');
 

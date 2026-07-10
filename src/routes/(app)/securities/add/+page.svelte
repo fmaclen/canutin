@@ -18,6 +18,7 @@
 	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+	import { isDuplicateSecurityNameError } from '$lib/utils';
 
 	const pb = getPocketBaseContext();
 	const auth = getAuthContext();
@@ -57,6 +58,10 @@
 			toast.success(m.securities_add_success());
 			await goto(resolve('/securities'));
 		} catch (error) {
+			if (isDuplicateSecurityNameError(error)) {
+				toast.error(m.securities_name_duplicate());
+				return;
+			}
 			logError('securitiesAdd', 'create', error);
 			toast.error(m.securities_add_failed());
 		}

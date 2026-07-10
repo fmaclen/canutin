@@ -158,7 +158,7 @@
 
 <Page pageTitle={m.sidebar_balance_sheet()}>
 	<Section>
-		<SectionTitle title="Balances" />
+		<SectionTitle title={m.balance_sheet_section_balances()} />
 		<div class="grid gap-x-6 gap-y-8 md:grid-cols-2 xl:grid-cols-4">
 			{#each balanceGroups as balanceGroup (balanceGroup)}
 				<div class="balances-cell flex w-full flex-col gap-3" data-testid={balanceGroup}>

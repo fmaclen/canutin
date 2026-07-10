@@ -1,4 +1,5 @@
 import { clsx, type ClassValue } from 'clsx';
+import { ClientResponseError } from 'pocketbase';
 import { twMerge } from 'tailwind-merge';
 
 import { env } from '$env/dynamic/public';
@@ -131,6 +132,26 @@ export function isUnavailableRecordError(error: unknown) {
 		error !== null &&
 		'status' in error &&
 		(error.status === 403 || error.status === 404)
+	);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null;
+}
+
+export function responseFieldCode(error: ClientResponseError, field: string) {
+	const data: unknown = error.response?.data;
+	if (!isRecord(data)) return '';
+	const fieldData = data[field];
+	if (!isRecord(fieldData)) return '';
+	return typeof fieldData.code === 'string' ? fieldData.code : '';
+}
+
+export function isDuplicateSecurityNameError(error: unknown) {
+	return (
+		error instanceof ClientResponseError &&
+		error.status === 400 &&
+		responseFieldCode(error, 'name') === 'security_name_exists'
 	);
 }
 

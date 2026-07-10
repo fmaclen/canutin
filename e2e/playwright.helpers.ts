@@ -17,21 +17,11 @@ export async function signIn(page: Page, email: string) {
 	await expect(page.getByRole('button', { name: 'Toggle Sidebar' })).toBeVisible();
 }
 
-export async function signOut(page: Page, userLabel: string) {
-	const userButton = page.getByRole('button', { name: userLabel });
-	if (!(await userButton.isVisible())) {
-		await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
-		await expect(userButton).toBeVisible();
-	}
-	await userButton.click();
-	await page.getByRole('menuitem', { name: 'Log out' }).click();
-	await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
-}
-
 // Label → route map used by goToPageViaSidebar. Keep in sync with app-sidebar.svelte,
 // nav-user.svelte, and settings/+layout.svelte (Imports lives in the settings SubNav).
 const SIDEBAR_ROUTES: Record<string, string> = {
 	Accounts: '/accounts',
+	Currencies: '/currencies',
 	Assets: '/assets',
 	Portfolio: '/portfolio',
 	Securities: '/securities',
@@ -60,8 +50,6 @@ export async function goToPageViaSidebar(page: Page, label: string) {
 // render a single "Add …" action link in their page header. Keep in sync with the
 // `{#snippet actions()}` blocks in the corresponding index +page.svelte files.
 const ADD_LINK_LABELS: Record<string, string> = {
-	Accounts: 'Add account',
-	Assets: 'Add asset',
 	Transactions: 'Add transaction',
 	Trades: 'Add trade',
 	Securities: 'Add security',

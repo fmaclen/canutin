@@ -50,6 +50,8 @@ test('navigating between authenticated realtime routes emits no realtime 403', a
 
 	const forbidden = collectRealtimeAuthForbidden(page);
 
+	// NOTE: exercise the authenticated root redirect while collecting realtime authorization failures.
+	await page.goto('/');
 	await expect(page.getByRole('region', { name: 'Net worth' })).toBeVisible();
 
 	await goToPageViaSidebar(page, 'Big picture');

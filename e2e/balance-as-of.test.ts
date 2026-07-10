@@ -32,7 +32,6 @@ test('account detail page shows "As of <date>" next to the Balance label', async
 		value: 2510
 	});
 
-	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
 
@@ -73,7 +72,6 @@ test('asset detail page shows "As of <date>" next to the Market value label', as
 		marketValue: 5500
 	});
 
-	// Session entry point before sign-in.
 	await page.goto('/');
 	await signIn(page, user.email);
 

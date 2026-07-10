@@ -18,7 +18,7 @@ export type TrendSecurityValueState = {
 export function latestIndexBeforeOrEqual<T extends { asOf: string }>(
 	entries: T[],
 	targetDate: Date,
-	startIndex = -1
+	startIndex: number
 ) {
 	const cutoffDate = endOfDay(new UTCDate(targetDate.getTime()));
 	let index = startIndex;
