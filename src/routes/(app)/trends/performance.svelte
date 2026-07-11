@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { UTCDate } from '@date-fns/utc';
-	import { endOfDay, startOfYear, subDays, subMonths, subYears } from 'date-fns';
+	import { endOfDay, startOfYear, sub } from 'date-fns';
 
 	import {
 		advanceTrendSecurityValue,
@@ -135,14 +135,6 @@
 		{ key: 'max', label: m.period_max_label(), offset: { max: true } }
 	];
 
-	function subtractFromDate(now: Date, o: { days?: number; months?: number; years?: number }) {
-		let d = now;
-		if (o.days) d = subDays(d, o.days);
-		if (o.months) d = subMonths(d, o.months);
-		if (o.years) d = subYears(d, o.years);
-		return d;
-	}
-
 	function percentChange(currentValue: number, previousValue: number) {
 		if (!previousValue || previousValue === 0) return null;
 		return (currentValue - previousValue) / Math.abs(previousValue);
@@ -267,7 +259,7 @@
 		const boundedPeriods = periods.filter((periodDef) => !periodDef.offset.max);
 		const anchorDates = boundedPeriods.map((periodDef) => {
 			if (periodDef.offset.ytd) return endOfDay(startOfYear(new UTCDate()));
-			const anchorDate = subtractFromDate(new UTCDate(), periodDef.offset);
+			const anchorDate = sub(new UTCDate(), periodDef.offset);
 			return endOfDay(anchorDate);
 		});
 		const totals = computeTotals(prepared, [...anchorDates, now]);

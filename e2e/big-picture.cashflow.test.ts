@@ -86,19 +86,19 @@ test.describe('big picture cashflow chart', () => {
 		});
 
 		const periodSeeds: PeriodSeed[] = [
-			{ monthsAgo: 0, income: 1000, expenses: -400 }, // Current month: surplus +600
-			{ monthsAgo: 1, income: 500, expenses: -800 }, // 1 month ago: deficit -300
-			{ monthsAgo: 2, income: 1200, expenses: -300 }, // 2 months ago: surplus +900
-			{ monthsAgo: 3, income: 400, expenses: -1100 }, // 3 months ago: deficit -700 (+ boundary)
-			{ monthsAgo: 4, income: 1400, expenses: -500 }, // 4 months ago: surplus +900
-			{ monthsAgo: 5, income: 300, expenses: -1500 }, // 5 months ago: deficit -1200 (lowest)
-			{ monthsAgo: 6, income: 1600, expenses: -200 }, // 6 months ago: surplus +1400 (+ boundary)
-			{ monthsAgo: 7, income: 600, expenses: -900 }, // 7 months ago: deficit -300
-			{ monthsAgo: 8, income: 1800, expenses: -100 }, // 8 months ago: surplus +1700 (highest)
-			{ monthsAgo: 9, income: 700, expenses: -1000 }, // 9 months ago: deficit -300 (+ boundary)
-			{ monthsAgo: 10, income: 1100, expenses: -600 }, // 10 months ago: surplus +500
-			{ monthsAgo: 11, income: 200, expenses: -700 }, // 11 months ago: deficit -500
-			{ monthsAgo: 12, income: 900, expenses: -400 } // 12 months ago: surplus +500
+			{ monthsAgo: 0, income: 1000, expenses: -400 },
+			{ monthsAgo: 1, income: 500, expenses: -800 },
+			{ monthsAgo: 2, income: 1200, expenses: -300 },
+			{ monthsAgo: 3, income: 400, expenses: -1100 },
+			{ monthsAgo: 4, income: 1400, expenses: -500 },
+			{ monthsAgo: 5, income: 300, expenses: -1500 },
+			{ monthsAgo: 6, income: 1600, expenses: -200 },
+			{ monthsAgo: 7, income: 600, expenses: -900 },
+			{ monthsAgo: 8, income: 1800, expenses: -100 },
+			{ monthsAgo: 9, income: 700, expenses: -1000 },
+			{ monthsAgo: 10, income: 1100, expenses: -600 },
+			{ monthsAgo: 11, income: 200, expenses: -700 },
+			{ monthsAgo: 12, income: 900, expenses: -400 }
 		];
 
 		for (const seed of periodSeeds) {
@@ -119,7 +119,6 @@ test.describe('big picture cashflow chart', () => {
 			});
 		}
 
-		// Boundary transactions - should be included in their respective months
 		await seedTransaction({
 			account: account.id,
 			owner: user.id,
@@ -144,7 +143,6 @@ test.describe('big picture cashflow chart', () => {
 			value: 25
 		});
 
-		// Out-of-range transactions (should NOT appear)
 		await seedTransaction({
 			account: account.id,
 			owner: user.id,
@@ -178,7 +176,6 @@ test.describe('big picture cashflow chart', () => {
 		await page.goto('/');
 		await signIn(page, user.email);
 
-		// Expected surplus: income + expenses (boundary txs added to months 3, 6, 9)
 		const expectedSurplus = [
 			600, -300, 900, -650, 900, -1200, 1475, -300, 1700, -275, 500, -500, 500
 		];
@@ -192,7 +189,6 @@ test.describe('big picture cashflow chart', () => {
 			const periodLabel = getExpectedPeriodLabel(monthsAgo);
 			const surplus = formatSurplus(expectedSurplus[monthsAgo]);
 
-			// aria-label format: "{periodLabel}: {surplus}"
 			const ariaLabel = `${periodLabel}: ${surplus}`;
 			await page.getByRole('link', { name: ariaLabel }).hover();
 			await expect(page.getByRole('link', { name: ariaLabel })).toBeVisible();
@@ -218,7 +214,6 @@ test('clicking cashflow chart bar navigates to transactions filtered by that mon
 		autoCalculated: new Date().toISOString()
 	});
 
-	// Seed transactions in a specific month (2 months ago to ensure it's in the chart)
 	const now = new UTCDate();
 	const targetMonth = addMonths(startOfMonth(now), -2);
 	const targetMonthLabel = format(targetMonth, 'MMMM yyyy');
@@ -254,7 +249,6 @@ test('clicking cashflow chart bar navigates to transactions filtered by that mon
 		value: -500
 	});
 
-	// Seed a transaction in the current month (should NOT be visible after filtering)
 	await seedTransaction({
 		account: account.id,
 		owner: elena.id,
@@ -266,26 +260,20 @@ test('clicking cashflow chart bar navigates to transactions filtered by that mon
 	await page.goto('/');
 	await signIn(page, elena.email);
 
-	// Click on the target month's bar in the cashflow chart
-	// The bar has aria-label "{periodLabel}: {surplus}" format
-	const expectedSurplus = '$1,000'; // 1500 - 500 = 1000
+	const expectedSurplus = '$1,000';
 	const ariaLabel = `${targetMonthLabel}: ${expectedSurplus}`;
 	await page.getByRole('link', { name: ariaLabel }).click();
 
-	// Should navigate to transactions page with custom date range params
 	await expect(page).toHaveURL(/\/transactions/);
 	await expect(page).toHaveURL(/periodFrom=/);
 	await expect(page).toHaveURL(/periodTo=/);
 
-	// Period filter should show the month label
 	await expect(page.getByLabel('Period')).toContainText(targetMonthLabel);
 
-	// Only transactions from the target month should be visible
 	await expect(page.getByText('Target Month Income')).toBeVisible();
 	await expect(page.getByText('Target Month Expense')).toBeVisible();
 	await expect(page.getByText('Current Month Transaction')).not.toBeVisible();
 
-	// Switch to a preset period - custom URL params should be cleared
 	await page.getByLabel('Period').click();
 	await page.getByRole('button', { name: 'Lifetime' }).click();
 
@@ -294,7 +282,6 @@ test('clicking cashflow chart bar navigates to transactions filtered by that mon
 	await expect(page).not.toHaveURL(/periodTo=/);
 	await expect(page).not.toHaveURL(/periodLabel=/);
 
-	// All transactions should now be visible
 	await expect(page.getByText('Target Month Income')).toBeVisible();
 	await expect(page.getByText('Target Month Expense')).toBeVisible();
 	await expect(page.getByText('Current Month Transaction')).toBeVisible();

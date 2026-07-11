@@ -245,7 +245,6 @@ test('trends performance table', async ({ page }) => {
 	const netCells = netRow.getByRole('cell');
 	await expect(netCells).toHaveCount(10, { timeout: 10000 });
 
-	// Volatile periods: just verify they render (percentage button or ~ placeholder)
 	for (const i of [1, 2, 3, 4, 5]) {
 		const cell = netCells.nth(i);
 		await expect(cell.getByRole('button').or(cell.getByText('~'))).toBeVisible();
@@ -254,9 +253,9 @@ test('trends performance table', async ({ page }) => {
 	// Stable periods: exact values. Closed accounts and sold assets contribute their
 	// last-known value to historical datepoints (zeroed only at/after their close/sell
 	// date), so the net at every prior anchor includes Closed Other and Sold Asset.
-	await expect(netCells.nth(6).getByRole('button', { name: '-77.8%' })).toBeVisible(); // 2Y
-	await expect(netCells.nth(7).getByRole('button', { name: '-77.3%' })).toBeVisible(); // 5Y
-	await expect(netCells.nth(8).getByRole('button', { name: '-70.6%' })).toBeVisible(); // MAX
+	await expect(netCells.nth(6).getByRole('button', { name: '-77.8%' })).toBeVisible();
+	await expect(netCells.nth(7).getByRole('button', { name: '-77.3%' })).toBeVisible();
+	await expect(netCells.nth(8).getByRole('button', { name: '-70.6%' })).toBeVisible();
 
 	const cashRow = page.getByRole('row', { name: /^Cash/ });
 	const cashCells = cashRow.getByRole('cell');
@@ -266,9 +265,9 @@ test('trends performance table', async ({ page }) => {
 		await expect(cell.getByRole('button').or(cell.getByText('~'))).toBeVisible();
 	}
 
-	await expect(cashCells.nth(6).getByRole('button', { name: '+207.7%' })).toBeVisible(); // 2Y
-	await expect(cashCells.nth(7).getByRole('button', { name: '+300%' })).toBeVisible(); // 5Y
-	await expect(cashCells.nth(8).getByRole('button', { name: '+700%' })).toBeVisible(); // MAX
+	await expect(cashCells.nth(6).getByRole('button', { name: '+207.7%' })).toBeVisible();
+	await expect(cashCells.nth(7).getByRole('button', { name: '+300%' })).toBeVisible();
+	await expect(cashCells.nth(8).getByRole('button', { name: '+700%' })).toBeVisible();
 
 	const debtRow = page.getByRole('row', { name: /^Debt/ });
 	const debtCells = debtRow.getByRole('cell');
@@ -278,7 +277,7 @@ test('trends performance table', async ({ page }) => {
 		await expect(cell.getByRole('button').or(cell.getByText('~'))).toBeVisible();
 	}
 
-	await expect(debtCells.nth(6).getByRole('button', { name: '+42.9%' })).toBeVisible(); // 2Y
-	await expect(debtCells.nth(7).getByRole('button', { name: '+50%' })).toBeVisible(); // 5Y
-	await expect(debtCells.nth(8).getByRole('button', { name: '+200%' })).toBeVisible(); // MAX
+	await expect(debtCells.nth(6).getByRole('button', { name: '+42.9%' })).toBeVisible();
+	await expect(debtCells.nth(7).getByRole('button', { name: '+50%' })).toBeVisible();
+	await expect(debtCells.nth(8).getByRole('button', { name: '+200%' })).toBeVisible();
 });

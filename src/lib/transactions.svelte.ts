@@ -24,7 +24,7 @@ import {
 	type SortState
 } from './utils';
 
-export type TransactionSortColumn = 'date' | 'description' | 'account' | 'amount';
+type TransactionSortColumn = 'date' | 'description' | 'account' | 'amount';
 
 function isTransactionSortColumn(column: string): column is TransactionSortColumn {
 	return (
@@ -1038,12 +1038,10 @@ class TransactionsContext {
 	}
 }
 
-const CONTEXT_KEY_TRANSACTIONS = 'transactions';
-
 export function setTransactionsContext(pb: PocketBaseContext) {
-	return setContext(CONTEXT_KEY_TRANSACTIONS, new TransactionsContext(pb));
+	return setContext('transactions', new TransactionsContext(pb));
 }
 
 export function getTransactionsContext() {
-	return getContext<ReturnType<typeof setTransactionsContext>>(CONTEXT_KEY_TRANSACTIONS);
+	return getContext<ReturnType<typeof setTransactionsContext>>('transactions');
 }

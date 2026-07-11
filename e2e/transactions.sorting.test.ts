@@ -57,7 +57,6 @@ test.describe('transactions table sorting', () => {
 
 		const rows = page.locator('tbody tr');
 
-		// Default sort is date DESC (most recent first)
 		expect(await getRowIndex(rows, 'Recent Transaction')).toBeLessThan(
 			await getRowIndex(rows, 'Mid Transaction')
 		);
@@ -65,7 +64,6 @@ test.describe('transactions table sorting', () => {
 			await getRowIndex(rows, 'Old Transaction')
 		);
 
-		// Click Date header - default is already DESC, so clicking toggles to ASC
 		const dateHeader = page.getByRole('button', { name: 'Date' });
 		await dateHeader.click();
 
@@ -80,7 +78,6 @@ test.describe('transactions table sorting', () => {
 			await getRowIndex(rows, 'Recent Transaction')
 		);
 
-		// Click again - should toggle back to DESC
 		await dateHeader.click();
 		await expect(page).toHaveURL(/dir=desc/);
 		await expect(rows.first()).toContainText('Recent Transaction');
@@ -380,7 +377,6 @@ test.describe('transactions table sorting', () => {
 		await amountButton.click();
 		await expect(amountHeader).toHaveAttribute('aria-sort', 'ascending');
 
-		// Click Date header - Date is default column, but we switched away, so clicking goes to DESC
 		const dateButton = page.getByRole('button', { name: 'Date' });
 		const dateHeader = dateButton.locator('xpath=..');
 		await dateButton.click();
@@ -434,18 +430,15 @@ test.describe('transactions table sorting', () => {
 		await goToPageViaSidebar(page, 'Transactions');
 		await expect(page.getByRole('row', { name: 'Credit A' })).toBeVisible();
 
-		// Apply Credits only filter first
 		await page.getByLabel('Type').click();
 		await page.getByRole('option', { name: 'Credits only' }).click();
 
-		// Then sort by amount DESC - sorting should work on filtered results
 		const amountHeader = page.getByRole('button', { name: 'Amount' });
 		await amountHeader.click();
 		await expect(page).toHaveURL(/sort=amount/);
 
 		const rows = page.locator('tbody tr');
 
-		// With filter applied, only credits visible, sorted by amount DESC (Credit A = 1000 > Credit B = 500)
 		expect(await getRowIndex(rows, 'Credit A')).toBeLessThan(await getRowIndex(rows, 'Credit B'));
 	});
 });

@@ -1,6 +1,8 @@
 <script lang="ts">
+	import { UTCDate } from '@date-fns/utc';
 	import { scaleUtc } from 'd3-scale';
 	import { curveBumpX } from 'd3-shape';
+	import { eachDayOfInterval } from 'date-fns';
 	import { LineChart } from 'layerchart';
 	import { SvelteMap } from 'svelte/reactivity';
 
@@ -170,13 +172,7 @@
 			rawAssetBalances
 		);
 
-		const startUTC = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
-		const endUTC = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
-		const MS_PER_DAY = 24 * 60 * 60 * 1000;
-		const datePoints: Date[] = [];
-		for (let utcTime = startUTC; utcTime <= endUTC; utcTime += MS_PER_DAY) {
-			datePoints.push(new Date(utcTime));
-		}
+		const datePoints = eachDayOfInterval({ start: new UTCDate(start), end: new UTCDate(end) });
 
 		const {
 			accountBalancesByAccountId,

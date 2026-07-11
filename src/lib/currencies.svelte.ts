@@ -8,16 +8,11 @@ import type { PocketBaseContext } from './pocketbase.svelte';
 
 const DEBOUNCE_MS = 200;
 
-export type CurrencyRegistryRow = {
+type CurrencyRegistryRow = {
 	id: string;
 	code: string;
 	name: string;
 	autoUpdate: boolean;
-};
-
-export type CurrencySelectOption = CurrencyRegistryRow & {
-	value: string;
-	label: string;
 };
 
 class CurrenciesContext {
@@ -160,12 +155,10 @@ class CurrenciesContext {
 	}
 }
 
-export const CONTEXT_KEY_CURRENCIES = 'currencies';
-
 export function setCurrenciesContext(pb: PocketBaseContext) {
-	return setContext(CONTEXT_KEY_CURRENCIES, new CurrenciesContext(pb));
+	return setContext('currencies', new CurrenciesContext(pb));
 }
 
 export function getCurrenciesContext() {
-	return getContext<ReturnType<typeof setCurrenciesContext>>(CONTEXT_KEY_CURRENCIES);
+	return getContext<ReturnType<typeof setCurrenciesContext>>('currencies');
 }

@@ -3,11 +3,8 @@ import { expect, test } from '@playwright/test';
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
 import { seedPortfolio, seedUser } from './pocketbase.helpers';
 
-test('portfolio: aggregate table defaults to market value descending with unknown values last', async ({
-	page
-}) => {
-	const user = await seedUser('fatima');
-	await seedPortfolio(user.id, {
+function seedSortingPortfolio(userId: string) {
+	return seedPortfolio(userId, {
 		accounts: ['Main Brokerage', 'Second Brokerage', 'Third Brokerage'],
 		securities: [
 			{ name: 'Alpha Holdings', symbol: 'ZZZ' },
@@ -66,6 +63,13 @@ test('portfolio: aggregate table defaults to market value descending with unknow
 			}
 		]
 	});
+}
+
+test('portfolio: aggregate table defaults to market value descending with unknown values last', async ({
+	page
+}) => {
+	const user = await seedUser('fatima');
+	await seedSortingPortfolio(user.id);
 
 	await page.goto('/');
 	await signIn(page, user.email);
@@ -82,65 +86,7 @@ test('portfolio: aggregate table sorts by security name descending then ascendin
 	page
 }) => {
 	const user = await seedUser('fatima');
-	await seedPortfolio(user.id, {
-		accounts: ['Main Brokerage', 'Second Brokerage', 'Third Brokerage'],
-		securities: [
-			{ name: 'Alpha Holdings', symbol: 'ZZZ' },
-			{ name: 'Bravo Holdings', symbol: 'WWW' },
-			{ name: 'Charlie Holdings', symbol: 'YYY' },
-			{ name: 'Delta Holdings', symbol: 'XXX' }
-		],
-		balances: [
-			{
-				account: 'Main Brokerage',
-				security: 'Alpha Holdings',
-				quantity: 5,
-				price: 300,
-				value: 1500,
-				costBasis: 1200
-			},
-			{
-				account: 'Third Brokerage',
-				security: 'Alpha Holdings',
-				quantity: 10,
-				price: 300,
-				value: 3000,
-				costBasis: 2500
-			},
-			{
-				account: 'Main Brokerage',
-				security: 'Bravo Holdings',
-				quantity: 14,
-				price: 250,
-				value: 3500,
-				costBasis: 3000
-			},
-			{
-				account: 'Second Brokerage',
-				security: 'Charlie Holdings',
-				quantity: 16,
-				price: 250,
-				value: 4000,
-				costBasis: 3400
-			},
-			{
-				account: 'Second Brokerage',
-				security: 'Delta Holdings',
-				quantity: 6,
-				price: null,
-				value: null,
-				costBasis: 600
-			},
-			{
-				account: 'Third Brokerage',
-				security: 'Delta Holdings',
-				quantity: 2,
-				price: 50,
-				value: 100,
-				costBasis: 80
-			}
-		]
-	});
+	await seedSortingPortfolio(user.id);
 
 	await page.goto('/');
 	await signIn(page, user.email);
@@ -167,65 +113,7 @@ test('portfolio: aggregate table sorts by security name descending then ascendin
 
 test('portfolio: aggregate table sorts by symbol', async ({ page }) => {
 	const user = await seedUser('fatima');
-	await seedPortfolio(user.id, {
-		accounts: ['Main Brokerage', 'Second Brokerage', 'Third Brokerage'],
-		securities: [
-			{ name: 'Alpha Holdings', symbol: 'ZZZ' },
-			{ name: 'Bravo Holdings', symbol: 'WWW' },
-			{ name: 'Charlie Holdings', symbol: 'YYY' },
-			{ name: 'Delta Holdings', symbol: 'XXX' }
-		],
-		balances: [
-			{
-				account: 'Main Brokerage',
-				security: 'Alpha Holdings',
-				quantity: 5,
-				price: 300,
-				value: 1500,
-				costBasis: 1200
-			},
-			{
-				account: 'Third Brokerage',
-				security: 'Alpha Holdings',
-				quantity: 10,
-				price: 300,
-				value: 3000,
-				costBasis: 2500
-			},
-			{
-				account: 'Main Brokerage',
-				security: 'Bravo Holdings',
-				quantity: 14,
-				price: 250,
-				value: 3500,
-				costBasis: 3000
-			},
-			{
-				account: 'Second Brokerage',
-				security: 'Charlie Holdings',
-				quantity: 16,
-				price: 250,
-				value: 4000,
-				costBasis: 3400
-			},
-			{
-				account: 'Second Brokerage',
-				security: 'Delta Holdings',
-				quantity: 6,
-				price: null,
-				value: null,
-				costBasis: 600
-			},
-			{
-				account: 'Third Brokerage',
-				security: 'Delta Holdings',
-				quantity: 2,
-				price: 50,
-				value: 100,
-				costBasis: 80
-			}
-		]
-	});
+	await seedSortingPortfolio(user.id);
 
 	await page.goto('/');
 	await signIn(page, user.email);
@@ -247,65 +135,7 @@ test('portfolio: aggregate table sorts by market value ascending with unknown va
 	page
 }) => {
 	const user = await seedUser('fatima');
-	await seedPortfolio(user.id, {
-		accounts: ['Main Brokerage', 'Second Brokerage', 'Third Brokerage'],
-		securities: [
-			{ name: 'Alpha Holdings', symbol: 'ZZZ' },
-			{ name: 'Bravo Holdings', symbol: 'WWW' },
-			{ name: 'Charlie Holdings', symbol: 'YYY' },
-			{ name: 'Delta Holdings', symbol: 'XXX' }
-		],
-		balances: [
-			{
-				account: 'Main Brokerage',
-				security: 'Alpha Holdings',
-				quantity: 5,
-				price: 300,
-				value: 1500,
-				costBasis: 1200
-			},
-			{
-				account: 'Third Brokerage',
-				security: 'Alpha Holdings',
-				quantity: 10,
-				price: 300,
-				value: 3000,
-				costBasis: 2500
-			},
-			{
-				account: 'Main Brokerage',
-				security: 'Bravo Holdings',
-				quantity: 14,
-				price: 250,
-				value: 3500,
-				costBasis: 3000
-			},
-			{
-				account: 'Second Brokerage',
-				security: 'Charlie Holdings',
-				quantity: 16,
-				price: 250,
-				value: 4000,
-				costBasis: 3400
-			},
-			{
-				account: 'Second Brokerage',
-				security: 'Delta Holdings',
-				quantity: 6,
-				price: null,
-				value: null,
-				costBasis: 600
-			},
-			{
-				account: 'Third Brokerage',
-				security: 'Delta Holdings',
-				quantity: 2,
-				price: 50,
-				value: 100,
-				costBasis: 80
-			}
-		]
-	});
+	await seedSortingPortfolio(user.id);
 
 	await page.goto('/');
 	await signIn(page, user.email);

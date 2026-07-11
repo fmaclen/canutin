@@ -28,41 +28,34 @@ test.skip('sign up, login and logout', async ({ page }) => {
 
 	const uniqueEmail = `bob.${Date.now()}@example.com`;
 
-	// Try to login before signing up
 	await page.getByLabel('Email').fill(uniqueEmail);
 	await page.getByLabel('Password', { exact: true }).fill(DEFAULT_PASSWORD);
 	await page.getByRole('button', { name: 'Login' }).click();
 	await expect(page.getByText('Failed to authenticate')).toBeVisible();
 
-	// Sign up
 	await page.getByRole('link', { name: 'Sign up' }).click();
 	await expect(page.getByRole('button', { name: 'Create account' })).toBeVisible();
 	await expect(page.getByText('Failed to create record')).not.toBeVisible();
 
-	// Enter incorrect password confirmation
 	await page.getByLabel('Email').fill(uniqueEmail);
 	await page.getByLabel('Password', { exact: true }).fill(DEFAULT_PASSWORD);
 	await page.getByLabel('Confirm password').fill('NOT_' + DEFAULT_PASSWORD);
 	await page.getByRole('button', { name: 'Create account' }).click();
 	await expect(page.getByText('Failed to create record')).toBeVisible();
 
-	// Enter correct password confirmation
 	await page.getByLabel('Confirm password').fill(DEFAULT_PASSWORD);
 	await page.getByRole('button', { name: 'Create account' }).click();
 	await expect(page.getByText('Account created, you can now log in')).toBeVisible();
 	await expect(page.getByText('Failed to create record')).not.toBeVisible();
 
-	// It redirects back to login
 	await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Create account' })).not.toBeVisible();
 	await expect(page.getByRole('button', { name: 'Toggle Sidebar' })).not.toBeVisible();
 
-	// Login
 	await page.getByLabel('Email').fill(uniqueEmail);
 	await page.getByLabel('Password').fill(DEFAULT_PASSWORD);
 	await page.getByRole('button', { name: 'Login' }).click();
 	await expect(page.getByRole('button', { name: 'Toggle Sidebar' })).toBeVisible();
-	// Logout
 	const logoutButton = page.getByRole('button', { name: 'Log out' });
 	if (!(await logoutButton.isVisible())) {
 		await page.getByRole('button', { name: 'Toggle Sidebar' }).click();

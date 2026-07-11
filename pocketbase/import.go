@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/pocketbase/pocketbase/core"
 )
@@ -25,19 +26,6 @@ var spaceRe = regexp.MustCompile(`\s+`)
 var currencyRe = regexp.MustCompile(`^[A-Z0-9]{2,10}$`)
 
 var revertingSessions sync.Map
-
-func markSessionReverting(sessionID string) {
-	revertingSessions.Store(sessionID, struct{}{})
-}
-
-func unmarkSessionReverting(sessionID string) {
-	revertingSessions.Delete(sessionID)
-}
-
-func isSessionReverting(sessionID string) bool {
-	_, ok := revertingSessions.Load(sessionID)
-	return ok
-}
 
 type importPayload struct {
 	SessionLabel         string                      `json:"sessionLabel"`
@@ -208,10 +196,6 @@ type importValidationError struct {
 	Message string `json:"message"`
 }
 
-func runeLen(s string) int {
-	return len([]rune(s))
-}
-
 // validateImportDate accepts the ISO date forms the write path already parses with datePart:
 // a bare "2006-01-02" or a longer timestamp whose date portion parses. An empty date is left to
 // the per-collection required-field checks so the error message can name the field.
@@ -244,7 +228,7 @@ func validateImportPayload(payload importPayload) []importValidationError {
 
 	if strings.TrimSpace(payload.SessionLabel) == "" {
 		validationErrors = append(validationErrors, importValidationError{Field: "sessionLabel", Message: "sessionLabel is required"})
-	} else if runeLen(payload.SessionLabel) > maxImportSessionLabelLength {
+	} else if utf8.RuneCountInString(payload.SessionLabel) > maxImportSessionLabelLength {
 		validationErrors = append(validationErrors, importValidationError{Field: "sessionLabel", Message: fmt.Sprintf("sessionLabel exceeds %d characters", maxImportSessionLabelLength)})
 	}
 
@@ -283,7 +267,7 @@ func validateImportPayload(payload importPayload) []importValidationError {
 		} else if !currencyRe.MatchString(code) {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("currencies[%d].code", i), Message: "code must be 2-10 uppercase letters or digits"})
 		}
-		if runeLen(currency.Name) > maxImportNameLength {
+		if utf8.RuneCountInString(currency.Name) > maxImportNameLength {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("currencies[%d].name", i), Message: fmt.Sprintf("name exceeds %d characters", maxImportNameLength)})
 		}
 		if len(currency.Quotes) == 0 {
@@ -302,10 +286,10 @@ func validateImportPayload(payload importPayload) []importValidationError {
 	for i, acct := range payload.Accounts {
 		if strings.TrimSpace(acct.Name) == "" {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("accounts[%d].name", i), Message: "name is required"})
-		} else if runeLen(acct.Name) > maxImportNameLength {
+		} else if utf8.RuneCountInString(acct.Name) > maxImportNameLength {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("accounts[%d].name", i), Message: fmt.Sprintf("name exceeds %d characters", maxImportNameLength)})
 		}
-		if runeLen(acct.Institution) > maxImportNameLength {
+		if utf8.RuneCountInString(acct.Institution) > maxImportNameLength {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("accounts[%d].institution", i), Message: fmt.Sprintf("institution exceeds %d characters", maxImportNameLength)})
 		}
 		if acct.Currency != "" && !currencyRe.MatchString(acct.Currency) {
@@ -324,7 +308,7 @@ func validateImportPayload(payload importPayload) []importValidationError {
 	for i, asset := range payload.Assets {
 		if strings.TrimSpace(asset.Name) == "" {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("assets[%d].name", i), Message: "name is required"})
-		} else if runeLen(asset.Name) > maxImportNameLength {
+		} else if utf8.RuneCountInString(asset.Name) > maxImportNameLength {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("assets[%d].name", i), Message: fmt.Sprintf("name exceeds %d characters", maxImportNameLength)})
 		}
 		if asset.Currency != "" && !currencyRe.MatchString(asset.Currency) {
@@ -346,10 +330,10 @@ func validateImportPayload(payload importPayload) []importValidationError {
 	for i, security := range payload.Securities {
 		if strings.TrimSpace(security.Name) == "" {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securities[%d].name", i), Message: "name is required"})
-		} else if runeLen(security.Name) > maxImportNameLength {
+		} else if utf8.RuneCountInString(security.Name) > maxImportNameLength {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securities[%d].name", i), Message: fmt.Sprintf("name exceeds %d characters", maxImportNameLength)})
 		}
-		if runeLen(security.Symbol) > maxImportSymbolLength {
+		if utf8.RuneCountInString(security.Symbol) > maxImportSymbolLength {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securities[%d].symbol", i), Message: fmt.Sprintf("symbol exceeds %d characters", maxImportSymbolLength)})
 		}
 		if security.Currency != "" && !currencyRe.MatchString(security.Currency) {
@@ -360,20 +344,20 @@ func validateImportPayload(payload importPayload) []importValidationError {
 	for i, tx := range payload.Transactions {
 		if strings.TrimSpace(tx.AccountName) == "" {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("transactions[%d].accountName", i), Message: "accountName is required"})
-		} else if runeLen(tx.AccountName) > maxImportNameLength {
+		} else if utf8.RuneCountInString(tx.AccountName) > maxImportNameLength {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("transactions[%d].accountName", i), Message: fmt.Sprintf("accountName exceeds %d characters", maxImportNameLength)})
 		}
 		if !validateImportDate(tx.Date) {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("transactions[%d].date", i), Message: "date is not a valid date"})
 		}
-		if runeLen(tx.Description) > maxImportDescriptionLength {
+		if utf8.RuneCountInString(tx.Description) > maxImportDescriptionLength {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("transactions[%d].description", i), Message: fmt.Sprintf("description exceeds %d characters", maxImportDescriptionLength)})
 		}
 		if !validateImportNumber(tx.Value) {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("transactions[%d].value", i), Message: "value is not a finite number"})
 		}
 		for j, lbl := range tx.Labels {
-			if runeLen(lbl) > maxImportLabelLength {
+			if utf8.RuneCountInString(lbl) > maxImportLabelLength {
 				validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("transactions[%d].labels[%d]", i, j), Message: fmt.Sprintf("label exceeds %d characters", maxImportLabelLength)})
 			}
 		}
@@ -383,13 +367,13 @@ func validateImportPayload(payload importPayload) []importValidationError {
 		if strings.TrimSpace(balance.AccountID) == "" && strings.TrimSpace(balance.AccountName) == "" {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityBalances[%d]", i), Message: "accountId or accountName is required"})
 		}
-		if runeLen(balance.AccountName) > maxImportNameLength {
+		if utf8.RuneCountInString(balance.AccountName) > maxImportNameLength {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityBalances[%d].accountName", i), Message: fmt.Sprintf("accountName exceeds %d characters", maxImportNameLength)})
 		}
-		if runeLen(balance.SecurityName) > maxImportNameLength {
+		if utf8.RuneCountInString(balance.SecurityName) > maxImportNameLength {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityBalances[%d].securityName", i), Message: fmt.Sprintf("securityName exceeds %d characters", maxImportNameLength)})
 		}
-		if runeLen(balance.SecuritySymbol) > maxImportSymbolLength {
+		if utf8.RuneCountInString(balance.SecuritySymbol) > maxImportSymbolLength {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityBalances[%d].securitySymbol", i), Message: fmt.Sprintf("securitySymbol exceeds %d characters", maxImportSymbolLength)})
 		}
 		if !validateImportDate(balance.AsOf) {
@@ -406,22 +390,22 @@ func validateImportPayload(payload importPayload) []importValidationError {
 		if strings.TrimSpace(tx.AccountID) == "" && strings.TrimSpace(tx.AccountName) == "" {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityTransactions[%d]", i), Message: "accountId or accountName is required"})
 		}
-		if runeLen(tx.AccountName) > maxImportNameLength {
+		if utf8.RuneCountInString(tx.AccountName) > maxImportNameLength {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityTransactions[%d].accountName", i), Message: fmt.Sprintf("accountName exceeds %d characters", maxImportNameLength)})
 		}
-		if runeLen(tx.SecurityName) > maxImportNameLength {
+		if utf8.RuneCountInString(tx.SecurityName) > maxImportNameLength {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityTransactions[%d].securityName", i), Message: fmt.Sprintf("securityName exceeds %d characters", maxImportNameLength)})
 		}
-		if runeLen(tx.SecuritySymbol) > maxImportSymbolLength {
+		if utf8.RuneCountInString(tx.SecuritySymbol) > maxImportSymbolLength {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityTransactions[%d].securitySymbol", i), Message: fmt.Sprintf("securitySymbol exceeds %d characters", maxImportSymbolLength)})
 		}
-		if runeLen(tx.Name) > maxImportNameLength {
+		if utf8.RuneCountInString(tx.Name) > maxImportNameLength {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityTransactions[%d].name", i), Message: fmt.Sprintf("name exceeds %d characters", maxImportNameLength)})
 		}
-		if runeLen(tx.Description) > maxImportDescriptionLength {
+		if utf8.RuneCountInString(tx.Description) > maxImportDescriptionLength {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityTransactions[%d].description", i), Message: fmt.Sprintf("description exceeds %d characters", maxImportDescriptionLength)})
 		}
-		if runeLen(tx.Notes) > maxImportNotesLength {
+		if utf8.RuneCountInString(tx.Notes) > maxImportNotesLength {
 			validationErrors = append(validationErrors, importValidationError{Field: fmt.Sprintf("securityTransactions[%d].notes", i), Message: fmt.Sprintf("notes exceeds %d characters", maxImportNotesLength)})
 		}
 		if !validateImportDate(tx.Date) {
@@ -1254,8 +1238,8 @@ func handleRevert(app core.App, re *core.RequestEvent) error {
 		return re.JSON(http.StatusBadRequest, map[string]string{"error": "Session already reverted"})
 	}
 
-	markSessionReverting(body.SessionID)
-	defer unmarkSessionReverting(body.SessionID)
+	revertingSessions.Store(body.SessionID, struct{}{})
+	defer revertingSessions.Delete(body.SessionID)
 
 	collections := []string{"transactions", "securityTransactions", "accountBalances", "assetBalances", "securityBalances", "accounts", "assets", "securities"}
 	totalDeleted := 0

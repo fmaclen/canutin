@@ -13,7 +13,6 @@ import {
 	seedUser
 } from './pocketbase.helpers';
 
-// Fixed reference date so the rendered "As of" label is deterministic.
 const REFERENCE_ASOF = '2025-03-15T12:00:00.000Z';
 
 test('account detail page shows "As of <date>" next to the Balance label', async ({ page }) => {

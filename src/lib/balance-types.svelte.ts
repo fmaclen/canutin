@@ -121,18 +121,10 @@ class BalanceTypesContext {
 	}
 }
 
-export const CONTEXT_KEY_BALANCE_TYPES = 'balance-types';
-
 export function setBalanceTypesContext(pb: PocketBaseContext) {
-	return setContext(CONTEXT_KEY_BALANCE_TYPES, new BalanceTypesContext(pb));
+	return setContext('balance-types', new BalanceTypesContext(pb));
 }
 
 export function getBalanceTypesContext() {
-	return getContext<ReturnType<typeof setBalanceTypesContext>>(CONTEXT_KEY_BALANCE_TYPES);
-}
-
-export function getOrCreateBalanceTypesContext(pb: PocketBaseContext) {
-	let ctx = getContext<ReturnType<typeof setBalanceTypesContext>>(CONTEXT_KEY_BALANCE_TYPES);
-	if (!ctx) ctx = setBalanceTypesContext(pb);
-	return ctx;
+	return getContext<ReturnType<typeof setBalanceTypesContext>>('balance-types');
 }

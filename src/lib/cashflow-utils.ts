@@ -26,7 +26,7 @@ export type CashflowWindow = {
 	startNextMonthKey: string;
 };
 
-export const CASHFLOW_PERIODS = 13;
+const CASHFLOW_PERIODS = 13;
 
 export type CashflowPeriod = {
 	id: number;

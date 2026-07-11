@@ -1,8 +1,6 @@
 import { cookieName, getLocale, localStorageKey, setLocale } from '$lib/paraglide/runtime';
 
-export const interfaceLocales = ['en', 'es'] as const;
-
-export type InterfaceLocale = (typeof interfaceLocales)[number];
+export type InterfaceLocale = 'en' | 'es';
 export type InterfaceThemeMode = 'system' | 'light' | 'dark';
 export type DisplayCurrencyRegistry = {
 	isLoaded: boolean;
@@ -69,7 +67,7 @@ function isInterfaceLocale(value: string | null | undefined): value is Interface
 // NOTE: currency codes are free-form - any uppercase alphanumeric 2-10 chars (ISO 4217, crypto
 // tickers like BTC/USDT, custom codes). This is the single frontend source of the rule; the same
 // pattern (^[A-Z0-9]{2,10}$) is enforced in the PocketBase schema, Go import validation and hooks.
-export function isValidCurrencyCode(value: string | null | undefined): value is string {
+function isValidCurrencyCode(value: string | null | undefined): value is string {
 	return typeof value === 'string' && /^[A-Z0-9]{2,10}$/.test(value);
 }
 

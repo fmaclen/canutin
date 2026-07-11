@@ -301,29 +301,7 @@ func TestDemoExchangeRatesIgnoreGlobalRows(t *testing.T) {
 
 func TestResetDemoKeepsOwnedExchangeRatesAfterDeferredCurrencyHooks(t *testing.T) {
 	app := newDemoSeedTestApp(t)
-	app.OnRecordAfterDeleteSuccess("currencies").BindFunc(func(e *core.RecordEvent) error {
-		owner := e.Record.GetString("owner")
-		code := e.Record.GetString("code")
-		for {
-			quotes, err := e.App.FindRecordsByFilter("exchangeRates",
-				"owner = {:owner} && currency = {:currency}",
-				"", 100, 0,
-				map[string]any{"owner": owner, "currency": code},
-			)
-			if err != nil {
-				return err
-			}
-			if len(quotes) == 0 {
-				break
-			}
-			for _, quote := range quotes {
-				if err := e.App.Delete(quote); err != nil {
-					return err
-				}
-			}
-		}
-		return e.Next()
-	})
+	app.OnRecordAfterDeleteSuccess("currencies").BindFunc(deleteCurrencyExchangeRates)
 
 	if err := resetDemo(app); err != nil {
 		t.Fatalf("first reset demo: %v", err)

@@ -560,15 +560,13 @@ class AssetsContext {
 	}
 }
 
-export const CONTEXT_KEY_ASSETS = 'assets';
-
 export function setAssetsContext(
 	pb: PocketBaseContext,
 	balanceTypesContext: ReturnType<typeof setBalanceTypesContext>
 ) {
-	return setContext(CONTEXT_KEY_ASSETS, new AssetsContext(pb, balanceTypesContext));
+	return setContext('assets', new AssetsContext(pb, balanceTypesContext));
 }
 
 export function getAssetsContext() {
-	return getContext<ReturnType<typeof setAssetsContext>>(CONTEXT_KEY_ASSETS);
+	return getContext<ReturnType<typeof setAssetsContext>>('assets');
 }

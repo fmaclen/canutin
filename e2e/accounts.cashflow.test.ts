@@ -1,18 +1,8 @@
 import { expect, test } from '@playwright/test';
-import { addDays, setHours, startOfMonth, subMonths } from 'date-fns';
 
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
-import { goToRecordDetail, signIn } from './playwright.helpers';
+import { goToRecordDetail, isoMidOfMonthMonthsAgo, signIn } from './playwright.helpers';
 import { seedAccount, seedTransaction, seedUser } from './pocketbase.helpers';
-
-// Pick the 15th at local noon for stable month inclusion across timezones
-function isoMidOfMonthMonthsAgo(monthsAgo: number) {
-	const startThisMonth = startOfMonth(new Date());
-	const targetStart = subMonths(startThisMonth, monthsAgo);
-	const mid = addDays(targetStart, 14); // 15th
-	const atNoon = setHours(mid, 12); // reduce DST/zone edge cases
-	return atNoon.toISOString();
-}
 
 test('account trailing cashflow is filtered to a single account', async ({ page }) => {
 	const user = await seedUser('matilda');
@@ -34,7 +24,6 @@ test('account trailing cashflow is filtered to a single account', async ({ page 
 	const when5M = isoMidOfMonthMonthsAgo(5);
 	const when11M = isoMidOfMonthMonthsAgo(11);
 
-	// Focused account: income 1200/300/600, expenses -600/-150/-300 across the windows
 	await seedTransaction({
 		account: focusedAccount.id,
 		owner: user.id,
@@ -132,19 +121,15 @@ test('account trailing cashflow is filtered to a single account', async ({ page 
 	const expenses = page.getByRole('region', { name: 'Expenses per month' });
 	const surplus = page.getByRole('region', { name: 'Surplus per month' });
 
-	// Default tab is 6M: focused account income 1500, expenses -750 over 6 months
-	// -> per month: income $250, expenses $125, surplus $125 (ignores the other account)
 	await expect(income).toContainText('$250');
 	await expect(expenses).toContainText('$125');
 	await expect(surplus).toContainText('$125');
 
-	// 3M tab: only the M-1 window counts -> income $400, expenses $200, surplus $200
 	await page.getByRole('tab', { name: '3M' }).click();
 	await expect(income).toContainText('$400');
 	await expect(expenses).toContainText('$200');
 	await expect(surplus).toContainText('$200');
 
-	// 1Y tab: all three windows count -> income $175, expenses $88, surplus $88
 	await page.getByRole('tab', { name: '1Y' }).click();
 	await expect(income).toContainText('$175');
 	await expect(expenses).toContainText('$88');

@@ -195,12 +195,10 @@ class AccountCashflowContext {
 	}
 }
 
-export const CONTEXT_KEY_ACCOUNT_CASHFLOW = 'accountCashflow';
-
 export function setAccountCashflowContext(pb: PocketBaseContext) {
-	return setContext(CONTEXT_KEY_ACCOUNT_CASHFLOW, new AccountCashflowContext(pb));
+	return setContext('accountCashflow', new AccountCashflowContext(pb));
 }
 
 export function getAccountCashflowContext() {
-	return getContext<ReturnType<typeof setAccountCashflowContext>>(CONTEXT_KEY_ACCOUNT_CASHFLOW);
+	return getContext<ReturnType<typeof setAccountCashflowContext>>('accountCashflow');
 }

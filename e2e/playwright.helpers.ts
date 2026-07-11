@@ -1,4 +1,5 @@
 import { expect, Locator, Page } from '@playwright/test';
+import { addDays, setHours, startOfMonth, subMonths } from 'date-fns';
 
 import { DEFAULT_PASSWORD } from './pocketbase.helpers';
 
@@ -8,6 +9,12 @@ export async function getRowIndex(rows: Locator, name: string) {
 
 export function formatDateForInput(date: Date) {
 	return date.toISOString().slice(0, 10);
+}
+
+export function isoMidOfMonthMonthsAgo(monthsAgo: number) {
+	// NOTE: 15th at local noon for stable month inclusion across timezones/DST
+	const targetMonthStart = subMonths(startOfMonth(new Date()), monthsAgo);
+	return setHours(addDays(targetMonthStart, 14), 12).toISOString();
 }
 
 export async function signIn(page: Page, email: string) {
