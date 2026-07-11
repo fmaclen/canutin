@@ -50,6 +50,7 @@ test('transactions table responds to period filters', async ({ page }) => {
 		await page.getByRole('button', { name: label }).click();
 		await expect(page.getByLabel('Period')).toContainText(label);
 
+		// Reopening the picker must highlight the active preset.
 		await page.getByLabel('Period').click();
 		const selectedPresetButton = page.getByRole('button', { name: label, exact: true });
 		await expect(selectedPresetButton).toHaveAttribute('data-selected');
@@ -65,6 +66,7 @@ test('transactions table responds to period filters', async ({ page }) => {
 		await expectPeriodFilteredRows(page, transactions, value, now);
 	}
 
+	// Sidebar navigation derives fresh defaults from the URL instead of retaining local filter state.
 	await expect(page.getByLabel('Period')).toContainText('Lifetime');
 	await goToPageViaSidebar(page, 'Transactions');
 	await expect(page).not.toHaveURL(/period=/);
@@ -86,6 +88,7 @@ test('transactions table responds to type filters', async ({ page }) => {
 	await expect(page.getByRole('row', { name: 'Invoice Payment' })).toBeVisible();
 	await expect(page.getByLabel('Type')).toContainText('Any amounts');
 
+	// Lifetime keeps date boundaries out of the type-filter cases.
 	await page.getByLabel('Period').click();
 	await page.getByRole('button', { name: 'Lifetime' }).click();
 	await expect(page.getByLabel('Period')).toContainText('Lifetime');
@@ -181,6 +184,7 @@ test('transactions pagination navigates between pages', async ({ page }) => {
 	const lastDescription = seededDescriptions[seededDescriptions.length - 1] ?? '';
 	await expect(page.getByRole('row', { name: lastDescription })).toHaveCount(0);
 
+	// Applying a filter on page 2 must reset to page 1 when only one page remains.
 	await nextButton.click();
 	await expect(rowsForBatch).toHaveCount(5);
 	await expect(page.getByRole('row', { name: lastDescription })).toBeVisible();
@@ -253,6 +257,7 @@ test('credits filter paginates across pages client-side', async ({ page }) => {
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Transactions');
 
+	// Lifetime keeps every seeded credit in range across month boundaries.
 	await page.getByLabel('Period').click();
 	await page.getByRole('button', { name: 'Lifetime' }).click();
 	await expect(page.getByLabel('Period')).toContainText('Lifetime');
@@ -268,6 +273,7 @@ test('credits filter paginates across pages client-side', async ({ page }) => {
 	await expect(previousButton).toBeDisabled();
 	await expect(nextButton).toBeEnabled();
 
+	// Client-side slicing keeps the newest row on page 1 and the oldest on page 2.
 	const firstDescription = seededDescriptions[0] ?? '';
 	const lastDescription = seededDescriptions[seededDescriptions.length - 1] ?? '';
 	await expect(page.getByRole('row', { name: firstDescription })).toBeVisible();
@@ -644,10 +650,12 @@ test('"Last year" filter correctly handles period boundaries', async ({ page }) 
 
 	// NOTE: This test could theoretically fail if run exactly at midnight on Dec 31st,
 	// as the test's "thisYear" and the backend's "thisYear" could differ by one year.
+	// Last year is a half-open range: start inclusive, end exclusive.
 	const now = new UTCDate();
 	const thisYearStart = startOfYear(now);
 	const lastYearStart = startOfYear(subYears(now, 1));
 
+	// One second before the start is outside the range.
 	const beforePeriod = new UTCDate(lastYearStart.getTime() - 1000);
 	await seedTransaction({
 		account: account.id,
@@ -668,6 +676,7 @@ test('"Last year" filter correctly handles period boundaries', async ({ page }) 
 		value: 200
 	});
 
+	// A mid-year value exercises the unambiguous interior of the range.
 	const midYear = new UTCDate(lastYearStart.getUTCFullYear(), 6, 15, 12, 0, 0, 0);
 	await seedTransaction({
 		account: account.id,
@@ -677,6 +686,7 @@ test('"Last year" filter correctly handles period boundaries', async ({ page }) 
 		value: 300
 	});
 
+	// One second before the end remains inside the range.
 	const beforePeriodEnd = new UTCDate(thisYearStart.getTime() - 1000);
 	await seedTransaction({
 		account: account.id,
@@ -686,6 +696,7 @@ test('"Last year" filter correctly handles period boundaries', async ({ page }) 
 		value: 400
 	});
 
+	// Exactly at the exclusive end is outside the range.
 	const atPeriodEnd = new UTCDate(thisYearStart.getTime());
 	await seedTransaction({
 		account: account.id,
@@ -755,7 +766,7 @@ test('custom date range with periodLabel from URL displays the label and calenda
 	const toDate = `${thisMonth.getUTCFullYear()}-${String(thisMonth.getUTCMonth() + 1).padStart(2, '0')}-01`;
 	const monthLabel = lastMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-	// Test's explicit purpose is direct-URL initialization with periodLabel (as set by cashflow chart link)
+	// Cashflow links initialize the custom range label directly from the URL.
 	await page.goto(
 		`/transactions?periodFrom=${fromDate}&periodTo=${toDate}&periodLabel=${encodeURIComponent(monthLabel)}`
 	);
@@ -1072,7 +1083,7 @@ test('switching from custom range back to preset clears custom URL params and up
 
 	const fromDate = `${lastMonth.getUTCFullYear()}-${String(lastMonth.getUTCMonth() + 1).padStart(2, '0')}-01`;
 	const toDate = `${thisMonth.getUTCFullYear()}-${String(thisMonth.getUTCMonth() + 1).padStart(2, '0')}-01`;
-	// Test's explicit purpose is direct-URL initialization with a custom periodFrom/periodTo range
+	// Initialize the custom range directly from the URL before switching to a preset.
 	await page.goto(`/transactions?periodFrom=${fromDate}&periodTo=${toDate}`);
 
 	await expect(page.getByText('Last Month Transaction')).toBeVisible();
@@ -1123,13 +1134,13 @@ test('invalid date range params fall back to default period', async ({ page }) =
 	await page.goto('/');
 	await signIn(page, user.email);
 
-	// Test's explicit purpose is direct-URL behavior with an invalid date format
+	// An invalid date in a direct URL must fall back safely.
 	await page.goto('/transactions?periodFrom=invalid-date&periodTo=2024-01-31');
 
 	await expect(page.getByLabel('Period')).toBeVisible();
 	await expect(page.getByLabel('Period')).toContainText('Last 3 months');
 
-	// Test's explicit purpose is direct-URL behavior with an end date before the start date
+	// A reversed direct-URL range must also fall back safely.
 	await page.goto('/transactions?periodFrom=2024-03-01&periodTo=2024-01-01');
 
 	await expect(page.getByLabel('Period')).toBeVisible();
@@ -1337,6 +1348,7 @@ test('clicking a label chip on a row applies the label filter', async ({ page })
 	await expect(page.getByText('Unlabeled Cash Withdrawal')).not.toBeVisible();
 	await expect(page).toHaveURL(/label=/);
 
+	// Clicking the active chip again clears the label filter.
 	await groceriesChip.click();
 
 	await expect(groceriesChip).toHaveAttribute('aria-pressed', 'false');
@@ -1421,6 +1433,7 @@ test('selecting multiple labels filters with OR semantics', async ({ page }) => 
 	await page.getByRole('option', { name: 'Utilities' }).click();
 	await page.keyboard.press('Escape');
 
+	// Either selected label may match; an unlabeled row must not.
 	await expect(page.getByText('Farm Stand Produce')).toBeVisible();
 	await expect(page.getByText('Electric Company Bill')).toBeVisible();
 	await expect(page.getByText('Unlabeled Cash Withdrawal')).not.toBeVisible();
@@ -1485,6 +1498,7 @@ test('account filter works with other filters combined', async ({ page }) => {
 		value: -500
 	});
 
+	// Realtime rows must satisfy both the account and amount filters.
 	await seedTransaction({
 		account: brokerageAccount.id,
 		owner: user.id,
@@ -1547,6 +1561,7 @@ test('account filter works with other filters combined', async ({ page }) => {
 	await expect(page.getByText('Interest Payment')).toBeVisible();
 	await expect(page.getByText('Transfer to Checking')).not.toBeVisible();
 
+	// Clearing only the account constraint must preserve the credit constraint.
 	await page.getByLabel('Clear account filter').click();
 
 	await expect(page.getByText('Interest Payment')).toBeVisible();

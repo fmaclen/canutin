@@ -306,7 +306,7 @@ func TestResetDemoKeepsOwnedExchangeRatesAfterDeferredCurrencyHooks(t *testing.T
 	if err := resetDemo(app); err != nil {
 		t.Fatalf("first reset demo: %v", err)
 	}
-	user, err := app.FindAuthRecordByEmail("users", demoEmail())
+	user, err := app.FindAuthRecordByEmail("users", demoEmail)
 	if err != nil {
 		t.Fatalf("find demo user: %v", err)
 	}

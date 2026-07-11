@@ -86,19 +86,19 @@ test.describe('big picture cashflow chart', () => {
 		});
 
 		const periodSeeds: PeriodSeed[] = [
-			{ monthsAgo: 0, income: 1000, expenses: -400 },
-			{ monthsAgo: 1, income: 500, expenses: -800 },
-			{ monthsAgo: 2, income: 1200, expenses: -300 },
-			{ monthsAgo: 3, income: 400, expenses: -1100 },
-			{ monthsAgo: 4, income: 1400, expenses: -500 },
-			{ monthsAgo: 5, income: 300, expenses: -1500 },
-			{ monthsAgo: 6, income: 1600, expenses: -200 },
-			{ monthsAgo: 7, income: 600, expenses: -900 },
-			{ monthsAgo: 8, income: 1800, expenses: -100 },
-			{ monthsAgo: 9, income: 700, expenses: -1000 },
-			{ monthsAgo: 10, income: 1100, expenses: -600 },
-			{ monthsAgo: 11, income: 200, expenses: -700 },
-			{ monthsAgo: 12, income: 900, expenses: -400 }
+			{ monthsAgo: 0, income: 1000, expenses: -400 }, // surplus +600
+			{ monthsAgo: 1, income: 500, expenses: -800 }, // deficit -300
+			{ monthsAgo: 2, income: 1200, expenses: -300 }, // surplus +900
+			{ monthsAgo: 3, income: 400, expenses: -1100 }, // deficit -700 before boundary seed
+			{ monthsAgo: 4, income: 1400, expenses: -500 }, // surplus +900
+			{ monthsAgo: 5, income: 300, expenses: -1500 }, // lowest deficit: -1200
+			{ monthsAgo: 6, income: 1600, expenses: -200 }, // surplus +1400 before boundary seed
+			{ monthsAgo: 7, income: 600, expenses: -900 }, // deficit -300
+			{ monthsAgo: 8, income: 1800, expenses: -100 }, // highest surplus: +1700
+			{ monthsAgo: 9, income: 700, expenses: -1000 }, // deficit -300 before boundary seed
+			{ monthsAgo: 10, income: 1100, expenses: -600 }, // surplus +500
+			{ monthsAgo: 11, income: 200, expenses: -700 }, // deficit -500
+			{ monthsAgo: 12, income: 900, expenses: -400 } // surplus +500
 		];
 
 		for (const seed of periodSeeds) {
@@ -119,6 +119,7 @@ test.describe('big picture cashflow chart', () => {
 			});
 		}
 
+		// Boundary seeds must remain in their respective months.
 		await seedTransaction({
 			account: account.id,
 			owner: user.id,
@@ -143,6 +144,7 @@ test.describe('big picture cashflow chart', () => {
 			value: 25
 		});
 
+		// Out-of-range, excluded, and future values must not enter the chart.
 		await seedTransaction({
 			account: account.id,
 			owner: user.id,
@@ -176,6 +178,7 @@ test.describe('big picture cashflow chart', () => {
 		await page.goto('/');
 		await signIn(page, user.email);
 
+		// Boundary values adjust months 3, 6, and 9.
 		const expectedSurplus = [
 			600, -300, 900, -650, 900, -1200, 1475, -300, 1700, -275, 500, -500, 500
 		];
@@ -214,6 +217,7 @@ test('clicking cashflow chart bar navigates to transactions filtered by that mon
 		autoCalculated: new Date().toISOString()
 	});
 
+	// Two months ago guarantees the target is present without relying on the current-month bar.
 	const now = new UTCDate();
 	const targetMonth = addMonths(startOfMonth(now), -2);
 	const targetMonthLabel = format(targetMonth, 'MMMM yyyy');
@@ -249,6 +253,7 @@ test('clicking cashflow chart bar navigates to transactions filtered by that mon
 		value: -500
 	});
 
+	// Current-month data is the negative control for the link's date filter.
 	await seedTransaction({
 		account: account.id,
 		owner: elena.id,
@@ -260,7 +265,7 @@ test('clicking cashflow chart bar navigates to transactions filtered by that mon
 	await page.goto('/');
 	await signIn(page, elena.email);
 
-	const expectedSurplus = '$1,000';
+	const expectedSurplus = '$1,000'; // $1,500 income - $500 expense
 	const ariaLabel = `${targetMonthLabel}: ${expectedSurplus}`;
 	await page.getByRole('link', { name: ariaLabel }).click();
 

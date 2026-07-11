@@ -24,6 +24,7 @@ test('account trailing cashflow is filtered to a single account', async ({ page 
 	const when5M = isoMidOfMonthMonthsAgo(5);
 	const when11M = isoMidOfMonthMonthsAgo(11);
 
+	// Focused-account amounts exercise distinct 3M, 6M, and 1Y averages.
 	await seedTransaction({
 		account: focusedAccount.id,
 		owner: user.id,
@@ -121,15 +122,18 @@ test('account trailing cashflow is filtered to a single account', async ({ page 
 	const expenses = page.getByRole('region', { name: 'Expenses per month' });
 	const surplus = page.getByRole('region', { name: 'Surplus per month' });
 
+	// 6M totals are $1,500 income and $750 expenses; the other account is excluded.
 	await expect(income).toContainText('$250');
 	await expect(expenses).toContainText('$125');
 	await expect(surplus).toContainText('$125');
 
+	// 3M includes only M-1, averaging $400 income and $200 expenses.
 	await page.getByRole('tab', { name: '3M' }).click();
 	await expect(income).toContainText('$400');
 	await expect(expenses).toContainText('$200');
 	await expect(surplus).toContainText('$200');
 
+	// 1Y includes all three seed windows, averaging $175 income and $88 expenses.
 	await page.getByRole('tab', { name: '1Y' }).click();
 	await expect(income).toContainText('$175');
 	await expect(expenses).toContainText('$88');

@@ -4,8 +4,8 @@ import { env } from '$env/dynamic/public';
 import type { AuthContext } from '$lib/auth.svelte';
 import { logError } from '$lib/logger';
 
-const DEMO_EMAIL = env.PUBLIC_DEMO_EMAIL ?? 'demo@canutin.com';
-const DEMO_PASSWORD = env.PUBLIC_DEMO_PASSWORD ?? '123qweasdzxc';
+const DEMO_EMAIL = 'demo@canutin.com';
+const DEMO_PASSWORD = '123qweasdzxc';
 
 export class DemoContext {
 	isStarting = $state(false);

@@ -4,421 +4,174 @@ import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
 import { getRowIndex, goToPageViaSidebar, signIn } from './playwright.helpers';
 import { seedAccount, seedAccountBalance, seedTransaction, seedUser } from './pocketbase.helpers';
 
-test.describe('accounts table sorting', () => {
-	test('clicking Balance header sorts by balance descending then ascending', async ({ page }) => {
-		const user = await seedUser('abigail');
+test('sorts accounts by every column and preserves sorting across reloads and filters', async ({
+	page
+}) => {
+	const user = await seedUser('abigail');
+	const now = new Date().toISOString();
 
-		await seedAccount({
-			name: 'Low Balance Account',
-			balanceGroup: AccountsBalanceGroupOptions.CASH,
-			owner: user.id,
-			balanceType: 'Checking'
-		}).then((acc) =>
-			seedAccountBalance({
-				account: acc.id,
-				owner: user.id,
-				asOf: new Date().toISOString(),
-				value: 100
-			})
-		);
-
-		await seedAccount({
-			name: 'High Balance Account',
-			balanceGroup: AccountsBalanceGroupOptions.CASH,
-			owner: user.id,
-			balanceType: 'Savings'
-		}).then((acc) =>
-			seedAccountBalance({
-				account: acc.id,
-				owner: user.id,
-				asOf: new Date().toISOString(),
-				value: 5000
-			})
-		);
-
-		await seedAccount({
-			name: 'Mid Balance Account',
-			balanceGroup: AccountsBalanceGroupOptions.CASH,
-			owner: user.id,
-			balanceType: 'Checking'
-		}).then((acc) =>
-			seedAccountBalance({
-				account: acc.id,
-				owner: user.id,
-				asOf: new Date().toISOString(),
-				value: 1000
-			})
-		);
-
-		await page.goto('/');
-		await signIn(page, user.email);
-		await goToPageViaSidebar(page, 'Accounts');
-		await expect(page.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'true');
-
-		await expect(page.getByRole('row', { name: 'High Balance Account' })).toBeVisible();
-
-		const rows = page.locator('tbody tr');
-
-		expect(await getRowIndex(rows, 'High Balance Account')).toBeLessThan(
-			await getRowIndex(rows, 'Mid Balance Account')
-		);
-		expect(await getRowIndex(rows, 'Mid Balance Account')).toBeLessThan(
-			await getRowIndex(rows, 'Low Balance Account')
-		);
-
-		const balanceHeader = page.getByRole('button', { name: 'Balance' });
-		await balanceHeader.click();
-		await expect(page).toHaveURL(/sort=balance/);
-		await expect(page).toHaveURL(/dir=asc/);
-
-		expect(await getRowIndex(rows, 'Low Balance Account')).toBeLessThan(
-			await getRowIndex(rows, 'Mid Balance Account')
-		);
-		expect(await getRowIndex(rows, 'Mid Balance Account')).toBeLessThan(
-			await getRowIndex(rows, 'High Balance Account')
-		);
-
-		await balanceHeader.click();
-		await expect(page).toHaveURL(/dir=desc/);
-
-		expect(await getRowIndex(rows, 'High Balance Account')).toBeLessThan(
-			await getRowIndex(rows, 'Mid Balance Account')
-		);
-		expect(await getRowIndex(rows, 'Mid Balance Account')).toBeLessThan(
-			await getRowIndex(rows, 'Low Balance Account')
-		);
-	});
-
-	test('clicking Account header sorts alphabetically', async ({ page }) => {
-		const user = await seedUser('barry');
-
-		await seedAccount({
-			name: 'Zebra Account',
-			balanceGroup: AccountsBalanceGroupOptions.CASH,
-			owner: user.id,
-			balanceType: 'Checking'
-		}).then((acc) =>
-			seedAccountBalance({
-				account: acc.id,
-				owner: user.id,
-				asOf: new Date().toISOString(),
-				value: 500
-			})
-		);
-
-		await seedAccount({
-			name: 'Alpha Account',
-			balanceGroup: AccountsBalanceGroupOptions.CASH,
-			owner: user.id,
-			balanceType: 'Checking'
-		}).then((acc) =>
-			seedAccountBalance({
-				account: acc.id,
-				owner: user.id,
-				asOf: new Date().toISOString(),
-				value: 500
-			})
-		);
-
-		await page.goto('/');
-		await signIn(page, user.email);
-		await goToPageViaSidebar(page, 'Accounts');
-		await expect(page.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'true');
-
-		await expect(page.getByRole('row', { name: 'Zebra Account' })).toBeVisible();
-
-		const rows = page.locator('tbody tr');
-
-		const accountHeader = page.getByRole('button', { name: 'Account', exact: true });
-		await accountHeader.click();
-
-		await expect(page).toHaveURL(/sort=name/);
-		await expect(page).toHaveURL(/dir=desc/);
-		expect(await getRowIndex(rows, 'Zebra Account')).toBeLessThan(
-			await getRowIndex(rows, 'Alpha Account')
-		);
-
-		await accountHeader.click();
-		await expect(page).toHaveURL(/dir=asc/);
-		expect(await getRowIndex(rows, 'Alpha Account')).toBeLessThan(
-			await getRowIndex(rows, 'Zebra Account')
-		);
-	});
-
-	test('clicking Institution header sorts by institution', async ({ page }) => {
-		const user = await seedUser('candice');
-
-		await seedAccount({
-			name: 'Chase Checking',
-			institution: 'Chase Bank',
-			balanceGroup: AccountsBalanceGroupOptions.CASH,
-			owner: user.id,
-			balanceType: 'Checking'
-		}).then((acc) =>
-			seedAccountBalance({
-				account: acc.id,
-				owner: user.id,
-				asOf: new Date().toISOString(),
-				value: 1000
-			})
-		);
-
-		await seedAccount({
+	// The dataset contains every account pair and trio used for balance, text, transaction-count, persistence, indicator, and filter sorting.
+	const accounts = [
+		{ name: 'Low Balance Account', value: 100 },
+		{ name: 'High Balance Account', value: 5000, balanceType: 'Savings' },
+		{ name: 'Mid Balance Account', value: 1000 },
+		{ name: 'Zebra Account', value: 500 },
+		{ name: 'Alpha Account', value: 500 },
+		{ name: 'Chase Checking', value: 1000, institution: 'Chase Bank' },
+		{
 			name: 'Wells Fargo Savings',
+			value: 2000,
 			institution: 'Wells Fargo',
-			balanceGroup: AccountsBalanceGroupOptions.CASH,
-			owner: user.id,
 			balanceType: 'Savings'
-		}).then((acc) =>
-			seedAccountBalance({
-				account: acc.id,
-				owner: user.id,
-				asOf: new Date().toISOString(),
-				value: 2000
-			})
-		);
-
-		await page.goto('/');
-		await signIn(page, user.email);
-		await goToPageViaSidebar(page, 'Accounts');
-		await expect(page.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'true');
-
-		await expect(page.getByRole('row', { name: 'Chase Checking' })).toBeVisible();
-
-		const institutionHeader = page.getByRole('button', { name: 'Institution' });
-		await institutionHeader.click();
-
-		await expect(page).toHaveURL(/sort=institution/);
-		await expect(page).toHaveURL(/dir=desc/);
-
-		await institutionHeader.click();
-		await expect(page).toHaveURL(/dir=asc/);
-	});
-
-	test('clicking Transactions header sorts by transaction count', async ({ page }) => {
-		const user = await seedUser('derek');
-
-		const manyTx = await seedAccount({
-			name: 'Many Transactions',
+		},
+		{ name: 'Many Transactions', value: 1000 },
+		{ name: 'Few Transactions', value: 2000 },
+		{ name: 'Account One', value: 1000 },
+		{ name: 'Account Two', value: 2000, balanceType: 'Savings' },
+		{ name: 'Test Account', value: 1000 },
+		{ name: 'Open Account', value: 3000 },
+		{ name: 'Closed Account', value: 1000, balanceType: 'Savings', closed: now }
+	];
+	const accountIds = new Map<string, string>();
+	for (const accountData of accounts) {
+		const account = await seedAccount({
+			name: accountData.name,
+			institution: accountData.institution,
 			balanceGroup: AccountsBalanceGroupOptions.CASH,
 			owner: user.id,
-			balanceType: 'Checking'
+			balanceType: accountData.balanceType ?? 'Checking',
+			closed: accountData.closed
 		});
+		accountIds.set(accountData.name, account.id);
 		await seedAccountBalance({
-			account: manyTx.id,
+			account: account.id,
 			owner: user.id,
-			asOf: new Date().toISOString(),
-			value: 1000
+			asOf: now,
+			value: accountData.value
 		});
-		for (let i = 0; i < 5; i++) {
-			await seedTransaction({
-				account: manyTx.id,
-				owner: user.id,
-				date: new Date().toISOString(),
-				description: `Transaction ${i}`,
-				value: 100
-			});
-		}
+	}
 
-		const fewTx = await seedAccount({
-			name: 'Few Transactions',
-			balanceGroup: AccountsBalanceGroupOptions.CASH,
-			owner: user.id,
-			balanceType: 'Checking'
-		});
-		await seedAccountBalance({
-			account: fewTx.id,
-			owner: user.id,
-			asOf: new Date().toISOString(),
-			value: 2000
-		});
+	const manyTransactionsAccount = accountIds.get('Many Transactions');
+	const fewTransactionsAccount = accountIds.get('Few Transactions');
+	if (!manyTransactionsAccount || !fewTransactionsAccount) {
+		throw new Error('Expected transaction-count accounts to be seeded');
+	}
+	for (let index = 0; index < 5; index++) {
 		await seedTransaction({
-			account: fewTx.id,
+			account: manyTransactionsAccount,
 			owner: user.id,
-			date: new Date().toISOString(),
-			description: 'Single transaction',
-			value: 50
+			date: now,
+			description: `Transaction ${index}`,
+			value: 100
 		});
-
-		await page.goto('/');
-		await signIn(page, user.email);
-		await goToPageViaSidebar(page, 'Accounts');
-		await expect(page.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'true');
-
-		await expect(page.getByRole('row', { name: 'Many Transactions' })).toBeVisible();
-
-		const rows = page.locator('tbody tr');
-
-		const txHeader = page.getByRole('button', { name: 'Transactions' });
-		await txHeader.click();
-
-		await expect(page).toHaveURL(/sort=transactions/);
-		await expect(page).toHaveURL(/dir=desc/);
-		expect(await getRowIndex(rows, 'Many Transactions')).toBeLessThan(
-			await getRowIndex(rows, 'Few Transactions')
-		);
-
-		await txHeader.click();
-		await expect(page).toHaveURL(/dir=asc/);
-		expect(await getRowIndex(rows, 'Few Transactions')).toBeLessThan(
-			await getRowIndex(rows, 'Many Transactions')
-		);
+	}
+	await seedTransaction({
+		account: fewTransactionsAccount,
+		owner: user.id,
+		date: now,
+		description: 'Single transaction',
+		value: 50
 	});
 
-	test('sort state persists in URL and survives page reload', async ({ page }) => {
-		const user = await seedUser('emma');
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Accounts');
+	await expect(page.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'true');
+	await expect(page.getByRole('row', { name: 'High Balance Account' })).toBeVisible();
 
-		await seedAccount({
-			name: 'Account One',
-			balanceGroup: AccountsBalanceGroupOptions.CASH,
-			owner: user.id,
-			balanceType: 'Checking'
-		}).then((acc) =>
-			seedAccountBalance({
-				account: acc.id,
-				owner: user.id,
-				asOf: new Date().toISOString(),
-				value: 1000
-			})
-		);
+	const rows = page.locator('tbody tr');
 
-		await seedAccount({
-			name: 'Account Two',
-			balanceGroup: AccountsBalanceGroupOptions.CASH,
-			owner: user.id,
-			balanceType: 'Savings'
-		}).then((acc) =>
-			seedAccountBalance({
-				account: acc.id,
-				owner: user.id,
-				asOf: new Date().toISOString(),
-				value: 2000
-			})
-		);
+	// Balance defaults descending, then toggles ascending and descending with its indicator.
+	await expect(page.getByRole('row', { name: 'Test Account' })).toBeVisible();
+	expect(await getRowIndex(rows, 'High Balance Account')).toBeLessThan(
+		await getRowIndex(rows, 'Mid Balance Account')
+	);
+	expect(await getRowIndex(rows, 'Mid Balance Account')).toBeLessThan(
+		await getRowIndex(rows, 'Low Balance Account')
+	);
+	const balanceButton = page.getByRole('button', { name: 'Balance' });
+	const balanceHeader = balanceButton.locator('xpath=..');
+	await expect(balanceHeader).toHaveAttribute('aria-sort', 'descending');
 
-		await page.goto('/');
-		await signIn(page, user.email);
-		await goToPageViaSidebar(page, 'Accounts');
-		await expect(page.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'true');
+	await balanceButton.click();
+	await expect(page).toHaveURL(/sort=balance/);
+	await expect(page).toHaveURL(/dir=asc/);
+	await expect(balanceHeader).toHaveAttribute('aria-sort', 'ascending');
+	expect(await getRowIndex(rows, 'Low Balance Account')).toBeLessThan(
+		await getRowIndex(rows, 'Mid Balance Account')
+	);
+	expect(await getRowIndex(rows, 'Mid Balance Account')).toBeLessThan(
+		await getRowIndex(rows, 'High Balance Account')
+	);
 
-		await expect(page.getByRole('row', { name: 'Account One' })).toBeVisible();
+	await balanceButton.click();
+	await expect(page).toHaveURL(/dir=desc/);
+	expect(await getRowIndex(rows, 'High Balance Account')).toBeLessThan(
+		await getRowIndex(rows, 'Mid Balance Account')
+	);
+	expect(await getRowIndex(rows, 'Mid Balance Account')).toBeLessThan(
+		await getRowIndex(rows, 'Low Balance Account')
+	);
 
-		const accountHeader = page.getByRole('button', { name: 'Account', exact: true });
-		await accountHeader.click();
-		await accountHeader.click();
+	// Account sorts alphabetically in both directions and persists after reload.
+	await expect(page.getByRole('row', { name: 'Zebra Account' })).toBeVisible();
+	await expect(page.getByRole('row', { name: 'Account One' })).toBeVisible();
+	const accountButton = page.getByRole('button', { name: 'Account', exact: true });
+	const accountHeader = accountButton.locator('xpath=..');
+	await accountButton.click();
+	await expect(page).toHaveURL(/sort=name/);
+	await expect(page).toHaveURL(/dir=desc/);
+	await expect(accountHeader).toHaveAttribute('aria-sort', 'descending');
+	await expect(balanceHeader).not.toHaveAttribute('aria-sort');
+	expect(await getRowIndex(rows, 'Zebra Account')).toBeLessThan(
+		await getRowIndex(rows, 'Alpha Account')
+	);
 
-		await expect(page).toHaveURL(/sort=name/);
-		await expect(page).toHaveURL(/dir=asc/);
+	await accountButton.click();
+	await expect(page).toHaveURL(/dir=asc/);
+	expect(await getRowIndex(rows, 'Alpha Account')).toBeLessThan(
+		await getRowIndex(rows, 'Zebra Account')
+	);
 
-		const rows = page.locator('tbody tr');
+	await page.reload();
+	await expect(page).toHaveURL(/sort=name/);
+	await expect(page).toHaveURL(/dir=asc/);
+	await expect(page.getByRole('row', { name: 'Account One' })).toBeVisible();
+	expect(await getRowIndex(rows, 'Account One')).toBeLessThan(
+		await getRowIndex(rows, 'Account Two')
+	);
 
-		expect(await getRowIndex(rows, 'Account One')).toBeLessThan(
-			await getRowIndex(rows, 'Account Two')
-		);
+	// Account sorting survives a filter-tab change.
+	await expect(page.getByRole('row', { name: 'Open Account' })).toBeVisible();
+	await page.getByRole('tab', { name: 'All' }).click();
+	await expect(page).toHaveURL(/sort=name/);
+	await expect(page).toHaveURL(/dir=asc/);
+	expect(await getRowIndex(rows, 'Closed Account')).toBeLessThan(
+		await getRowIndex(rows, 'Open Account')
+	);
 
-		await page.reload();
+	// Institution records both descending and ascending state.
+	await expect(page.getByRole('row', { name: 'Chase Checking' })).toBeVisible();
+	const institutionHeader = page.getByRole('button', { name: 'Institution' });
+	await institutionHeader.click();
+	await expect(page).toHaveURL(/sort=institution/);
+	await expect(page).toHaveURL(/dir=desc/);
+	await institutionHeader.click();
+	await expect(page).toHaveURL(/dir=asc/);
 
-		await expect(page).toHaveURL(/sort=name/);
-		await expect(page).toHaveURL(/dir=asc/);
-		await expect(page.getByRole('row', { name: 'Account One' })).toBeVisible();
-		expect(await getRowIndex(rows, 'Account One')).toBeLessThan(
-			await getRowIndex(rows, 'Account Two')
-		);
-	});
+	// Transactions sorts the populated accounts by count in both directions.
+	await expect(page.getByRole('row', { name: 'Many Transactions' })).toBeVisible();
+	const transactionsHeader = page.getByRole('button', { name: 'Transactions' });
+	await transactionsHeader.click();
+	await expect(page).toHaveURL(/sort=transactions/);
+	await expect(page).toHaveURL(/dir=desc/);
+	expect(await getRowIndex(rows, 'Many Transactions')).toBeLessThan(
+		await getRowIndex(rows, 'Few Transactions')
+	);
 
-	test('sort indicator shows on active column', async ({ page }) => {
-		const user = await seedUser('felix');
-
-		await seedAccount({
-			name: 'Test Account',
-			balanceGroup: AccountsBalanceGroupOptions.CASH,
-			owner: user.id,
-			balanceType: 'Checking'
-		}).then((acc) =>
-			seedAccountBalance({
-				account: acc.id,
-				owner: user.id,
-				asOf: new Date().toISOString(),
-				value: 1000
-			})
-		);
-
-		await page.goto('/');
-		await signIn(page, user.email);
-		await goToPageViaSidebar(page, 'Accounts');
-		await expect(page.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'true');
-
-		await expect(page.getByRole('row', { name: 'Test Account' })).toBeVisible();
-
-		const balanceButton = page.getByRole('button', { name: 'Balance' });
-		const balanceTh = balanceButton.locator('xpath=..');
-		await expect(balanceTh).toHaveAttribute('aria-sort', 'descending');
-
-		await balanceButton.click();
-		await expect(balanceTh).toHaveAttribute('aria-sort', 'ascending');
-
-		const accountButton = page.getByRole('button', { name: 'Account', exact: true });
-		const accountTh = accountButton.locator('xpath=..');
-		await accountButton.click();
-
-		await expect(accountTh).toHaveAttribute('aria-sort', 'descending');
-		await expect(balanceTh).not.toHaveAttribute('aria-sort');
-	});
-
-	test('sorting works correctly across filter tabs', async ({ page }) => {
-		const user = await seedUser('gloria');
-
-		await seedAccount({
-			name: 'Open Account',
-			balanceGroup: AccountsBalanceGroupOptions.CASH,
-			owner: user.id,
-			balanceType: 'Checking'
-		}).then((acc) =>
-			seedAccountBalance({
-				account: acc.id,
-				owner: user.id,
-				asOf: new Date().toISOString(),
-				value: 3000
-			})
-		);
-
-		await seedAccount({
-			name: 'Closed Account',
-			balanceGroup: AccountsBalanceGroupOptions.CASH,
-			owner: user.id,
-			balanceType: 'Savings',
-			closed: new Date().toISOString()
-		}).then((acc) =>
-			seedAccountBalance({
-				account: acc.id,
-				owner: user.id,
-				asOf: new Date().toISOString(),
-				value: 1000
-			})
-		);
-
-		await page.goto('/');
-		await signIn(page, user.email);
-		await goToPageViaSidebar(page, 'Accounts');
-		await expect(page.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'true');
-
-		await expect(page.getByRole('row', { name: 'Open Account' })).toBeVisible();
-
-		const accountHeader = page.getByRole('button', { name: 'Account', exact: true });
-		await accountHeader.click();
-		await accountHeader.click();
-
-		await expect(page).toHaveURL(/sort=name/);
-		await expect(page).toHaveURL(/dir=asc/);
-
-		await page.getByRole('tab', { name: 'All' }).click();
-		await expect(page).toHaveURL(/sort=name/);
-		await expect(page).toHaveURL(/dir=asc/);
-
-		const rows = page.locator('tbody tr');
-
-		expect(await getRowIndex(rows, 'Closed Account')).toBeLessThan(
-			await getRowIndex(rows, 'Open Account')
-		);
-	});
+	await transactionsHeader.click();
+	await expect(page).toHaveURL(/dir=asc/);
+	expect(await getRowIndex(rows, 'Few Transactions')).toBeLessThan(
+		await getRowIndex(rows, 'Many Transactions')
+	);
 });

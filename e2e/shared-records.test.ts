@@ -175,6 +175,7 @@ test('owner creates account share via UI and recipient sees it with NORMAL persp
 	await goToRecordDetail(page, 'Accounts', 'Joint savings');
 	await goToEditTab(page);
 	await page.getByLabel('Email').fill(recipient.email);
+	// Leaving perspective untouched exercises its NORMAL default.
 	await page.getByRole('button', { name: 'Share', exact: true }).click();
 
 	await expect(page.getByText('Share created')).toBeVisible();
@@ -416,6 +417,7 @@ test('account share API rejects self-share, unknown recipient, duplicates, and m
 		balanceType: 'Checking'
 	});
 
+	// Missing recipient email
 	let response = await pbSend(
 		'/api/shares/accounts',
 		{ accountId: account.id, perspective: 'NORMAL' },
@@ -423,6 +425,7 @@ test('account share API rejects self-share, unknown recipient, duplicates, and m
 	);
 	expect(response.status).toBe(400);
 
+	// Missing account id
 	response = await pbSend(
 		'/api/shares/accounts',
 		{ recipientEmail: recipient.email, perspective: 'NORMAL' },
@@ -430,6 +433,7 @@ test('account share API rejects self-share, unknown recipient, duplicates, and m
 	);
 	expect(response.status).toBe(400);
 
+	// Invalid perspective
 	response = await pbSend(
 		'/api/shares/accounts',
 		{ accountId: account.id, recipientEmail: recipient.email, perspective: 'SIDEWAYS' },
@@ -437,6 +441,7 @@ test('account share API rejects self-share, unknown recipient, duplicates, and m
 	);
 	expect(response.status).toBe(400);
 
+	// Self-share
 	response = await pbSend(
 		'/api/shares/accounts',
 		{ accountId: account.id, recipientEmail: owner.email, perspective: 'NORMAL' },
@@ -444,6 +449,7 @@ test('account share API rejects self-share, unknown recipient, duplicates, and m
 	);
 	expect(response.status).toBe(400);
 
+	// Unknown recipient
 	response = await pbSend(
 		'/api/shares/accounts',
 		{
@@ -455,6 +461,7 @@ test('account share API rejects self-share, unknown recipient, duplicates, and m
 	);
 	expect(response.status).toBe(404);
 
+	// Unauthenticated
 	response = await pbSend('/api/shares/accounts', {
 		accountId: account.id,
 		recipientEmail: recipient.email,
@@ -462,6 +469,7 @@ test('account share API rejects self-share, unknown recipient, duplicates, and m
 	});
 	expect(response.status).toBe(401);
 
+	// Valid share succeeds
 	response = await pbSend(
 		'/api/shares/accounts',
 		{ accountId: account.id, recipientEmail: recipient.email, perspective: 'NORMAL' },
@@ -469,6 +477,7 @@ test('account share API rejects self-share, unknown recipient, duplicates, and m
 	);
 	expect(response.status).toBe(200);
 
+	// Duplicate share rejected
 	response = await pbSend(
 		'/api/shares/accounts',
 		{ accountId: account.id, recipientEmail: recipient.email, perspective: 'NORMAL' },
@@ -732,6 +741,7 @@ test('asset share API rejects self-share and unknown recipient', async () => {
 		balanceType: 'Collectible'
 	});
 
+	// Self-share
 	let response = await pbSend(
 		'/api/shares/assets',
 		{ assetId: asset.id, recipientEmail: owner.email, perspective: 'NORMAL' },
@@ -739,6 +749,7 @@ test('asset share API rejects self-share and unknown recipient', async () => {
 	);
 	expect(response.status).toBe(400);
 
+	// Unknown recipient
 	response = await pbSend(
 		'/api/shares/assets',
 		{
@@ -750,6 +761,7 @@ test('asset share API rejects self-share and unknown recipient', async () => {
 	);
 	expect(response.status).toBe(404);
 
+	// Valid share succeeds
 	response = await pbSend(
 		'/api/shares/assets',
 		{ assetId: asset.id, recipientEmail: recipient.email, perspective: 'NORMAL' },

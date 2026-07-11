@@ -125,6 +125,7 @@ test('selection persists across pagination', async ({ page }) => {
 		value: 10000
 	});
 
+	// Fifty rows fit on a page, so 60 seeds exercise cross-page selection.
 	const baseDate = new UTCDate();
 	for (let i = 0; i < 60; i++) {
 		await seedTransaction({
@@ -140,6 +141,7 @@ test('selection persists across pagination', async ({ page }) => {
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Transactions');
 
+	// Lifetime keeps all 60 transactions available regardless of their dates.
 	await page.getByLabel('Period').click();
 	await page.getByRole('button', { name: 'Lifetime' }).click();
 
@@ -152,6 +154,7 @@ test('selection persists across pagination', async ({ page }) => {
 	await tx02Row.getByRole('checkbox').check();
 	await expect(page.getByRole('link', { name: 'Edit 2 transactions' })).toBeVisible();
 
+	// Selection count persists while moving between pages.
 	await page.getByRole('button', { name: 'Go to next page' }).click();
 	await expect(page.getByRole('row', { name: 'Transaction 51' })).toBeVisible();
 
@@ -185,6 +188,7 @@ test('user can select all results across pages', async ({ page }) => {
 		value: 10000
 	});
 
+	// Fifty rows fit on a page, so 60 seeds expose the select-all-results control.
 	const baseDate = new UTCDate();
 	for (let i = 0; i < 60; i++) {
 		await seedTransaction({
@@ -213,6 +217,7 @@ test('user can select all results across pages', async ({ page }) => {
 
 	await expect(page.getByRole('button', { name: 'Select all 60 results' })).toBeVisible();
 
+	// Promote the current-page selection to every result across both pages.
 	await page.getByRole('button', { name: 'Select all 60 results' }).click();
 	await expect(page.getByRole('link', { name: 'Edit 60 transactions' })).toBeVisible();
 
@@ -227,6 +232,7 @@ test('user can select all results across pages', async ({ page }) => {
 	await expect(tx60Row.getByRole('checkbox')).toBeChecked();
 	await expect(page.getByRole('link', { name: 'Edit 60 transactions' })).toBeVisible();
 
+	// Clearing from page 2 must also clear the off-page selections.
 	await tableHeader.getByRole('checkbox').uncheck();
 
 	await expect(page.getByRole('link', { name: 'Edit 60 transactions' })).not.toBeVisible();
@@ -275,6 +281,7 @@ test('batch editor displays mixed values correctly', async ({ page }) => {
 		owner: user.id
 	});
 
+	// The selected rows intentionally disagree on account, description, date, labels, and amount.
 	await seedTransaction({
 		account: checkingAccount.id,
 		owner: user.id,
@@ -313,10 +320,12 @@ test('batch editor displays mixed values correctly', async ({ page }) => {
 	await expect(page.getByLabel('breadcrumb').getByText('Batch editor')).toBeVisible();
 	await expect(page.getByText('Update 3 transactions')).toBeVisible();
 
+	// Select fields render mixed values in their trigger; text fields use placeholders.
 	await expect(page.getByText('Multiple accounts')).toBeVisible();
 	await expect(page.getByPlaceholder('Multiple descriptions')).toBeVisible();
 	await expect(page.getByPlaceholder('Multiple dates')).toBeVisible();
 	await expect(page.getByPlaceholder('Multiple labels')).toBeVisible();
+	// The disabled amount input uses a value because amounts cannot be batch-edited.
 	await expect(page.getByLabel('Amount')).toHaveValue('Multiple amounts');
 
 	await expect(page.getByLabel('Account')).toBeDisabled();
@@ -338,6 +347,7 @@ test('batch editor displays mixed values correctly', async ({ page }) => {
 	await expect(page.getByText('Permanently delete all 3 transactions')).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Delete' }).first()).toBeVisible();
 
+	// Discard returns to the list without changing rows or retaining selection.
 	await page.getByRole('button', { name: 'Discard' }).click();
 	await expect(page).toHaveURL('/transactions');
 
@@ -371,6 +381,7 @@ test('batch editor displays common values when transactions share them', async (
 
 	const sameDate = setHours(subDays(new UTCDate(), 5), 12);
 
+	// Every editable field is shared; only the amounts differ.
 	await seedTransaction({
 		account: checkingAccount.id,
 		owner: user.id,
@@ -477,6 +488,7 @@ test('user can batch update transaction fields', async ({ page }) => {
 	// Field order: Description(0), Amount(1), Date(2), Account(3), Labels(4), Excluded(5)
 	const editCheckboxes = page.getByRole('checkbox', { name: 'Edit' });
 
+	// Enable three fields to verify one apply updates every selected row consistently.
 	await editCheckboxes.nth(0).check();
 	await expect(page.getByLabel('Description')).toBeEnabled();
 	await page.getByLabel('Description').fill('Updated Description');
@@ -561,6 +573,7 @@ test('user can batch delete transactions', async ({ page }) => {
 	await expect(page.getByRole('row', { name: 'Transaction To Delete B' })).toBeVisible();
 	await expect(page.getByRole('row', { name: 'Transaction To Keep' })).toBeVisible();
 
+	// Select only two rows so the third acts as a deletion negative control.
 	const deleteARow = page.getByRole('row', { name: 'Transaction To Delete A' });
 	const deleteBRow = page.getByRole('row', { name: 'Transaction To Delete B' });
 	await deleteARow.getByRole('checkbox').check();
@@ -570,6 +583,7 @@ test('user can batch delete transactions', async ({ page }) => {
 	await page.getByRole('link', { name: 'Edit 2 transactions' }).click();
 	await expect(page).toHaveURL('/transactions/batch');
 
+	// The first Delete opens the danger-zone dialog; the dialog action is separate.
 	await page.getByRole('button', { name: 'Delete' }).first().click();
 
 	const dialog = page.getByRole('alertdialog');
@@ -589,7 +603,7 @@ test('user can batch delete transactions', async ({ page }) => {
 
 	await expect(page.getByRole('row', { name: 'Transaction To Keep' })).toBeVisible();
 
-	// Test's explicit purpose is direct-URL navigation to the batch editor without a selection
+	// Direct navigation without a selection must return to the transactions list.
 	await page.goto('/transactions/batch');
 	await expect(page).toHaveURL('/transactions');
 });

@@ -229,6 +229,7 @@ test('transactions display edge cases correctly (empty labels, no account name, 
 
 	const info = test.info();
 	const isMobile = info.project.name?.toLowerCase().includes('mobile') ?? false;
+	// Hover tooltips are unavailable in mobile projects.
 	if (!isMobile) {
 		await excludedAmount.hover();
 		await expect(page.getByText('Excluded transactions do not affect reports')).toBeVisible();
@@ -253,6 +254,8 @@ test('transactions page shows correct count and net balance in summary', async (
 
 	const now = new UTCDate();
 
+	// Included credits total $801.25 and debits total -$350.58.
+	// The excluded $1,000 credit appears in the table but contributes nothing to net amount.
 	await seedTransaction({
 		account: account.id,
 		owner: user.id,
@@ -300,12 +303,14 @@ test('transactions page shows correct count and net balance in summary', async (
 	await expect(page.getByText('Utility Bill')).toBeVisible();
 	await expect(page.getByText('Excluded Transfer')).toBeVisible();
 
+	// Five rows render, while only included rows produce the $450.67 net amount.
 	const summaryRegion = page.getByRole('region', { name: 'Transactions summary' });
 	await expect(summaryRegion.getByText('Transactions')).toBeVisible();
 	await expect(summaryRegion.getByText('5', { exact: true })).toBeVisible();
 	await expect(summaryRegion.getByText('Net amount')).toBeVisible();
 	await expect(summaryRegion.getByText('$450.67')).toBeVisible();
 
+	// Both component totals are useful only while the unfiltered net combines them.
 	await expect(summaryRegion.getByText('Net credits')).toBeVisible();
 	await expect(summaryRegion.getByText('$801.25')).toBeVisible();
 	await expect(summaryRegion.getByText('Net debits')).toBeVisible();
@@ -314,6 +319,7 @@ test('transactions page shows correct count and net balance in summary', async (
 	await page.getByLabel('Type').click();
 	await page.getByRole('option', { name: 'Credits only' }).click();
 
+	// Credits-only hides the redundant credit subtotal.
 	await expect(summaryRegion.getByText('2', { exact: true })).toBeVisible();
 	await expect(summaryRegion.getByLabel('Net amount').getByText('$801.25')).toBeVisible();
 	await expect(summaryRegion.getByText('Net credits')).not.toBeVisible();
@@ -321,6 +327,7 @@ test('transactions page shows correct count and net balance in summary', async (
 	await page.getByLabel('Type').click();
 	await page.getByRole('option', { name: 'Debits only' }).click();
 
+	// Debits-only hides the redundant debit subtotal.
 	await expect(summaryRegion.getByText('2', { exact: true })).toBeVisible();
 	await expect(summaryRegion.getByLabel('Net amount').getByText('-$350.58')).toBeVisible();
 	await expect(summaryRegion.getByText('Net debits')).not.toBeVisible();
@@ -328,6 +335,7 @@ test('transactions page shows correct count and net balance in summary', async (
 	await page.getByLabel('Type').click();
 	await page.getByRole('option', { name: 'Excluded only' }).click();
 
+	// Excluded-only shows one row but a zero net; neither included subtotal applies.
 	await expect(summaryRegion.getByText('1', { exact: true })).toBeVisible();
 	await expect(summaryRegion.getByText('$0.00')).toBeVisible();
 	await expect(summaryRegion.getByText('Net credits')).not.toBeVisible();

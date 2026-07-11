@@ -25,9 +25,7 @@ export default defineConfig({
 			env: {
 				...process.env,
 				PUBLIC_PLAYWRIGHT_TESTING: 'true',
-				PUBLIC_DEMO_ENABLED: 'true',
-				PUBLIC_DEMO_EMAIL: 'demo@canutin.com',
-				PUBLIC_DEMO_PASSWORD: '123qweasdzxc'
+				PUBLIC_DEMO_ENABLED: 'true'
 			}
 		}
 	],

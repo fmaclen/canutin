@@ -7,8 +7,6 @@ services:
       - '42070:42070'
     environment:
       PUBLIC_DEMO_ENABLED: 'true'
-      PUBLIC_DEMO_EMAIL: 'demo@canutin.com'
-      PUBLIC_DEMO_PASSWORD: '123qweasdzxc'
     volumes:
       - pocketbase-data:/app/pocketbase/pb_data
     restart: unless-stopped
@@ -21,8 +19,6 @@ services:
     environment:
       PUBLIC_PB_URL: 'https://pb-next.canutin.com'
       PUBLIC_DEMO_ENABLED: 'true'
-      PUBLIC_DEMO_EMAIL: 'demo@canutin.com'
-      PUBLIC_DEMO_PASSWORD: '123qweasdzxc'
       ORIGIN: 'https://next.canutin.com'
     depends_on:
       - pocketbase

@@ -381,10 +381,12 @@ test('account positions: positions table sorts by column with order, aria-sort, 
 	const table = page.getByRole('table');
 	const rows = table.getByRole('row');
 
+	// Default sort is value descending.
 	await expect(rows.nth(1)).toContainText('Beta Position');
 	await expect(rows.nth(2)).toContainText('Gamma Position');
 	await expect(rows.nth(3)).toContainText('Alpha Position');
 
+	// Security sorts by name descending first, then ascending.
 	const securityButton = table.getByRole('button', { name: 'Security', exact: true });
 	const securityHeader = securityButton.locator('xpath=..');
 	const marketValueButton = table.getByRole('button', { name: 'Market value', exact: true });
@@ -404,6 +406,7 @@ test('account positions: positions table sorts by column with order, aria-sort, 
 	await expect(rows.nth(2)).toContainText('Beta Position');
 	await expect(rows.nth(3)).toContainText('Gamma Position');
 
+	// Switching columns starts market value in descending order.
 	await marketValueButton.click();
 	await expect(page).toHaveURL(/sort=value/);
 	await expect(page).toHaveURL(/dir=desc/);
@@ -411,12 +414,14 @@ test('account positions: positions table sorts by column with order, aria-sort, 
 	await expect(rows.nth(2)).toContainText('Gamma Position');
 	await expect(rows.nth(3)).toContainText('Alpha Position');
 
+	// A second click toggles market value to ascending.
 	await marketValueButton.click();
 	await expect(page).toHaveURL(/dir=asc/);
 	await expect(rows.nth(1)).toContainText('Alpha Position');
 	await expect(rows.nth(2)).toContainText('Gamma Position');
 	await expect(rows.nth(3)).toContainText('Beta Position');
 
+	// Gain/loss starts with gain amount descending.
 	await table.getByRole('button', { name: 'Gain/loss', exact: true }).click();
 	await expect(page).toHaveURL(/sort=gainLoss/);
 	await expect(page).toHaveURL(/dir=desc/);
@@ -424,6 +429,7 @@ test('account positions: positions table sorts by column with order, aria-sort, 
 	await expect(rows.nth(2)).toContainText('Alpha Position');
 	await expect(rows.nth(3)).toContainText('Gamma Position');
 
+	// Sort state must survive a reload.
 	await securityButton.click();
 	await securityButton.click();
 	await expect(page).toHaveURL(/sort=securityName/);
