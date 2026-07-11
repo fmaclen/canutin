@@ -65,7 +65,7 @@
 			<TradesFilters />
 			<TradeSummary />
 			{#if tradesContext.isLoading && tradesContext.rawTransactions.length === 0}
-				<Skeleton class="min-h-32" />
+				<Skeleton class="h-64" showSpinner />
 			{:else}
 				<TradesTable />
 			{/if}

@@ -681,7 +681,7 @@
 {#snippet samplePlaceholder()}
 	<Section>
 		<Skeleton class="h-7 w-40" />
-		<Skeleton class="h-64" />
+		<Skeleton class="h-64" showSpinner />
 	</Section>
 {/snippet}
 

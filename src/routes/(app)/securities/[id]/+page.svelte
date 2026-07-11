@@ -161,7 +161,7 @@
 <Section>
 	<SectionTitle title={m.securities_section_balances()} />
 	{#if !loaded || !security}
-		<Skeleton class="h-64" />
+		<Skeleton class="h-64" showSpinner />
 	{:else if accountBalances.length > 0}
 		<div
 			role="region"

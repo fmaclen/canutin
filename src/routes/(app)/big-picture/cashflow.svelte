@@ -63,7 +63,10 @@
 		let negativeRatio = proportionBetween(Math.abs(lowestSurplus), surplusRange);
 
 		// Normalize so the larger ratio is relative to 1
-		if (positiveRatio > negativeRatio) {
+		if (positiveRatio === 0 && negativeRatio === 0) {
+			positiveRatio = 1;
+			negativeRatio = 1;
+		} else if (positiveRatio > negativeRatio) {
 			const isNegativeRatioZero = negativeRatio === 0;
 			positiveRatio = isNegativeRatioZero ? 1 : positiveRatio / negativeRatio;
 			negativeRatio = isNegativeRatioZero ? 0 : 1;
@@ -72,13 +75,6 @@
 			negativeRatio = isPositiveRatioZero ? 1 : negativeRatio / positiveRatio;
 			positiveRatio = isPositiveRatioZero ? 0 : 1;
 		}
-
-		// Handle edge case where both are equal (e.g., all zeros)
-		if (positiveRatio === negativeRatio) {
-			positiveRatio = 1;
-			negativeRatio = 1;
-		}
-
 		return { positiveRatio, negativeRatio, highestSurplus, lowestSurplus };
 	});
 

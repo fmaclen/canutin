@@ -77,7 +77,7 @@
 				</div>
 			{/if}
 			{#if txContext.isLoading && txContext.rawTransactions.length === 0}
-				<Skeleton class="min-h-32" />
+				<Skeleton class="h-64" showSpinner />
 			{:else}
 				<TransactionTable />
 			{/if}

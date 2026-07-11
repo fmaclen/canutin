@@ -160,7 +160,7 @@
 	<Section>
 		<SectionTitle title={m.currencies_quote_history_section_title()} />
 		{#if !isLoaded || !currency}
-			<Skeleton class="h-64" />
+			<Skeleton class="h-64" showSpinner />
 		{:else}
 			{#if latestQuote}
 				<div

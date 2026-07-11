@@ -169,7 +169,7 @@
 						isUnconverted={grouped[balanceGroup].isUnconverted}
 					/>
 					{#if isLoading}
-						<Skeleton class="min-h-32" />
+						<Skeleton class="min-h-32" showSpinner />
 					{:else if grouped[balanceGroup].types.length === 0}
 						<Empty>{m.balance_sheet_group_empty()}</Empty>
 					{:else}
