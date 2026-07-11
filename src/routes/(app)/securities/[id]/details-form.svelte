@@ -18,7 +18,7 @@
 	let { formData, currency, onSubmit }: Props = $props();
 </script>
 
-<div class="bg-muted border-border overflow-hidden rounded border">
+<div class="border-border overflow-hidden rounded border">
 	<form
 		onsubmit={(event) => {
 			event.preventDefault();

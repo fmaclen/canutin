@@ -667,7 +667,7 @@ test('user can batch delete transactions', async ({ page }) => {
 	// Kept transaction should still exist
 	await expect(page.getByRole('row', { name: 'Transaction To Keep' })).toBeVisible();
 
-	// Also test: navigating directly to batch editor without selection should redirect
+	// Test's explicit purpose is direct-URL navigation to the batch editor without a selection
 	await page.goto('/transactions/batch');
 	await expect(page).toHaveURL('/transactions');
 });

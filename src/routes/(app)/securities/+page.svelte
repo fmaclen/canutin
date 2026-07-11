@@ -7,9 +7,6 @@
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
-	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
-	import Separator from '$lib/components/ui/separator/separator.svelte';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Table from '$lib/components/ui/table/index';
 	import { m } from '$lib/paraglide/messages';
@@ -57,29 +54,11 @@
 	});
 </script>
 
-<header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
-	<div class="flex items-center gap-2">
-		<Sidebar.Trigger class="-ml-1" />
-		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
-		<Breadcrumb.Root>
-			<Breadcrumb.List>
-				<Breadcrumb.Item>
-					<Breadcrumb.Link href={resolve('/trades')}>{m.trades_title()}</Breadcrumb.Link>
-				</Breadcrumb.Item>
-				<Breadcrumb.Separator />
-				<Breadcrumb.Item>
-					<Breadcrumb.Page>{m.securities_title()}</Breadcrumb.Page>
-				</Breadcrumb.Item>
-			</Breadcrumb.List>
-		</Breadcrumb.Root>
-	</div>
-	<nav class="flex items-center gap-4 px-4">
-		<Link href={resolve('/trades/securities/add')} class="text-sm">{m.securities_button_add()}</Link
-		>
-	</nav>
-</header>
+{#snippet actions()}
+	<Link href={resolve('/securities/add')} class="text-sm">{m.securities_add_page_title()}</Link>
+{/snippet}
 
-<Page pageTitle={m.securities_title()}>
+<Page pageTitle={m.securities_title()} {actions}>
 	<Section>
 		<SectionTitle title={m.securities_title()} />
 		{#if securitiesContext.isLoading}
@@ -116,7 +95,7 @@
 							<Table.Row>
 								<Table.Cell>
 									<Link
-										href={resolve(`/trades/securities/${row.id}`)}
+										href={resolve(`/securities/${row.id}`)}
 										class="text-foreground/90 text-sm font-medium"
 									>
 										{row.name}

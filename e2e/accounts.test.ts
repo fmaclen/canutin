@@ -1,11 +1,18 @@
 import { expect, test } from '@playwright/test';
 
-import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
-import { goToPageViaSidebar, signIn } from './playwright.helpers';
+import {
+	AccountsBalanceGroupOptions,
+	SecurityTransactionsTypeOptions
+} from '../src/lib/pocketbase.schema';
+import { goToEditTab, goToPageViaSidebar, goToRecordDetail, signIn } from './playwright.helpers';
 import {
 	recordExists,
 	seedAccount,
 	seedAccountBalance,
+	seedCurrency,
+	seedSecurity,
+	seedSecurityBalance,
+	seedTrade,
 	seedTransaction,
 	seedUser,
 	updateAccount
@@ -76,11 +83,19 @@ test('accounts table reflects filters, transactions, and aggregate totals', asyn
 		asOf: new Date().toISOString(),
 		value: -400
 	});
+	await seedAccount({
+		name: 'Idle Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking',
+		autoCalculated: new Date().toISOString()
+	});
 
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Accounts');
 	await expect(page.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'true');
+	await expect(page).toHaveTitle('Accounts · Canutin');
 
 	const openRow = page.getByRole('row', { name: /Daily Checking/ });
 	await expect(openRow).toBeVisible();
@@ -89,6 +104,9 @@ test('accounts table reflects filters, transactions, and aggregate totals', asyn
 	await expect(openCells.nth(6)).toContainText('$2,500.00');
 	await expect(openCells.nth(5)).toHaveText('3');
 	await expect(openRow.getByText('Excluded')).not.toBeVisible();
+	await expect(page.getByRole('row', { name: 'Idle Checking' }).locator('td').nth(5)).toHaveText(
+		'0'
+	);
 
 	const excludedRow = page.getByRole('row', { name: /Sandbox Account/ });
 	await expect(excludedRow).toBeVisible();
@@ -157,7 +175,7 @@ test('user can add a new account', async ({ page }) => {
 	await page.getByLabel('Category').fill('Savings');
 	await page.getByLabel('Notes').fill('Opened in 2024 for emergency fund');
 	await page.getByLabel('Balance', { exact: true }).fill('5000');
-	await page.getByRole('button', { name: 'Add' }).click();
+	await page.getByRole('button', { name: 'Add', exact: true }).click();
 	await expect(page.getByText('Account added')).toBeVisible();
 	await expect(page).toHaveURL('/accounts');
 
@@ -179,7 +197,7 @@ test('user can add a new account', async ({ page }) => {
 	await page.getByLabel('Balance', { exact: true }).fill('-1200');
 	await expect(page.getByText('Account added')).not.toBeVisible();
 
-	await page.getByRole('button', { name: 'Add' }).click();
+	await page.getByRole('button', { name: 'Add', exact: true }).click();
 	await expect(page.getByText('Account added')).toBeVisible();
 	await expect(page).toHaveURL('/accounts');
 
@@ -222,6 +240,11 @@ test('user can edit account details and update balance', async ({ page }) => {
 
 	await initialRow.getByRole('link', { name: 'Primary Checking' }).click();
 	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}(\\?|$)`));
+	await expect(page).toHaveTitle('Primary Checking · Accounts · Canutin');
+
+	await goToEditTab(page);
+	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}/edit`));
+	await expect(page).toHaveTitle('Edit · Primary Checking · Accounts · Canutin');
 	await expect(page.getByLabel('Name')).toHaveValue('Primary Checking');
 	await expect(page.getByLabel('Institution')).toHaveValue('Bank of America');
 	await expect(page.getByLabel('Category')).toHaveValue('Checking');
@@ -254,6 +277,9 @@ test('user can edit account details and update balance', async ({ page }) => {
 
 	await renamedRow.getByRole('link', { name: 'Business Checking' }).click();
 	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}(\\?|$)`));
+
+	await goToEditTab(page);
+	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}/edit`));
 	await expect(page.getByLabel('Name')).toHaveValue('Business Checking');
 	await expect(page.getByLabel('Institution')).toHaveValue('Wells Fargo');
 	await expect(page.getByLabel('Category')).toHaveValue('Checking');
@@ -262,7 +288,7 @@ test('user can edit account details and update balance', async ({ page }) => {
 	await expect(page.getByLabel('Exclude from net worth')).not.toBeChecked();
 
 	await page.getByLabel('Balance', { exact: true }).fill('4500');
-	await page.getByRole('button', { name: 'Update' }).click();
+	await page.getByRole('button', { name: 'Add', exact: true }).click();
 	await expect(page.getByText('Balance updated')).toBeVisible();
 	await expect(page).toHaveURL('/accounts');
 	await expect(
@@ -271,6 +297,10 @@ test('user can edit account details and update balance', async ({ page }) => {
 
 	await page.getByRole('row', { name: 'Business Checking' }).getByRole('link').click();
 	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}(\\?|$)`));
+
+	await goToEditTab(page);
+	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}/edit`));
+
 	await page.getByLabel('Exclude from net worth').check();
 	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(page.getByText('Account updated').first()).toBeVisible();
@@ -278,7 +308,11 @@ test('user can edit account details and update balance', async ({ page }) => {
 
 	await page.getByRole('row', { name: 'Business Checking' }).getByRole('link').click();
 	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}(\\?|$)`));
+
+	await goToEditTab(page);
+	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}/edit`));
 	await expect(page.getByLabel('Exclude from net worth')).toBeChecked();
+
 	await page.getByLabel('Exclude from net worth').uncheck();
 	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(page.getByText('Account updated').first()).toBeVisible();
@@ -286,6 +320,9 @@ test('user can edit account details and update balance', async ({ page }) => {
 
 	await page.getByRole('row', { name: 'Business Checking' }).getByRole('link').click();
 	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}(\\?|$)`));
+
+	await goToEditTab(page);
+	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}/edit`));
 	await expect(page.getByLabel('Exclude from net worth')).not.toBeChecked();
 });
 
@@ -309,8 +346,9 @@ test('user can directly navigate to account edit page', async ({ page }) => {
 	await page.goto('/');
 	await signIn(page, user.email);
 
-	await page.goto(`/accounts/${savingsAccount.id}`);
-	await expect(page).toHaveURL(`/accounts/${savingsAccount.id}`);
+	// Test's explicit purpose is direct-URL navigation to the edit page
+	await page.goto(`/accounts/${savingsAccount.id}/edit`);
+	await expect(page).toHaveURL(`/accounts/${savingsAccount.id}/edit`);
 	await expect(page.getByLabel('Name')).toHaveValue('Emergency Fund');
 	await expect(page.getByLabel('Institution')).toHaveValue('Ally Bank');
 	await expect(page.getByLabel('Category')).toHaveValue('Savings');
@@ -339,6 +377,9 @@ test('user sees stale data warning and can refresh form', async ({ page }) => {
 
 	await page.getByRole('link', { name: 'Investment Account' }).click();
 	await expect(page).toHaveURL(new RegExp(`/accounts/${investmentAccount.id}(\\?|$)`));
+
+	await goToEditTab(page);
+	await expect(page).toHaveURL(new RegExp(`/accounts/${investmentAccount.id}/edit`));
 	await expect(page.getByLabel('Name')).toHaveValue('Investment Account');
 
 	await page.getByLabel('Name').fill('My Investment Account');
@@ -405,6 +446,9 @@ test('user can delete account and cascade deletes transactions and balances', as
 	await accountRow.getByRole('link', { name: 'Old Checking' }).click();
 	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}(\\?|$)`));
 
+	await goToEditTab(page);
+	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}/edit`));
+
 	await page.getByRole('button', { name: 'Delete' }).first().click();
 	const dialog = page.getByRole('alertdialog');
 	await expect(dialog).toBeVisible();
@@ -418,4 +462,226 @@ test('user can delete account and cascade deletes transactions and balances', as
 	expect(await recordExists('accountBalances', balance.id)).toBe(false);
 	expect(await recordExists('transactions', transaction1.id)).toBe(false);
 	expect(await recordExists('transactions', transaction2.id)).toBe(false);
+});
+
+test('account overview keeps the balance history section and swaps its empty state for a chart', async ({
+	page
+}) => {
+	const user = await seedUser('winona');
+
+	const account = await seedAccount({
+		name: 'Growth Savings',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Savings'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: '2025-01-01T00:00:00.000Z',
+		value: 1000
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToRecordDetail(page, 'Accounts', 'Growth Savings');
+	await expect(page.getByRole('heading', { name: 'Balance history' })).toBeVisible();
+	await expect(page.getByText('No balance history yet')).toBeVisible();
+
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: '2025-02-01T00:00:00.000Z',
+		value: 2000
+	});
+	await expect(page.getByText('No balance history yet')).not.toBeVisible();
+	await expect(page.getByRole('img', { name: 'Balance' })).toBeVisible();
+});
+
+test('account overview charts an auto-calculated account from its transaction history', async ({
+	page
+}) => {
+	const user = await seedUser('wilbur');
+
+	const account = await seedAccount({
+		name: 'Auto Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking',
+		autoCalculated: new Date().toISOString()
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: '2025-01-01T00:00:00.000Z',
+		description: 'Opening deposit',
+		value: 500
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date: '2025-02-01T00:00:00.000Z',
+		description: 'Paycheck',
+		value: 750
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToRecordDetail(page, 'Accounts', 'Auto Checking');
+	await expect(page.getByRole('heading', { name: 'Balance history' })).toBeVisible();
+	await expect(page.getByRole('img', { name: 'Balance' })).toBeVisible();
+});
+
+test('account overview charts an investment account from its security positions', async ({
+	page
+}) => {
+	const user = await seedUser('phoebe');
+
+	const brokerage = await seedAccount({
+		name: 'Index Brokerage',
+		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+		owner: user.id,
+		balanceType: 'Brokerage'
+	});
+	const security = await seedSecurity({ name: 'Globex Fund', symbol: 'GLBX', owner: user.id });
+	await seedSecurityBalance({
+		account: brokerage.id,
+		owner: user.id,
+		security: security.id,
+		asOf: '2025-01-01T00:00:00.000Z',
+		quantity: 10,
+		price: 100,
+		value: 1000
+	});
+	await seedSecurityBalance({
+		account: brokerage.id,
+		owner: user.id,
+		security: security.id,
+		asOf: '2025-02-01T00:00:00.000Z',
+		quantity: 12,
+		price: 150,
+		value: 1800
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToRecordDetail(page, 'Accounts', 'Index Brokerage');
+	await expect(page.getByRole('img', { name: 'Balance' })).toBeVisible();
+});
+
+test('account overview blanks the balance history when it holds a foreign-currency security', async ({
+	page
+}) => {
+	const user = await seedUser('sabine');
+	await seedCurrency({ owner: user.id, code: 'EUR', name: 'Euro', autoUpdate: false });
+
+	const brokerage = await seedAccount({
+		name: 'Euro Brokerage',
+		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+		owner: user.id,
+		balanceType: 'Brokerage',
+		currency: 'EUR'
+	});
+	const security = await seedSecurity({ name: 'Dollar Fund', symbol: 'USDF', owner: user.id });
+	await seedSecurityBalance({
+		account: brokerage.id,
+		owner: user.id,
+		security: security.id,
+		asOf: '2025-01-01T00:00:00.000Z',
+		quantity: 10,
+		price: 100,
+		value: 1000
+	});
+	await seedSecurityBalance({
+		account: brokerage.id,
+		owner: user.id,
+		security: security.id,
+		asOf: '2025-02-01T00:00:00.000Z',
+		quantity: 12,
+		price: 150,
+		value: 1800
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToRecordDetail(page, 'Accounts', 'Euro Brokerage');
+	await expect(page.getByText('No balance history yet')).toBeVisible();
+	await expect(page.getByRole('img', { name: 'Balance' })).not.toBeVisible();
+});
+
+test('account overview samples transactions and trades with links to filtered ledgers', async ({
+	page
+}) => {
+	const user = await seedUser('nova');
+
+	const brokerage = await seedAccount({
+		name: 'Brokerage One',
+		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+		owner: user.id,
+		balanceType: 'Investment'
+	});
+	const security = await seedSecurity({ name: 'Acme Corp', symbol: 'ACME', owner: user.id });
+	await seedTransaction({
+		account: brokerage.id,
+		owner: user.id,
+		date: new Date().toISOString(),
+		description: 'Dividend payout',
+		value: 120
+	});
+	await seedTrade({
+		account: brokerage.id,
+		owner: user.id,
+		security: security.id,
+		date: new Date().toISOString(),
+		type: SecurityTransactionsTypeOptions.buy,
+		description: 'Bought Acme',
+		quantity: 5,
+		price: 100,
+		amount: -500
+	});
+
+	await seedAccount({
+		name: 'Empty Vault',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Savings'
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToRecordDetail(page, 'Accounts', 'Brokerage One');
+	await expect(page.getByText('Dividend payout')).toBeVisible();
+	await expect(page.getByText('Bought Acme')).toBeVisible();
+
+	const brokeragePositions = await page.getByRole('heading', { name: 'Positions' }).boundingBox();
+	const brokerageCashflow = await page
+		.getByRole('heading', { name: 'Trailing cashflow' })
+		.boundingBox();
+	expect(brokeragePositions).not.toBeNull();
+	expect(brokerageCashflow).not.toBeNull();
+	expect(brokeragePositions!.y).toBeLessThan(brokerageCashflow!.y);
+
+	await page.getByRole('link', { name: 'View all 1 transaction' }).click();
+	await expect(page).toHaveURL(new RegExp(`account=${brokerage.id}`));
+	await expect(page.getByText('Dividend payout')).toBeVisible();
+
+	await goToRecordDetail(page, 'Accounts', 'Brokerage One');
+	await page.getByRole('link', { name: 'View all 1 trade' }).click();
+	await expect(page).toHaveURL(new RegExp(`account=${brokerage.id}`));
+	await expect(page.getByText('Bought Acme')).toBeVisible();
+
+	await goToRecordDetail(page, 'Accounts', 'Empty Vault');
+	await expect(page.getByText('No transactions yet')).toBeVisible();
+	await expect(page.getByText('No trades yet')).toBeVisible();
+	await expect(page.getByRole('link', { name: /View all/ })).not.toBeVisible();
+
+	const emptyAccountPositions = await page
+		.getByRole('heading', { name: 'Positions' })
+		.boundingBox();
+	const emptyAccountCashflow = await page
+		.getByRole('heading', { name: 'Trailing cashflow' })
+		.boundingBox();
+	expect(emptyAccountPositions).not.toBeNull();
+	expect(emptyAccountCashflow).not.toBeNull();
+	expect(emptyAccountCashflow!.y).toBeLessThan(emptyAccountPositions!.y);
 });

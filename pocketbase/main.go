@@ -90,7 +90,7 @@ func main() {
 			return handleRevert(e.App, re)
 		}).Bind(apis.RequireAuth())
 
-		e.Router.POST("/api/canutin/securities/with-initial-balance", createSecurityWithInitialBalanceHandler(e.App)).Bind(
+		e.Router.POST("/api/canutin/securities/with-initial-transaction", createSecurityWithInitialTransactionHandler(e.App)).Bind(
 			apis.RequireAuth("users"),
 		)
 
@@ -227,6 +227,23 @@ func main() {
 
 	app.OnRecordValidate("securities").BindFunc(func(e *core.RecordEvent) error {
 		normalizeSecurityRecord(e.Record)
+		_, err := e.App.FindFirstRecordByFilter(
+			"securities",
+			"id != {:id} && owner = {:owner} && normalizedName = {:normalizedName}",
+			map[string]any{
+				"id":             e.Record.Id,
+				"owner":          e.Record.GetString("owner"),
+				"normalizedName": e.Record.GetString("normalizedName"),
+			},
+		)
+		if err == nil {
+			return validation.Errors{
+				"name": validation.NewError("security_name_exists", "Security name already exists"),
+			}
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("check security name uniqueness: %w", err)
+		}
 		if err := validateSecurityOwnerImmutable(e.Record); err != nil {
 			return err
 		}

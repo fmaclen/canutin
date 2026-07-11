@@ -4,7 +4,7 @@ import {
 	AccountsBalanceGroupOptions,
 	AssetsBalanceGroupOptions
 } from '../src/lib/pocketbase.schema';
-import { goToPageViaSidebar, signIn } from './playwright.helpers';
+import { goToEditTab, goToPageViaSidebar, goToRecordDetail, signIn } from './playwright.helpers';
 import {
 	getUserPB,
 	pbSend,
@@ -75,14 +75,16 @@ test('shared inverse account mirrors balances and transactions while allowing re
 	await expect(transactionRow).toBeVisible();
 	await expect(transactionRow.getByText('$200.00')).toBeVisible();
 
-	await page.goto(`/accounts/${payableAccount.id}`);
+	await goToPageViaSidebar(page, 'Accounts');
+	await accountRow.getByRole('link', { name: 'Partner payable' }).click();
+	await goToEditTab(page);
 	await expect(page.getByLabel('Include in net worth')).toBeChecked();
 
 	await page.getByLabel('Include in net worth').uncheck();
 	await page.getByRole('button', { name: 'Save', exact: true }).click();
 	await expect(page.getByText('Preferences updated')).toBeVisible();
 
-	await page.goto('/');
+	await goToPageViaSidebar(page, 'Big picture');
 	await expect(netWorth).toContainText('$0');
 
 	await goToPageViaSidebar(page, 'Accounts');
@@ -132,14 +134,15 @@ test('shared inverse asset mirrors value fields while allowing recipient-only ne
 	await expect(assetCells.nth(4)).toContainText('-$9,000.00');
 	await expect(assetCells.nth(7)).toContainText('-$12,000.00');
 
-	await page.goto(`/assets/${receivableAsset.id}`);
+	await assetRow.getByRole('link', { name: 'Intercompany receivable' }).click();
+	await goToEditTab(page);
 	await expect(page.getByLabel('Include in net worth')).toBeChecked();
 
 	await page.getByLabel('Include in net worth').uncheck();
 	await page.getByRole('button', { name: 'Save', exact: true }).click();
 	await expect(page.getByText('Preferences updated')).toBeVisible();
 
-	await page.goto('/');
+	await goToPageViaSidebar(page, 'Big picture');
 	await expect(netWorth).toContainText('$0');
 
 	await goToPageViaSidebar(page, 'Assets');
@@ -169,7 +172,8 @@ test('owner creates account share via UI and recipient sees it with NORMAL persp
 	await page.goto('/');
 	await signIn(page, owner.email);
 
-	await page.goto(`/accounts/${jointAccount.id}`);
+	await goToRecordDetail(page, 'Accounts', 'Joint savings');
+	await goToEditTab(page);
 	await page.getByLabel('Email').fill(recipient.email);
 	// Perspective defaults to NORMAL; no need to change it
 	await page.getByRole('button', { name: 'Share', exact: true }).click();
@@ -295,7 +299,7 @@ test('shared transaction detail page stays read-only for recipients', async ({ p
 		owner: recipient.id,
 		balanceType: 'Checking'
 	});
-	const transaction = await seedTransaction({
+	await seedTransaction({
 		account: account.id,
 		owner: owner.id,
 		date: new Date().toISOString(),
@@ -322,7 +326,7 @@ test('shared transaction detail page stays read-only for recipients', async ({ p
 	await page.goto('/');
 	await signIn(page, recipient.email);
 
-	await page.goto(`/transactions/${transaction.id}`);
+	await goToRecordDetail(page, 'Transactions', 'Shared transfer');
 	await expect(page.getByText('This shared transaction is read-only')).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Save' })).toHaveCount(0);
 	await expect(page.getByRole('button', { name: 'Delete' })).toHaveCount(0);
@@ -389,10 +393,16 @@ test('shared account and asset detail views keep currency formatting for recipie
 	await page.goto('/');
 	await signIn(page, recipient.email);
 
-	await page.goto(`/accounts/${account.id}`);
+	await goToRecordDetail(page, 'Accounts', 'Formatted liability');
+	await goToEditTab(page);
 	await expect(page.getByLabel('Balance', { exact: true })).toHaveValue('$1,200.00');
 
-	await page.goto(`/assets/${asset.id}`);
+	await goToRecordDetail(page, 'Assets', 'Formatted receivable');
+	await goToEditTab(page);
+	// Assets Overview also has a "Market value" summary stat with the same exact label as this
+	// Edit-page input, so wait for the URL to confirm the SPA transition landed before asserting -
+	// otherwise a still-in-flight navigation can resolve the Overview stat instead of the input.
+	await expect(page).toHaveURL(/\/assets\/.+\/edit/);
 	await expect(page.getByLabel('Market value', { exact: true })).toHaveValue('-$12,000.00');
 });
 
@@ -513,9 +523,11 @@ test('recipient can leave a shared account via UI', async ({ page }) => {
 	await signIn(page, recipient.email);
 
 	await goToPageViaSidebar(page, 'Accounts');
-	await expect(page.getByRole('row', { name: /Leavable savings/ })).toBeVisible();
+	const accountRow = page.getByRole('row', { name: /Leavable savings/ });
+	await expect(accountRow).toBeVisible();
 
-	await page.goto(`/accounts/${account.id}`);
+	await accountRow.getByRole('link', { name: 'Leavable savings' }).click();
+	await goToEditTab(page);
 	await page.getByRole('button', { name: 'Leave' }).first().click();
 	await page.getByRole('button', { name: 'Continue' }).click();
 
@@ -557,9 +569,11 @@ test('recipient can leave a shared asset via UI', async ({ page }) => {
 	await signIn(page, recipient.email);
 
 	await goToPageViaSidebar(page, 'Assets');
-	await expect(page.getByRole('row', { name: /Leavable brokerage/ })).toBeVisible();
+	const assetRow = page.getByRole('row', { name: /Leavable brokerage/ });
+	await expect(assetRow).toBeVisible();
 
-	await page.goto(`/assets/${asset.id}`);
+	await assetRow.getByRole('link', { name: 'Leavable brokerage' }).click();
+	await goToEditTab(page);
 	await page.getByRole('button', { name: 'Leave' }).first().click();
 	await page.getByRole('button', { name: 'Continue' }).click();
 

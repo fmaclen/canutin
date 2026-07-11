@@ -10,13 +10,11 @@
 	let { title }: Props = $props();
 </script>
 
-<div class="bg-muted border-border overflow-hidden rounded border">
-	<div class="flex items-center justify-between p-4">
+<div class="bg-muted border-border overflow-hidden rounded border border-l-4 border-l-amber-500">
+	<div class="flex items-center gap-2 p-4">
+		<UsersIcon class="text-muted-foreground size-3.5" aria-hidden="true" />
 		<div>
-			<p class="flex items-center gap-2 text-sm">
-				<UsersIcon class="text-muted-foreground size-3.5" aria-hidden="true" />
-				{title}
-			</p>
+			<p class="text-sm font-semibold">{title}</p>
 			<p class="text-muted-foreground text-sm">
 				{m.shared_record_readonly_subtext()}
 			</p>

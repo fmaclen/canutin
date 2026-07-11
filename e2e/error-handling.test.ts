@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { signIn } from './playwright.helpers';
+import { goToPageViaSidebar, signIn } from './playwright.helpers';
 import { deleteUser, seedUser } from './pocketbase.helpers';
 
 test('shows connection error toast when PocketBase is unreachable', async ({ page }) => {
@@ -83,7 +83,7 @@ test('stays silent when a request is aborted mid-flight', async ({ page }) => {
 		route.abort('aborted');
 	});
 
-	await page.goto('/transactions');
+	await goToPageViaSidebar(page, 'Transactions');
 	await expect(page).toHaveURL('/transactions');
 	await expect(
 		page.locator('[data-sonner-toast]', {
@@ -112,7 +112,7 @@ test('forces logout without reload when a request returns 401 mid-session', asyn
 		});
 	});
 
-	await page.goto('/transactions');
+	await goToPageViaSidebar(page, 'Transactions');
 	await expect(page).toHaveURL('/auth');
 	await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
 	await expect(

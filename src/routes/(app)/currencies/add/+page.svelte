@@ -13,15 +13,13 @@
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
-	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import Separator from '$lib/components/ui/separator/separator.svelte';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+	import { responseFieldCode } from '$lib/utils';
 
 	const pb = getPocketBaseContext();
 	const auth = getAuthContext();
@@ -40,19 +38,6 @@
 	const previewCode = $derived(currencyCode || 'USD');
 	const isIntlPreviewCode = $derived(isIntlCurrency(previewCode));
 	const previewValue = $derived(formatNativeCurrency(Number(previewAmount), 2, previewCode));
-
-	function isRecord(value: unknown): value is Record<string, unknown> {
-		return typeof value === 'object' && value !== null;
-	}
-
-	function responseFieldCode(error: ClientResponseError, field: string) {
-		const data: unknown = error.response?.data;
-		if (!isRecord(data)) return '';
-		const fieldData = data[field];
-		if (!isRecord(fieldData)) return '';
-		const errorCode = fieldData.code;
-		return typeof errorCode === 'string' ? errorCode : '';
-	}
 
 	function handleCodeInput(event: Event) {
 		const target = event.currentTarget;
@@ -137,29 +122,17 @@
 	}
 </script>
 
-<header class="bg-background flex h-16 shrink-0 items-center gap-2 border-b">
-	<div class="flex items-center gap-2 px-4">
-		<Sidebar.Trigger class="-ml-1" />
-		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
-		<Breadcrumb.Root>
-			<Breadcrumb.List>
-				<Breadcrumb.Item>
-					<Breadcrumb.Link href={resolve('/currencies')}>{m.sidebar_currencies()}</Breadcrumb.Link>
-				</Breadcrumb.Item>
-				<Breadcrumb.Separator />
-				<Breadcrumb.Item>
-					<Breadcrumb.Page>{m.currencies_add_page_title()}</Breadcrumb.Page>
-				</Breadcrumb.Item>
-			</Breadcrumb.List>
-		</Breadcrumb.Root>
-	</div>
-</header>
-
-<Page pageTitle={m.currencies_add_page_title()}>
+<Page
+	pageTitle={m.currencies_add_page_title()}
+	crumbs={[
+		{ label: m.sidebar_currencies(), href: resolve('/currencies') },
+		{ label: m.currencies_add_page_title() }
+	]}
+>
 	<Section>
 		<SectionTitle title={m.currencies_section_details()} />
 
-		<div class="bg-muted border-border overflow-hidden rounded border">
+		<div class="border-border overflow-hidden rounded border">
 			<form
 				onsubmit={(event) => {
 					event.preventDefault();

@@ -73,17 +73,17 @@ function importPayload(sessionLabel: string) {
 
 const IMPORT_PATH = '/api/canutin/import';
 
-test('settings page shows empty state when no imports exist', async ({ page }) => {
+test('imports page shows empty state when no imports exist', async ({ page }) => {
 	const user = await seedUser('wendy');
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await goToPageViaSidebar(page, 'Settings');
+	await goToPageViaSidebar(page, 'Imports');
 
 	await expect(page.getByText('No imports yet')).toBeVisible();
 });
 
-test('bulk import creates records and displays in settings', async ({ page }) => {
+test('bulk import creates records and displays on the imports page', async ({ page }) => {
 	const user = await seedUser('nathan');
 
 	const response = await pbSend(
@@ -107,7 +107,7 @@ test('bulk import creates records and displays in settings', async ({ page }) =>
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await goToPageViaSidebar(page, 'Settings');
+	await goToPageViaSidebar(page, 'Imports');
 
 	await expect(page.getByText('nathan-scraper-2025-06-15')).toBeVisible();
 	await expect(page.getByText('Completed')).toBeVisible();
@@ -141,7 +141,7 @@ test('duplicate import skips existing records', async ({ page }) => {
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await goToPageViaSidebar(page, 'Settings');
+	await goToPageViaSidebar(page, 'Imports');
 
 	await expect(page.getByText('olivia-scraper-run-1')).toBeVisible();
 	await expect(page.getByText('olivia-scraper-run-2')).toBeVisible();
@@ -256,7 +256,7 @@ test('reverting an import deletes its records and updates status', async ({ page
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await goToPageViaSidebar(page, 'Settings');
+	await goToPageViaSidebar(page, 'Imports');
 
 	await expect(page.getByText('samuel-scraper-to-revert')).toBeVisible();
 	await expect(page.getByText('Completed')).toBeVisible();
@@ -732,7 +732,7 @@ test('mixed valid and invalid rows complete with errors and persist the valid ro
 	expect(transactions[0].description).toBe('Valid deposit');
 });
 
-test('settings shows the completed-with-errors status and failed count', async ({ page }) => {
+test('imports page shows the completed-with-errors status and failed count', async ({ page }) => {
 	const user = await seedUser('rosa');
 	const result = await (
 		await pbSend(
@@ -762,7 +762,7 @@ test('settings shows the completed-with-errors status and failed count', async (
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await goToPageViaSidebar(page, 'Settings');
+	await goToPageViaSidebar(page, 'Imports');
 
 	await expect(page.getByText('rosa-partial-import')).toBeVisible();
 	await expect(page.getByText('Completed with errors')).toBeVisible();

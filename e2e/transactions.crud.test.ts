@@ -76,7 +76,7 @@ test('user can add a new transaction', async ({ page }) => {
 
 	await page.getByLabel('Labels').fill('Food & Dining, Personal');
 	await page.getByLabel('Notes').fill('Met with Sam to review Q3 plans');
-	await page.getByRole('button', { name: 'Add' }).click();
+	await page.getByRole('button', { name: 'Add', exact: true }).click();
 	await expect(page.getByText('Transaction added').first()).toBeVisible();
 	await expect(page.url()).toContain('/transactions');
 	const moonbeamRow = page.getByRole('row', { name: /Moonbeam Cafe/ });
@@ -100,7 +100,7 @@ test('user can add a new transaction', async ({ page }) => {
 	await page.getByRole('option', { name: 'Apex Credit Card' }).click();
 	await expect(page.getByLabel('Account')).toContainText('Apex Credit Card');
 
-	await page.getByRole('button', { name: 'Add' }).click();
+	await page.getByRole('button', { name: 'Add', exact: true }).click();
 	await expect(page.getByText('Transaction added').first()).toBeVisible();
 	await expect(page.url()).toContain('/transactions');
 	const creditCardRow = page.getByRole('row', { name: /Credit Card Payment/ });
@@ -326,6 +326,7 @@ test('user can directly navigate to transaction edit page', async ({ page }) => 
 	await page.goto('/');
 	await signIn(page, user.email);
 
+	// Test's explicit purpose is direct-URL navigation to the transaction page
 	await page.goto(`/transactions/${transaction.id}`);
 	await expect(page).toHaveURL(`/transactions/${transaction.id}`);
 	await expect(page.getByLabel('Description')).toHaveValue('Greenleaf Pharmacy');
@@ -499,7 +500,7 @@ test('reuses existing labels instead of creating duplicates', async ({ page }) =
 	await page.getByLabel('Account').click();
 	await page.getByRole('option', { name: 'Pinewood Checking' }).click();
 	await page.getByLabel('Labels').fill('Groceries');
-	await page.getByRole('button', { name: 'Add' }).click();
+	await page.getByRole('button', { name: 'Add', exact: true }).click();
 	await expect(page.getByText('Transaction added').first()).toBeVisible();
 
 	const groceriesAfterAdd = await getTransactionLabelsByName(user.id, 'Groceries');

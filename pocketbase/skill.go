@@ -109,10 +109,11 @@ const skillCustomEndpointsSection = "## Custom endpoints\n\n" +
 	"`{ sessionId }`. Returns `{ sessionId, deleted }`. Revert deletes import-session-tagged " +
 	"financial rows, but does not remove import-created `currencies` rows or their manual " +
 	"`exchangeRates` quotes because those rows do not carry an `importSession` tag.\n" +
-	"- `POST /api/canutin/securities/with-initial-balance` — requires a `users` token. Body is " +
-	"`{ security: { name, symbol, owner, currency }, balance: { account, owner, asOf, quantity, price, value, costBasis } }`. " +
+	"- `POST /api/canutin/securities/with-initial-transaction` — requires a `users` token. Body is " +
+	"`{ security: { name, symbol, owner, currency }, transaction: { account, owner, date, type, subtype, description, quantity, price, amount, fees, notes } }`. " +
 	"`security.currency` is optional (free-form uppercase code matching `^[A-Z0-9]{2,10}$`, defaults to `USD`). " +
-	"Returns the created `securities` record.\n" +
+	"Creates both records atomically and returns the created `securities` record. A duplicate normalized " +
+	"security name returns `security_name_exists` on the `name` field.\n" +
 	"- `POST /api/shares/accounts` — requires a `users` token. Body is " +
 	"`{ accountId, recipientEmail, perspective }` where perspective is `NORMAL` or `INVERSE`. " +
 	"Returns `{ id }`.\n" +
@@ -123,6 +124,9 @@ const skillConstraintsSection = `## Behavioral constraints
 
 Backend hooks enforce invariants that are not visible in the access rules:
 
+- Security names are trimmed, internal whitespace is collapsed, and names are unique per owner
+  without regard to case. Every security create or update path rejects a duplicate with
+  ` + "`security_name_exists`" + ` on the ` + "`name`" + ` field.
 - Writing a ` + "`securityBalances`" + ` or ` + "`securityTransactions`" + ` record whose account is
   closed is rejected. (Imports are exempt so they can restore a closed account's history.)
 - Share records (` + "`accountShares`" + `, ` + "`assetShares`" + `) can only be updated by the recipient,

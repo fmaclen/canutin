@@ -30,14 +30,17 @@ test('settings switches language only after clicking Save and persists after rel
 	await expect(page.getByText('Interface')).not.toBeVisible();
 	await expect(page.getByText('Interfaz')).toBeVisible();
 	await expect(page.getByLabel('Idioma')).toContainText('Español');
-	await expect(page.getByText('Importaciones', { exact: true })).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Guardar' })).toBeDisabled();
 
-	await page.reload();
+	await goToPageViaSidebar(page, 'Imports');
+	await expect(page.getByText('Agentes de IA', { exact: true })).toBeVisible();
 
+	await page.reload();
+	await expect(page.getByText('Agentes de IA', { exact: true })).toBeVisible();
+
+	await goToPageViaSidebar(page, 'Settings');
 	await expect(page.getByText('Interfaz')).toBeVisible();
 	await expect(page.getByLabel('Idioma')).toContainText('Español');
-	await expect(page.getByText('Importaciones', { exact: true })).toBeVisible();
 });
 
 test('settings switches theme only after clicking Save and persists after reload', async ({
@@ -47,12 +50,15 @@ test('settings switches theme only after clicking Save and persists after reload
 
 	await page.goto('/');
 	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Imports');
+
+	await expect(page.getByText('AI agents')).toBeVisible();
+	await expect(page.getByLabel('Instructions URL')).toHaveValue(/\/api\/canutin\/skill$/);
+
 	await goToPageViaSidebar(page, 'Settings');
 
 	await expect(page.locator('html')).not.toHaveClass(/dark/);
 	await expect(page.getByRole('button', { name: 'Save' })).toBeDisabled();
-	await expect(page.getByText('AI agent access')).toBeVisible();
-	await expect(page.getByLabel('URL')).toHaveValue(/\/api\/canutin\/skill$/);
 
 	await page.getByLabel('Theme').click();
 	await page.getByRole('option', { name: 'Dark' }).click();
@@ -130,6 +136,7 @@ test('locale defaults from browser locale when supported and falls back to Engli
 	const spanishContext = await browser.newContext({ locale: 'es-MX' });
 	const spanishPage = await spanishContext.newPage();
 
+	// Test's explicit purpose is direct-URL locale-detection behavior on first load
 	await spanishPage.goto('/demo/paraglide');
 
 	await expect(spanishPage.getByText('Personal finance platform')).not.toBeVisible();
@@ -140,6 +147,7 @@ test('locale defaults from browser locale when supported and falls back to Engli
 	const fallbackContext = await browser.newContext({ locale: 'fr-CA' });
 	const fallbackPage = await fallbackContext.newPage();
 
+	// Test's explicit purpose is direct-URL locale-detection behavior on first load
 	await fallbackPage.goto('/demo/paraglide');
 
 	await expect(fallbackPage.getByText('Plataforma de finanzas personales')).not.toBeVisible();

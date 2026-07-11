@@ -9,10 +9,7 @@
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
-	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import * as Pagination from '$lib/components/ui/pagination/index';
-	import Separator from '$lib/components/ui/separator/separator.svelte';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index';
 	import * as Table from '$lib/components/ui/table/index';
 	import { getCurrenciesContext } from '$lib/currencies.svelte';
@@ -90,15 +87,16 @@
 
 	const sortedRows = $derived.by(() => {
 		const rows: CurrencyRow[] = currenciesContext.currencies.map((currency) => {
-			const latest = currency.code === 'USD' ? null : latestQuoteFor(currency.code);
+			const isUsd = currency.code === 'USD';
+			const latest = isUsd ? null : latestQuoteFor(currency.code);
 			return {
 				id: currency.id,
 				code: currency.code,
-				name: currency.name,
+				name: isUsd ? currency.name || m.currencies_usd_name() : currency.name,
 				autoUpdate: currency.autoUpdate,
 				latestDate: latest?.date ?? null,
-				latestRate: latest?.rate ?? null,
-				isUsd: currency.code === 'USD'
+				latestRate: isUsd ? 1 : (latest?.rate ?? null),
+				isUsd
 			};
 		});
 
@@ -136,24 +134,10 @@
 	}
 </script>
 
-<header class="bg-background flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
-	<div class="flex items-center gap-2">
-		<Sidebar.Trigger class="-ml-1" />
-		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
-		<Breadcrumb.Root>
-			<Breadcrumb.List>
-				<Breadcrumb.Item>
-					<Breadcrumb.Page>{m.sidebar_currencies()}</Breadcrumb.Page>
-				</Breadcrumb.Item>
-			</Breadcrumb.List>
-		</Breadcrumb.Root>
-	</div>
-	<nav class="flex items-center gap-4 px-4">
-		<Link href={resolve('/currencies/add')} class="text-sm">{m.currencies_add_page_title()}</Link>
-	</nav>
-</header>
-
 <Page pageTitle={m.currencies_section_title()}>
+	{#snippet actions()}
+		<Link href={resolve('/currencies/add')} class="text-sm">{m.currencies_add_page_title()}</Link>
+	{/snippet}
 	<Section>
 		{#if !currenciesContext.isLoaded || !exchangeRatesContext.isLoaded}
 			<Skeleton class="h-64" showSpinner />

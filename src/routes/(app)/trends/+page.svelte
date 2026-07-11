@@ -5,12 +5,10 @@
 
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAssetsContext } from '$lib/assets.svelte';
+	import { type TrendSecurityBalance } from '$lib/balance-series';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
-	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
-	import Separator from '$lib/components/ui/separator/separator.svelte';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index';
 	import { m } from '$lib/paraglide/messages';
 	import type {
@@ -27,12 +25,7 @@
 
 	import ChartNetWorth from './growth.svelte';
 	import Performance from './performance.svelte';
-	import {
-		buildPreparedMaps,
-		computeBoundedHistoryStart,
-		type PeriodKey,
-		type TrendSecurityBalance
-	} from './trends';
+	import { buildPreparedMaps, computeBoundedHistoryStart, type PeriodKey } from './trends';
 
 	const pb = getPocketBaseContext();
 	const accountsCtx = getAccountsContext();
@@ -592,25 +585,10 @@
 	});
 </script>
 
-<header class="bg-background flex h-16 shrink-0 items-center gap-2 border-b">
-	<div class="flex items-center gap-2 px-4">
-		<Sidebar.Trigger class="-ml-1" />
-		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
-		<Breadcrumb.Root>
-			<Breadcrumb.List>
-				<Breadcrumb.Item>
-					<Breadcrumb.Page>{m.sidebar_trends()}</Breadcrumb.Page>
-				</Breadcrumb.Item>
-			</Breadcrumb.List>
-		</Breadcrumb.Root>
-	</div>
-</header>
-
 <Page pageTitle={m.trends_page_title()}>
 	<Tabs.Root bind:value={period}>
 		<Section>
-			<nav class="flex items-center justify-between space-x-2">
-				<SectionTitle title={m.trends_growth_section_title()} />
+			<SectionTitle title={m.trends_growth_section_title()}>
 				<Tabs.List>
 					<Tabs.Trigger value="3m">{m.period_3m_label()}</Tabs.Trigger>
 					<Tabs.Trigger value="6m">{m.period_6m_label()}</Tabs.Trigger>
@@ -620,7 +598,7 @@
 					<Tabs.Trigger value="5y">{m.period_5y_label()}</Tabs.Trigger>
 					<Tabs.Trigger value="max">{m.period_max_label()}</Tabs.Trigger>
 				</Tabs.List>
-			</nav>
+			</SectionTitle>
 
 			<ChartNetWorth
 				bind:period

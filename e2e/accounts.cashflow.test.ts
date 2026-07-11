@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { addDays, setHours, startOfMonth, subMonths } from 'date-fns';
 
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
-import { signIn } from './playwright.helpers';
+import { goToRecordDetail, signIn } from './playwright.helpers';
 import { seedAccount, seedTransaction, seedUser } from './pocketbase.helpers';
 
 // Pick the 15th at local noon for stable month inclusion across timezones
@@ -125,8 +125,8 @@ test('account trailing cashflow is filtered to a single account', async ({ page 
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto(`/accounts/${focusedAccount.id}`);
-	await expect(page.getByLabel('Name')).toHaveValue('Everyday Checking');
+	await goToRecordDetail(page, 'Accounts', 'Everyday Checking');
+	await expect(page.getByRole('heading', { name: 'Everyday Checking' })).toBeVisible();
 
 	const income = page.getByRole('region', { name: 'Income per month' });
 	const expenses = page.getByRole('region', { name: 'Expenses per month' });

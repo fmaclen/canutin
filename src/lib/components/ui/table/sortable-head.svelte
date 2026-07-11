@@ -44,18 +44,18 @@
 	<button
 		type="button"
 		class={cn(
-			'-ml-2 inline-flex cursor-pointer items-center gap-1 rounded-sm px-2 py-1 transition-colors hover:bg-white/5',
+			'-mx-2 inline-flex cursor-pointer items-center gap-1 rounded-sm px-2 py-1 transition-colors hover:bg-white/5',
 			isActive ? 'text-foreground bg-white/5' : 'hover:text-foreground'
 		)}
 		onclick={() => onSort(column)}
 	>
 		{@render children?.()}
 		{#if isActive && sortDirection === 'asc'}
-			<ArrowUp class="size-3.5" />
+			<ArrowUp class="size-3.5 -translate-y-[0.75px]" />
 		{:else if isActive && sortDirection === 'desc'}
-			<ArrowDown class="size-3.5" />
+			<ArrowDown class="size-3.5 -translate-y-[0.75px]" />
 		{:else}
-			<ArrowUpDown class="size-3.5 opacity-50" />
+			<ArrowUpDown class="size-3.5 -translate-y-[0.75px] opacity-50" />
 		{/if}
 	</button>
 </th>

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { signIn } from './playwright.helpers';
+import { goToPageViaSidebar, signIn } from './playwright.helpers';
 import { seedPortfolio, seedUser } from './pocketbase.helpers';
 
 test('portfolio: aggregate table defaults to market value descending with unknown values last', async ({
@@ -69,7 +69,7 @@ test('portfolio: aggregate table defaults to market value descending with unknow
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto('/portfolio');
+	await goToPageViaSidebar(page, 'Portfolio');
 	const rows = page.getByRole('table').getByRole('row');
 	await expect(rows.nth(1)).toContainText('Alpha Holdings');
 	await expect(rows.nth(2)).toContainText('Charlie Holdings');
@@ -144,7 +144,7 @@ test('portfolio: aggregate table sorts by security name descending then ascendin
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto('/portfolio');
+	await goToPageViaSidebar(page, 'Portfolio');
 	const rows = page.getByRole('table').getByRole('row');
 	await expect(rows.nth(1)).toContainText('Alpha Holdings');
 
@@ -229,7 +229,7 @@ test('portfolio: aggregate table sorts by symbol', async ({ page }) => {
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto('/portfolio');
+	await goToPageViaSidebar(page, 'Portfolio');
 	const rows = page.getByRole('table').getByRole('row');
 	await expect(rows.nth(1)).toContainText('Alpha Holdings');
 
@@ -309,7 +309,7 @@ test('portfolio: aggregate table sorts by market value ascending with unknown va
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto('/portfolio');
+	await goToPageViaSidebar(page, 'Portfolio');
 	const rows = page.getByRole('table').getByRole('row');
 	await expect(rows.nth(1)).toContainText('Alpha Holdings');
 
@@ -342,7 +342,7 @@ test('portfolio: aggregate table marks the active sort column with aria-sort', a
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto('/portfolio');
+	await goToPageViaSidebar(page, 'Portfolio');
 	await expect(page.getByRole('table').getByRole('row').nth(1)).toContainText('Alpha Holdings');
 
 	const securityButton = page.getByRole('button', { name: 'Security', exact: true });
@@ -374,7 +374,7 @@ test('portfolio: aggregate table sort state persists across reload', async ({ pa
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto('/portfolio');
+	await goToPageViaSidebar(page, 'Portfolio');
 	await expect(page.getByRole('table').getByRole('row').nth(1)).toContainText('Alpha Holdings');
 
 	const securityHeader = page.getByRole('button', { name: 'Security', exact: true });
@@ -408,7 +408,7 @@ test('portfolio: aggregate table does not make the Accounts column sortable', as
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto('/portfolio');
+	await goToPageViaSidebar(page, 'Portfolio');
 	await expect(page.getByRole('table').getByRole('row').nth(1)).toContainText('Solo Holdings');
 
 	await expect(page.getByRole('button', { name: 'Accounts', exact: true })).toHaveCount(0);

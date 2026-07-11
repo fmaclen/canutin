@@ -207,8 +207,6 @@ test('unconvertible balances render native amounts and are excluded from totals'
 	const row = page.getByRole('row', { name: 'Unquoted pesos' });
 	const noRateAmount = row.getByLabel(noRateTooltip);
 	await expect(noRateAmount).toBeVisible();
-	await expect(noRateAmount).toHaveClass(/border-dashed/);
-	await expect(noRateAmount.locator('span')).toHaveClass(/text-muted-foreground/);
 	await expect(row.getByText(/\$\s1\.495\.000,00/)).toBeVisible();
 
 	const netBalance = page.getByRole('region', { name: 'Net balance' });

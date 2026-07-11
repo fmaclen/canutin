@@ -4,7 +4,7 @@ import {
 	AccountsBalanceGroupOptions,
 	AssetsBalanceGroupOptions
 } from '../src/lib/pocketbase.schema';
-import { signIn } from './playwright.helpers';
+import { goToEditTab, goToRecordDetail, signIn } from './playwright.helpers';
 import {
 	seedAccount,
 	seedAccountBalance,
@@ -35,7 +35,8 @@ test('account detail page shows "As of <date>" next to the Balance label', async
 	await page.goto('/');
 	await signIn(page, user.email);
 
-	await page.goto(`/accounts/${account.id}`);
+	await goToRecordDetail(page, 'Accounts', 'As Of Checking');
+	await goToEditTab(page);
 
 	const asOf = page.getByTestId('balance-as-of').first();
 	await expect(asOf).toBeVisible();
@@ -74,7 +75,8 @@ test('asset detail page shows "As of <date>" next to the Market value label', as
 	await page.goto('/');
 	await signIn(page, user.email);
 
-	await page.goto(`/assets/${asset.id}`);
+	await goToRecordDetail(page, 'Assets', 'As Of Collectible');
+	await goToEditTab(page);
 
 	const asOf = page.getByTestId('balance-as-of').first();
 	await expect(asOf).toBeVisible();

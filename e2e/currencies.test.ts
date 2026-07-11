@@ -1,7 +1,13 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
-import { signIn } from './playwright.helpers';
+import {
+	goToAddPage,
+	goToEditTab,
+	goToPageViaSidebar,
+	goToRecordDetail,
+	signIn
+} from './playwright.helpers';
 import {
 	getUserPB,
 	seedAccount,
@@ -93,7 +99,7 @@ test('the currencies ledger shows the USD pivot and seeded registry currencies',
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto('/currencies');
+	await goToPageViaSidebar(page, 'Currencies');
 
 	await expect(page.getByRole('link', { name: 'Add currency' })).toBeVisible();
 	await expect(page.getByText('Code', { exact: true })).toBeVisible();
@@ -104,9 +110,10 @@ test('the currencies ledger shows the USD pivot and seeded registry currencies',
 
 	const usdRow = currencyRow(page, 'USD');
 	await expect(usdRow).toBeVisible();
+	await expectCellText(usdRow, 1, 'US Dollar');
 	await expectCellText(usdRow, 2, '~');
 	await expectCellText(usdRow, 3, '~');
-	await expectCellText(usdRow, 4, '~');
+	await expectCellText(usdRow, 4, '$1.00');
 
 	const manualRow = currencyRow(page, manualCode);
 	await expect(manualRow).toBeVisible();
@@ -134,7 +141,7 @@ test('adding a currency previews ISO and custom codes and lists the seeded quote
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto('/currencies/add');
+	await goToAddPage(page, 'Currencies');
 
 	const code = page.getByLabel('Code', { exact: true });
 	const name = page.getByLabel('Name', { exact: true });
@@ -160,7 +167,7 @@ test('adding a currency previews ISO and custom codes and lists the seeded quote
 
 	await name.fill('Euro-like credits');
 	await rate.fill('1495');
-	await page.getByRole('button', { name: 'Add currency' }).click();
+	await page.getByRole('button', { name: 'Add', exact: true }).click();
 
 	await expect(page).toHaveURL('/currencies');
 
@@ -179,10 +186,10 @@ test('adding a duplicate currency shows the duplicate-code toast', async ({ page
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto('/currencies/add');
+	await goToAddPage(page, 'Currencies');
 
 	await page.getByLabel('Code', { exact: true }).fill(code);
-	await page.getByRole('button', { name: 'Add currency' }).click();
+	await page.getByRole('button', { name: 'Add', exact: true }).click();
 
 	await expect(page.getByText('Currency already exists')).toBeVisible();
 	await expect(page).toHaveURL('/currencies/add');
@@ -203,14 +210,20 @@ test('currency detail edits registry fields and upserts same-date manual quotes'
 
 	await page.goto('/');
 	await signIn(page, user.email);
+	// This test asserts the bare edit URL below with no `?from=` query param; every click-through
+	// path to a currency row attaches one (see the ledger-redirect test), so that exact assertion
+	// is only reachable by navigating here directly.
 	await page.goto(`/currencies/${currency.id}`);
 
-	await expect(page.locator('div.text-muted-foreground.font-mono.uppercase')).toContainText([
-		'Exchange rates',
-		'Details',
-		'Quote history',
-		'Danger zone'
-	]);
+	await expect(page.getByRole('heading', { name: 'Quote history' })).toBeVisible();
+	await expect(page.getByText('No quotes')).toBeVisible();
+
+	await goToEditTab(page);
+	await expect(page).toHaveURL(`/currencies/${currency.id}/edit`);
+
+	await expect(page.getByRole('heading', { name: 'Exchange rates' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Details' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Danger zone' })).toBeVisible();
 	await expect(page.getByLabel('Code', { exact: true })).toBeDisabled();
 	await expect(page.getByLabel('Code', { exact: true })).toHaveValue(code);
 	await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Original detail coin');
@@ -221,7 +234,7 @@ test('currency detail edits registry fields and upserts same-date manual quotes'
 	await page.getByRole('button', { name: 'Save' }).click();
 
 	await expect(page.getByText('Currency updated')).toBeVisible();
-	await expect(page).toHaveURL(`/currencies/${currency.id}`);
+	await expect(page).toHaveURL(`/currencies/${currency.id}/edit`);
 	await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Updated detail coin');
 	await expect(page.getByLabel('Automatic updates', { exact: true })).toBeChecked();
 
@@ -231,21 +244,28 @@ test('currency detail edits registry fields and upserts same-date manual quotes'
 	await page.getByLabel('USD exchange rate', { exact: true }).fill('1.23');
 	await page.getByRole('button', { name: 'Add quote' }).click();
 	await expect(page.getByText('Quote added')).toBeVisible();
+	await expect(page).toHaveURL(`/currencies/${currency.id}/edit`);
+
+	await page.getByRole('link', { name: 'Overview' }).click();
 	await expect(page).toHaveURL(`/currencies/${currency.id}`);
 	await expect(quoteRow.getByText('Manual')).toBeVisible();
 	await expect(quoteRow.getByText(formatRate(1.23, code), { exact: true })).toBeVisible();
 
+	await goToEditTab(page);
+	await expect(page).toHaveURL(`/currencies/${currency.id}/edit`);
 	await page.getByLabel('Date', { exact: true }).fill(quoteDate);
 	await page.getByLabel('USD exchange rate', { exact: true }).fill('1.5');
 	await page.getByRole('button', { name: 'Add quote' }).click();
 
 	await expect(page.getByText('Quote updated')).toBeVisible();
+	await expect(page).toHaveURL(`/currencies/${currency.id}/edit`);
+
+	await page.getByRole('link', { name: 'Overview' }).click();
 	await expect(page).toHaveURL(`/currencies/${currency.id}`);
 	await expect(quoteRow.getByText(formatRate(1.5, code), { exact: true })).toBeVisible();
 	await expect(quoteRow.getByText(formatRate(1.23, code), { exact: true })).not.toBeVisible();
 
-	await page.goto('/currencies');
-	await currencyRow(page, 'USD').getByRole('link', { name: 'USD' }).click();
+	await goToRecordDetail(page, 'Currencies', 'USD');
 
 	await expect(page.getByText('Base currency', { exact: true })).toBeVisible();
 	await expect(
@@ -278,10 +298,15 @@ test('currency detail actions reached from the ledger redirect back with the led
 
 	await page.goto('/');
 	await signIn(page, user.email);
+	// This test's explicit purpose is the ledger's `from=` redirect round-trip, which
+	// requires starting from this exact sorted/filtered URL — not reachable by clicking.
 	await page.goto(ledgerUrl);
 
 	await currencyRow(page, code).getByRole('link', { name: code }).click();
 	await expectCurrencyDetailFrom(page, currency.id, ledgerUrl);
+
+	await goToEditTab(page);
+	await expect(page).toHaveURL(new RegExp(`/currencies/${currency.id}/edit\\?from=`));
 
 	await page.getByLabel('Name', { exact: true }).fill('Ledger redirect coin v2');
 	await page.getByRole('button', { name: 'Save' }).click();
@@ -291,6 +316,9 @@ test('currency detail actions reached from the ledger redirect back with the led
 
 	await currencyRow(page, code).getByRole('link', { name: code }).click();
 	await expectCurrencyDetailFrom(page, currency.id, ledgerUrl);
+
+	await goToEditTab(page);
+	await expect(page).toHaveURL(new RegExp(`/currencies/${currency.id}/edit\\?from=`));
 
 	await page.getByLabel('Date', { exact: true }).fill(quoteDate);
 	await page.getByLabel('USD exchange rate', { exact: true }).fill('2.25');
@@ -303,12 +331,47 @@ test('currency detail actions reached from the ledger redirect back with the led
 	await currencyRow(page, code).getByRole('link', { name: code }).click();
 	await expectCurrencyDetailFrom(page, currency.id, ledgerUrl);
 
+	await goToEditTab(page);
+	await expect(page).toHaveURL(new RegExp(`/currencies/${currency.id}/edit\\?from=`));
+
 	await page.getByLabel('Date', { exact: true }).fill(quoteDate);
 	await page.getByLabel('USD exchange rate', { exact: true }).fill('2.5');
 	await page.getByRole('button', { name: 'Add quote' }).click();
 
 	await expect(page).toHaveURL(ledgerUrl);
 	await expectCellText(currencyRow(page, code), 4, formatRate(2.5, code));
+});
+
+test('currency overview shows rate history once it has at least two quotes', async ({ page }) => {
+	const user = await seedUser('beatrix');
+	const code = uniqueCurrency('QH');
+	await seedCurrency({
+		owner: user.id,
+		code,
+		name: 'History coin',
+		autoUpdate: false
+	});
+	await seedExchangeRate({
+		owner: user.id,
+		currency: code,
+		date: utcIso('2026-01-01'),
+		rate: 1.1
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToRecordDetail(page, 'Currencies', code);
+	await expect(page.getByRole('heading', { name: 'Rate history' })).toBeVisible();
+	await expect(page.getByText('No rate history yet')).toBeVisible();
+
+	await seedExchangeRate({
+		owner: user.id,
+		currency: code,
+		date: utcIso('2026-02-01'),
+		rate: 1.2
+	});
+	await expect(page.getByText('No rate history yet')).not.toBeVisible();
+	await expect(page.getByRole('img', { name: 'Rate' })).toBeVisible();
 });
 
 test('currency delete blocks in-use currencies and removes unused quotes', async ({ page }) => {
@@ -323,7 +386,7 @@ test('currency delete blocks in-use currencies and removes unused quotes', async
 		name: 'Guarded coin',
 		autoUpdate: false
 	});
-	const unusedCurrency = await seedCurrency({
+	await seedCurrency({
 		owner: user.id,
 		code: unusedCode,
 		name: 'Unused coin',
@@ -351,7 +414,10 @@ test('currency delete blocks in-use currencies and removes unused quotes', async
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await page.goto(`/currencies/${guardedCurrency.id}`);
+	// This test asserts the bare edit URL below with no `?from=` query param; every click-through
+	// path to a currency row attaches one (see the ledger-redirect test), so that exact assertion
+	// is only reachable by navigating here directly.
+	await page.goto(`/currencies/${guardedCurrency.id}/edit`);
 
 	await page.getByRole('button', { name: 'Delete' }).first().click();
 	const guardedDialog = page.getByRole('alertdialog');
@@ -359,9 +425,15 @@ test('currency delete blocks in-use currencies and removes unused quotes', async
 	await guardedDialog.getByRole('button').last().click();
 
 	await expect(page.getByText('Currency is in use')).toBeVisible();
-	await expect(page).toHaveURL(`/currencies/${guardedCurrency.id}`);
+	await expect(page).toHaveURL(`/currencies/${guardedCurrency.id}/edit`);
 
-	await page.goto(`/currencies/${unusedCurrency.id}`);
+	// The blocked delete leaves the confirmation dialog open; dismiss it before navigating on,
+	// same as a real user would.
+	await guardedDialog.getByRole('button').first().click();
+	await expect(guardedDialog).not.toBeVisible();
+
+	await goToRecordDetail(page, 'Currencies', unusedCode);
+	await goToEditTab(page);
 	await page.getByRole('button', { name: 'Delete' }).first().click();
 	const unusedDialog = page.getByRole('alertdialog');
 	await expect(unusedDialog).toBeVisible();

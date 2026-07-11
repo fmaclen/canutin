@@ -110,7 +110,7 @@
 						<Table.Cell>
 							{#if row.securityName && row.securityId}
 								<Link
-									href={resolve(`/trades/securities/${row.securityId}`)}
+									href={resolve(`/securities/${row.securityId}`)}
 									class="text-foreground/80 text-sm"
 								>
 									{row.securityName}

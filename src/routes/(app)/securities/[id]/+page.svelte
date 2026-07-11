@@ -1,0 +1,189 @@
+<script lang="ts">
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
+	import BalanceHistoryChart from '$lib/components/balance-history-chart.svelte';
+	import { formatNativeCurrency } from '$lib/components/currency';
+	import Empty from '$lib/components/empty.svelte';
+	import KeyValue from '$lib/components/key-value.svelte';
+	import PositionsTable from '$lib/components/positions-table.svelte';
+	import SectionTitle from '$lib/components/section-title.svelte';
+	import Section from '$lib/components/section.svelte';
+	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+	import { getExchangeRatesContext } from '$lib/exchange-rates.svelte';
+	import { m } from '$lib/paraglide/messages';
+	import type { SecurityBalancesResponse } from '$lib/pocketbase.schema';
+	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+	import { getSecuritiesContext, type SecurityAccountBalance } from '$lib/securities.svelte';
+	import { gainLossPercentOrNull, sumOrUnknown } from '$lib/security-balance-values';
+	import {
+		createSortComparator,
+		getSortFromUrl,
+		setSortInUrl,
+		toggleSort,
+		type SortState
+	} from '$lib/utils';
+
+	const securitiesContext = getSecuritiesContext();
+	const fx = getExchangeRatesContext();
+	const pb = getPocketBaseContext();
+
+	const securityId = $derived(page.params.id);
+	const security = $derived(securityId ? securitiesContext.getSecurity(securityId) : null);
+	const securityCurrency = $derived(security?.currency ?? 'USD');
+	const loaded = $derived(!securitiesContext.isLoading && !!security);
+	const accountBalances = $derived(
+		securityId ? securitiesContext.getAccountBalances(securityId) : []
+	);
+
+	type SecurityPricePoint = { date: Date; value: number };
+	let priceHistory: SecurityPricePoint[] = $state([]);
+	let priceHistoryLoading = $state(true);
+
+	$effect(() => {
+		const id = securityId;
+		priceHistory = [];
+		priceHistoryLoading = true;
+		if (!id) return;
+		let cancelled = false;
+		pb.authedClient
+			.collection('securityBalances')
+			.getFullList<SecurityBalancesResponse<number, number, number, number>>({
+				filter: `security='${id}'`,
+				sort: 'asOf,created,id',
+				fields: 'id,asOf,price,created',
+				requestKey: null
+			})
+			.then((records) => {
+				if (cancelled) return;
+				// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local dedupe scratch, discarded after building priceHistory
+				const latestByDate = new Map<string, SecurityPricePoint>();
+				for (const record of records) {
+					if (record.price === null) continue;
+					latestByDate.set(record.asOf, { date: new Date(record.asOf), value: record.price });
+				}
+				priceHistory = [...latestByDate.values()];
+				priceHistoryLoading = false;
+			})
+			.catch((error) => {
+				if (cancelled) return;
+				pb.handleConnectionError(error, 'securities', 'price_history');
+				priceHistoryLoading = false;
+			});
+		return () => {
+			cancelled = true;
+		};
+	});
+	const balancesMarketValue = $derived({
+		value: sumOrUnknown(accountBalances.map((row) => (row.isUnconverted ? 0 : row.value))),
+		isUnconverted: accountBalances.some((row) => row.isUnconverted)
+	});
+
+	type BalanceSortColumn =
+		| 'asOf'
+		| 'accountName'
+		| 'quantity'
+		| 'price'
+		| 'costBasis'
+		| 'gainLoss'
+		| 'gainLossPercent'
+		| 'value';
+	const validSortColumns: BalanceSortColumn[] = [
+		'asOf',
+		'accountName',
+		'quantity',
+		'price',
+		'costBasis',
+		'gainLoss',
+		'gainLossPercent',
+		'value'
+	];
+
+	const defaultSort: SortState<BalanceSortColumn> = { column: 'value', direction: 'desc' };
+	const sortState = $derived.by(() => {
+		const urlSort = getSortFromUrl(page.url);
+		if (
+			urlSort.column &&
+			urlSort.direction &&
+			validSortColumns.includes(urlSort.column as BalanceSortColumn)
+		) {
+			return urlSort as SortState<BalanceSortColumn>;
+		}
+		return defaultSort;
+	});
+
+	function handleSort(column: string) {
+		const newState = toggleSort(sortState, column as BalanceSortColumn);
+		const newUrl = setSortInUrl(page.url, newState);
+		// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic URL computed at runtime
+		goto(newUrl, { replaceState: true, keepFocus: true });
+	}
+
+	const sortedBalances = $derived.by(() => {
+		const comparator = createSortComparator<SecurityAccountBalance, BalanceSortColumn>(sortState, {
+			asOf: (r) => new Date(r.asOf).getTime(),
+			accountName: (r) => r.accountName,
+			quantity: (r) => r.quantity,
+			price: (r) => (r.price === null ? null : fx.convert(r.price, securityCurrency, r.asOf).value),
+			costBasis: (r) => r.costBasis,
+			gainLoss: (r) => r.gainLoss,
+			gainLossPercent: (r) => gainLossPercentOrNull(r.gainLoss, r.costBasis),
+			value: (r) => r.value
+		});
+		return [...accountBalances].sort(comparator).map((row) => ({
+			...row,
+			entityId: row.accountId,
+			entityName: row.accountName,
+			nativeCurrency: securityCurrency
+		}));
+	});
+</script>
+
+<Section>
+	<SectionTitle title={m.securities_section_price_history()} />
+	{#if !loaded || priceHistoryLoading}
+		<Skeleton class="h-[30vh] min-h-[220px]" showSpinner />
+	{:else if priceHistory.length >= 2}
+		<div class="bg-background overflow-visible rounded-sm shadow-md">
+			<BalanceHistoryChart
+				points={priceHistory}
+				seriesLabel={m.securities_price_history_series_label()}
+				formatAxisValue={(value) => formatNativeCurrency(Math.round(value), 0, securityCurrency)}
+				formatTooltipValue={(value) => formatNativeCurrency(value, 2, securityCurrency)}
+			/>
+		</div>
+	{:else}
+		<div class="h-[30vh] min-h-[220px]">
+			<Empty class="h-full">{m.securities_price_history_empty()}</Empty>
+		</div>
+	{/if}
+</Section>
+
+<Section>
+	<SectionTitle title={m.securities_section_balances()} />
+	{#if !loaded || !security}
+		<Skeleton class="h-64" showSpinner />
+	{:else if accountBalances.length > 0}
+		<div
+			role="region"
+			aria-label={m.securities_section_balances()}
+			class="grid grid-cols-1 gap-2 sm:grid-cols-2"
+		>
+			<KeyValue
+				title={m.securities_section_balances()}
+				value={accountBalances.length}
+				variant="outline"
+				format="number"
+			/>
+			<KeyValue
+				title={m.summary_net_market_value()}
+				value={balancesMarketValue.value}
+				variant="outline"
+				decimalScale={2}
+				isUnconverted={balancesMarketValue.isUnconverted}
+			/>
+		</div>
+		<PositionsTable rows={sortedBalances} entity="account" {sortState} onSort={handleSort} />
+	{:else}
+		<Empty>{m.securities_balances_empty()}</Empty>
+	{/if}
+</Section>

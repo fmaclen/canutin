@@ -318,6 +318,7 @@ test('reverting an import deletes securities, balances, and transactions', async
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Settings');
+	await page.getByRole('link', { name: 'Imports' }).click();
 
 	await expect(page.getByText('frank-securities-to-revert')).toBeVisible();
 	await expect(page.getByText('Completed')).toBeVisible();

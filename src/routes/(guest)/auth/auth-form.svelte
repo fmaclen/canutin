@@ -86,7 +86,7 @@
 			{/if}
 
 			{#if auth.error}
-				<p class="text-sm text-red-600">{auth.error}</p>
+				<p class="text-destructive text-sm">{auth.error}</p>
 			{/if}
 
 			<Button type="submit" class="w-full" disabled={auth.isSubmitting}>{primaryText}</Button>
@@ -95,7 +95,7 @@
 				<Button href="/demo" variant="outline" class="w-full">{m.demo_try_as_guest()}</Button>
 			{/if}
 
-			{#if dev}
+			{#if dev && mode === 'login'}
 				<DevAuthShortcuts />
 			{/if}
 		</form>
