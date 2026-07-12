@@ -103,8 +103,18 @@ const skillCustomEndpointsSection = "## Custom endpoints\n\n" +
 	"and `securities` object accepts an optional `currency` (uppercase code matching " +
 	"`^[A-Z0-9]{2,10}$`, defaults to `USD`); the code must already exist in the importer's " +
 	"`currencies` registry or be declared in `currencies` with a quote. Transactions and balances " +
-	"inherit their parent's currency. Returns " +
-	"`{ sessionId, status, recordsFailed, … }` with per-collection `{ created, existing, skipped }` counts.\n" +
+	"inherit their parent's currency. Import exchange-rate quotes follow the standard direction " +
+	"(units of the currency per 1 USD). Unknown JSON fields are silently dropped, and `externalId` " +
+	"is honored only on cash `transactions`. Records are deduplicated per collection (accounts by " +
+	"name+institution+balanceGroup, cash transactions by externalId or account+date+value+description, " +
+	"assets by name only, securityBalances by account+security+day plus matching non-null numbers); an " +
+	"account is resolved by owned `accountId`, then a name+institution+balanceGroup tuple, then a unique " +
+	"bare name (ambiguous names error the row), while securityBalances/securityTransactions resolve " +
+	"accounts by accountId or unique bare name only. The import is not wrapped in a transaction: rows " +
+	"fail independently, are counted in `recordsFailed`, and partial results persist — only revert is " +
+	"atomic. Limits: 64 MiB body, 200k total records, 100k per collection. Returns " +
+	"`{ sessionId, status, recordsFailed, … }` with per-collection `{ created, existing, skipped }` " +
+	"counts; `status` is `completed`, `completed_with_errors`, `failed`, or `rolled_back`.\n" +
 	"- `POST /api/canutin/import/revert` — requires an authenticated token. Body is " +
 	"`{ sessionId }`. Returns `{ sessionId, deleted }`. Revert deletes import-session-tagged " +
 	"financial rows, but does not remove import-created `currencies` rows or their manual " +
@@ -129,6 +139,19 @@ Backend hooks enforce invariants that are not visible in the access rules:
   ` + "`security_name_exists`" + ` on the ` + "`name`" + ` field.
 - Writing a ` + "`securityBalances`" + ` or ` + "`securityTransactions`" + ` record whose account is
   closed is rejected. (Imports are exempt so they can restore a closed account's history.)
+- An account's displayed value is cash plus security positions, summed in the UI rather than stored
+  in one column: cash comes from the latest ` + "`accountBalances`" + ` snapshot, positions from
+  ` + "`securityBalances`" + ` holding snapshots. Holdings come exclusively from ` + "`securityBalances`" + `;
+  ` + "`securityTransactions`" + ` are display-only trade history that never affect balances. Writing
+  portfolio value into an account balance double-counts it.
+- Number fields on ` + "`securityBalances`" + ` and ` + "`securityTransactions`" + ` are nullable and the
+  distinction matters: ` + "`null`" + ` (or an omitted field) means unknown and is carried forward from the
+  last known snapshot, ` + "`0`" + ` is a known zero, and ` + "`quantity = 0`" + ` closes a position and stops
+  carry-forward. Never send ` + "`0`" + ` for a value you do not know.
+- Setting ` + "`autoCalculated`" + ` on an account makes the engine recompute its latest cash balance by
+  summing imported cash transactions into a new ` + "`source = derived`" + ` row stamped with the current
+  time, which overrides any imported cash snapshot and re-fires on later transaction edits. Leave it
+  off to preserve an imported snapshot.
 - Share records (` + "`accountShares`" + `, ` + "`assetShares`" + `) can only be updated by the recipient,
   and only the ` + "`includeInNetWorth`" + ` field may change. The sharer must revoke and recreate
   a share to change anything else.
