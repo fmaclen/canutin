@@ -1,9 +1,7 @@
 <script lang="ts">
 	import { SvelteMap } from 'svelte/reactivity';
 
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import Currency, { getCurrencyFxLabel } from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
@@ -22,13 +20,8 @@
 	import type { TransactionsResponse } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { sumOrUnknown } from '$lib/security-balance-values';
-	import {
-		createSortComparator,
-		getSortFromUrl,
-		setSortInUrl,
-		toggleSort,
-		type SortState
-	} from '$lib/utils';
+	import { TableSort } from '$lib/sorting.svelte';
+	import { createSortComparator, type SortState } from '$lib/utils';
 
 	type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
 
@@ -98,24 +91,7 @@
 	const validSortColumns: AccountSortColumn[] = ['name', 'institution', 'balance', 'transactions'];
 
 	const defaultSort: SortState<AccountSortColumn> = { column: 'balance', direction: 'desc' };
-	const sortState = $derived.by(() => {
-		const urlSort = getSortFromUrl(page.url);
-		if (
-			urlSort.column &&
-			urlSort.direction &&
-			validSortColumns.includes(urlSort.column as AccountSortColumn)
-		) {
-			return urlSort as SortState<AccountSortColumn>;
-		}
-		return defaultSort;
-	});
-
-	function handleSort(column: string) {
-		const newState = toggleSort(sortState, column as AccountSortColumn);
-		const newUrl = setSortInUrl(page.url, newState);
-		// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic URL computed at runtime
-		goto(newUrl, { replaceState: true, keepFocus: true });
-	}
+	const sort = new TableSort<AccountSortColumn>(validSortColumns, defaultSort);
 
 	const sortedRows = $derived.by(() => {
 		const rows = accountsContext.accounts.map((account) => ({
@@ -136,7 +112,7 @@
 			isShared: account.isShared
 		}));
 
-		const comparator = createSortComparator<AccountRow, AccountSortColumn>(sortState, {
+		const comparator = createSortComparator<AccountRow, AccountSortColumn>(sort.state, {
 			name: (r) => r.name,
 			institution: (r) => r.institution,
 			balance: (r) => r.balance,
@@ -286,18 +262,18 @@
 											<Table.SortableHead
 												class="text-left whitespace-nowrap"
 												column="name"
-												sortColumn={sortState.column}
-												sortDirection={sortState.direction}
-												onSort={handleSort}
+												sortColumn={sort.column}
+												sortDirection={sort.direction}
+												onSort={sort.toggle}
 											>
 												{m.accounts_table_header_account()}
 											</Table.SortableHead>
 											<Table.SortableHead
 												class="text-left whitespace-nowrap"
 												column="institution"
-												sortColumn={sortState.column}
-												sortDirection={sortState.direction}
-												onSort={handleSort}
+												sortColumn={sort.column}
+												sortDirection={sort.direction}
+												onSort={sort.toggle}
 											>
 												{m.accounts_table_header_institution()}
 											</Table.SortableHead>
@@ -313,18 +289,18 @@
 											<Table.SortableHead
 												class="text-right whitespace-nowrap"
 												column="transactions"
-												sortColumn={sortState.column}
-												sortDirection={sortState.direction}
-												onSort={handleSort}
+												sortColumn={sort.column}
+												sortDirection={sort.direction}
+												onSort={sort.toggle}
 											>
 												{m.accounts_table_header_transactions()}
 											</Table.SortableHead>
 											<Table.SortableHead
 												class="text-right whitespace-nowrap"
 												column="balance"
-												sortColumn={sortState.column}
-												sortDirection={sortState.direction}
-												onSort={handleSort}
+												sortColumn={sort.column}
+												sortDirection={sort.direction}
+												onSort={sort.toggle}
 											>
 												{m.accounts_table_header_balance()}
 											</Table.SortableHead>

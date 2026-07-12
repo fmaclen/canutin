@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import BalanceHistoryChart from '$lib/components/balance-history-chart.svelte';
 	import { formatNativeCurrency } from '$lib/components/currency';
@@ -15,13 +14,8 @@
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { getSecuritiesContext, type SecurityAccountBalance } from '$lib/securities.svelte';
 	import { gainLossPercentOrNull, sumOrUnknown } from '$lib/security-balance-values';
-	import {
-		createSortComparator,
-		getSortFromUrl,
-		setSortInUrl,
-		toggleSort,
-		type SortState
-	} from '$lib/utils';
+	import { TableSort } from '$lib/sorting.svelte';
+	import { createSortComparator, type SortState } from '$lib/utils';
 
 	const securitiesContext = getSecuritiesContext();
 	const fx = getExchangeRatesContext();
@@ -99,27 +93,10 @@
 	];
 
 	const defaultSort: SortState<BalanceSortColumn> = { column: 'value', direction: 'desc' };
-	const sortState = $derived.by(() => {
-		const urlSort = getSortFromUrl(page.url);
-		if (
-			urlSort.column &&
-			urlSort.direction &&
-			validSortColumns.includes(urlSort.column as BalanceSortColumn)
-		) {
-			return urlSort as SortState<BalanceSortColumn>;
-		}
-		return defaultSort;
-	});
-
-	function handleSort(column: string) {
-		const newState = toggleSort(sortState, column as BalanceSortColumn);
-		const newUrl = setSortInUrl(page.url, newState);
-		// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic URL computed at runtime
-		goto(newUrl, { replaceState: true, keepFocus: true });
-	}
+	const sort = new TableSort<BalanceSortColumn>(validSortColumns, defaultSort);
 
 	const sortedBalances = $derived.by(() => {
-		const comparator = createSortComparator<SecurityAccountBalance, BalanceSortColumn>(sortState, {
+		const comparator = createSortComparator<SecurityAccountBalance, BalanceSortColumn>(sort.state, {
 			asOf: (r) => new Date(r.asOf).getTime(),
 			accountName: (r) => r.accountName,
 			quantity: (r) => r.quantity,
@@ -182,7 +159,12 @@
 				isUnconverted={balancesMarketValue.isUnconverted}
 			/>
 		</div>
-		<PositionsTable rows={sortedBalances} entity="account" {sortState} onSort={handleSort} />
+		<PositionsTable
+			rows={sortedBalances}
+			entity="account"
+			sortState={sort.state}
+			onSort={sort.toggle}
+		/>
 	{:else}
 		<Empty>{m.securities_balances_empty()}</Empty>
 	{/if}

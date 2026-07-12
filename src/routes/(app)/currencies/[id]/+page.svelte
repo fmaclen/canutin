@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import BalanceHistoryChart from '$lib/components/balance-history-chart.svelte';
 	import { formatNativeCurrency } from '$lib/components/currency';
@@ -16,13 +15,8 @@
 	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { ExchangeRatesSourceOptions, type ExchangeRatesResponse } from '$lib/pocketbase.schema';
-	import {
-		createSortComparator,
-		getSortFromUrl,
-		setSortInUrl,
-		toggleSort,
-		type SortState
-	} from '$lib/utils';
+	import { TableSort } from '$lib/sorting.svelte';
+	import { createSortComparator, type SortState } from '$lib/utils';
 
 	const currenciesContext = getCurrenciesContext();
 	const exchangeRatesContext = getExchangeRatesContext();
@@ -47,26 +41,13 @@
 	const validSortColumns: QuoteSortColumn[] = ['date', 'rate', 'source'];
 
 	const defaultSort: SortState<QuoteSortColumn> = { column: 'date', direction: 'desc' };
-	const sortState = $derived.by(() => {
-		const urlSort = getSortFromUrl(page.url);
-		if (
-			urlSort.column &&
-			urlSort.direction &&
-			validSortColumns.includes(urlSort.column as QuoteSortColumn)
-		) {
-			return urlSort as SortState<QuoteSortColumn>;
-		}
-		return defaultSort;
-	});
+	const sort = new TableSort<QuoteSortColumn>(validSortColumns, defaultSort);
 
 	let currentPage = $state(1);
 
 	function handleSort(column: string) {
-		const newState = toggleSort(sortState, column as QuoteSortColumn);
-		const newUrl = setSortInUrl(page.url, newState);
+		sort.toggle(column);
 		currentPage = 1;
-		// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic URL computed at runtime
-		goto(newUrl, { replaceState: true, keepFocus: true });
 	}
 
 	function sourceLabel(source: ExchangeRatesSourceOptions) {
@@ -106,7 +87,7 @@
 			owner: record.owner
 		}));
 
-		const comparator = createSortComparator<QuoteRow, QuoteSortColumn>(sortState, {
+		const comparator = createSortComparator<QuoteRow, QuoteSortColumn>(sort.state, {
 			date: (r) => new Date(r.date).getTime(),
 			rate: (r) => r.rate,
 			source: (r) => sourceLabel(r.source)
@@ -186,8 +167,8 @@
 								<Table.SortableHead
 									class="text-left whitespace-nowrap"
 									column="date"
-									sortColumn={sortState.column}
-									sortDirection={sortState.direction}
+									sortColumn={sort.column}
+									sortDirection={sort.direction}
 									onSort={handleSort}
 								>
 									{m.currencies_table_header_date()}
@@ -195,8 +176,8 @@
 								<Table.SortableHead
 									class="text-left whitespace-nowrap"
 									column="source"
-									sortColumn={sortState.column}
-									sortDirection={sortState.direction}
+									sortColumn={sort.column}
+									sortDirection={sort.direction}
 									onSort={handleSort}
 								>
 									{m.currencies_table_header_source()}
@@ -204,8 +185,8 @@
 								<Table.SortableHead
 									class="text-right whitespace-nowrap"
 									column="rate"
-									sortColumn={sortState.column}
-									sortDirection={sortState.direction}
+									sortColumn={sort.column}
+									sortDirection={sort.direction}
 									onSort={handleSort}
 								>
 									{m.currencies_table_header_rate()}

@@ -67,16 +67,6 @@ export type SortState<T extends string = string> = {
 	direction: SortDirection | null;
 };
 
-export function toggleSort<T extends string>(currentState: SortState<T>, column: T): SortState<T> {
-	if (currentState.column !== column) {
-		return { column, direction: 'desc' };
-	}
-	if (currentState.direction === 'desc') {
-		return { column, direction: 'asc' };
-	}
-	return { column, direction: 'desc' };
-}
-
 export function createSortComparator<T, K extends string>(
 	sortState: SortState<K>,
 	getters: Record<K, (item: T) => string | number | null | undefined>
@@ -102,15 +92,6 @@ export function createSortComparator<T, K extends string>(
 		}
 
 		return sortState.direction === 'asc' ? comparison : -comparison;
-	};
-}
-
-export function getSortFromUrl(url: URL): SortState {
-	const column = url.searchParams.get('sort');
-	const dir = url.searchParams.get('dir');
-	return {
-		column: column || null,
-		direction: dir === 'asc' || dir === 'desc' ? dir : null
 	};
 }
 

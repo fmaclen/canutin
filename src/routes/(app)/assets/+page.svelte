@@ -1,9 +1,7 @@
 <script lang="ts">
 	import { SvelteMap } from 'svelte/reactivity';
 
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
 	import { getAssetsContext } from '$lib/assets.svelte';
 	import Currency, { getCurrencyFxLabel } from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
@@ -20,14 +18,8 @@
 	import * as Tabs from '$lib/components/ui/tabs/index';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { m } from '$lib/paraglide/messages';
-	import {
-		createSortComparator,
-		formatPercent,
-		getSortFromUrl,
-		setSortInUrl,
-		toggleSort,
-		type SortState
-	} from '$lib/utils';
+	import { TableSort } from '$lib/sorting.svelte';
+	import { createSortComparator, formatPercent, type SortState } from '$lib/utils';
 
 	type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
 
@@ -104,24 +96,7 @@
 	];
 
 	const defaultSort: SortState<AssetSortColumn> = { column: 'marketValue', direction: 'desc' };
-	const sortState = $derived.by(() => {
-		const urlSort = getSortFromUrl(page.url);
-		if (
-			urlSort.column &&
-			urlSort.direction &&
-			validSortColumns.includes(urlSort.column as AssetSortColumn)
-		) {
-			return urlSort as SortState<AssetSortColumn>;
-		}
-		return defaultSort;
-	});
-
-	function handleSort(column: string) {
-		const newState = toggleSort(sortState, column as AssetSortColumn);
-		const newUrl = setSortInUrl(page.url, newState);
-		// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic URL computed at runtime
-		goto(newUrl, { replaceState: true, keepFocus: true });
-	}
+	const sort = new TableSort<AssetSortColumn>(validSortColumns, defaultSort);
 
 	const sortedRows = $derived.by(() => {
 		const rows = assetsContext.assets.map((asset) => ({
@@ -145,7 +120,7 @@
 			nativeCurrency: asset.currency
 		}));
 
-		const comparator = createSortComparator<AssetRow, AssetSortColumn>(sortState, {
+		const comparator = createSortComparator<AssetRow, AssetSortColumn>(sort.state, {
 			name: (r) => r.name,
 			bookValue: (r) => r.bookValue,
 			gain: (r) => r.gain,
@@ -267,9 +242,9 @@
 											<Table.SortableHead
 												class="text-left whitespace-nowrap"
 												column="name"
-												sortColumn={sortState.column}
-												sortDirection={sortState.direction}
-												onSort={handleSort}
+												sortColumn={sort.column}
+												sortDirection={sort.direction}
+												onSort={sort.toggle}
 											>
 												{m.assets_table_header_asset()}
 											</Table.SortableHead>
@@ -285,36 +260,36 @@
 											<Table.SortableHead
 												class="text-right whitespace-nowrap"
 												column="bookValue"
-												sortColumn={sortState.column}
-												sortDirection={sortState.direction}
-												onSort={handleSort}
+												sortColumn={sort.column}
+												sortDirection={sort.direction}
+												onSort={sort.toggle}
 											>
 												{m.assets_table_header_book_value()}
 											</Table.SortableHead>
 											<Table.SortableHead
 												class="text-right whitespace-nowrap"
 												column="gain"
-												sortColumn={sortState.column}
-												sortDirection={sortState.direction}
-												onSort={handleSort}
+												sortColumn={sort.column}
+												sortDirection={sort.direction}
+												onSort={sort.toggle}
 											>
 												{m.assets_table_header_gain_loss()}
 											</Table.SortableHead>
 											<Table.SortableHead
 												class="text-right whitespace-nowrap"
 												column="gainPercent"
-												sortColumn={sortState.column}
-												sortDirection={sortState.direction}
-												onSort={handleSort}
+												sortColumn={sort.column}
+												sortDirection={sort.direction}
+												onSort={sort.toggle}
 											>
 												{m.assets_table_header_gain_percent()}
 											</Table.SortableHead>
 											<Table.SortableHead
 												class="text-right whitespace-nowrap"
 												column="marketValue"
-												sortColumn={sortState.column}
-												sortDirection={sortState.direction}
-												onSort={handleSort}
+												sortColumn={sort.column}
+												sortDirection={sort.direction}
+												onSort={sort.toggle}
 											>
 												{m.assets_table_header_market_value()}
 											</Table.SortableHead>

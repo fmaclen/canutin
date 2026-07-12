@@ -175,3 +175,52 @@ test('sorts accounts by every column and preserves sorting across reloads and fi
 		await getRowIndex(rows, 'Many Transactions')
 	);
 });
+
+test('reorders rows in place without resetting scroll when sorting a scrolled page', async ({
+	page
+}) => {
+	const user = await seedUser('zelda');
+	const now = new Date().toISOString();
+
+	// Seed enough accounts that the list overflows the viewport and the window can scroll.
+	// Zero-padded names keep row-text matching unambiguous; balances are unique so the
+	// default descending sort has a stable order that the ascending toggle fully reverses.
+	for (let index = 1; index <= 30; index++) {
+		const name = `Account ${String(index).padStart(2, '0')}`;
+		const account = await seedAccount({
+			name,
+			balanceGroup: AccountsBalanceGroupOptions.CASH,
+			owner: user.id,
+			balanceType: 'Checking'
+		});
+		await seedAccountBalance({
+			account: account.id,
+			owner: user.id,
+			asOf: now,
+			value: index * 100
+		});
+	}
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Accounts');
+	await expect(page.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'true');
+	await expect(page.getByRole('row', { name: 'Account 30' })).toBeVisible();
+
+	// Scroll the balance header to the top of the viewport: the page is now scrolled past the
+	// top (scrollY > 0) while the header stays fully visible, so clicking it needs no auto-scroll.
+	const balanceButton = page.getByRole('button', { name: 'Balance' });
+	await balanceButton.evaluate((element) => element.scrollIntoView({ block: 'start' }));
+	const scrolledY = await page.evaluate(() => window.scrollY);
+	expect(scrolledY).toBeGreaterThan(0);
+
+	// Balance defaults to descending, so the highest balance leads before the toggle.
+	const firstRow = page.locator('tbody tr').first();
+	await expect(firstRow).toContainText('Account 30');
+
+	// Toggling to ascending must reorder the rows in place: the row order flips, but the shallow
+	// route update means the scroll position stays exactly where it was.
+	await balanceButton.click();
+	await expect(firstRow).toContainText('Account 01');
+	expect(await page.evaluate(() => window.scrollY)).toBe(scrolledY);
+});
