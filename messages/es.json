@@ -11,7 +11,7 @@
 	"summary_net_gain_percent": "Ganancia neta %",
 	"fx_converted_from": "Convertido desde {amount}",
 	"fx_includes_converted": "Incluye montos convertidos",
-	"fx_includes_unconverted": "Incluye montos que no se pudieron convertir",
+	"fx_includes_unconverted": "Incluye monedas que no se pudieron convertir",
 	"fx_no_rate_available": "No hay tipo de cambio para {currency} — agrega una cotización o activa las actualizaciones automáticas en Monedas",
 
 	"auth_login_title": "Iniciar sesión",

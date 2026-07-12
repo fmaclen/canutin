@@ -73,7 +73,11 @@
 			{#if totals.netWorth.value === null}
 				<span class="text-white/70">~</span>
 			{:else}
-				<Currency value={totals.netWorth.value} isUnconverted={totals.netWorth.isUnconverted} />
+				<Currency
+					value={totals.netWorth.value}
+					isUnconverted={totals.netWorth.isUnconverted}
+					onColoredSurface
+				/>
 			{/if}
 		</div>
 	</div>

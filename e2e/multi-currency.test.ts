@@ -157,7 +157,7 @@ test('a US-dollar account renders without any exchange-rate indicators', async (
 	await expect(page.getByLabel(/Converted from/)).toHaveCount(0);
 	await expect(page.getByLabel('Includes converted amounts')).toHaveCount(0);
 	await expect(page.getByLabel(/No exchange rate/)).toHaveCount(0);
-	await expect(page.getByLabel('Includes amounts that could not be converted')).toHaveCount(0);
+	await expect(page.getByLabel('Includes currencies that could not be converted')).toHaveCount(0);
 
 	await goToPageViaSidebar(page, 'Accounts');
 	await expect(page.getByRole('region', { name: 'Net balance' })).toContainText('$2,500.00');
@@ -211,6 +211,8 @@ test('unconvertible balances render native amounts and are excluded from totals'
 
 	const netBalance = page.getByRole('region', { name: 'Net balance' });
 	await expect(netBalance).toContainText('$200.00');
-	await expect(netBalance.getByLabel('Includes amounts that could not be converted')).toBeVisible();
+	await expect(
+		netBalance.getByLabel('Includes currencies that could not be converted')
+	).toBeVisible();
 	await expect(netBalance).not.toContainText('$1,495,200.00');
 });
