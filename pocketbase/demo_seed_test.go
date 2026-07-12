@@ -385,3 +385,106 @@ func TestResetDemoKeepsOwnedExchangeRatesAfterDeferredCurrencyHooks(t *testing.T
 		t.Fatalf("find global ARS rate after reset: %v", err)
 	}
 }
+
+func TestResetDemoSeedsMissingRatesQAFixture(t *testing.T) {
+	app := newDemoSeedTestApp(t)
+
+	ratesColl, err := app.FindCollectionByNameOrId("exchangeRates")
+	if err != nil {
+		t.Fatalf("find exchangeRates collection: %v", err)
+	}
+	globalStart, _ := pbDateRange(time.Now().UTC().Format("2006-01-02"))
+	for _, code := range []string{demoQAMissingAccountCurrency, demoQAMissingAssetCurrency} {
+		rate := core.NewRecord(ratesColl)
+		rate.Set("owner", "")
+		rate.Set("currency", code)
+		rate.Set("date", globalStart)
+		rate.Set("rate", 999.25)
+		rate.Set("source", "fetched")
+		if err := app.Save(rate); err != nil {
+			t.Fatalf("save conflicting global %s rate: %v", code, err)
+		}
+	}
+
+	if err := resetDemo(app); err != nil {
+		t.Fatalf("first reset demo: %v", err)
+	}
+	if err := resetDemo(app); err != nil {
+		t.Fatalf("second reset demo: %v", err)
+	}
+
+	qaUser, err := app.FindAuthRecordByEmail("users", demoQAEmail)
+	if err != nil {
+		t.Fatalf("find demo QA user: %v", err)
+	}
+	if !qaUser.ValidatePassword(demoDefaultPassword) {
+		t.Fatal("demo QA password was not reset to the deterministic password")
+	}
+
+	for collection, expectedCurrencies := range map[string][]string{
+		"accounts": {"USD", demoQAMissingAccountCurrency},
+		"assets":   {"USD", demoQAMissingAssetCurrency},
+	} {
+		records, err := app.FindRecordsByFilter(collection, "owner = {:owner}", "", 0, 0, map[string]any{"owner": qaUser.Id})
+		if err != nil {
+			t.Fatalf("find QA %s: %v", collection, err)
+		}
+		if len(records) != len(expectedCurrencies) {
+			t.Fatalf("QA %s = %d, want %d", collection, len(records), len(expectedCurrencies))
+		}
+		currencies := map[string]bool{}
+		for _, record := range records {
+			currencies[record.GetString("currency")] = true
+		}
+		for _, code := range expectedCurrencies {
+			if !currencies[code] {
+				t.Errorf("QA %s missing currency %s", collection, code)
+			}
+		}
+	}
+
+	for collection, valueField := range map[string]string{
+		"accountBalances": "value",
+		"assetBalances":   "marketValue",
+	} {
+		records, err := app.FindRecordsByFilter(collection, "owner = {:owner}", "", 0, 0, map[string]any{"owner": qaUser.Id})
+		if err != nil {
+			t.Fatalf("find QA %s: %v", collection, err)
+		}
+		values := map[float64]bool{}
+		for _, record := range records {
+			values[record.GetFloat(valueField)] = true
+		}
+		for _, expected := range map[string][]float64{"accountBalances": {200, 1495000}, "assetBalances": {500, 1000}}[collection] {
+			if !values[expected] {
+				t.Errorf("QA %s missing value %v", collection, expected)
+			}
+		}
+	}
+
+	currencies, err := app.FindRecordsByFilter("currencies", "owner = {:owner}", "", 0, 0, map[string]any{"owner": qaUser.Id})
+	if err != nil {
+		t.Fatalf("find QA currencies: %v", err)
+	}
+	codes := map[string]bool{}
+	for _, currency := range currencies {
+		codes[currency.GetString("code")] = true
+	}
+	for _, code := range []string{"USD", demoQAMissingAccountCurrency, demoQAMissingAssetCurrency} {
+		if !codes[code] {
+			t.Errorf("QA currencies missing %s", code)
+		}
+	}
+	rates, err := app.FindRecordsByFilter("exchangeRates",
+		"(owner = {:owner} || owner = '') && (currency = {:accountCurrency} || currency = {:assetCurrency})",
+		"", 0, 0, map[string]any{
+			"owner": qaUser.Id, "accountCurrency": demoQAMissingAccountCurrency, "assetCurrency": demoQAMissingAssetCurrency,
+		},
+	)
+	if err != nil {
+		t.Fatalf("find applicable QA exchange rates: %v", err)
+	}
+	if len(rates) != 0 {
+		t.Fatalf("applicable owner or global QA exchange rates = %d, want 0", len(rates))
+	}
+}

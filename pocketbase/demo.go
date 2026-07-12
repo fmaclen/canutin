@@ -10,8 +10,11 @@ import (
 )
 
 const (
-	demoDefaultEmail    = "demo@canutin.com"
-	demoDefaultPassword = "123qweasdzxc"
+	demoDefaultEmail             = "demo@canutin.com"
+	demoDefaultPassword          = "123qweasdzxc"
+	demoQAEmail                  = "qa-missing-rates@canutin.com"
+	demoQAMissingAccountCurrency = "QAC"
+	demoQAMissingAssetCurrency   = "QAS"
 )
 
 // demoWipeCollections lists demo-owned rows that must be wiped, child-before-parent, so deletes
@@ -78,6 +81,24 @@ func ensureDemoUser(app core.App) (string, error) {
 	return user.Id, nil
 }
 
+func ensureDemoQAUser(app core.App) (string, error) {
+	user, err := app.FindAuthRecordByEmail("users", demoQAEmail)
+	if err != nil {
+		coll, err := app.FindCollectionByNameOrId("users")
+		if err != nil {
+			return "", err
+		}
+		user = core.NewRecord(coll)
+		user.SetEmail(demoQAEmail)
+	}
+	user.SetPassword(demoDefaultPassword)
+	user.SetVerified(true)
+	if err := app.Save(user); err != nil {
+		return "", err
+	}
+	return user.Id, nil
+}
+
 func wipeDemoData(app core.App, userID string) error {
 	for _, coll := range demoWipeCollections {
 		for {
@@ -101,6 +122,29 @@ func wipeDemoData(app core.App, userID string) error {
 	return nil
 }
 
+func wipeDemoQAGlobalRates(app core.App) error {
+	for _, code := range []string{demoQAMissingAccountCurrency, demoQAMissingAssetCurrency} {
+		for {
+			rates, err := app.FindRecordsByFilter("exchangeRates",
+				"owner = '' && currency = {:currency}", "", 200, 0,
+				map[string]any{"currency": code},
+			)
+			if err != nil {
+				return err
+			}
+			if len(rates) == 0 {
+				break
+			}
+			for _, rate := range rates {
+				if err := app.Delete(rate); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func resetDemo(app core.App) error {
 	demoResetMu.Lock()
 	defer demoResetMu.Unlock()
@@ -109,13 +153,26 @@ func resetDemo(app core.App) error {
 	if err != nil {
 		return fmt.Errorf("ensure demo user: %w", err)
 	}
+	qaUserID, err := ensureDemoQAUser(app)
+	if err != nil {
+		return fmt.Errorf("ensure demo QA user: %w", err)
+	}
 
 	return app.RunInTransaction(func(txApp core.App) error {
 		if err := wipeDemoData(txApp, userID); err != nil {
 			return fmt.Errorf("wipe demo data: %w", err)
 		}
+		if err := wipeDemoData(txApp, qaUserID); err != nil {
+			return fmt.Errorf("wipe demo QA data: %w", err)
+		}
+		if err := wipeDemoQAGlobalRates(txApp); err != nil {
+			return fmt.Errorf("wipe demo QA global rates: %w", err)
+		}
 		if err := seedDemoData(txApp, userID, time.Now()); err != nil {
 			return fmt.Errorf("seed demo data: %w", err)
+		}
+		if err := seedDemoQAData(txApp, qaUserID, time.Now()); err != nil {
+			return fmt.Errorf("seed demo QA data: %w", err)
 		}
 		return nil
 	})

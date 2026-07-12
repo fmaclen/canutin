@@ -94,7 +94,7 @@
 		<Tooltip.Root>
 			<Tooltip.Trigger
 				aria-label={fxLabel}
-				class="border-border inline-block border-b border-dashed leading-none hover:border-current"
+				class="currency-unconverted inline-block leading-none hover:border-current"
 			>
 				<Number value={formattedValue} sentiment="neutral" />
 			</Tooltip.Trigger>
@@ -103,7 +103,7 @@
 			</Tooltip.Content>
 		</Tooltip.Root>
 	{:else}
-		<span class="border-border inline-block border-b border-dashed leading-none">
+		<span class="currency-unconverted inline-block leading-none">
 			<Number value={formattedValue} sentiment="neutral" />
 		</span>
 	{/if}
@@ -128,3 +128,10 @@
 {:else}
 	<Number value={formattedValue} {sentiment} />
 {/if}
+
+<style>
+	.currency-unconverted {
+		color: var(--currency-unconverted-color, var(--color-muted-foreground));
+		border-bottom: var(--currency-unconverted-border-width, 1px) dashed var(--color-border);
+	}
+</style>
