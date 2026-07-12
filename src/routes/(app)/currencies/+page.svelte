@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { formatNativeCurrency } from '$lib/components/currency';
@@ -17,13 +16,8 @@
 	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import type { ExchangeRatesResponse } from '$lib/pocketbase.schema';
-	import {
-		createSortComparator,
-		getSortFromUrl,
-		setSortInUrl,
-		toggleSort,
-		type SortState
-	} from '$lib/utils';
+	import { TableSort } from '$lib/sorting.svelte';
+	import { createSortComparator, setSortInUrl, type SortState } from '$lib/utils';
 
 	const currenciesContext = getCurrenciesContext();
 	const exchangeRatesContext = getExchangeRatesContext();
@@ -48,24 +42,13 @@
 	];
 
 	const defaultSort: SortState<CurrencySortColumn> = { column: 'code', direction: 'asc' };
-	const sortState = $derived.by(() => {
-		const urlSort = getSortFromUrl(page.url);
-		if (
-			urlSort.column &&
-			urlSort.direction &&
-			validSortColumns.includes(urlSort.column as CurrencySortColumn)
-		) {
-			return urlSort as SortState<CurrencySortColumn>;
-		}
-		return defaultSort;
-	});
+	const sort = new TableSort<CurrencySortColumn>(validSortColumns, defaultSort);
+	// Shallow sort routing leaves `page.url` stale, so rebuild the back-link target from the live sort.
+	const listUrl = $derived(setSortInUrl(page.url, sort.state));
 
 	function handleSort(column: string) {
-		const newState = toggleSort(sortState, column as CurrencySortColumn);
-		const newUrl = setSortInUrl(page.url, newState);
+		sort.toggle(column);
 		currentPage = 1;
-		// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic URL computed at runtime
-		goto(newUrl, { replaceState: true, keepFocus: true });
 	}
 
 	function latestQuoteFor(code: string) {
@@ -100,7 +83,7 @@
 			};
 		});
 
-		const comparator = createSortComparator<CurrencyRow, CurrencySortColumn>(sortState, {
+		const comparator = createSortComparator<CurrencyRow, CurrencySortColumn>(sort.state, {
 			code: (r) => r.code,
 			name: (r) => r.name || null,
 			autoUpdate: (r) => (r.isUsd ? null : autoUpdateLabel(r)),
@@ -155,8 +138,8 @@
 								<Table.SortableHead
 									class="text-left whitespace-nowrap"
 									column="code"
-									sortColumn={sortState.column}
-									sortDirection={sortState.direction}
+									sortColumn={sort.column}
+									sortDirection={sort.direction}
 									onSort={handleSort}
 								>
 									{m.currencies_table_header_code()}
@@ -164,8 +147,8 @@
 								<Table.SortableHead
 									class="text-left whitespace-nowrap"
 									column="name"
-									sortColumn={sortState.column}
-									sortDirection={sortState.direction}
+									sortColumn={sort.column}
+									sortDirection={sort.direction}
 									onSort={handleSort}
 								>
 									{m.currencies_table_header_name()}
@@ -173,8 +156,8 @@
 								<Table.SortableHead
 									class="text-left whitespace-nowrap"
 									column="autoUpdate"
-									sortColumn={sortState.column}
-									sortDirection={sortState.direction}
+									sortColumn={sort.column}
+									sortDirection={sort.direction}
 									onSort={handleSort}
 								>
 									{m.currencies_table_header_auto_update()}
@@ -182,8 +165,8 @@
 								<Table.SortableHead
 									class="text-left whitespace-nowrap"
 									column="lastUpdated"
-									sortColumn={sortState.column}
-									sortDirection={sortState.direction}
+									sortColumn={sort.column}
+									sortDirection={sort.direction}
 									onSort={handleSort}
 								>
 									{m.currencies_table_header_last_updated()}
@@ -191,8 +174,8 @@
 								<Table.SortableHead
 									class="text-right whitespace-nowrap"
 									column="latestQuote"
-									sortColumn={sortState.column}
-									sortDirection={sortState.direction}
+									sortColumn={sort.column}
+									sortDirection={sort.direction}
 									onSort={handleSort}
 								>
 									{m.currencies_table_header_latest_quote()}
@@ -204,9 +187,7 @@
 								<Table.Row>
 									<Table.Cell>
 										<Link
-											href={`${resolve(`/currencies/${row.id}`)}?from=${encodeURIComponent(
-												page.url.pathname + page.url.search
-											)}`}
+											href={`${resolve(`/currencies/${row.id}`)}?from=${encodeURIComponent(listUrl)}`}
 											class="text-foreground/90 text-sm font-medium">{row.code}</Link
 										>
 									</Table.Cell>

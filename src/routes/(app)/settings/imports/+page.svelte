@@ -1,8 +1,6 @@
 <script lang="ts">
 	import { toast } from 'svelte-sonner';
 
-	import { goto } from '$app/navigation';
-	import { page } from '$app/state';
 	import Empty from '$lib/components/empty.svelte';
 	import Fieldset from '$lib/components/fieldset.svelte';
 	import FormFieldRow from '$lib/components/form-field-row.svelte';
@@ -21,13 +19,8 @@
 	import { m } from '$lib/paraglide/messages';
 	import type { ImportSessionsResponse } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
-	import {
-		createSortComparator,
-		getSortFromUrl,
-		setSortInUrl,
-		toggleSort,
-		type SortState
-	} from '$lib/utils';
+	import { TableSort } from '$lib/sorting.svelte';
+	import { createSortComparator, type SortState } from '$lib/utils';
 
 	const importSessionsContext = getImportSessionsContext();
 	const pb = getPocketBaseContext();
@@ -53,24 +46,7 @@
 	];
 
 	const defaultSort: SortState<SessionSortColumn> = { column: 'created', direction: 'desc' };
-	const sortState = $derived.by(() => {
-		const urlSort = getSortFromUrl(page.url);
-		if (
-			urlSort.column &&
-			urlSort.direction &&
-			validSortColumns.includes(urlSort.column as SessionSortColumn)
-		) {
-			return urlSort as SortState<SessionSortColumn>;
-		}
-		return defaultSort;
-	});
-
-	function handleSort(column: string) {
-		const newState = toggleSort(sortState, column as SessionSortColumn);
-		const newUrl = setSortInUrl(page.url, newState);
-		// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic URL computed at runtime
-		goto(newUrl, { replaceState: true, keepFocus: true });
-	}
+	const sort = new TableSort<SessionSortColumn>(validSortColumns, defaultSort);
 
 	const sortedRows = $derived.by(() => {
 		const rows: SessionRow[] = importSessionsContext.sessions.map((session) => ({
@@ -83,7 +59,7 @@
 			created: session.created
 		}));
 
-		const comparator = createSortComparator<SessionRow, SessionSortColumn>(sortState, {
+		const comparator = createSortComparator<SessionRow, SessionSortColumn>(sort.state, {
 			label: (r) => r.label,
 			recordsCreated: (r) => r.recordsCreated,
 			recordsSkipped: (r) => r.recordsSkipped,
@@ -139,9 +115,9 @@
 						<Table.SortableHead
 							class="text-left whitespace-nowrap"
 							column="label"
-							sortColumn={sortState.column}
-							sortDirection={sortState.direction}
-							onSort={handleSort}
+							sortColumn={sort.column}
+							sortDirection={sort.direction}
+							onSort={sort.toggle}
 						>
 							{m.settings_imports_table_header_label()}
 						</Table.SortableHead>
@@ -151,36 +127,36 @@
 						<Table.SortableHead
 							class="text-right whitespace-nowrap"
 							column="recordsCreated"
-							sortColumn={sortState.column}
-							sortDirection={sortState.direction}
-							onSort={handleSort}
+							sortColumn={sort.column}
+							sortDirection={sort.direction}
+							onSort={sort.toggle}
 						>
 							{m.settings_imports_table_header_records()}
 						</Table.SortableHead>
 						<Table.SortableHead
 							class="text-right whitespace-nowrap"
 							column="recordsSkipped"
-							sortColumn={sortState.column}
-							sortDirection={sortState.direction}
-							onSort={handleSort}
+							sortColumn={sort.column}
+							sortDirection={sort.direction}
+							onSort={sort.toggle}
 						>
 							{m.settings_imports_table_header_skipped()}
 						</Table.SortableHead>
 						<Table.SortableHead
 							class="text-right whitespace-nowrap"
 							column="recordsFailed"
-							sortColumn={sortState.column}
-							sortDirection={sortState.direction}
-							onSort={handleSort}
+							sortColumn={sort.column}
+							sortDirection={sort.direction}
+							onSort={sort.toggle}
 						>
 							{m.settings_imports_table_header_failed()}
 						</Table.SortableHead>
 						<Table.SortableHead
 							class="text-right whitespace-nowrap"
 							column="created"
-							sortColumn={sortState.column}
-							sortDirection={sortState.direction}
-							onSort={handleSort}
+							sortColumn={sort.column}
+							sortDirection={sort.direction}
+							onSort={sort.toggle}
 						>
 							{m.settings_imports_table_header_created()}
 						</Table.SortableHead>

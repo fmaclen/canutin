@@ -1,7 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
 	import KeyValue from '$lib/components/key-value.svelte';
@@ -19,14 +17,8 @@
 		gainLossPercentOrNull,
 		sentiment
 	} from '$lib/security-balance-values';
-	import {
-		createSortComparator,
-		formatPercent,
-		getSortFromUrl,
-		setSortInUrl,
-		toggleSort,
-		type SortState
-	} from '$lib/utils';
+	import { TableSort } from '$lib/sorting.svelte';
+	import { createSortComparator, formatPercent, type SortState } from '$lib/utils';
 
 	const securitiesContext = getSecuritiesContext();
 
@@ -53,27 +45,10 @@
 	];
 
 	const defaultSort: SortState<PortfolioSortColumn> = { column: 'value', direction: 'desc' };
-	const sortState = $derived.by(() => {
-		const urlSort = getSortFromUrl(page.url);
-		if (
-			urlSort.column &&
-			urlSort.direction &&
-			validSortColumns.includes(urlSort.column as PortfolioSortColumn)
-		) {
-			return urlSort as SortState<PortfolioSortColumn>;
-		}
-		return defaultSort;
-	});
-
-	function handleSort(column: string) {
-		const newState = toggleSort(sortState, column as PortfolioSortColumn);
-		const newUrl = setSortInUrl(page.url, newState);
-		// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic URL computed at runtime
-		goto(newUrl, { replaceState: true, keepFocus: true });
-	}
+	const sort = new TableSort<PortfolioSortColumn>(validSortColumns, defaultSort);
 
 	const sortedRows = $derived.by(() => {
-		const comparator = createSortComparator<SecurityAggregate, PortfolioSortColumn>(sortState, {
+		const comparator = createSortComparator<SecurityAggregate, PortfolioSortColumn>(sort.state, {
 			name: (r) => r.name,
 			symbol: (r) => r.symbol,
 			quantity: (r) => r.quantity,
@@ -147,18 +122,18 @@
 							<Table.SortableHead
 								class="text-left whitespace-nowrap"
 								column="name"
-								sortColumn={sortState.column}
-								sortDirection={sortState.direction}
-								onSort={handleSort}
+								sortColumn={sort.column}
+								sortDirection={sort.direction}
+								onSort={sort.toggle}
 							>
 								{m.securities_table_header_security()}
 							</Table.SortableHead>
 							<Table.SortableHead
 								class="text-left whitespace-nowrap"
 								column="symbol"
-								sortColumn={sortState.column}
-								sortDirection={sortState.direction}
-								onSort={handleSort}
+								sortColumn={sort.column}
+								sortDirection={sort.direction}
+								onSort={sort.toggle}
 							>
 								{m.securities_table_header_symbol()}
 							</Table.SortableHead>
@@ -168,45 +143,45 @@
 							<Table.SortableHead
 								class="text-right whitespace-nowrap"
 								column="quantity"
-								sortColumn={sortState.column}
-								sortDirection={sortState.direction}
-								onSort={handleSort}
+								sortColumn={sort.column}
+								sortDirection={sort.direction}
+								onSort={sort.toggle}
 							>
 								{m.securities_table_header_quantity()}
 							</Table.SortableHead>
 							<Table.SortableHead
 								class="text-right whitespace-nowrap"
 								column="costBasis"
-								sortColumn={sortState.column}
-								sortDirection={sortState.direction}
-								onSort={handleSort}
+								sortColumn={sort.column}
+								sortDirection={sort.direction}
+								onSort={sort.toggle}
 							>
 								{m.securities_table_header_cost_basis()}
 							</Table.SortableHead>
 							<Table.SortableHead
 								class="text-right whitespace-nowrap"
 								column="gainLoss"
-								sortColumn={sortState.column}
-								sortDirection={sortState.direction}
-								onSort={handleSort}
+								sortColumn={sort.column}
+								sortDirection={sort.direction}
+								onSort={sort.toggle}
 							>
 								{m.securities_table_header_gain_loss()}
 							</Table.SortableHead>
 							<Table.SortableHead
 								class="text-right whitespace-nowrap"
 								column="gainLossPercent"
-								sortColumn={sortState.column}
-								sortDirection={sortState.direction}
-								onSort={handleSort}
+								sortColumn={sort.column}
+								sortDirection={sort.direction}
+								onSort={sort.toggle}
 							>
 								{m.securities_table_header_gain_loss_percent()}
 							</Table.SortableHead>
 							<Table.SortableHead
 								class="text-right whitespace-nowrap"
 								column="value"
-								sortColumn={sortState.column}
-								sortDirection={sortState.direction}
-								onSort={handleSort}
+								sortColumn={sort.column}
+								sortDirection={sort.direction}
+								onSort={sort.toggle}
 							>
 								{m.securities_table_header_value()}
 							</Table.SortableHead>

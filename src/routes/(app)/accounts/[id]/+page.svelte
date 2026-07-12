@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { getAccountCashflowContext } from '$lib/account-cashflow.svelte';
@@ -40,14 +39,8 @@
 	import { getSecuritiesContext } from '$lib/securities.svelte';
 	import { gainLossPercentOrNull, sentiment, sumOrUnknown } from '$lib/security-balance-values';
 	import { projectSignedValue } from '$lib/sharing';
-	import {
-		createSortComparator,
-		getSortFromUrl,
-		setSortInUrl,
-		toggleSort,
-		toNumber,
-		type SortState
-	} from '$lib/utils';
+	import { TableSort } from '$lib/sorting.svelte';
+	import { createSortComparator, toNumber, type SortState } from '$lib/utils';
 
 	const accountsContext = getAccountsContext();
 	const securitiesContext = getSecuritiesContext();
@@ -368,24 +361,7 @@
 	];
 
 	const defaultSort: SortState<PositionSortColumn> = { column: 'value', direction: 'desc' };
-	const sortState = $derived.by(() => {
-		const urlSort = getSortFromUrl(page.url);
-		if (
-			urlSort.column &&
-			urlSort.direction &&
-			validSortColumns.includes(urlSort.column as PositionSortColumn)
-		) {
-			return urlSort as SortState<PositionSortColumn>;
-		}
-		return defaultSort;
-	});
-
-	function handleSort(column: string) {
-		const newState = toggleSort(sortState, column as PositionSortColumn);
-		const newUrl = setSortInUrl(page.url, newState);
-		// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic URL computed at runtime
-		goto(newUrl, { replaceState: true, keepFocus: true });
-	}
+	const sort = new TableSort<PositionSortColumn>(validSortColumns, defaultSort);
 
 	const positionsRows = $derived.by(() => {
 		const rows = positionsBalances.map((balance) => ({
@@ -395,7 +371,7 @@
 			nativeCurrency: securitiesContext.getSecurity(balance.securityId)?.currency ?? 'USD'
 		}));
 
-		const comparator = createSortComparator<(typeof rows)[number], PositionSortColumn>(sortState, {
+		const comparator = createSortComparator<(typeof rows)[number], PositionSortColumn>(sort.state, {
 			asOf: (row) => new Date(row.asOf).getTime(),
 			securityName: (row) => row.entityName,
 			quantity: (row) => row.quantity,
@@ -474,7 +450,12 @@
 					isUnconverted={positionsMarketValue.isUnconverted}
 				/>
 			</div>
-			<PositionsTable rows={positionsRows} entity="security" {sortState} onSort={handleSort} />
+			<PositionsTable
+				rows={positionsRows}
+				entity="security"
+				sortState={sort.state}
+				onSort={sort.toggle}
+			/>
 		{:else}
 			<Empty>{m.accounts_overview_positions_empty()}</Empty>
 		{/if}

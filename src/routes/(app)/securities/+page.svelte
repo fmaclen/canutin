@@ -1,7 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
 	import Empty from '$lib/components/empty.svelte';
 	import Link from '$lib/components/link.svelte';
 	import Page from '$lib/components/page.svelte';
@@ -12,13 +10,8 @@
 	import { m } from '$lib/paraglide/messages';
 	import type { SecuritiesResponse } from '$lib/pocketbase.schema';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
-	import {
-		createSortComparator,
-		getSortFromUrl,
-		setSortInUrl,
-		toggleSort,
-		type SortState
-	} from '$lib/utils';
+	import { TableSort } from '$lib/sorting.svelte';
+	import { createSortComparator, type SortState } from '$lib/utils';
 
 	const securitiesContext = getSecuritiesContext();
 
@@ -26,27 +19,10 @@
 	const validSortColumns: SecuritiesSortColumn[] = ['name', 'symbol'];
 
 	const defaultSort: SortState<SecuritiesSortColumn> = { column: 'name', direction: 'asc' };
-	const sortState = $derived.by(() => {
-		const urlSort = getSortFromUrl(page.url);
-		if (
-			urlSort.column &&
-			urlSort.direction &&
-			validSortColumns.includes(urlSort.column as SecuritiesSortColumn)
-		) {
-			return urlSort as SortState<SecuritiesSortColumn>;
-		}
-		return defaultSort;
-	});
-
-	function handleSort(column: string) {
-		const newState = toggleSort(sortState, column as SecuritiesSortColumn);
-		const newUrl = setSortInUrl(page.url, newState);
-		// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic URL computed at runtime
-		goto(newUrl, { replaceState: true, keepFocus: true });
-	}
+	const sort = new TableSort<SecuritiesSortColumn>(validSortColumns, defaultSort);
 
 	const sortedRows = $derived.by(() => {
-		const comparator = createSortComparator<SecuritiesResponse, SecuritiesSortColumn>(sortState, {
+		const comparator = createSortComparator<SecuritiesResponse, SecuritiesSortColumn>(sort.state, {
 			name: (r) => r.name,
 			symbol: (r) => r.symbol ?? null
 		});
@@ -73,18 +49,18 @@
 							<Table.SortableHead
 								class="text-left whitespace-nowrap"
 								column="name"
-								sortColumn={sortState.column}
-								sortDirection={sortState.direction}
-								onSort={handleSort}
+								sortColumn={sort.column}
+								sortDirection={sort.direction}
+								onSort={sort.toggle}
 							>
 								{m.securities_table_header_security()}
 							</Table.SortableHead>
 							<Table.SortableHead
 								class="text-left whitespace-nowrap"
 								column="symbol"
-								sortColumn={sortState.column}
-								sortDirection={sortState.direction}
-								onSort={handleSort}
+								sortColumn={sort.column}
+								sortDirection={sort.direction}
+								onSort={sort.toggle}
 							>
 								{m.securities_table_header_symbol()}
 							</Table.SortableHead>
