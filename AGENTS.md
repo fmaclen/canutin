@@ -73,6 +73,8 @@ Load when your tool list matches the harness. The agent must check tool availabi
 | Harness-specific quirks for Codex sessions - spawn_agent rules and validation gotchas    | codex    |
 | Harness-specific quirks for opencode sessions - plan mode rules and delegation reminders | opencode |
 
-> `pocketbase/skill.go` hand-maintains the custom endpoints, behavioral constraints, and auth
-> sections of the `/api/canutin/skill` reference. Update them whenever custom routes or
-> backend hooks change - nothing enforces this automatically.
+> `pocketbase/skill.go` hand-maintains the behavioral semantics - custom endpoints, behavioral
+> constraints, and auth - of the `/api/canutin/skill` reference; the import payload shape is
+> generated from the Go structs. Update the hand-maintained sections whenever custom routes or
+> backend hooks change. CI enforces this: a change under `pocketbase/**/*.go` without a matching
+> `pocketbase/skill.go` or `.agents/skills/` update fails the PR unless labeled `skip-skill-check`.

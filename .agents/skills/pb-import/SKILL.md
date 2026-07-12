@@ -83,14 +83,14 @@ Rule of thumb: send `value`/`price`/`costBasis` explicitly on every snapshot you
 
 Declares currencies and their exchange-rate quotes. Each quote is stored as an owner-scoped manual `exchangeRates` row.
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `code` | string | yes | Uppercase, must match `^[A-Z0-9]{2,10}$` |
-| `name` | string | no | ≤256 runes |
-| `autoUpdate` | boolean | no | Default false. On import it is stored but not fetch-validated — a bogus code won't fail the import; the daily 5am rate cron attempts the fetch later |
-| `quotes` | array | **yes** | At least one quote required per declared currency |
-| `quotes[].date` | string | yes | ISO or PB date; the date part must parse |
-| `quotes[].rate` | number | yes | Must be finite and **> 0** |
+| Field           | Type    | Required | Notes                                                                                                                                                |
+| --------------- | ------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `code`          | string  | yes      | Uppercase, must match `^[A-Z0-9]{2,10}$`                                                                                                             |
+| `name`          | string  | no       | ≤256 runes                                                                                                                                           |
+| `autoUpdate`    | boolean | no       | Default false. On import it is stored but not fetch-validated — a bogus code won't fail the import; the daily 5am rate cron attempts the fetch later |
+| `quotes`        | array   | **yes**  | At least one quote required per declared currency                                                                                                    |
+| `quotes[].date` | string  | yes      | ISO or PB date; the date part must parse                                                                                                             |
+| `quotes[].rate` | number  | yes      | Must be finite and **> 0**                                                                                                                           |
 
 **Quote direction:** a rate is **units of the foreign currency per 1 USD** (USD is the pivot and is never stored as a fetched rate — but the import loop doesn't skip it, so declaring USD in `currencies[]` with quotes writes inert owner-scoped manual `exchangeRates` rows). Manual import quotes are stored verbatim, so they must follow this direction to convert correctly. Manual quotes override same-day fetched rates.
 
@@ -98,17 +98,17 @@ Quotes dedup on `owner + currency + day`.
 
 ### accounts[]
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `name` | string | yes | ≤256 |
-| `institution` | string | no | Part of the dedup key when present |
-| `balanceGroup` | string | no | `CASH\|DEBT\|INVESTMENT\|OTHER` — stored raw, not validated. Part of the dedup key |
-| `balanceType` | string | no | Free-form; find-or-created in `balanceTypes` by name. NOT part of the dedup key |
-| `currency` | string | no | `^[A-Z0-9]{2,10}$`; defaults to `USD`. Immutable once set |
-| `autoCalculated` | boolean | no | Stored as a timestamp — see warning below |
-| `closed` | boolean | no | Stored as a timestamp |
-| `excluded` | boolean | no | Stored as a timestamp |
-| `balance` | object | no | `{ "value": number, "asOf": string }` — a single `accountBalances` cash snapshot |
+| Field            | Type    | Required | Notes                                                                              |
+| ---------------- | ------- | -------- | ---------------------------------------------------------------------------------- |
+| `name`           | string  | yes      | ≤256                                                                               |
+| `institution`    | string  | no       | Part of the dedup key when present                                                 |
+| `balanceGroup`   | string  | no       | `CASH\|DEBT\|INVESTMENT\|OTHER` — stored raw, not validated. Part of the dedup key |
+| `balanceType`    | string  | no       | Free-form; find-or-created in `balanceTypes` by name. NOT part of the dedup key    |
+| `currency`       | string  | no       | `^[A-Z0-9]{2,10}$`; defaults to `USD`. Immutable once set                          |
+| `autoCalculated` | boolean | no       | Stored as a timestamp — see warning below                                          |
+| `closed`         | boolean | no       | Stored as a timestamp                                                              |
+| `excluded`       | boolean | no       | Stored as a timestamp                                                              |
+| `balance`        | object  | no       | `{ "value": number, "asOf": string }` — a single `accountBalances` cash snapshot   |
 
 There is no `notes` field on account import (the schema has one; the importer omits it).
 
@@ -120,15 +120,15 @@ Accounts dedup on `name + balanceGroup + owner`, plus `institution` when present
 
 Assets are the legacy "whole asset" concept (a house, a collectible), distinct from securities.
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `name` | string | yes | ≤256 |
-| `balanceGroup` | string | no | Stored raw |
-| `balanceType` | string | no | Find-or-created by name |
-| `currency` | string | no | Defaults to `USD`. Immutable once set |
-| `sold` | boolean | no | Stored as a timestamp |
-| `excluded` | boolean | no | Stored as a timestamp |
-| `balance` | object | no | `{ "marketValue": number, "bookValue": number, "asOf": string }` |
+| Field          | Type    | Required | Notes                                                            |
+| -------------- | ------- | -------- | ---------------------------------------------------------------- |
+| `name`         | string  | yes      | ≤256                                                             |
+| `balanceGroup` | string  | no       | Stored raw                                                       |
+| `balanceType`  | string  | no       | Find-or-created by name                                          |
+| `currency`     | string  | no       | Defaults to `USD`. Immutable once set                            |
+| `sold`         | boolean | no       | Stored as a timestamp                                            |
+| `excluded`     | boolean | no       | Stored as a timestamp                                            |
+| `balance`      | object  | no       | `{ "marketValue": number, "bookValue": number, "asOf": string }` |
 
 **Assets have no `symbol`, `type`, `quantity`, `marketPrice`, or `bookPrice` fields** — any such fields are silently dropped. Only `marketValue`, `bookValue`, and `asOf` exist on an asset balance.
 
@@ -138,28 +138,28 @@ Assets dedup on `name + owner` only (not symbol). Asset balances dedup on `asset
 
 Declares a security so you can set its currency. Securities are also auto-created on demand when a `securityBalances` or `securityTransactions` row references one by name/symbol — but those auto-created securities are always `USD`. List a security here to give it a non-USD currency.
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `name` | string | yes | ≤256; trimmed, internal whitespace collapsed, unique per owner case-insensitively |
-| `symbol` | string | no | ≤32; upper-cased and trimmed |
-| `currency` | string | no | Defaults to `USD`. Immutable once set |
+| Field      | Type   | Required | Notes                                                                             |
+| ---------- | ------ | -------- | --------------------------------------------------------------------------------- |
+| `name`     | string | yes      | ≤256; trimmed, internal whitespace collapsed, unique per owner case-insensitively |
+| `symbol`   | string | no       | ≤32; upper-cased and trimmed                                                      |
+| `currency` | string | no       | Defaults to `USD`. Immutable once set                                             |
 
 Securities dedup on `(symbol OR normalized name) + owner`.
 
 ### transactions[] (cash transactions)
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `accountId` | string | no | Preferred reference; accepted only if owned |
-| `accountName` | string | yes | ≤256 |
-| `institution` | string | no | Used for tuple account resolution |
-| `balanceGroup` | string | no | Used for tuple account resolution |
-| `date` | string | yes | ISO or PB date |
-| `description` | string | no | ≤2000; normalized (trim / collapse whitespace / lowercase) for dedup |
-| `value` | number | no | Finite; defaults to 0 if omitted |
-| `externalId` | string | no | **Honored only here**; primary dedup key when present |
-| `labels` | string[] | no | Each ≤256; find-or-created in `transactionLabels` |
-| `excluded` | boolean | no | Stored as a timestamp |
+| Field          | Type     | Required | Notes                                                                |
+| -------------- | -------- | -------- | -------------------------------------------------------------------- |
+| `accountId`    | string   | no       | Preferred reference; accepted only if owned                          |
+| `accountName`  | string   | yes      | ≤256                                                                 |
+| `institution`  | string   | no       | Used for tuple account resolution                                    |
+| `balanceGroup` | string   | no       | Used for tuple account resolution                                    |
+| `date`         | string   | yes      | ISO or PB date                                                       |
+| `description`  | string   | no       | ≤2000; normalized (trim / collapse whitespace / lowercase) for dedup |
+| `value`        | number   | no       | Finite; defaults to 0 if omitted                                     |
+| `externalId`   | string   | no       | **Honored only here**; primary dedup key when present                |
+| `labels`       | string[] | no       | Each ≤256; find-or-created in `transactionLabels`                    |
+| `excluded`     | boolean  | no       | Stored as a timestamp                                                |
 
 `externalId` is the only place it is honored — it does not exist on securities, security balances, security transactions, accounts, or assets, and is dropped if supplied there.
 
@@ -169,15 +169,15 @@ Transactions with an `externalId` dedup on `account + externalId + owner`. Witho
 
 The **only** source of holdings and positions value. Number fields are nullable — see the carry-forward section above.
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `accountId` OR `accountName` | string | one required | Resolved by accountId or unique bare name only (no institution/group tuple here) |
-| `securityId` / `securityName` / `securitySymbol` | string | unenforced | Not server-validated. Resolves an existing security or auto-creates one (USD); omitting all three creates a junk empty-named USD security |
-| `asOf` | string | yes | Normalized to `<day> 00:00:00.000Z` |
-| `quantity` | number\|null | no | Nullable; `0` closes the position |
-| `price` | number\|null | no | Nullable |
-| `value` | number\|null | no | Nullable — the position's total value |
-| `costBasis` | number\|null | no | Nullable |
+| Field                                            | Type         | Required     | Notes                                                                                                                                     |
+| ------------------------------------------------ | ------------ | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `accountId` OR `accountName`                     | string       | one required | Resolved by accountId or unique bare name only (no institution/group tuple here)                                                          |
+| `securityId` / `securityName` / `securitySymbol` | string       | unenforced   | Not server-validated. Resolves an existing security or auto-creates one (USD); omitting all three creates a junk empty-named USD security |
+| `asOf`                                           | string       | yes          | Normalized to `<day> 00:00:00.000Z`                                                                                                       |
+| `quantity`                                       | number\|null | no           | Nullable; `0` closes the position                                                                                                         |
+| `price`                                          | number\|null | no           | Nullable                                                                                                                                  |
+| `value`                                          | number\|null | no           | Nullable — the position's total value                                                                                                     |
+| `costBasis`                                      | number\|null | no           | Nullable                                                                                                                                  |
 
 Dedup on `account + security + exact-day(asOf) + owner`, then all non-null numbers must match.
 
@@ -185,17 +185,17 @@ Dedup on `account + security + exact-day(asOf) + owner`, then all non-null numbe
 
 Display-only history. **Never affects holdings or balances** — post a `securityBalances` snapshot to change the actual holding.
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `accountId` OR `accountName` | string | one required | accountId or unique bare name only |
-| `securityId` / `securityName` / `securitySymbol` | string | unenforced | Not server-validated. Resolves or auto-creates a security (USD); omitting all three creates a junk empty-named USD security |
-| `date` | string | yes | Normalized to the day |
-| `type` | string | no | Schema select `buy\|sell\|cancel\|cash\|fee\|transfer` (not enforced by the importer) |
-| `subtype` | string | no | |
-| `name` | string | no | ≤256; used as the dedup label when present |
-| `description` | string | no | ≤2000; dedup label fallback |
-| `quantity` / `price` / `amount` / `fees` | number\|null | no | Nullable |
-| `notes` | string | no | ≤5000. `notes` is accepted only here, not on cash transactions or accounts |
+| Field                                            | Type         | Required     | Notes                                                                                                                       |
+| ------------------------------------------------ | ------------ | ------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `accountId` OR `accountName`                     | string       | one required | accountId or unique bare name only                                                                                          |
+| `securityId` / `securityName` / `securitySymbol` | string       | unenforced   | Not server-validated. Resolves or auto-creates a security (USD); omitting all three creates a junk empty-named USD security |
+| `date`                                           | string       | yes          | Normalized to the day                                                                                                       |
+| `type`                                           | string       | no           | Schema select `buy\|sell\|cancel\|cash\|fee\|transfer` (not enforced by the importer)                                       |
+| `subtype`                                        | string       | no           |                                                                                                                             |
+| `name`                                           | string       | no           | ≤256; used as the dedup label when present                                                                                  |
+| `description`                                    | string       | no           | ≤2000; dedup label fallback                                                                                                 |
+| `quantity` / `price` / `amount` / `fees`         | number\|null | no           | Nullable                                                                                                                    |
+| `notes`                                          | string       | no           | ≤5000. `notes` is accepted only here, not on cash transactions or accounts                                                  |
 
 There is **no `externalId`** on securityTransactions — any supplied is dropped. Dedup on `account + security + day(date) + type + owner`, then the label (normalized `name`, else `description`) and all non-null numbers must match.
 
