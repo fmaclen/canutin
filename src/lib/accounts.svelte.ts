@@ -52,6 +52,11 @@ type LatestAccountBalance = {
 	created: string;
 };
 
+type SnapshotMutation<T> = {
+	deleted: boolean;
+	record: T;
+};
+
 class AccountsContext {
 	accounts: AccountWithBalance[] = $derived.by(() =>
 		this.rawAccounts.map((record) => {
@@ -82,7 +87,11 @@ class AccountsContext {
 	private _fx: ReturnType<typeof getExchangeRatesContext>;
 	private balanceTypesContext: ReturnType<typeof setBalanceTypesContext>;
 	private refreshSequence = 0;
-	private mutationEpoch = 0;
+	private activeSnapshotToken: number | null = null;
+	private accountSnapshotMutations: SnapshotMutation<AccountsResponse>[] = [];
+	private shareSnapshotMutations: SnapshotMutation<AccountSharesResponse>[] = [];
+	private snapshotBalanceOwners = new Set<string>();
+	private snapshotShareAccounts = new Set<string>();
 	private _activeUserId = '';
 	private _isSubscribed = false;
 	private _teardownCallback = () => this.unsubscribeRealtime();
@@ -177,6 +186,11 @@ class AccountsContext {
 			const userId = this.currentUserId;
 			if (userId === this._activeUserId) return;
 			this.unsubscribeRealtime();
+			this.activeSnapshotToken = null;
+			this.accountSnapshotMutations = [];
+			this.shareSnapshotMutations = [];
+			this.snapshotBalanceOwners.clear();
+			this.snapshotShareAccounts.clear();
 			this._activeUserId = userId;
 			if (!userId) {
 				this.refreshSequence++;
@@ -196,19 +210,94 @@ class AccountsContext {
 		});
 	}
 
+	// NOTE: Realtime events landing while these list fetches are in flight are buffered (records and
+	// shares) or noted by owner (balances). Buffered record/share mutations replay onto the fetched
+	// snapshot before it's committed, and touched owners are refetched afterwards, so an event is
+	// never clobbered by the older snapshot and the store never commits emptier than the database.
 	private async refreshForCurrentUser() {
 		const userId = this.currentUserId;
 		const token = ++this.refreshSequence;
+		this.activeSnapshotToken = token;
+		this.accountSnapshotMutations = [];
+		this.shareSnapshotMutations = [];
+		this.snapshotBalanceOwners.clear();
+		this.snapshotShareAccounts.clear();
 		try {
-			await this.refreshShares(userId, token);
-			await this.refreshAccounts(userId, token);
+			const [shares, accounts] = await Promise.all([
+				this._pb.authedClient.collection('accountShares').getFullList<AccountSharesResponse>({
+					filter: `grantedBy='${userId}' || recipient='${userId}'`,
+					sort: 'recipientEmail',
+					requestKey: null
+				}),
+				this._pb.authedClient.collection('accounts').getFullList<AccountsResponse>({
+					filter: `owner='${userId}' || accountShares_via_account.recipient ?= '${userId}'`,
+					requestKey: null
+				})
+			]);
+			if (userId !== this.currentUserId || token !== this.refreshSequence) return;
+			for (const account of accounts) {
+				await this.balanceTypesContext.ensureLoaded(account.balanceType);
+			}
+			for (const mutation of this.accountSnapshotMutations) {
+				if (!mutation.deleted)
+					await this.balanceTypesContext.ensureLoaded(mutation.record.balanceType);
+			}
+			const latestBalances = await Promise.all(
+				accounts.map((account) => this.getLatestAccountBalance(account.id))
+			);
+			if (userId !== this.currentUserId || token !== this.refreshSequence) return;
+
+			let reconciledShares = shares;
+			for (const mutation of this.shareSnapshotMutations) {
+				reconciledShares = mutation.deleted
+					? reconciledShares.filter((share) => share.id !== mutation.record.id)
+					: upsertById(reconciledShares, mutation.record).list;
+			}
+			this.shares = reconciledShares.toSorted((a, b) =>
+				a.recipientEmail.localeCompare(b.recipientEmail)
+			);
+
+			let reconciledAccounts = accounts;
+			for (const mutation of this.accountSnapshotMutations) {
+				reconciledAccounts = mutation.deleted
+					? reconciledAccounts.filter((account) => account.id !== mutation.record.id)
+					: upsertById(reconciledAccounts, mutation.record).list;
+			}
+			this.latestCashByAccount.clear();
+			for (const balance of latestBalances) {
+				if (balance) this.latestCashByAccount.set(balance.account, balance);
+			}
+			this.rawAccounts = reconciledAccounts;
+			this.accountsLoaded = true;
 			this.notifyBalancesChanged();
 		} catch (error) {
 			if (userId !== this.currentUserId || token !== this.refreshSequence) return;
 			this._pb.handleConnectionError(error, 'accounts', 'init');
 		} finally {
+			if (this.activeSnapshotToken === token) {
+				this.activeSnapshotToken = null;
+				this.accountSnapshotMutations = [];
+				this.shareSnapshotMutations = [];
+			}
 			if (userId === this.currentUserId && token === this.refreshSequence) this.isLoading = false;
 		}
+
+		// Refetch owners touched by balance events and accounts touched by share events so a delete or
+		// membership change that landed during the fetch resolves to the database's current state.
+		if (userId !== this.currentUserId || token !== this.refreshSequence) return;
+		const balanceOwners = [...this.snapshotBalanceOwners];
+		const shareAccounts = [...this.snapshotShareAccounts];
+		this.snapshotBalanceOwners.clear();
+		this.snapshotShareAccounts.clear();
+		let changed = false;
+		for (const accountId of shareAccounts) {
+			if (await this.refreshAccount(accountId, userId)) changed = true;
+		}
+		for (const accountId of balanceOwners) {
+			if (shareAccounts.includes(accountId)) continue;
+			if (await this.refreshAccountBalance(accountId, userId)) changed = true;
+		}
+		if (changed && userId === this.currentUserId) this.notifyBalancesChanged();
 	}
 
 	private async refreshShares(userId = this.currentUserId, token = this.refreshSequence) {
@@ -220,36 +309,6 @@ class AccountsContext {
 		});
 		if (userId !== this.currentUserId || token !== this.refreshSequence) return;
 		this.shares = shares;
-	}
-
-	private async refreshAccounts(userId = this.currentUserId, token = this.refreshSequence) {
-		if (!userId || userId !== this.currentUserId || token !== this.refreshSequence) return;
-		const epoch = this.mutationEpoch;
-		const accounts = await this._pb.authedClient
-			.collection('accounts')
-			.getFullList<AccountsResponse>({
-				filter: `owner='${userId}' || accountShares_via_account.recipient ?= '${userId}'`,
-				requestKey: null
-			});
-		for (const account of accounts) {
-			await this.balanceTypesContext.ensureLoaded(account.balanceType);
-		}
-		const latestBalances = await Promise.all(
-			accounts.map((account) => this.getLatestAccountBalance(account.id))
-		);
-		if (userId !== this.currentUserId || token !== this.refreshSequence) return;
-
-		// NOTE: A targeted membership mutation landed while this list was
-		// in flight, so the fetched snapshot is stale; leave membership and
-		// balances to the mutation but still mark the store loaded.
-		if (epoch === this.mutationEpoch) {
-			this.latestCashByAccount.clear();
-			for (const balance of latestBalances) {
-				if (balance) this.latestCashByAccount.set(balance.account, balance);
-			}
-			this.rawAccounts = accounts;
-		}
-		this.accountsLoaded = true;
 	}
 
 	private realtimeSubscribe(userId = this._activeUserId) {
@@ -314,6 +373,18 @@ class AccountsContext {
 	) {
 		if (!userId || userId !== this._activeUserId) return;
 		if (!e.action) return;
+		if (this.activeSnapshotToken !== null) {
+			if ('account' in e.record) {
+				this.snapshotBalanceOwners.add(e.record.account);
+				for (const [ownerAccountId, cash] of this.latestCashByAccount) {
+					if (cash.id === e.record.id) this.snapshotBalanceOwners.add(ownerAccountId);
+				}
+			} else {
+				this.accountSnapshotMutations.push({ deleted: e.action === 'delete', record: e.record });
+				if (e.action === 'create') this.snapshotBalanceOwners.add(e.record.id);
+			}
+			return;
+		}
 		if ('account' in e.record) {
 			await this.onAccountBalanceEvent(e.action, e.record, userId);
 			return;
@@ -324,6 +395,15 @@ class AccountsContext {
 	private onAccountShareEvent(e: RecordSubscription<AccountSharesResponse>, userId: string) {
 		if (!userId || userId !== this._activeUserId) return;
 		const isRelevantShare = e.record.grantedBy === userId || e.record.recipient === userId;
+		if (this.activeSnapshotToken !== null) {
+			if (e.action === 'delete') {
+				this.shareSnapshotMutations.push({ deleted: true, record: e.record });
+			} else if (isRelevantShare) {
+				this.shareSnapshotMutations.push({ deleted: false, record: e.record });
+			}
+			this.snapshotShareAccounts.add(e.record.account);
+			return;
+		}
 		if (e.action === 'create') {
 			if (isRelevantShare) this.shares = [...this.shares, e.record];
 		} else if (e.action === 'update') {
@@ -394,19 +474,12 @@ class AccountsContext {
 		}
 	}
 
-	// NOTE: Targeted membership changes bump mutationEpoch so an in-flight
-	// refreshAccounts that fetched its list before this mutation aborts its
-	// commit and can't overwrite newer state with a stale snapshot.
 	private upsertAccountRecord(account: AccountsResponse) {
-		const { list, inserted } = upsertById(this.rawAccounts, account);
-		this.rawAccounts = list;
-		if (inserted) this.mutationEpoch++;
+		this.rawAccounts = upsertById(this.rawAccounts, account).list;
 	}
 
 	private removeAccountRecord(accountId: string) {
-		const { list, removed } = removeById(this.rawAccounts, accountId);
-		this.rawAccounts = list;
-		if (removed) this.mutationEpoch++;
+		this.rawAccounts = removeById(this.rawAccounts, accountId).list;
 	}
 
 	async refreshAccount(accountId: string, userId: string) {

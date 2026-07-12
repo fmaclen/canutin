@@ -44,6 +44,11 @@ type LatestAssetBalance = AssetBalanceData & {
 	created: string;
 };
 
+type SnapshotMutation<T> = {
+	deleted: boolean;
+	record: T;
+};
+
 const DEFAULT_BALANCE_DATA: AssetBalanceData = {
 	marketValue: 0,
 	bookValue: 0,
@@ -83,7 +88,11 @@ class AssetsContext {
 	private _fx: ReturnType<typeof getExchangeRatesContext>;
 	private balanceTypesContext: ReturnType<typeof setBalanceTypesContext>;
 	private refreshSequence = 0;
-	private mutationEpoch = 0;
+	private activeSnapshotToken: number | null = null;
+	private assetSnapshotMutations: SnapshotMutation<AssetsResponse>[] = [];
+	private shareSnapshotMutations: SnapshotMutation<AssetSharesResponse>[] = [];
+	private snapshotBalanceOwners = new Set<string>();
+	private snapshotShareAssets = new Set<string>();
 	private _activeUserId = '';
 	private _isSubscribed = false;
 	private _teardownCallback = () => this.unsubscribeRealtime();
@@ -167,6 +176,11 @@ class AssetsContext {
 			const userId = this.currentUserId;
 			if (userId === this._activeUserId) return;
 			this.unsubscribeRealtime();
+			this.activeSnapshotToken = null;
+			this.assetSnapshotMutations = [];
+			this.shareSnapshotMutations = [];
+			this.snapshotBalanceOwners.clear();
+			this.snapshotShareAssets.clear();
 			this._activeUserId = userId;
 			if (!userId) {
 				this.refreshSequence++;
@@ -184,19 +198,93 @@ class AssetsContext {
 		});
 	}
 
+	// NOTE: Realtime events landing while these list fetches are in flight are buffered (records and
+	// shares) or noted by owner (balances). Buffered record/share mutations replay onto the fetched
+	// snapshot before it's committed, and touched owners are refetched afterwards, so an event is
+	// never clobbered by the older snapshot and the store never commits emptier than the database.
 	private async refreshForCurrentUser() {
 		const userId = this.currentUserId;
 		const token = ++this.refreshSequence;
+		this.activeSnapshotToken = token;
+		this.assetSnapshotMutations = [];
+		this.shareSnapshotMutations = [];
+		this.snapshotBalanceOwners.clear();
+		this.snapshotShareAssets.clear();
 		try {
-			await this.refreshShares(userId, token);
-			await this.refreshAssets(userId, token);
+			const [shares, list] = await Promise.all([
+				this._pb.authedClient.collection('assetShares').getFullList<AssetSharesResponse>({
+					sort: 'recipientEmail',
+					requestKey: null
+				}),
+				this._pb.authedClient.collection('assets').getFullList<AssetsResponse>({
+					requestKey: null
+				})
+			]);
+			if (userId !== this.currentUserId || token !== this.refreshSequence) return;
+			for (const asset of list) {
+				await this.balanceTypesContext.ensureLoaded(asset.balanceType);
+			}
+			for (const mutation of this.assetSnapshotMutations) {
+				if (!mutation.deleted)
+					await this.balanceTypesContext.ensureLoaded(mutation.record.balanceType);
+			}
+			const latestBalances = await Promise.all(
+				list.map((asset) => this.getLatestAssetBalance(asset.id))
+			);
+			if (userId !== this.currentUserId || token !== this.refreshSequence) return;
+
+			let reconciledShares = shares;
+			for (const mutation of this.shareSnapshotMutations) {
+				reconciledShares = mutation.deleted
+					? reconciledShares.filter((share) => share.id !== mutation.record.id)
+					: upsertById(reconciledShares, mutation.record).list;
+			}
+			this.shares = reconciledShares.toSorted((a, b) =>
+				a.recipientEmail.localeCompare(b.recipientEmail)
+			);
+
+			let reconciledAssets = list;
+			for (const mutation of this.assetSnapshotMutations) {
+				reconciledAssets = mutation.deleted
+					? reconciledAssets.filter((asset) => asset.id !== mutation.record.id)
+					: upsertById(reconciledAssets, mutation.record).list;
+			}
+			this.latestBalanceByAsset.clear();
+			list.forEach((asset, index) => {
+				const balance = latestBalances[index];
+				if (balance) this.latestBalanceByAsset.set(asset.id, balance);
+			});
+			this.rawAssets = reconciledAssets;
 			this.lastBalanceEvent = Date.now();
 		} catch (error) {
 			if (userId !== this.currentUserId || token !== this.refreshSequence) return;
 			this._pb.handleConnectionError(error, 'assets', 'init');
 		} finally {
+			if (this.activeSnapshotToken === token) {
+				this.activeSnapshotToken = null;
+				this.assetSnapshotMutations = [];
+				this.shareSnapshotMutations = [];
+			}
 			if (userId === this.currentUserId && token === this.refreshSequence) this.isLoading = false;
 		}
+
+		// Refetch owners touched by balance events and assets touched by share events so a delete or
+		// membership change that landed during the fetch resolves to the database's current state.
+		if (userId !== this.currentUserId || token !== this.refreshSequence) return;
+		const balanceOwners = [...this.snapshotBalanceOwners];
+		const shareAssets = [...this.snapshotShareAssets];
+		this.snapshotBalanceOwners.clear();
+		this.snapshotShareAssets.clear();
+		let changed = false;
+		for (const assetId of shareAssets) {
+			if (await this.refreshAsset(assetId, userId)) changed = true;
+		}
+		for (const assetId of balanceOwners) {
+			if (shareAssets.includes(assetId)) continue;
+			await this.refetchAssetBalance(assetId, userId);
+			changed = true;
+		}
+		if (changed && userId === this.currentUserId) this.lastBalanceEvent = Date.now();
 	}
 
 	private async refreshShares(userId = this.currentUserId, token = this.refreshSequence) {
@@ -207,33 +295,6 @@ class AssetsContext {
 		});
 		if (userId !== this.currentUserId || token !== this.refreshSequence) return;
 		this.shares = shares;
-	}
-
-	private async refreshAssets(userId = this.currentUserId, token = this.refreshSequence) {
-		if (!userId || userId !== this.currentUserId || token !== this.refreshSequence) return;
-		const epoch = this.mutationEpoch;
-		const list = await this._pb.authedClient.collection('assets').getFullList<AssetsResponse>({
-			requestKey: null
-		});
-		for (const asset of list) {
-			await this.balanceTypesContext.ensureLoaded(asset.balanceType);
-		}
-		const latestBalances = await Promise.all(
-			list.map((asset) => this.getLatestAssetBalance(asset.id))
-		);
-		if (userId !== this.currentUserId || token !== this.refreshSequence) return;
-
-		// NOTE: A targeted membership mutation landed while this list was in
-		// flight, so the fetched snapshot is stale; leave membership and
-		// balances to the mutation rather than overwriting with stale state.
-		if (epoch === this.mutationEpoch) {
-			this.latestBalanceByAsset.clear();
-			list.forEach((asset, index) => {
-				const balance = latestBalances[index];
-				if (balance) this.latestBalanceByAsset.set(asset.id, balance);
-			});
-			this.rawAssets = list;
-		}
 	}
 
 	private realtimeSubscribe(userId = this._activeUserId) {
@@ -290,6 +351,11 @@ class AssetsContext {
 
 	private async onAssetEvent(e: RecordSubscription<AssetsResponse>, userId: string) {
 		if (userId !== this.currentUserId) return;
+		if (this.activeSnapshotToken !== null) {
+			this.assetSnapshotMutations.push({ deleted: e.action === 'delete', record: e.record });
+			if (e.action === 'create') this.snapshotBalanceOwners.add(e.record.id);
+			return;
+		}
 
 		if (e.action === 'create') {
 			await this.balanceTypesContext.ensureLoaded(e.record.balanceType);
@@ -315,6 +381,13 @@ class AssetsContext {
 	private onAssetBalanceEvent(e: RecordSubscription<AssetBalancesResponse>, userId: string) {
 		if (userId !== this.currentUserId) return;
 		if (!e.action) return;
+		if (this.activeSnapshotToken !== null) {
+			this.snapshotBalanceOwners.add(e.record.asset);
+			for (const [ownerAssetId, current] of this.latestBalanceByAsset) {
+				if (current.id === e.record.id) this.snapshotBalanceOwners.add(ownerAssetId);
+			}
+			return;
+		}
 		const assetId = e.record.asset;
 		let displayedAssetId: string | null = null;
 		for (const [key, currentBalance] of this.latestBalanceByAsset) {
@@ -362,6 +435,11 @@ class AssetsContext {
 
 	private onAssetShareEvent(e: RecordSubscription<AssetSharesResponse>, userId: string) {
 		if (userId !== this.currentUserId) return;
+		if (this.activeSnapshotToken !== null) {
+			this.shareSnapshotMutations.push({ deleted: e.action === 'delete', record: e.record });
+			this.snapshotShareAssets.add(e.record.asset);
+			return;
+		}
 
 		if (e.action === 'create') {
 			this.shares = [...this.shares, e.record];
@@ -473,19 +551,12 @@ class AssetsContext {
 		}
 	}
 
-	// NOTE: Targeted membership changes bump mutationEpoch so an in-flight
-	// refreshAssets that fetched its list before this mutation aborts its
-	// commit and can't overwrite newer state with a stale snapshot.
 	private upsertAssetRecord(asset: AssetsResponse) {
-		const { list, inserted } = upsertById(this.rawAssets, asset);
-		this.rawAssets = list;
-		if (inserted) this.mutationEpoch++;
+		this.rawAssets = upsertById(this.rawAssets, asset).list;
 	}
 
 	private removeAssetRecord(assetId: string) {
-		const { list, removed } = removeById(this.rawAssets, assetId);
-		this.rawAssets = list;
-		if (removed) this.mutationEpoch++;
+		this.rawAssets = removeById(this.rawAssets, assetId).list;
 	}
 
 	private async refreshAsset(assetId: string, userId: string) {

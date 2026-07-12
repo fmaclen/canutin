@@ -103,6 +103,7 @@ class TransactionsContext {
 	private _refreshSequence = 0;
 	private _pageRefreshSequence = 0;
 	private _summaryRefreshSequence = 0;
+	private _labelRefreshSequence = 0;
 
 	private static readonly LOADING_DELAY_MS = 150;
 	private static readonly SEARCH_DEBOUNCE_MS = 300;
@@ -305,6 +306,7 @@ class TransactionsContext {
 	private async refreshLabels(userId = this._activeUserId) {
 		if (!userId || userId !== this._activeUserId) return;
 
+		const labelRefreshId = ++this._labelRefreshSequence;
 		try {
 			const labels = await this._pb.authedClient
 				.collection('transactionLabels')
@@ -312,10 +314,10 @@ class TransactionsContext {
 					sort: 'name',
 					requestKey: null
 				});
-			if (userId !== this._activeUserId) return;
+			if (userId !== this._activeUserId || labelRefreshId !== this._labelRefreshSequence) return;
 			this.transactionLabels = labels;
 		} catch (error) {
-			if (userId !== this._activeUserId) return;
+			if (userId !== this._activeUserId || labelRefreshId !== this._labelRefreshSequence) return;
 			this._pb.handleConnectionError(error, 'transactionLabels', 'refresh');
 		}
 	}
