@@ -12,7 +12,7 @@ import (
 const (
 	demoDefaultEmail             = "demo@canutin.com"
 	demoDefaultPassword          = "123qweasdzxc"
-	demoQAEmail                  = "qa-missing-rates@canutin.com"
+	demoQAEmail                  = "qa-missing-rates@example.com"
 	demoQAMissingAccountCurrency = "QAC"
 	demoQAMissingAssetCurrency   = "QAS"
 )
