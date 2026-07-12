@@ -25,6 +25,7 @@ Do not rewrite the diff unless the orchestrator explicitly assigns implementatio
 - Edge cases are handled where the changed behavior requires them.
 - Failures are surfaced through the project failures-and-logs pattern.
 - No silent failures, swallowed promises, or user-visible raw error messages.
+- A change that alters behavior documented in a skill (`.agents/skills/`) or the served skill reference (`pocketbase/skill.go`) updates those docs in the same change set - flag it if the docs went stale.
 
 ## Conventions
 

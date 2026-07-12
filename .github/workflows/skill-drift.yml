@@ -1,0 +1,56 @@
+# Deliberately conservative: a shape-only change to the import payload structs trips
+# this check even though the served /api/canutin/skill shape section is generated from
+# those structs. That is intentional — a new field still needs its semantics documented
+# by a human (meaning, nullability, dedup, carry-forward), and the hand-maintained
+# field tables in .agents/skills/pb-import/SKILL.md don't self-update. A false trip
+# costs one `skip-skill-check` label; a false exemption recreates the silent doc drift
+# of #396. If false trips become common, generate more of the docs — don't weaken this guard.
+name: Skill drift
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+jobs:
+  skill-drift:
+    name: Check skill reference drift
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure backend changes update skill docs
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HAS_SKIP_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'skip-skill-check') }}
+        run: |
+          changed=$(git diff --name-only "origin/$BASE_REF...HEAD")
+
+          backend_changed=$(echo "$changed" | grep -E '^pocketbase/.*\.go$' | grep -vxF 'pocketbase/skill.go' || true)
+          if [ -z "$backend_changed" ]; then
+            echo "No PocketBase Go changes outside pocketbase/skill.go; nothing to guard."
+            exit 0
+          fi
+
+          docs_changed=$(echo "$changed" | grep -E '^pocketbase/skill\.go$|^\.agents/skills/' || true)
+          if [ -n "$docs_changed" ]; then
+            echo "Backend behavior changed and skill docs were updated."
+            exit 0
+          fi
+
+          if [ "$HAS_SKIP_LABEL" = "true" ]; then
+            echo "Backend behavior changed without doc updates, bypassed by the 'skip-skill-check' label."
+            exit 0
+          fi
+
+          echo "::error::PocketBase backend behavior changed but no skill docs were updated."
+          echo "Changes to PocketBase Go code (excluding pocketbase/skill.go) must also update the served"
+          echo "skill reference (pocketbase/skill.go) or the relevant doc under .agents/skills/."
+          echo "If this change has no doc impact, add the 'skip-skill-check' label to the PR to bypass."
+          echo ""
+          echo "Backend files changed without a matching doc update:"
+          echo "$backend_changed"
+          exit 1

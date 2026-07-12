@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -96,15 +97,24 @@ const skillCustomEndpointsSection = "## Custom endpoints\n\n" +
 	"- `GET /api/setup-status` — public, no body. Returns `{ \"ready\": bool }` indicating " +
 	"whether a superuser account has been provisioned.\n" +
 	"- `POST /api/canutin/import` — requires any authenticated token. Body is an import " +
-	"payload: `sessionLabel` plus optional arrays `currencies`, `accounts`, `assets`, `securities`, " +
-	"`transactions`, `securityBalances`, and `securityTransactions`. Each `currencies` object is " +
-	"`{ code, name?, autoUpdate?, quotes: [{ date, rate }] }`; at least one quote is required and " +
-	"quotes are stored as owner-scoped manual `exchangeRates` rows. Each `accounts`, `assets`, " +
-	"and `securities` object accepts an optional `currency` (uppercase code matching " +
-	"`^[A-Z0-9]{2,10}$`, defaults to `USD`); the code must already exist in the importer's " +
+	"payload with a required `sessionLabel` and optional per-collection arrays; the exact field " +
+	"shape of each array is generated under **Import payload shape** below. At least one quote is " +
+	"required per `currencies` object and quotes are stored as owner-scoped manual `exchangeRates` " +
+	"rows. The optional `currency` on `accounts`, `assets`, and `securities` is an uppercase code " +
+	"matching `^[A-Z0-9]{2,10}$` and defaults to `USD`; the code must already exist in the importer's " +
 	"`currencies` registry or be declared in `currencies` with a quote. Transactions and balances " +
-	"inherit their parent's currency. Returns " +
-	"`{ sessionId, status, recordsFailed, … }` with per-collection `{ created, existing, skipped }` counts.\n" +
+	"inherit their parent's currency. Import exchange-rate quotes follow the standard direction " +
+	"(units of the currency per 1 USD). Unknown JSON fields are silently dropped, and `externalId` " +
+	"is honored only on cash `transactions`. Records are deduplicated per collection (accounts by " +
+	"name+institution+balanceGroup, cash transactions by externalId or account+date+value+description, " +
+	"assets by name only, securityBalances by account+security+day plus matching non-null numbers); an " +
+	"account is resolved by owned `accountId`, then a name+institution+balanceGroup tuple, then a unique " +
+	"bare name (ambiguous names error the row), while securityBalances/securityTransactions resolve " +
+	"accounts by accountId or unique bare name only. The import is not wrapped in a transaction: rows " +
+	"fail independently, are counted in `recordsFailed`, and partial results persist — only revert is " +
+	"atomic. Limits: 64 MiB body, 200k total records, 100k per collection. Returns " +
+	"`{ sessionId, status, recordsFailed, … }` with per-collection `{ created, existing, skipped }` " +
+	"counts; `status` is `completed`, `completed_with_errors`, `failed`, or `rolled_back`.\n" +
 	"- `POST /api/canutin/import/revert` — requires an authenticated token. Body is " +
 	"`{ sessionId }`. Returns `{ sessionId, deleted }`. Revert deletes import-session-tagged " +
 	"financial rows, but does not remove import-created `currencies` rows or their manual " +
@@ -129,6 +139,19 @@ Backend hooks enforce invariants that are not visible in the access rules:
   ` + "`security_name_exists`" + ` on the ` + "`name`" + ` field.
 - Writing a ` + "`securityBalances`" + ` or ` + "`securityTransactions`" + ` record whose account is
   closed is rejected. (Imports are exempt so they can restore a closed account's history.)
+- An account's displayed value is cash plus security positions, summed in the UI rather than stored
+  in one column: cash comes from the latest ` + "`accountBalances`" + ` snapshot, positions from
+  ` + "`securityBalances`" + ` holding snapshots. Holdings come exclusively from ` + "`securityBalances`" + `;
+  ` + "`securityTransactions`" + ` are display-only trade history that never affect balances. Writing
+  portfolio value into an account balance double-counts it.
+- Number fields on ` + "`securityBalances`" + ` and ` + "`securityTransactions`" + ` are nullable and the
+  distinction matters: ` + "`null`" + ` (or an omitted field) means unknown and is carried forward from the
+  last known snapshot, ` + "`0`" + ` is a known zero, and ` + "`quantity = 0`" + ` closes a position and stops
+  carry-forward. Never send ` + "`0`" + ` for a value you do not know.
+- Setting ` + "`autoCalculated`" + ` on an account makes the engine recompute its latest cash balance by
+  summing imported cash transactions into a new ` + "`source = derived`" + ` row stamped with the current
+  time, which overrides any imported cash snapshot and re-fires on later transaction edits. Leave it
+  off to preserve an imported snapshot.
 - Share records (` + "`accountShares`" + `, ` + "`assetShares`" + `) can only be updated by the recipient,
   and only the ` + "`includeInNetWorth`" + ` field may change. The sharer must revoke and recreate
   a share to change anything else.
@@ -200,6 +223,11 @@ func canutinSkillHandler(app core.App) func(*core.RequestEvent) error {
 		doc.WriteString("\n")
 		doc.WriteString(skillCustomEndpointsSection)
 		doc.WriteString("\n")
+		doc.WriteString("### Import payload shape\n\n")
+		doc.WriteString("These field lists are generated from the server's import payload definitions, so they " +
+			"always match the accepted shape. `sessionLabel` is required and every array is optional; a field " +
+			"marked `(nullable)` may be omitted or sent as `null`.\n\n")
+		writeImportShape(&doc, "", reflect.TypeOf(importPayload{}))
 		doc.WriteString(skillConstraintsSection)
 
 		return re.Blob(200, "text/markdown; charset=utf-8", []byte(doc.String()))
@@ -293,4 +321,86 @@ func asString(value any) string {
 func asBool(value any) bool {
 	b, ok := value.(bool)
 	return ok && b
+}
+
+// writeImportShape renders the JSON shape of an import payload struct as a markdown table, then
+// recurses into any nested element structs (slice elements, pointer-to-struct fields). Field names,
+// types, and nullability come from the struct's `json` tags and Go types via reflection, so the
+// served shape can never drift from the structs the import endpoint actually decodes. path is the
+// dotted JSON path to the current struct ("" for the top-level payload); it prefixes the labels of
+// nested sub-structs so a reader can locate each object in the payload.
+func writeImportShape(doc *strings.Builder, path string, typ reflect.Type) {
+	label := "Payload"
+	if path != "" {
+		label = path
+	}
+	fmt.Fprintf(doc, "**%s**\n\n", label)
+	doc.WriteString("| Field | Type |\n| --- | --- |\n")
+
+	type nestedStruct struct {
+		path string
+		typ  reflect.Type
+	}
+	var nested []nestedStruct
+
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		name, _, _ := strings.Cut(field.Tag.Get("json"), ",")
+		if name == "" || name == "-" {
+			continue
+		}
+
+		fieldType := field.Type
+		nullable := ""
+		if fieldType.Kind() == reflect.Ptr {
+			nullable = " (nullable)"
+			fieldType = fieldType.Elem()
+		}
+
+		childPath := name
+		if path != "" {
+			childPath = path + "." + name
+		}
+
+		switch fieldType.Kind() {
+		case reflect.Slice:
+			element := fieldType.Elem()
+			if element.Kind() == reflect.Struct {
+				fmt.Fprintf(doc, "| %s | array of objects%s |\n", name, nullable)
+				nested = append(nested, nestedStruct{childPath + "[]", element})
+			} else {
+				fmt.Fprintf(doc, "| %s | array of %ss%s |\n", name, simpleImportType(element, ""), nullable)
+			}
+		case reflect.Struct:
+			fmt.Fprintf(doc, "| %s | object%s |\n", name, nullable)
+			nested = append(nested, nestedStruct{childPath, fieldType})
+		default:
+			fmt.Fprintf(doc, "| %s | %s%s |\n", name, simpleImportType(fieldType, name), nullable)
+		}
+	}
+	doc.WriteString("\n")
+
+	for _, child := range nested {
+		writeImportShape(doc, child.path, child.typ)
+	}
+}
+
+// simpleImportType maps a scalar Go kind to the type label used in the import shape tables. String
+// fields whose JSON name is a date carry a `date-string` label because the import validator parses
+// them as dates, a distinction Go's string type cannot express.
+func simpleImportType(typ reflect.Type, name string) string {
+	switch typ.Kind() {
+	case reflect.String:
+		if name == "date" || name == "asOf" {
+			return "date-string"
+		}
+		return "string"
+	case reflect.Bool:
+		return "boolean"
+	case reflect.Float32, reflect.Float64,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return "number"
+	}
+	return typ.Kind().String()
 }

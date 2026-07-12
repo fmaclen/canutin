@@ -107,6 +107,8 @@ The `Conventions` list on a write template and the `Review lens` list on a revie
 
 A missing convention skill is the most common cause of executor work the user has to send back. When in doubt, include more.
 
+When a write concern's in-bounds files touch PocketBase custom routes, hooks, or import behavior, its `Done when` must include updating `pocketbase/skill.go`'s hand-maintained sections and any affected `.agents/skills/` doc. Those doc updates are part of the concern, not a follow-up.
+
 ## Acceptance gate
 
 Gate on the contract, not the substance. Substance review happens at milestones via review executors.
