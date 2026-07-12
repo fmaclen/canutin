@@ -8,6 +8,7 @@ import { getExchangeRatesContext } from './exchange-rates.svelte';
 import { logError } from './logger';
 import type { SecuritiesResponse, SecurityBalancesResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
+import { MutationEpochMap, RequestSequence, SnapshotReconciler } from './realtime-sync';
 import {
 	compareByValueDescThenName,
 	resolveSecurityBalanceValues,
@@ -15,7 +16,7 @@ import {
 	type SecurityBalanceResolvedValue
 } from './security-balance-values';
 import { projectSignedValue } from './sharing';
-import { toNumber, upsertById, type SnapshotMutation } from './utils';
+import { toNumber, upsertById } from './utils';
 
 type SecurityBalance = SecurityBalancesResponse<number, number, number, number>;
 
@@ -139,11 +140,10 @@ class SecuritiesContext {
 	private _accounts: ReturnType<typeof getAccountsContext>;
 	private _fx: ReturnType<typeof getExchangeRatesContext>;
 	private positionRefreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
-	private positionMutationEpochs = new Map<string, number>();
-	private refreshSequence = 0;
-	private activeSnapshotToken: number | null = null;
-	private securitySnapshotMutations: SnapshotMutation<SecuritiesResponse>[] = [];
-	private balanceSnapshotMutations: SnapshotMutation<SecurityBalance>[] = [];
+	private positionEpochs = new MutationEpochMap();
+	private sequence = new RequestSequence();
+	private securitiesSnapshot = new SnapshotReconciler<SecuritiesResponse>();
+	private balancesSnapshot = new SnapshotReconciler<SecurityBalance>();
 	private _activeUserId = '';
 	private _isSubscribed = false;
 	private _teardownCallback = () => this.unsubscribeRealtime();
@@ -190,7 +190,7 @@ class SecuritiesContext {
 				balanceData.account,
 				securityId,
 				this._auth.currentUserId,
-				this.refreshSequence
+				this.sequence.current
 			)
 		) {
 			this._accounts.notifyBalancesChanged();
@@ -202,13 +202,12 @@ class SecuritiesContext {
 			const userId = this._auth.currentUserId;
 			if (userId === this._activeUserId) return;
 			this.unsubscribeRealtime();
-			this.activeSnapshotToken = null;
-			this.securitySnapshotMutations = [];
-			this.balanceSnapshotMutations = [];
-			this.positionMutationEpochs.clear();
+			this.securitiesSnapshot.reset();
+			this.balancesSnapshot.reset();
+			this.positionEpochs.clear();
 			this._activeUserId = userId;
 			if (!userId) {
-				this.refreshSequence++;
+				this.sequence.bump();
 				this.clearPositionRefreshTimers();
 				this.securities = [];
 				this.currentPositions.clear();
@@ -225,15 +224,15 @@ class SecuritiesContext {
 
 	private async refreshForCurrentUser() {
 		const userId = this._auth.currentUserId;
-		const token = ++this.refreshSequence;
+		const token = this.sequence.next();
 		try {
 			await this.refreshAll(userId, token);
 		} catch (error) {
-			if (userId !== this._auth.currentUserId || token !== this.refreshSequence) return;
+			if (userId !== this._auth.currentUserId || !this.sequence.isCurrent(token)) return;
 			this._pb.handleConnectionError(error, 'securities', 'init');
 			this.resolvePositionsLoaded();
 		} finally {
-			if (userId === this._auth.currentUserId && token === this.refreshSequence)
+			if (userId === this._auth.currentUserId && this.sequence.isCurrent(token))
 				this.isLoading = false;
 		}
 	}
@@ -243,10 +242,9 @@ class SecuritiesContext {
 		this._accounts.notifyBalancesChanged();
 	}
 
-	private async refreshAll(userId = this._auth.currentUserId, token = ++this.refreshSequence) {
-		this.activeSnapshotToken = token;
-		this.securitySnapshotMutations = [];
-		this.balanceSnapshotMutations = [];
+	private async refreshAll(userId: string, token: number) {
+		this.securitiesSnapshot.begin(token);
+		this.balancesSnapshot.begin(token);
 		try {
 			const [securities, securityBalances] = await Promise.all([
 				this._pb.authedClient.collection('securities').getFullList<SecuritiesResponse>({
@@ -258,39 +256,24 @@ class SecuritiesContext {
 					requestKey: null
 				})
 			]);
-			if (userId !== this._auth.currentUserId || token !== this.refreshSequence) return;
+			if (userId !== this._auth.currentUserId || !this.sequence.isCurrent(token)) return;
 
-			let reconciledSecurities = securities;
-			const deletedSecurityIds = new SvelteSet<string>();
-			for (const mutation of this.securitySnapshotMutations) {
-				if (mutation.deleted) deletedSecurityIds.add(mutation.record.id);
-				reconciledSecurities = mutation.deleted
-					? reconciledSecurities.filter((security) => security.id !== mutation.record.id)
-					: upsertById(reconciledSecurities, mutation.record).list;
-			}
-			this.securities = reconciledSecurities.toSorted((a, b) =>
-				a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
-			);
+			this.securities = this.securitiesSnapshot
+				.replay(securities)
+				.toSorted((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+			const deletedSecurityIds = this.securitiesSnapshot.deletedIds;
 
-			let reconciledBalances = securityBalances.filter(
-				(balance) => !deletedSecurityIds.has(balance.security)
+			const reconciledBalances = this.balancesSnapshot.replay(
+				securityBalances.filter((balance) => !deletedSecurityIds.has(balance.security))
 			);
-			for (const mutation of this.balanceSnapshotMutations) {
-				reconciledBalances = mutation.deleted
-					? reconciledBalances.filter((balance) => balance.id !== mutation.record.id)
-					: upsertById(reconciledBalances, mutation.record).list;
-			}
 			this.currentPositions.clear();
 			for (const [key, position] of resolveSecurityBalanceValues(reconciledBalances)) {
 				this.currentPositions.set(key, position);
 			}
 			this.resolvePositionsLoaded();
 		} finally {
-			if (this.activeSnapshotToken === token) {
-				this.activeSnapshotToken = null;
-				this.securitySnapshotMutations = [];
-				this.balanceSnapshotMutations = [];
-			}
+			this.securitiesSnapshot.end(token);
+			this.balancesSnapshot.end(token);
 		}
 	}
 
@@ -330,18 +313,10 @@ class SecuritiesContext {
 	private onSecurityEvent(event: RecordSubscription<SecuritiesResponse>, userId: string) {
 		if (!userId || userId !== this._activeUserId) return;
 		if (!event.action) return;
-		if (this.activeSnapshotToken !== null) {
-			this.securitySnapshotMutations.push({
-				deleted: event.action === 'delete',
-				record: event.record
-			});
-		}
+		this.securitiesSnapshot.buffer(event.record, event.action === 'delete');
 		if (event.action === 'delete') {
 			this.securities = this.securities.filter((security) => security.id !== event.record.id);
-			for (const key of this.positionMutationEpochs.keys()) {
-				if (!key.endsWith(`:${event.record.id}`)) continue;
-				this.positionMutationEpochs.set(key, (this.positionMutationEpochs.get(key) ?? 0) + 1);
-			}
+			this.positionEpochs.bumpMatching((key) => key.endsWith(`:${event.record.id}`));
 			for (const [key, position] of this.currentPositions) {
 				if (position.balance.security === event.record.id) this.currentPositions.delete(key);
 			}
@@ -355,12 +330,7 @@ class SecuritiesContext {
 	private onSecurityBalanceEvent(event: RecordSubscription<SecurityBalance>, userId: string) {
 		if (!userId || userId !== this._activeUserId) return;
 		if (!event.action) return;
-		if (this.activeSnapshotToken !== null) {
-			this.balanceSnapshotMutations.push({
-				deleted: event.action === 'delete',
-				record: event.record
-			});
-		}
+		this.balancesSnapshot.buffer(event.record, event.action === 'delete');
 
 		const key = this.positionKey(event.record.account, event.record.security);
 		const affectedKeys = new SvelteSet([key]);
@@ -374,10 +344,7 @@ class SecuritiesContext {
 		}
 
 		for (const affectedKey of affectedKeys) {
-			this.positionMutationEpochs.set(
-				affectedKey,
-				(this.positionMutationEpochs.get(affectedKey) ?? 0) + 1
-			);
+			this.positionEpochs.bump(affectedKey);
 			const [accountId, securityId] = affectedKey.split(':');
 			if (accountId && securityId) this.schedulePositionRefresh(accountId, securityId, userId);
 		}
@@ -392,13 +359,13 @@ class SecuritiesContext {
 			key,
 			setTimeout(() => {
 				this.positionRefreshTimers.delete(key);
-				const token = this.refreshSequence;
+				const token = this.sequence.current;
 				void this.refreshPosition(accountId, securityId, userId, token)
 					.then((refreshed) => {
 						if (refreshed && this.positionsLoaded) this._accounts.notifyBalancesChanged();
 					})
 					.catch((error) => {
-						if (userId !== this._auth.currentUserId || token !== this.refreshSequence) return;
+						if (userId !== this._auth.currentUserId || !this.sequence.isCurrent(token)) return;
 						this._pb.handleConnectionError(error, 'securities', 'position_refresh');
 					});
 			}, DEBOUNCE_MS)
@@ -411,13 +378,10 @@ class SecuritiesContext {
 		userId: string,
 		token: number
 	) {
-		if (!userId || userId !== this._auth.currentUserId || token !== this.refreshSequence)
+		if (!userId || userId !== this._auth.currentUserId || !this.sequence.isCurrent(token))
 			return false;
 		const key = this.positionKey(accountId, securityId);
-		const mutationEpoch = this.positionMutationEpochs.get(key) ?? 0;
-		// NOTE: Register the key so security-delete invalidation can see this in-flight
-		// targeted fetch when it scans positionMutationEpochs.keys().
-		this.positionMutationEpochs.set(key, mutationEpoch);
+		const mutationEpoch = this.positionEpochs.read(key);
 		const balances = await this._pb.authedClient
 			.collection('securityBalances')
 			.getFullList<SecurityBalance>({
@@ -427,8 +391,8 @@ class SecuritiesContext {
 			});
 		if (
 			userId !== this._auth.currentUserId ||
-			token !== this.refreshSequence ||
-			mutationEpoch !== (this.positionMutationEpochs.get(key) ?? 0)
+			!this.sequence.isCurrent(token) ||
+			!this.positionEpochs.isCurrent(key, mutationEpoch)
 		)
 			return false;
 
