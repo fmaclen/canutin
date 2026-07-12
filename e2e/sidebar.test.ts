@@ -6,16 +6,23 @@ import { seedUser } from './pocketbase.helpers';
 // On desktop the sidebar is expanded by default; on mobile it is a Sheet that
 // stays closed until "Toggle Sidebar" is clicked, and navigating closes it
 // again. Reopen it before each interaction so the test runs on both projects.
+// The mobile sheet stays mounted (data-state="closed") for its close transition
+// before unmounting, so a plain visibility check would catch it mid-animation -
+// check data-state too, since accounts stays visible until the transition ends.
 async function ensureSidebarOpen(page: Page) {
 	const sidebar = page.getByLabel('Sidebar');
 	const accounts = sidebar.getByRole('link', { name: 'Accounts' });
-	if (await accounts.isVisible()) return;
+	if (await sidebar.count()) {
+		const state = await sidebar.getAttribute('data-state');
+		if (state !== 'closed' && (await accounts.isVisible())) return;
+	}
 	await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
 	await expect(accounts).toBeVisible();
 }
 
 test('sidebar shows pillars before subordinate records and highlights the active item', async ({
-	page
+	page,
+	isMobile
 }) => {
 	const user = await seedUser('wallace');
 
@@ -53,6 +60,8 @@ test('sidebar shows pillars before subordinate records and highlights the active
 
 	await trades.click();
 	await expect(page).toHaveURL(/\/trades$/);
+	// Navigating on mobile closes the sheet; desktop leaves it expanded.
+	if (isMobile) await expect(sidebar).toBeHidden();
 	await ensureSidebarOpen(page);
 	await expect(sidebar.getByRole('link', { name: 'Trades' })).toHaveAttribute(
 		'data-active',
