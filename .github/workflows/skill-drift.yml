@@ -1,3 +1,10 @@
+# Deliberately conservative: a shape-only change to the import payload structs trips
+# this check even though the served /api/canutin/skill shape section is generated from
+# those structs. That is intentional — a new field still needs its semantics documented
+# by a human (meaning, nullability, dedup, carry-forward), and the hand-maintained
+# field tables in .agents/skills/pb-import/SKILL.md don't self-update. A false trip
+# costs one `skip-skill-check` label; a false exemption recreates the silent doc drift
+# of #396. If false trips become common, generate more of the docs — don't weaken this guard.
 name: Skill drift
 
 on:
