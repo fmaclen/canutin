@@ -61,7 +61,7 @@ test.skip('sign up, login and logout', async ({ page }) => {
 	await page.getByLabel('Email').fill(uniqueEmail);
 	await page.getByLabel('Password').fill(DEFAULT_PASSWORD);
 	await page.getByRole('button', { name: 'Login' }).click();
-  await expect(page.getByRole('button', { name: 'Toggle Sidebar' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Toggle Sidebar' })).toBeVisible();
 
 	// Logout
 	const logoutButton = page.getByRole('button', { name: 'Log out' });
