@@ -15,7 +15,7 @@ import {
 	type SecurityBalanceResolvedValue
 } from './security-balance-values';
 import { projectSignedValue } from './sharing';
-import { toNumber, upsertById } from './utils';
+import { toNumber, upsertById, type SnapshotMutation } from './utils';
 
 type SecurityBalance = SecurityBalancesResponse<number, number, number, number>;
 
@@ -80,11 +80,6 @@ type PositionsAccumulator = {
 	isConverted: boolean;
 	isUnconverted: boolean;
 	missingCurrency: string | null;
-};
-
-type SnapshotMutation<T> = {
-	deleted: boolean;
-	record: T;
 };
 
 const DEBOUNCE_MS = 200;

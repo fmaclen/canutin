@@ -17,7 +17,13 @@ import type { PocketBaseContext } from './pocketbase.svelte';
 import type { AccountPositionsValue } from './securities.svelte';
 import { sumOrUnknown } from './security-balance-values';
 import { participantExcluded, projectSignedValue } from './sharing';
-import { isUnavailableRecordError, removeById, toPocketBaseDateString, upsertById } from './utils';
+import {
+	isUnavailableRecordError,
+	removeById,
+	toPocketBaseDateString,
+	upsertById,
+	type SnapshotMutation
+} from './utils';
 
 export type AccountWithBalance = AccountsResponse & {
 	// NOTE: `balance` is the perspective-projected total in the account's own currency (null when
@@ -50,11 +56,6 @@ type LatestAccountBalance = {
 	value: number;
 	asOf: string;
 	created: string;
-};
-
-type SnapshotMutation<T> = {
-	deleted: boolean;
-	record: T;
 };
 
 class AccountsContext {
@@ -290,12 +291,17 @@ class AccountsContext {
 		this.snapshotBalanceOwners.clear();
 		this.snapshotShareAccounts.clear();
 		let changed = false;
-		for (const accountId of shareAccounts) {
-			if (await this.refreshAccount(accountId, userId)) changed = true;
-		}
-		for (const accountId of balanceOwners) {
-			if (shareAccounts.includes(accountId)) continue;
-			if (await this.refreshAccountBalance(accountId, userId)) changed = true;
+		try {
+			for (const accountId of shareAccounts) {
+				if (await this.refreshAccount(accountId, userId)) changed = true;
+			}
+			for (const accountId of balanceOwners) {
+				if (shareAccounts.includes(accountId)) continue;
+				if (await this.refreshAccountBalance(accountId, userId)) changed = true;
+			}
+		} catch (error) {
+			if (userId !== this.currentUserId) return;
+			this._pb.handleConnectionError(error, 'accounts', 'snapshot_settle');
 		}
 		if (changed && userId === this.currentUserId) this.notifyBalancesChanged();
 	}
@@ -376,9 +382,6 @@ class AccountsContext {
 		if (this.activeSnapshotToken !== null) {
 			if ('account' in e.record) {
 				this.snapshotBalanceOwners.add(e.record.account);
-				for (const [ownerAccountId, cash] of this.latestCashByAccount) {
-					if (cash.id === e.record.id) this.snapshotBalanceOwners.add(ownerAccountId);
-				}
 			} else {
 				this.accountSnapshotMutations.push({ deleted: e.action === 'delete', record: e.record });
 				if (e.action === 'create') this.snapshotBalanceOwners.add(e.record.id);

@@ -15,7 +15,13 @@ import {
 } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
 import { participantExcluded, projectAssetFinancials } from './sharing';
-import { isUnavailableRecordError, removeById, toPocketBaseDateString, upsertById } from './utils';
+import {
+	isUnavailableRecordError,
+	removeById,
+	toPocketBaseDateString,
+	upsertById,
+	type SnapshotMutation
+} from './utils';
 
 type AssetBalanceData = {
 	marketValue: number;
@@ -42,11 +48,6 @@ type AssetDisplayBalanceData = AssetBalanceData & {
 type LatestAssetBalance = AssetBalanceData & {
 	id: string;
 	created: string;
-};
-
-type SnapshotMutation<T> = {
-	deleted: boolean;
-	record: T;
 };
 
 const DEFAULT_BALANCE_DATA: AssetBalanceData = {
@@ -276,13 +277,18 @@ class AssetsContext {
 		this.snapshotBalanceOwners.clear();
 		this.snapshotShareAssets.clear();
 		let changed = false;
-		for (const assetId of shareAssets) {
-			if (await this.refreshAsset(assetId, userId)) changed = true;
-		}
-		for (const assetId of balanceOwners) {
-			if (shareAssets.includes(assetId)) continue;
-			await this.refetchAssetBalance(assetId, userId);
-			changed = true;
+		try {
+			for (const assetId of shareAssets) {
+				if (await this.refreshAsset(assetId, userId)) changed = true;
+			}
+			for (const assetId of balanceOwners) {
+				if (shareAssets.includes(assetId)) continue;
+				await this.refetchAssetBalance(assetId, userId);
+				changed = true;
+			}
+		} catch (error) {
+			if (userId !== this.currentUserId) return;
+			this._pb.handleConnectionError(error, 'assets', 'snapshot_settle');
 		}
 		if (changed && userId === this.currentUserId) this.lastBalanceEvent = Date.now();
 	}
@@ -383,9 +389,6 @@ class AssetsContext {
 		if (!e.action) return;
 		if (this.activeSnapshotToken !== null) {
 			this.snapshotBalanceOwners.add(e.record.asset);
-			for (const [ownerAssetId, current] of this.latestBalanceByAsset) {
-				if (current.id === e.record.id) this.snapshotBalanceOwners.add(ownerAssetId);
-			}
 			return;
 		}
 		const assetId = e.record.asset;

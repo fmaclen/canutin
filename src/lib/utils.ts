@@ -155,6 +155,13 @@ export function isDuplicateSecurityNameError(error: unknown) {
 	);
 }
 
+// A realtime event buffered while a store's snapshot fetch is in flight, replayed onto the fetched
+// list before it's committed so the older snapshot can't clobber the event.
+export type SnapshotMutation<T> = {
+	deleted: boolean;
+	record: T;
+};
+
 export function upsertById<T extends { id: string }>(list: T[], record: T) {
 	const exists = list.some((r) => r.id === record.id);
 	return {
