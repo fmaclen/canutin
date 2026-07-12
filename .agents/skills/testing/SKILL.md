@@ -17,6 +17,8 @@ In order of preference:
 
 Pick the most-preferred tier the behavior reaches. If a feature is UI-driven, write an E2E even when the bug is in backend-adjacent data code - the E2E proves the end-to-end fix and the lower-level code is covered transitively.
 
+Playwright (`e2e/`) is the only test suite. The Go tests under `pocketbase/` are a narrow, justified exception reserved for behavior that cannot be provoked or observed through any surface Playwright reaches - currently the balance worker's serialization/locking (`balance_test.go`) and the FX fetcher's outbound-response classification against stubbed transports (`rates_test.go`). Each such file carries a top-of-file justification comment explaining why the behavior is unreachable from Playwright, and they run in CI through the Tests workflow alongside the Playwright run. Never add a Go test for behavior a Playwright test could cover.
+
 Top-level commands:
 
 ```bash

@@ -24,7 +24,7 @@ export const DEFAULT_PASSWORD = '123qweasdzxc';
 
 export const PB_URL = process.env.PUBLIC_PB_URL ?? 'http://127.0.0.1:42070';
 const SUPERADMIN_EMAIL = 'superadmin@example.com';
-const DEMO_EMAIL = 'demo@canutin.com';
+export const DEMO_EMAIL = 'demo@canutin.com';
 
 async function getAdminPB() {
 	const pb = new PocketBase(PB_URL) as TypedPocketBase;

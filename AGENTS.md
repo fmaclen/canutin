@@ -39,7 +39,6 @@ Each skill lives at `.agents/skills/<slug>/SKILL.md`.
 | Backend writing conventions in this PocketBase codebase                  | pocketbase        |
 | How tests are organized, written, and run across tiers                   | testing           |
 | How frontend design work should preserve and extend visual quality       | frontend-design   |
-| Write the least code that works: YAGNI, stdlib and native first          | ponytail          |
 
 ### Shipping
 
@@ -47,7 +46,6 @@ Each skill lives at `.agents/skills/<slug>/SKILL.md`.
 | ---------------------------------------------------- | --------------- |
 | How to review code before declaring a milestone done | code-review     |
 | How to commit, push, and open PRs in this repo       | commits-and-prs |
-| Whole-repo audit for over-engineering and bloat      | ponytail-audit  |
 
 ### Operations
 

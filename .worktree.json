@@ -1,8 +1,0 @@
-{
-	"worktree": 1,
-	"branch": "chore/ponytail-audit",
-	"ports": {
-		"vite": 42169,
-		"pocketbase": 42170
-	}
-}
