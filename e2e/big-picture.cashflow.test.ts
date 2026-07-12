@@ -192,6 +192,7 @@ test.describe('big picture cashflow chart', () => {
 			const periodLabel = getExpectedPeriodLabel(monthsAgo);
 			const surplus = formatSurplus(expectedSurplus[monthsAgo]);
 
+			// aria-label format: "{periodLabel}: {surplus}"
 			const ariaLabel = `${periodLabel}: ${surplus}`;
 			await page.getByRole('link', { name: ariaLabel }).hover();
 			await expect(page.getByRole('link', { name: ariaLabel })).toBeVisible();
@@ -265,20 +266,26 @@ test('clicking cashflow chart bar navigates to transactions filtered by that mon
 	await page.goto('/');
 	await signIn(page, elena.email);
 
+	// Click on the target month's bar in the cashflow chart
+	// The bar has aria-label "{periodLabel}: {surplus}" format
 	const expectedSurplus = '$1,000'; // $1,500 income - $500 expense
 	const ariaLabel = `${targetMonthLabel}: ${expectedSurplus}`;
 	await page.getByRole('link', { name: ariaLabel }).click();
 
+	// Should navigate to transactions page with custom date range params
 	await expect(page).toHaveURL(/\/transactions/);
 	await expect(page).toHaveURL(/periodFrom=/);
 	await expect(page).toHaveURL(/periodTo=/);
 
+	// Period filter should show the month label
 	await expect(page.getByLabel('Period')).toContainText(targetMonthLabel);
 
+	// Only transactions from the target month should be visible
 	await expect(page.getByText('Target Month Income')).toBeVisible();
 	await expect(page.getByText('Target Month Expense')).toBeVisible();
 	await expect(page.getByText('Current Month Transaction')).not.toBeVisible();
 
+	// Switch to a preset period - custom URL params should be cleared
 	await page.getByLabel('Period').click();
 	await page.getByRole('button', { name: 'Lifetime' }).click();
 
@@ -287,6 +294,7 @@ test('clicking cashflow chart bar navigates to transactions filtered by that mon
 	await expect(page).not.toHaveURL(/periodTo=/);
 	await expect(page).not.toHaveURL(/periodLabel=/);
 
+	// All transactions should now be visible
 	await expect(page.getByText('Target Month Income')).toBeVisible();
 	await expect(page.getByText('Target Month Expense')).toBeVisible();
 	await expect(page.getByText('Current Month Transaction')).toBeVisible();

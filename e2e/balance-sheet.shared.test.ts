@@ -14,6 +14,7 @@ test('balance sheet groups shared accounts with the recipient own accounts of th
 	const owner = await seedUser('paloma');
 	const recipient = await seedUser('tomas');
 
+	// Recipient has her own brokerage accounts.
 	const recipientOwnAccount = await seedAccount({
 		name: 'IOL (Argentina)',
 		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
@@ -27,6 +28,7 @@ test('balance sheet groups shared accounts with the recipient own accounts of th
 		value: 2500
 	});
 
+	// Owner has a brokerage account and shares it with the recipient.
 	const ownerSharedAccount = await seedAccount({
 		name: 'Diana & Ricardo',
 		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
@@ -63,5 +65,6 @@ test('balance sheet groups shared accounts with the recipient own accounts of th
 	await expect(brokerageRegion.getByRole('link', { name: 'IOL (Argentina)' })).toBeVisible();
 	await expect(brokerageRegion.getByRole('link', { name: 'Diana & Ricardo' })).toBeVisible();
 
+	// Group total must include both accounts.
 	await expect(brokerageRegion).toContainText('$12,500');
 });

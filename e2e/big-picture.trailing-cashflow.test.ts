@@ -10,6 +10,7 @@ test('big picture trailing cashflow', async ({ page }) => {
 	await page.goto('/');
 	await signIn(page, user.email);
 
+	// Default tab is 6M
 	const income = page.getByRole('region', { name: 'Income per month' });
 	const expenses = page.getByRole('region', { name: 'Expenses per month' });
 	const surplus = page.getByRole('region', { name: 'Surplus per month' });
@@ -18,6 +19,7 @@ test('big picture trailing cashflow', async ({ page }) => {
 	await expect(expenses).toContainText('$0');
 	await expect(surplus).toContainText('$0');
 
+	// Seed a cash account and transactions across different trailing windows
 	const creditCardAccount = await seedAccount({
 		name: 'Crescent Classic',
 		balanceGroup: AccountsBalanceGroupOptions.DEBT,

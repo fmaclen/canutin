@@ -161,6 +161,7 @@ test('transactions display edge cases correctly (empty labels, no account name, 
 
 	const now = new UTCDate();
 
+	// Create some transaction labels
 	const groceriesLabel = await seedTransactionLabel({
 		name: 'Groceries',
 		owner: user.id
@@ -170,6 +171,7 @@ test('transactions display edge cases correctly (empty labels, no account name, 
 		owner: user.id
 	});
 
+	// Transaction with no labels (empty array)
 	await seedTransaction({
 		account: account.id,
 		owner: user.id,
@@ -179,6 +181,7 @@ test('transactions display edge cases correctly (empty labels, no account name, 
 		// labels field omitted (will be empty array)
 	});
 
+	// Transaction with multiple labels
 	await seedTransaction({
 		account: account.id,
 		owner: user.id,
@@ -188,6 +191,7 @@ test('transactions display edge cases correctly (empty labels, no account name, 
 		labels: [groceriesLabel.id, personalLabel.id]
 	});
 
+	// Excluded transaction
 	await seedTransaction({
 		account: account.id,
 		owner: user.id,
@@ -201,25 +205,32 @@ test('transactions display edge cases correctly (empty labels, no account name, 
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Transactions');
 
+	// Verify empty labels shows "~"
 	const noLabelsRow = page.getByRole('row', { name: 'No Labels Transaction' });
 	await expect(noLabelsRow).toBeVisible();
 	await expect(noLabelsRow.getByText('~')).toBeVisible();
 
+	// Verify transaction with labels displays all labels as badges
 	const hasLabelsRow = page.getByRole('row', { name: 'Has Labels Transaction' });
 	await expect(hasLabelsRow).toBeVisible();
 	await expect(hasLabelsRow.getByText('Groceries')).toBeVisible();
 	await expect(hasLabelsRow.getByText('Personal')).toBeVisible();
 
+	// Verify account name is displayed as a link
 	await expect(hasLabelsRow.getByRole('link', { name: 'Edge Case Account' })).toBeVisible();
 
+	// Click on account name link and verify navigation to account page
 	await hasLabelsRow.getByRole('link', { name: 'Edge Case Account' }).click();
 	await expect(page).toHaveURL(/\/accounts\//);
+	// Verify we're on the account page by checking for the breadcrumb
 	await expect(
 		page.getByRole('listitem').getByText('Edge Case Account', { exact: true })
 	).toBeVisible();
 
+	// Navigate back to transactions to continue testing
 	await goToPageViaSidebar(page, 'Transactions');
 
+	// Verify excluded transaction has muted styling and dashed underline on amount
 	const excludedRow = page.getByRole('row', { name: 'Excluded Transaction' });
 	await expect(excludedRow).toBeVisible();
 	await expect(excludedRow).toHaveClass(/bg-muted/);
@@ -227,11 +238,13 @@ test('transactions display edge cases correctly (empty labels, no account name, 
 	const excludedAmount = excludedRow.getByText('$300.00');
 	await expect(excludedAmount).toBeVisible();
 
+	// Verify tooltip on excluded amount (only test hover on desktop)
 	const info = test.info();
 	const isMobile = info.project.name?.toLowerCase().includes('mobile') ?? false;
 	// Hover tooltips are unavailable in mobile projects.
 	if (!isMobile) {
 		await excludedAmount.hover();
+		// Tooltip should appear with exact exclusion message
 		await expect(page.getByText('Excluded transactions do not affect reports')).toBeVisible();
 	}
 });
@@ -297,6 +310,7 @@ test('transactions page shows correct count and net balance in summary', async (
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Transactions');
 
+	// Verify all 5 transactions are visible
 	await expect(page.getByText('Freelance Payment')).toBeVisible();
 	await expect(page.getByText('Refund Received')).toBeVisible();
 	await expect(page.getByText('Grocery Shopping')).toBeVisible();
@@ -316,6 +330,8 @@ test('transactions page shows correct count and net balance in summary', async (
 	await expect(summaryRegion.getByText('Net debits')).toBeVisible();
 	await expect(summaryRegion.getByText('-$350.58')).toBeVisible();
 
+	// Change filter to "Credits only"
+	// Expected: count = 2 (excluded credits are shown only by the excluded filter), net balance = $801.25 (500.75 + 300.50)
 	await page.getByLabel('Type').click();
 	await page.getByRole('option', { name: 'Credits only' }).click();
 
@@ -324,6 +340,8 @@ test('transactions page shows correct count and net balance in summary', async (
 	await expect(summaryRegion.getByLabel('Net amount').getByText('$801.25')).toBeVisible();
 	await expect(summaryRegion.getByText('Net credits')).not.toBeVisible();
 
+	// Change filter to "Debits only"
+	// Expected: count = 2, net balance = -$350.58 (-200.25 + -150.33)
 	await page.getByLabel('Type').click();
 	await page.getByRole('option', { name: 'Debits only' }).click();
 
@@ -332,6 +350,8 @@ test('transactions page shows correct count and net balance in summary', async (
 	await expect(summaryRegion.getByLabel('Net amount').getByText('-$350.58')).toBeVisible();
 	await expect(summaryRegion.getByText('Net debits')).not.toBeVisible();
 
+	// Change filter to "Excluded only"
+	// Expected: count = 1, net balance = $0.00 (excluded transactions don't count toward net)
 	await page.getByLabel('Type').click();
 	await page.getByRole('option', { name: 'Excluded only' }).click();
 
