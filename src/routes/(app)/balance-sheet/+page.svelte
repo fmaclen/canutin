@@ -159,10 +159,7 @@
 <Page pageTitle={m.sidebar_balance_sheet()}>
 	<Section>
 		<SectionTitle title={m.balance_sheet_section_balances()} />
-		<div
-			class="grid gap-x-6 gap-y-8 md:grid-cols-2 xl:grid-cols-4"
-			style="--currency-unconverted-color: currentColor; --currency-unconverted-border-width: 0"
-		>
+		<div class="grid gap-x-6 gap-y-8 md:grid-cols-2 xl:grid-cols-4">
 			{#each balanceGroups as balanceGroup (balanceGroup)}
 				<div class="balances-cell flex w-full flex-col gap-3" data-testid={balanceGroup}>
 					<KeyValue
@@ -181,7 +178,6 @@
 								class="bg-background overflow-hidden rounded-sm shadow-md"
 								role="region"
 								aria-label={balanceType.name}
-								style="--currency-unconverted-color: var(--color-muted-foreground); --currency-unconverted-border-width: 1px"
 							>
 								<div class="flex items-center justify-between border-b px-4 py-3.5">
 									<div class="text-sm font-medium">{balanceType.name}</div>

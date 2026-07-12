@@ -57,6 +57,7 @@
 		nativeCurrency?: string;
 		nativeValue?: number;
 		showFxTooltip?: boolean;
+		onColoredSurface?: boolean;
 	}
 
 	let {
@@ -68,8 +69,13 @@
 		missingCurrency = null,
 		nativeCurrency,
 		nativeValue,
-		showFxTooltip = true
+		showFxTooltip = true,
+		onColoredSurface = false
 	}: Props = $props();
+
+	const unconvertedClasses = $derived(
+		onColoredSurface ? 'text-white border-white/66' : 'text-muted-foreground border-border'
+	);
 
 	const formattedValue = $derived.by(() => {
 		if (isUnconverted && nativeCurrency !== undefined && nativeValue !== undefined) {
@@ -94,17 +100,17 @@
 		<Tooltip.Root>
 			<Tooltip.Trigger
 				aria-label={fxLabel}
-				class="currency-unconverted inline-block leading-none hover:border-current"
+				class="{unconvertedClasses} inline-block border-b border-dashed leading-none hover:border-current"
 			>
-				<Number value={formattedValue} sentiment="neutral" />
+				<Number value={formattedValue} {sentiment} />
 			</Tooltip.Trigger>
 			<Tooltip.Content sideOffset={6}>
 				<p class="text-xs leading-snug font-normal">{fxLabel}</p>
 			</Tooltip.Content>
 		</Tooltip.Root>
 	{:else}
-		<span class="currency-unconverted inline-block leading-none">
-			<Number value={formattedValue} sentiment="neutral" />
+		<span class="{unconvertedClasses} inline-block border-b border-dashed leading-none">
+			<Number value={formattedValue} {sentiment} />
 		</span>
 	{/if}
 {:else if isConverted}
@@ -128,10 +134,3 @@
 {:else}
 	<Number value={formattedValue} {sentiment} />
 {/if}
-
-<style>
-	.currency-unconverted {
-		color: var(--currency-unconverted-color, var(--color-muted-foreground));
-		border-bottom: var(--currency-unconverted-border-width, 1px) dashed var(--color-border);
-	}
-</style>

@@ -62,10 +62,7 @@
 	});
 </script>
 
-<div
-	class="grid gap-2 text-white lg:grid-cols-[1.3fr_1fr_1fr]"
-	style="--currency-unconverted-color: currentColor; --currency-unconverted-border-width: 0"
->
+<div class="grid gap-2 text-white lg:grid-cols-[1.3fr_1fr_1fr]">
 	<div
 		class="flex flex-col justify-between rounded-sm bg-stone-700 p-4 shadow-md md:row-span-2"
 		role="region"
@@ -76,7 +73,11 @@
 			{#if totals.netWorth.value === null}
 				<span class="text-white/70">~</span>
 			{:else}
-				<Currency value={totals.netWorth.value} isUnconverted={totals.netWorth.isUnconverted} />
+				<Currency
+					value={totals.netWorth.value}
+					isUnconverted={totals.netWorth.isUnconverted}
+					onColoredSurface
+				/>
 			{/if}
 		</div>
 	</div>

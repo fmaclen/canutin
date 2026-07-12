@@ -30,6 +30,10 @@
 		investment: 'shadow-md bg-investment text-white',
 		other: 'shadow-md bg-other-assets text-white'
 	};
+
+	const onColoredSurface = $derived(
+		variant === 'cash' || variant === 'debt' || variant === 'investment' || variant === 'other'
+	);
 </script>
 
 <div
@@ -46,7 +50,7 @@
 		{:else if format === 'number'}
 			<Number value={value.toLocaleString(getFormattingLocale())} />
 		{:else}
-			<Currency {value} {decimalScale} {isUnconverted} />
+			<Currency {value} {decimalScale} {isUnconverted} {onColoredSurface} />
 		{/if}
 	</div>
 </div>

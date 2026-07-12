@@ -11,7 +11,7 @@
 	"summary_net_gain_percent": "Net gain %",
 	"fx_converted_from": "Converted from {amount}",
 	"fx_includes_converted": "Includes converted amounts",
-	"fx_includes_unconverted": "Includes amounts that could not be converted",
+	"fx_includes_unconverted": "Includes currencies that could not be converted",
 	"fx_no_rate_available": "No exchange rate for {currency} — add a quote or enable automatic updates in Currencies",
 
 	"auth_login_title": "Login",
