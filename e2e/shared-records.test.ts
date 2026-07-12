@@ -769,3 +769,103 @@ test('asset share API rejects self-share and unknown recipient', async () => {
 	);
 	expect(response.status).toBe(200);
 });
+
+test('shared account and asset reconcile after a realtime reconnect without relogin', async ({
+	page
+}) => {
+	const owner = await seedUser('dexter');
+	const recipient = await seedUser('gwen');
+
+	const sharedAccount = await seedAccount({
+		name: 'Reconnect savings',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: owner.id,
+		balanceType: 'Savings'
+	});
+	await seedAccountBalance({
+		account: sharedAccount.id,
+		owner: owner.id,
+		asOf: new Date().toISOString(),
+		value: 4200
+	});
+	const sharedAsset = await seedAsset({
+		name: 'Reconnect brokerage',
+		balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
+		owner: owner.id,
+		balanceType: 'Brokerage'
+	});
+	await seedAssetBalance({
+		asset: sharedAsset.id,
+		owner: owner.id,
+		asOf: new Date().toISOString(),
+		bookValue: 8000,
+		marketValue: 11000
+	});
+
+	// Track the SDK's realtime EventSource so the test can force it to error like a dropped
+	// connection, reproducing a session that misses the share events emitted while disconnected.
+	await page.addInitScript(() => {
+		const NativeEventSource = window.EventSource;
+		const sources: EventSource[] = [];
+		Object.assign(window, { __realtimeSources: sources });
+		window.EventSource = class extends NativeEventSource {
+			constructor(url: string | URL, init?: EventSourceInit) {
+				super(url, init);
+				sources.push(this);
+			}
+		};
+	});
+
+	await page.goto('/');
+	await signIn(page, recipient.email);
+
+	await goToPageViaSidebar(page, 'Accounts');
+	await expect(page.getByRole('row', { name: /Reconnect savings/ })).toHaveCount(0);
+
+	// Hold the realtime connection down while both records are shared, so the create events are
+	// never delivered to this session. Gating the reconnect (rather than aborting it) keeps the SDK
+	// from backing off, so releasing the gate reconnects promptly.
+	let releaseRealtime = () => {};
+	const realtimeGate = new Promise<void>((resolve) => {
+		releaseRealtime = resolve;
+	});
+	await page.route('**/api/realtime', async (route) => {
+		await realtimeGate;
+		await route.continue();
+	});
+	await page.evaluate(() => {
+		const sources = (window as unknown as { __realtimeSources: EventSource[] }).__realtimeSources;
+		for (const source of sources) source.dispatchEvent(new Event('error'));
+	});
+	await Promise.all([
+		seedAccountShare({
+			account: sharedAccount.id,
+			recipient: recipient.id,
+			recipientEmail: recipient.email,
+			grantedBy: owner.id,
+			accessRole: 'VIEWER',
+			perspective: 'NORMAL',
+			includeInNetWorth: true
+		}),
+		seedAssetShare({
+			asset: sharedAsset.id,
+			recipient: recipient.id,
+			recipientEmail: recipient.email,
+			grantedBy: owner.id,
+			accessRole: 'VIEWER',
+			perspective: 'NORMAL',
+			includeInNetWorth: true
+		})
+	]);
+	releaseRealtime();
+
+	// HACK: reconnect reconciliation refetches shares, accounts, and each account's balance in
+	// sequence, which can outrun the default expect timeout under a loaded CI machine; there is no
+	// reconcile-complete signal to await instead.
+	await expect(page.getByRole('row', { name: /Reconnect savings/ })).toContainText('$4,200.00', {
+		timeout: 15000
+	});
+
+	await goToPageViaSidebar(page, 'Assets');
+	await expect(page.getByRole('row', { name: /Reconnect brokerage/ })).toBeVisible();
+});
