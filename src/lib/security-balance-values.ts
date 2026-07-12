@@ -64,10 +64,7 @@ export function sentiment(value: number | null) {
 	return value > 0 ? 'positive' : 'negative';
 }
 
-export function compareSecurityBalanceRecency(
-	a: SecurityBalanceValueInput,
-	b: SecurityBalanceValueInput
-) {
+function compareSecurityBalanceRecency(a: SecurityBalanceValueInput, b: SecurityBalanceValueInput) {
 	const asOfCompare = compareDesc(new Date(a.asOf), new Date(b.asOf));
 	if (asOfCompare !== 0) return asOfCompare;
 	const createdCompare = compareDesc(new Date(a.created), new Date(b.created));

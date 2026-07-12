@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { UTCDate } from '@date-fns/utc';
+	import { startOfDay } from 'date-fns';
 	import { ClientResponseError } from 'pocketbase';
 	import { toast } from 'svelte-sonner';
 
@@ -45,13 +47,6 @@
 		const nextCode = target.value.toUpperCase();
 		target.value = nextCode;
 		code = nextCode;
-	}
-
-	function todayUtcIso() {
-		const now = new Date();
-		return new Date(
-			Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
-		).toISOString();
 	}
 
 	function handleCurrencyCreateError(error: unknown) {
@@ -106,7 +101,7 @@
 				await pb.authedClient.collection('exchangeRates').create({
 					owner: currentOwnerId,
 					currency: currencyCode,
-					date: todayUtcIso(),
+					date: startOfDay(new UTCDate()).toISOString(),
 					rate: rateValue
 				});
 			} catch (error) {

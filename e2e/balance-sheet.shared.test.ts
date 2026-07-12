@@ -57,8 +57,7 @@ test('balance sheet groups shared accounts with the recipient own accounts of th
 
 	const investments = page.getByTestId('INVESTMENT');
 
-	// Both accounts should appear inside a single "Brokerage" region instead of
-	// splitting owner-vs-recipient balance types into two duplicate sections.
+	// Ownership must not split the same balance type into duplicate groups.
 	const brokerageRegions = investments.getByRole('region', { name: 'Brokerage' });
 	await expect(brokerageRegions).toHaveCount(1);
 

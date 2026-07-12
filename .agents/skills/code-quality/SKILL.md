@@ -21,16 +21,13 @@ When a touched file already contains an instance of the rule you are now applyin
 
 ## Comments
 
-- Self-documenting code first - clear names and structure beat narration
-- Only durable comments - non-obvious rules, constraints, workarounds, tradeoffs
-- Prefix intentional comments so cleanup passes can tell them from disposable narration:
-- `NOTE:` important context, rules, or constraints that are easy to miss
-- `HACK:` deliberate workarounds or temporary compromises
-- `TODO:` planned follow-up work that is intentionally deferred
-- `FIXME:` known broken or risky behavior that still needs correction
-- For multiline intentional comments, prefix only the first line; continuation lines use plain `//`
+- Comments are notes to the repo's future readers - humans and agents alike. Write them as if the change that produced them never happened
+- Add short comments on complex or non-obvious logic describing its intent. Tests especially: step comments that walk the reader through what each phase of a test does and why are welcome - they make test intent scannable
+- Never write session narration - comments that only make sense in the context of the change or conversation that produced them ("removed the old handler", "now uses X", "as requested"). If a comment describes the diff rather than the code, it belongs in the PR, not the repo
+- Deleting an existing comment needs a stronger reason than adding one: only delete it when it is wrong, stale, or references a past editing session. "It restates the code" is not reason enough - what reads as obvious to the author is often the fastest path into the test for the next reader
+- No prefix required - a plain comment is a note by default. Two flags remain useful when they apply: `HACK:` for deliberate workarounds or temporary compromises, `TODO:` for intentionally deferred follow-up work
 - Keep pragma/framework comments in their required syntax when tooling depends on them
-- Update or delete stale comments when the code changes
+- Update or delete stale comments when the code changes; a comment's usefulness to a future reader is the only test for keeping it
 
 ## Structure
 

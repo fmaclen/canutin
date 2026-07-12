@@ -17,6 +17,12 @@ jobs:
           go-version: '1.25'
           cache-dependency-path: pocketbase/go.sum
 
+      - name: Run Go tests
+        working-directory: pocketbase
+        run: |
+          go vet ./...
+          go test ./...
+
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:

@@ -30,26 +30,6 @@ type Trade = SecurityTransactionsResponse<number, number, number, number, TradeE
 
 export type TradeTypeFilter = 'all' | SecurityTransactionsTypeOptions;
 
-export type TradeRow = {
-	id: string;
-	date: Date;
-	dateValue: number;
-	securityId: string | null;
-	securityName: string;
-	securitySymbol: string | null;
-	securityCurrency: string;
-	type: SecurityTransactionsTypeOptions;
-	subtype: string;
-	description: string;
-	accountId: string | null;
-	accountName: string;
-	accountIsShared: boolean;
-	quantity: number | null;
-	price: number | null;
-	amount: number | null;
-	fees: number | null;
-};
-
 class TradesContext {
 	period: PeriodOption = $state('last-3-months');
 	search: string = $state('');
@@ -656,12 +636,10 @@ class TradesContext {
 	}
 }
 
-const CONTEXT_KEY_TRADES = 'trades';
-
 export function setTradesContext(pb: PocketBaseContext) {
-	return setContext(CONTEXT_KEY_TRADES, new TradesContext(pb));
+	return setContext('trades', new TradesContext(pb));
 }
 
 export function getTradesContext() {
-	return getContext<ReturnType<typeof setTradesContext>>(CONTEXT_KEY_TRADES);
+	return getContext<ReturnType<typeof setTradesContext>>('trades');
 }

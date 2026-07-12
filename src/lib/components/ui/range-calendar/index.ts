@@ -7,7 +7,6 @@ import GridRow from './range-calendar-grid-row.svelte';
 import Grid from './range-calendar-grid.svelte';
 import HeadCell from './range-calendar-head-cell.svelte';
 import Header from './range-calendar-header.svelte';
-import Heading from './range-calendar-heading.svelte';
 import MonthSelect from './range-calendar-month-select.svelte';
 import Month from './range-calendar-month.svelte';
 import Months from './range-calendar-months.svelte';
@@ -27,7 +26,6 @@ export {
 	Header,
 	Months,
 	GridRow,
-	Heading,
 	GridBody,
 	GridHead,
 	HeadCell,

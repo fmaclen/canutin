@@ -24,15 +24,15 @@ export const DEFAULT_PASSWORD = '123qweasdzxc';
 
 export const PB_URL = process.env.PUBLIC_PB_URL ?? 'http://127.0.0.1:42070';
 const SUPERADMIN_EMAIL = 'superadmin@example.com';
-const DEMO_EMAIL = process.env.PUBLIC_DEMO_EMAIL ?? 'demo@canutin.com';
+export const DEMO_EMAIL = 'demo@canutin.com';
 
-async function getAdminPB(): Promise<TypedPocketBase> {
+async function getAdminPB() {
 	const pb = new PocketBase(PB_URL) as TypedPocketBase;
 	await pb.collection('_superusers').authWithPassword(SUPERADMIN_EMAIL, DEFAULT_PASSWORD);
 	return pb;
 }
 
-export async function getUserPB(email: string): Promise<TypedPocketBase> {
+export async function getUserPB(email: string) {
 	const pb = new PocketBase(PB_URL) as TypedPocketBase;
 	await pb.collection('users').authWithPassword(email, DEFAULT_PASSWORD);
 	return pb;
@@ -313,18 +313,12 @@ export async function seedPortfolio(
 	};
 }
 
-export async function updateAsset(
-	id: string,
-	updates: Partial<AssetsRecord>
-): Promise<AssetsRecord> {
+export async function updateAsset(id: string, updates: Partial<AssetsRecord>) {
 	const pb = await getAdminPB();
 	return await pb.collection('assets').update(id, updates);
 }
 
-export async function updateAccount(
-	id: string,
-	updates: Partial<AccountsRecord>
-): Promise<AccountsRecord> {
+export async function updateAccount(id: string, updates: Partial<AccountsRecord>) {
 	const pb = await getAdminPB();
 	return await pb.collection('accounts').update(id, updates);
 }
@@ -379,7 +373,7 @@ export async function seedAssetShare(shareInput: {
 	return await pb.collection('assetShares').create(shareInput);
 }
 
-export async function recordExists(collection: string, id: string): Promise<boolean> {
+export async function recordExists(collection: string, id: string) {
 	const pb = await getAdminPB();
 	try {
 		await pb.collection(collection).getOne(id);

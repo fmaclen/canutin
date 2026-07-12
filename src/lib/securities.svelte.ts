@@ -576,12 +576,10 @@ class SecuritiesContext {
 	}
 }
 
-export const CONTEXT_KEY_SECURITIES = 'securities';
-
 export function setSecuritiesContext(pb: PocketBaseContext) {
-	return setContext(CONTEXT_KEY_SECURITIES, new SecuritiesContext(pb));
+	return setContext('securities', new SecuritiesContext(pb));
 }
 
 export function getSecuritiesContext() {
-	return getContext<ReturnType<typeof setSecuritiesContext>>(CONTEXT_KEY_SECURITIES);
+	return getContext<ReturnType<typeof setSecuritiesContext>>('securities');
 }

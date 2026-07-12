@@ -175,7 +175,7 @@ test('owner creates account share via UI and recipient sees it with NORMAL persp
 	await goToRecordDetail(page, 'Accounts', 'Joint savings');
 	await goToEditTab(page);
 	await page.getByLabel('Email').fill(recipient.email);
-	// Perspective defaults to NORMAL; no need to change it
+	// Leaving perspective untouched exercises its NORMAL default.
 	await page.getByRole('button', { name: 'Share', exact: true }).click();
 
 	await expect(page.getByText('Share created')).toBeVisible();

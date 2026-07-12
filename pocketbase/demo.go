@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	demoDefaultEmail    = "demo@canutin.com"
-	demoDefaultPassword = "123qweasdzxc"
+	demoEmail    = "demo@canutin.com"
+	demoPassword = "123qweasdzxc"
 )
 
 // demoWipeCollections lists demo-owned rows that must be wiped, child-before-parent, so deletes
@@ -38,39 +38,20 @@ func demoEnabled() bool {
 	return os.Getenv("PUBLIC_DEMO_ENABLED") == "true"
 }
 
-func demoEmail() string {
-	if v := os.Getenv("PUBLIC_DEMO_EMAIL"); v != "" {
-		return v
-	}
-	return demoDefaultEmail
-}
-
-func demoPassword() string {
-	if v := os.Getenv("PUBLIC_DEMO_PASSWORD"); v != "" {
-		return v
-	}
-	return demoDefaultPassword
-}
-
 func ensureDemoUser(app core.App) (string, error) {
-	user, err := app.FindAuthRecordByEmail("users", demoEmail())
-	if err == nil {
-		if _, _, err := ensureCurrencyRecord(app, user.Id, "USD", "", false); err != nil {
+	user, err := app.FindAuthRecordByEmail("users", demoEmail)
+	if err != nil {
+		coll, err := app.FindCollectionByNameOrId("users")
+		if err != nil {
 			return "", err
 		}
-		return user.Id, nil
-	}
-
-	coll, err := app.FindCollectionByNameOrId("users")
-	if err != nil {
-		return "", err
-	}
-	user = core.NewRecord(coll)
-	user.SetEmail(demoEmail())
-	user.SetPassword(demoPassword())
-	user.SetVerified(true)
-	if err := app.Save(user); err != nil {
-		return "", err
+		user = core.NewRecord(coll)
+		user.SetEmail(demoEmail)
+		user.SetPassword(demoPassword)
+		user.SetVerified(true)
+		if err := app.Save(user); err != nil {
+			return "", err
+		}
 	}
 	if _, _, err := ensureCurrencyRecord(app, user.Id, "USD", "", false); err != nil {
 		return "", err

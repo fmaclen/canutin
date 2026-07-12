@@ -20,6 +20,30 @@ import (
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
 )
 
+func deleteCurrencyExchangeRates(e *core.RecordEvent) error {
+	owner := e.Record.GetString("owner")
+	code := e.Record.GetString("code")
+	for {
+		quotes, err := e.App.FindRecordsByFilter("exchangeRates",
+			"owner = {:owner} && currency = {:currency}",
+			"", 100, 0,
+			map[string]any{"owner": owner, "currency": code},
+		)
+		if err != nil {
+			return fmt.Errorf("find manual quotes for deleted currency: %w", err)
+		}
+		if len(quotes) == 0 {
+			break
+		}
+		for _, quote := range quotes {
+			if err := e.App.Delete(quote); err != nil {
+				return fmt.Errorf("delete manual quote for deleted currency: %w", err)
+			}
+		}
+	}
+	return e.Next()
+}
+
 func main() {
 	app := pocketbase.New()
 
@@ -185,29 +209,7 @@ func main() {
 		return e.Next()
 	})
 
-	app.OnRecordAfterDeleteSuccess("currencies").BindFunc(func(e *core.RecordEvent) error {
-		owner := e.Record.GetString("owner")
-		code := e.Record.GetString("code")
-		for {
-			quotes, err := e.App.FindRecordsByFilter("exchangeRates",
-				"owner = {:owner} && currency = {:currency}",
-				"", 100, 0,
-				map[string]any{"owner": owner, "currency": code},
-			)
-			if err != nil {
-				return fmt.Errorf("find manual quotes for deleted currency: %w", err)
-			}
-			if len(quotes) == 0 {
-				break
-			}
-			for _, quote := range quotes {
-				if err := e.App.Delete(quote); err != nil {
-					return fmt.Errorf("delete manual quote for deleted currency: %w", err)
-				}
-			}
-		}
-		return e.Next()
-	})
+	app.OnRecordAfterDeleteSuccess("currencies").BindFunc(deleteCurrencyExchangeRates)
 
 	// NOTE: currency is a required text field, but PocketBase text fields cannot declare a
 	// schema-level default, so an empty currency defaults to USD here — the single enforcement
@@ -335,7 +337,7 @@ func main() {
 		// also fire would race that recompute (appending a duplicate snapshot) and run against
 		// import-created accounts cascade-deleted in the same revert. importSession alone is permanent,
 		// so a user deleting a single imported transaction outside revert must still enqueue.
-		if isSessionReverting(e.Record.GetString("importSession")) {
+		if _, reverting := revertingSessions.Load(e.Record.GetString("importSession")); reverting {
 			return e.Next()
 		}
 		if aid := e.Record.GetString("account"); aid != "" {

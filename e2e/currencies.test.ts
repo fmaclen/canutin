@@ -427,8 +427,7 @@ test('currency delete blocks in-use currencies and removes unused quotes', async
 	await expect(page.getByText('Currency is in use')).toBeVisible();
 	await expect(page).toHaveURL(`/currencies/${guardedCurrency.id}/edit`);
 
-	// The blocked delete leaves the confirmation dialog open; dismiss it before navigating on,
-	// same as a real user would.
+	// NOTE: blocked delete leaves the confirmation dialog open; dismiss it
 	await guardedDialog.getByRole('button').first().click();
 	await expect(guardedDialog).not.toBeVisible();
 

@@ -215,15 +215,13 @@ class ExchangeRatesContext {
 	}
 }
 
-export const CONTEXT_KEY_EXCHANGE_RATES = 'exchange-rates';
-
 export function setExchangeRatesContext(
 	pb: PocketBaseContext,
 	currencies: ReturnType<typeof setCurrenciesContext>
 ) {
-	return setContext(CONTEXT_KEY_EXCHANGE_RATES, new ExchangeRatesContext(pb, currencies));
+	return setContext('exchange-rates', new ExchangeRatesContext(pb, currencies));
 }
 
 export function getExchangeRatesContext() {
-	return getContext<ReturnType<typeof setExchangeRatesContext>>(CONTEXT_KEY_EXCHANGE_RATES);
+	return getContext<ReturnType<typeof setExchangeRatesContext>>('exchange-rates');
 }

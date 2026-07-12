@@ -1,18 +1,8 @@
 import { expect, test } from '@playwright/test';
-import { addDays, setHours, startOfMonth, subMonths } from 'date-fns';
 
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
-import { signIn } from './playwright.helpers';
+import { isoMidOfMonthMonthsAgo, signIn } from './playwright.helpers';
 import { seedAccount, seedTransaction, seedUser } from './pocketbase.helpers';
-
-// Pick the 15th at local noon for stable month inclusion across timezones
-function isoMidOfMonthMonthsAgo(monthsAgo: number) {
-	const startThisMonth = startOfMonth(new Date());
-	const targetStart = subMonths(startThisMonth, monthsAgo);
-	const mid = addDays(targetStart, 14); // 15th
-	const atNoon = setHours(mid, 12); // reduce DST/zone edge cases
-	return atNoon.toISOString();
-}
 
 test('big picture trailing cashflow', async ({ page }) => {
 	const user = await seedUser('daphne');
@@ -48,7 +38,8 @@ test('big picture trailing cashflow', async ({ page }) => {
 	const when5M = isoMidOfMonthMonthsAgo(5);
 	const when11M = isoMidOfMonthMonthsAgo(11);
 
-	// In last month (counts in 3M/6M/1Y): income 1200, expense -600
+	// Transactions span the 3M, 6M, and 1Y windows across both account kinds.
+	// M-1 contributes $1,200 income and $600 expenses to every window.
 	await seedTransaction({
 		account: creditCardAccount.id,
 		owner: user.id,
@@ -64,7 +55,7 @@ test('big picture trailing cashflow', async ({ page }) => {
 		value: -600
 	});
 
-	// In 5 months ago (counts in 6M/1Y only): income 300, expense -150
+	// M-5 contributes $300 income and $150 expenses only to 6M and 1Y.
 	await seedTransaction({
 		account: autoCalculatedAccount.id,
 		owner: user.id,
@@ -80,7 +71,7 @@ test('big picture trailing cashflow', async ({ page }) => {
 		value: -150
 	});
 
-	// In 11 months ago (counts in 1Y only): income 600, expense -300
+	// M-11 contributes $600 income and $300 expenses only to 1Y.
 	await seedTransaction({
 		account: autoCalculatedAccount.id,
 		owner: user.id,
@@ -96,19 +87,18 @@ test('big picture trailing cashflow', async ({ page }) => {
 		value: -300
 	});
 
-	// Expected averages (6M window totals: income 1500, expenses -750)
-	// -> per month: income $250, expenses $125, surplus $125
+	// 6M totals average to $250 income, $125 expenses, and $125 surplus.
 	await expect(income).toContainText('$250');
 	await expect(expenses).toContainText('$125');
 	await expect(surplus).toContainText('$125');
 
-	// Switch to 3M tab and verify averages scale accordingly
+	// 3M includes only M-1, averaging $400 income and $200 expenses.
 	await page.getByRole('tab', { name: '3M' }).click();
 	await expect(income).toContainText('$400');
 	await expect(expenses).toContainText('$200');
 	await expect(surplus).toContainText('$200');
 
-	// Switch to 1Y tab and verify 12-month averages
+	// 1Y includes every seed window, averaging $175 income and $88 expenses.
 	await page.getByRole('tab', { name: '1Y' }).click();
 	await expect(income).toContainText('$175');
 	await expect(expenses).toContainText('$88');

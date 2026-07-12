@@ -1,5 +1,10 @@
 package main
 
+// The test suite for this repo is Playwright (e2e/). These Go tests exist only to prove the
+// serialization and locking behavior of the in-process balance worker - concurrency interleavings
+// that cannot be provoked or observed through the HTTP surface Playwright reaches. Do not add Go
+// tests here for anything a Playwright test could cover.
+
 import (
 	"sync"
 	"testing"

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { getBalanceGroupMeta } from '$lib/account-utils';
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAssetsContext } from '$lib/assets.svelte';
 	import Currency from '$lib/components/currency.svelte';
@@ -18,27 +19,8 @@
 	const assetsContext = getAssetsContext();
 
 	const balanceGroups: BalanceGroup[] = ['CASH', 'DEBT', 'INVESTMENT', 'OTHER'];
+	const balanceGroupMeta = getBalanceGroupMeta();
 	const isLoading = $derived(accountsContext.isLoading || assetsContext.isLoading);
-
-	function groupTitle(group: BalanceGroup) {
-		return group === 'CASH'
-			? 'Cash'
-			: group === 'DEBT'
-				? 'Debt'
-				: group === 'INVESTMENT'
-					? 'Investments'
-					: 'Other assets';
-	}
-
-	function groupVariant(group: BalanceGroup) {
-		return group === 'CASH'
-			? 'cash'
-			: group === 'DEBT'
-				? 'debt'
-				: group === 'INVESTMENT'
-					? 'investment'
-					: 'other';
-	}
 
 	// NOTE: accounts/assets already carry their own display-currency conversion
 	// (displayBalance/displayMarketValue + isConverted/isUnconverted); this just groups and
@@ -163,9 +145,9 @@
 			{#each balanceGroups as balanceGroup (balanceGroup)}
 				<div class="balances-cell flex w-full flex-col gap-3" data-testid={balanceGroup}>
 					<KeyValue
-						title={groupTitle(balanceGroup)}
+						title={balanceGroupMeta[balanceGroup].label}
 						value={grouped[balanceGroup].total}
-						variant={groupVariant(balanceGroup)}
+						variant={balanceGroupMeta[balanceGroup].variant}
 						isUnconverted={grouped[balanceGroup].isUnconverted}
 					/>
 					{#if isLoading}

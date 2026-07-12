@@ -6,11 +6,6 @@ const PB_PORT = Number(process.env.PB_PORT ?? 42070);
 const VITE_PORT = Number(process.env.VITE_PREVIEW_PORT ?? process.env.VITE_PORT ?? 42069);
 const BASE_URL = `http://localhost:${VITE_PORT}`;
 
-export enum Projects {
-	DESKTOP_CHROMIUM = 'desktop',
-	MOBILE_WEBKIT = 'mobile'
-}
-
 export default defineConfig({
 	globalSetup: 'e2e/global.setup.ts',
 	webServer: [
@@ -30,9 +25,7 @@ export default defineConfig({
 			env: {
 				...process.env,
 				PUBLIC_PLAYWRIGHT_TESTING: 'true',
-				PUBLIC_DEMO_ENABLED: 'true',
-				PUBLIC_DEMO_EMAIL: 'demo@canutin.com',
-				PUBLIC_DEMO_PASSWORD: '123qweasdzxc'
+				PUBLIC_DEMO_ENABLED: 'true'
 			}
 		}
 	],
@@ -40,7 +33,7 @@ export default defineConfig({
 	retries: isCI ? 2 : 0,
 	projects: [
 		{
-			name: Projects.DESKTOP_CHROMIUM,
+			name: 'desktop',
 			use: {
 				...devices['Desktop Chrome'],
 				baseURL: BASE_URL,
@@ -49,7 +42,7 @@ export default defineConfig({
 			}
 		},
 		{
-			name: Projects.MOBILE_WEBKIT,
+			name: 'mobile',
 			use: {
 				...devices['iPhone 13'],
 				baseURL: BASE_URL,

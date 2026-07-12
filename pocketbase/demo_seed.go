@@ -193,11 +193,6 @@ func demoISODate(t time.Time) string {
 	return t.UTC().Format("2006-01-02")
 }
 
-func demoStartOfMonth(t time.Time) time.Time {
-	y, m, _ := t.Date()
-	return time.Date(y, m, 1, 0, 0, 0, 0, t.Location())
-}
-
 // demoSubMonths mirrors date-fns subMonths: subtract whole calendar months, then clamp the day to
 // the target month's last valid day. Go's time.AddDate normalizes overflow forward instead (e.g.
 // March 31 minus one month becomes March 3, not Feb 28), which skips a month bucket whenever the
@@ -214,7 +209,9 @@ func demoSubMonths(t time.Time, months int) time.Time {
 }
 
 func demoMonthStart(monthsAgo int, reference time.Time) time.Time {
-	return demoStartOfMonth(demoSubMonths(reference, monthsAgo))
+	t := demoSubMonths(reference, monthsAgo)
+	y, m, _ := t.Date()
+	return time.Date(y, m, 1, 0, 0, 0, 0, t.Location())
 }
 
 func demoMonthsAgo(monthsAgo int, reference time.Time) string {

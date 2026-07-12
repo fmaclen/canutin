@@ -241,6 +241,7 @@ test('transactions display edge cases correctly (empty labels, no account name, 
 	// Verify tooltip on excluded amount (only test hover on desktop)
 	const info = test.info();
 	const isMobile = info.project.name?.toLowerCase().includes('mobile') ?? false;
+	// Hover tooltips are unavailable in mobile projects.
 	if (!isMobile) {
 		await excludedAmount.hover();
 		// Tooltip should appear with exact exclusion message
@@ -266,13 +267,8 @@ test('transactions page shows correct count and net balance in summary', async (
 
 	const now = new UTCDate();
 
-	// Seed 5 transactions:
-	// - 2 credits: +500.75, +300.50 = +801.25
-	// - 2 debits: -200.25, -150.33 = -350.58
-	// - 1 excluded credit: +1000 (should not affect net balance)
-	// Expected count: 5
-	// Expected net balance: 500.75 + 300.50 - 200.25 - 150.33 = 450.67
-
+	// Included credits total $801.25 and debits total -$350.58.
+	// The excluded $1,000 credit appears in the table but contributes nothing to net amount.
 	await seedTransaction({
 		account: account.id,
 		owner: user.id,
@@ -321,15 +317,14 @@ test('transactions page shows correct count and net balance in summary', async (
 	await expect(page.getByText('Utility Bill')).toBeVisible();
 	await expect(page.getByText('Excluded Transfer')).toBeVisible();
 
-	// Verify summary shows correct count and net balance
+	// Five rows render, while only included rows produce the $450.67 net amount.
 	const summaryRegion = page.getByRole('region', { name: 'Transactions summary' });
 	await expect(summaryRegion.getByText('Transactions')).toBeVisible();
 	await expect(summaryRegion.getByText('5', { exact: true })).toBeVisible();
 	await expect(summaryRegion.getByText('Net amount')).toBeVisible();
 	await expect(summaryRegion.getByText('$450.67')).toBeVisible();
 
-	// Credits and debits cards both render under the "all" filter, the only state
-	// where both totals are uniquely visible: credits +801.25, debits -350.58
+	// Both component totals are useful only while the unfiltered net combines them.
 	await expect(summaryRegion.getByText('Net credits')).toBeVisible();
 	await expect(summaryRegion.getByText('$801.25')).toBeVisible();
 	await expect(summaryRegion.getByText('Net debits')).toBeVisible();
@@ -340,9 +335,9 @@ test('transactions page shows correct count and net balance in summary', async (
 	await page.getByLabel('Type').click();
 	await page.getByRole('option', { name: 'Credits only' }).click();
 
+	// Credits-only hides the redundant credit subtotal.
 	await expect(summaryRegion.getByText('2', { exact: true })).toBeVisible();
 	await expect(summaryRegion.getByLabel('Net amount').getByText('$801.25')).toBeVisible();
-	// Net credits is hidden under the credits filter: it equals Net amount, so it's redundant
 	await expect(summaryRegion.getByText('Net credits')).not.toBeVisible();
 
 	// Change filter to "Debits only"
@@ -350,9 +345,9 @@ test('transactions page shows correct count and net balance in summary', async (
 	await page.getByLabel('Type').click();
 	await page.getByRole('option', { name: 'Debits only' }).click();
 
+	// Debits-only hides the redundant debit subtotal.
 	await expect(summaryRegion.getByText('2', { exact: true })).toBeVisible();
 	await expect(summaryRegion.getByLabel('Net amount').getByText('-$350.58')).toBeVisible();
-	// Net debits is hidden under the debits filter: it equals Net amount, so it's redundant
 	await expect(summaryRegion.getByText('Net debits')).not.toBeVisible();
 
 	// Change filter to "Excluded only"
@@ -360,9 +355,9 @@ test('transactions page shows correct count and net balance in summary', async (
 	await page.getByLabel('Type').click();
 	await page.getByRole('option', { name: 'Excluded only' }).click();
 
+	// Excluded-only shows one row but a zero net; neither included subtotal applies.
 	await expect(summaryRegion.getByText('1', { exact: true })).toBeVisible();
 	await expect(summaryRegion.getByText('$0.00')).toBeVisible();
-	// Both cards are hidden under the excluded filter: their predicates require non-excluded rows
 	await expect(summaryRegion.getByText('Net credits')).not.toBeVisible();
 	await expect(summaryRegion.getByText('Net debits')).not.toBeVisible();
 });

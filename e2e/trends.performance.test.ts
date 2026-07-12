@@ -245,7 +245,7 @@ test('trends performance table', async ({ page }) => {
 	const netCells = netRow.getByRole('cell');
 	await expect(netCells).toHaveCount(10, { timeout: 10000 });
 
-	// Volatile periods: just verify they render (percentage button or ~ placeholder)
+	// Volatile periods only need to render a percentage or placeholder.
 	for (const i of [1, 2, 3, 4, 5]) {
 		const cell = netCells.nth(i);
 		await expect(cell.getByRole('button').or(cell.getByText('~'))).toBeVisible();

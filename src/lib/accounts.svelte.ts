@@ -538,15 +538,13 @@ class AccountsContext {
 	}
 }
 
-export const CONTEXT_KEY_ACCOUNTS = 'accounts';
-
 export function setAccountsContext(
 	pb: PocketBaseContext,
 	balanceTypesContext: ReturnType<typeof setBalanceTypesContext>
 ) {
-	return setContext(CONTEXT_KEY_ACCOUNTS, new AccountsContext(pb, balanceTypesContext));
+	return setContext('accounts', new AccountsContext(pb, balanceTypesContext));
 }
 
 export function getAccountsContext() {
-	return getContext<ReturnType<typeof setAccountsContext>>(CONTEXT_KEY_ACCOUNTS);
+	return getContext<ReturnType<typeof setAccountsContext>>('accounts');
 }

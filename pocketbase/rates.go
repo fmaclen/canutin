@@ -296,9 +296,6 @@ func autoUpdatedCurrencyCodes(app core.App) ([]string, error) {
 	seen := map[string]struct{}{}
 	for _, rec := range records {
 		code := rec.GetString("code")
-		if code == "" || code == "USD" {
-			continue
-		}
 		seen[code] = struct{}{}
 	}
 	codes := make([]string, 0, len(seen))
@@ -392,9 +389,6 @@ func fetchUSDRate(currency, date string) (float64, error) {
 			return 0, fmt.Errorf("%w: no %s rate for %s", errFXCodeUnavailable, currency, date)
 		}
 		return value, nil
-	}
-	if fetchErr == nil {
-		fetchErr = errFXRequestFailed
 	}
 	return 0, fetchErr
 }

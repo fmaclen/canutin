@@ -19,30 +19,15 @@ function error(msg: string) {
 	console.error(`[pocketbase] ERROR: ${msg}`);
 }
 
-type Platform = 'darwin' | 'linux' | 'windows';
-
-function getPlatform(): Platform {
-	switch (process.platform) {
-		case 'darwin':
-			return 'darwin';
-		case 'linux':
-			return 'linux';
-		case 'win32':
-			return 'windows';
-		default:
-			throw new Error(`Unsupported platform: ${process.platform}`);
-	}
+function getBinaryName() {
+	return process.platform === 'win32' ? 'pocketbase-custom.exe' : 'pocketbase-custom';
 }
 
-function getBinaryName(): string {
-	return getPlatform() === 'windows' ? 'pocketbase-custom.exe' : 'pocketbase-custom';
-}
-
-function getBinaryPath(): string {
+function getBinaryPath() {
 	return path.join(pbDir, getBinaryName());
 }
 
-function goModHash(): string | null {
+function goModHash() {
 	try {
 		const goMod = path.join(pbDir, 'go.mod');
 		if (!existsSync(goMod)) return null;
@@ -63,7 +48,7 @@ function goModHash(): string | null {
 	}
 }
 
-function readBuildHash(): string | null {
+function readBuildHash() {
 	try {
 		const hashFile = path.join(pbDir, '.build-hash');
 		if (!existsSync(hashFile)) return null;
@@ -73,7 +58,7 @@ function readBuildHash(): string | null {
 	}
 }
 
-function writeBuildHash(hash: string): void {
+function writeBuildHash(hash: string) {
 	try {
 		const hashFile = path.join(pbDir, '.build-hash');
 		writeFileSync(hashFile, hash);
@@ -82,7 +67,7 @@ function writeBuildHash(hash: string): void {
 	}
 }
 
-function buildPocketBase(): void {
+function buildPocketBase() {
 	log('Building custom PocketBase binary...');
 	const res = spawnSync('go', ['build', '-o', getBinaryName()], {
 		cwd: pbDir,
@@ -97,7 +82,7 @@ function buildPocketBase(): void {
 	log('Build complete.');
 }
 
-async function ensurePocketBase(): Promise<string> {
+async function ensurePocketBase() {
 	const binPath = getBinaryPath();
 	const currentHash = goModHash();
 	const savedHash = readBuildHash();
@@ -126,7 +111,7 @@ async function ensurePocketBase(): Promise<string> {
 	return binPath;
 }
 
-async function startPocketBase(binPath: string): Promise<void> {
+async function startPocketBase(binPath: string) {
 	const host = process.env.PB_HOST || '127.0.0.1';
 	const port = Number(process.env.PB_PORT || 42070);
 	const httpAddr = `${host}:${port}`;
@@ -155,7 +140,7 @@ async function startPocketBase(binPath: string): Promise<void> {
 	});
 }
 
-function runMigrations(binPath: string): void {
+function runMigrations(binPath: string) {
 	log('Running database migrations...');
 	const res = spawnSync(binPath, ['migrate', 'up'], {
 		cwd: pbDir,
@@ -167,7 +152,7 @@ function runMigrations(binPath: string): void {
 	}
 }
 
-async function upsertSuperuser(binPath: string): Promise<void> {
+async function upsertSuperuser(binPath: string) {
 	const email = process.env.PB_SUPERUSER_EMAIL || 'superadmin@example.com';
 	const password = process.env.PB_SUPERUSER_PASSWORD || '123qweasdzxc';
 
@@ -182,7 +167,7 @@ async function upsertSuperuser(binPath: string): Promise<void> {
 	}
 }
 
-function getTypegenBin(): string {
+function getTypegenBin() {
 	const bin = process.platform === 'win32' ? 'pocketbase-typegen.cmd' : 'pocketbase-typegen';
 	const candidate = path.join(projectRoot, 'node_modules', '.bin', bin);
 	if (!existsSync(candidate)) {
@@ -193,7 +178,7 @@ function getTypegenBin(): string {
 	return candidate;
 }
 
-function generateTypesFromServer(): number {
+function generateTypesFromServer() {
 	const typegen = getTypegenBin();
 	const host = process.env.PB_HOST || '127.0.0.1';
 	const port = Number(process.env.PB_PORT || 42070);
@@ -210,7 +195,7 @@ function generateTypesFromServer(): number {
 	return res.status ?? 1;
 }
 
-async function generateTypesWithRetry(retries = 20, delayMs = 750): Promise<void> {
+async function generateTypesWithRetry(retries = 20, delayMs = 750) {
 	for (let i = 0; i < retries; i++) {
 		const status = generateTypesFromServer();
 		if (status === 0) return;
@@ -219,7 +204,7 @@ async function generateTypesWithRetry(retries = 20, delayMs = 750): Promise<void
 	throw new Error('Failed to generate PocketBase types after multiple attempts.');
 }
 
-function watchMigrationsAndTypegen(): void {
+function watchMigrationsAndTypegen() {
 	if (!existsSync(migrationsDir)) {
 		log('No migrations directory found to watch for typegen updates.');
 		return;

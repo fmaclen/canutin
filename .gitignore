@@ -40,3 +40,6 @@ SCRATCHPAD.md
 # Local coding agent package manager noise
 .agents/package.json
 .agents/package-lock.json
+
+# Worktree-local config
+.worktree.json

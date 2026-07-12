@@ -3,11 +3,48 @@ import { expect, test } from '@playwright/test';
 import { getRowIndex, goToPageViaSidebar, goToRecordDetail, signIn } from './playwright.helpers';
 import { seedPortfolio, seedSecurity, seedUser } from './pocketbase.helpers';
 
+async function seedSortingSecurities(owner: string) {
+	await seedSecurity({ name: 'Apex Industries', symbol: 'ZZZ', owner });
+	await seedSecurity({ name: 'Midpoint Group', symbol: 'MMM', owner });
+	await seedSecurity({ name: 'Zephyr Corp', symbol: 'AAA', owner });
+}
+
+function seedSecurityDetailPortfolio(userId: string) {
+	return seedPortfolio(userId, {
+		accounts: ['Alpha Brokerage', 'Beta Brokerage', 'Gamma Brokerage'],
+		securities: [{ name: 'Detail Security', symbol: 'DTL' }],
+		balances: [
+			{
+				account: 'Alpha Brokerage',
+				security: 'Detail Security',
+				quantity: 10,
+				price: 100,
+				value: 1000,
+				costBasis: 800
+			},
+			{
+				account: 'Beta Brokerage',
+				security: 'Detail Security',
+				quantity: 30,
+				price: 100,
+				value: 3000,
+				costBasis: 2000
+			},
+			{
+				account: 'Gamma Brokerage',
+				security: 'Detail Security',
+				quantity: 20,
+				price: 100,
+				value: 2000,
+				costBasis: 2500
+			}
+		]
+	});
+}
+
 test('securities list: defaults to security name ascending', async ({ page }) => {
 	const user = await seedUser('bianca');
-	await seedSecurity({ name: 'Apex Industries', symbol: 'ZZZ', owner: user.id });
-	await seedSecurity({ name: 'Midpoint Group', symbol: 'MMM', owner: user.id });
-	await seedSecurity({ name: 'Zephyr Corp', symbol: 'AAA', owner: user.id });
+	await seedSortingSecurities(user.id);
 
 	await page.goto('/');
 	await signIn(page, user.email);
@@ -28,9 +65,7 @@ test('securities list: clicking Security header toggles name descending then asc
 	page
 }) => {
 	const user = await seedUser('bianca');
-	await seedSecurity({ name: 'Apex Industries', symbol: 'ZZZ', owner: user.id });
-	await seedSecurity({ name: 'Midpoint Group', symbol: 'MMM', owner: user.id });
-	await seedSecurity({ name: 'Zephyr Corp', symbol: 'AAA', owner: user.id });
+	await seedSortingSecurities(user.id);
 
 	await page.goto('/');
 	await signIn(page, user.email);
@@ -66,9 +101,7 @@ test('securities list: clicking Symbol header sorts by symbol descending then as
 	page
 }) => {
 	const user = await seedUser('bianca');
-	await seedSecurity({ name: 'Apex Industries', symbol: 'ZZZ', owner: user.id });
-	await seedSecurity({ name: 'Midpoint Group', symbol: 'MMM', owner: user.id });
-	await seedSecurity({ name: 'Zephyr Corp', symbol: 'AAA', owner: user.id });
+	await seedSortingSecurities(user.id);
 
 	await page.goto('/');
 	await signIn(page, user.email);
@@ -102,9 +135,7 @@ test('securities list: clicking Symbol header sorts by symbol descending then as
 
 test('securities list: sort indicator shows on active column', async ({ page }) => {
 	const user = await seedUser('bianca');
-	await seedSecurity({ name: 'Apex Industries', symbol: 'ZZZ', owner: user.id });
-	await seedSecurity({ name: 'Midpoint Group', symbol: 'MMM', owner: user.id });
-	await seedSecurity({ name: 'Zephyr Corp', symbol: 'AAA', owner: user.id });
+	await seedSortingSecurities(user.id);
 
 	await page.goto('/');
 	await signIn(page, user.email);
@@ -124,9 +155,7 @@ test('securities list: sort indicator shows on active column', async ({ page }) 
 
 test('securities list: sort state persists across reload', async ({ page }) => {
 	const user = await seedUser('bianca');
-	await seedSecurity({ name: 'Apex Industries', symbol: 'ZZZ', owner: user.id });
-	await seedSecurity({ name: 'Midpoint Group', symbol: 'MMM', owner: user.id });
-	await seedSecurity({ name: 'Zephyr Corp', symbol: 'AAA', owner: user.id });
+	await seedSortingSecurities(user.id);
 
 	await page.goto('/');
 	await signIn(page, user.email);
@@ -150,36 +179,7 @@ test('security detail: defaults to market value descending', async ({ page }) =>
 	const user = await seedUser('dominic');
 	const {
 		securities: [security]
-	} = await seedPortfolio(user.id, {
-		accounts: ['Alpha Brokerage', 'Beta Brokerage', 'Gamma Brokerage'],
-		securities: [{ name: 'Detail Security', symbol: 'DTL' }],
-		balances: [
-			{
-				account: 'Alpha Brokerage',
-				security: 'Detail Security',
-				quantity: 10,
-				price: 100,
-				value: 1000,
-				costBasis: 800
-			},
-			{
-				account: 'Beta Brokerage',
-				security: 'Detail Security',
-				quantity: 30,
-				price: 100,
-				value: 3000,
-				costBasis: 2000
-			},
-			{
-				account: 'Gamma Brokerage',
-				security: 'Detail Security',
-				quantity: 20,
-				price: 100,
-				value: 2000,
-				costBasis: 2500
-			}
-		]
-	});
+	} = await seedSecurityDetailPortfolio(user.id);
 
 	await page.goto('/');
 	await signIn(page, user.email);
@@ -199,36 +199,7 @@ test('security detail: clicking Account header sorts by account name descending 
 	const user = await seedUser('dominic');
 	const {
 		securities: [security]
-	} = await seedPortfolio(user.id, {
-		accounts: ['Alpha Brokerage', 'Beta Brokerage', 'Gamma Brokerage'],
-		securities: [{ name: 'Detail Security', symbol: 'DTL' }],
-		balances: [
-			{
-				account: 'Alpha Brokerage',
-				security: 'Detail Security',
-				quantity: 10,
-				price: 100,
-				value: 1000,
-				costBasis: 800
-			},
-			{
-				account: 'Beta Brokerage',
-				security: 'Detail Security',
-				quantity: 30,
-				price: 100,
-				value: 3000,
-				costBasis: 2000
-			},
-			{
-				account: 'Gamma Brokerage',
-				security: 'Detail Security',
-				quantity: 20,
-				price: 100,
-				value: 2000,
-				costBasis: 2500
-			}
-		]
-	});
+	} = await seedSecurityDetailPortfolio(user.id);
 
 	await page.goto('/');
 	await signIn(page, user.email);
@@ -262,36 +233,7 @@ test('security detail: clicking Market value header sorts value ascending from d
 	const user = await seedUser('dominic');
 	const {
 		securities: [security]
-	} = await seedPortfolio(user.id, {
-		accounts: ['Alpha Brokerage', 'Beta Brokerage', 'Gamma Brokerage'],
-		securities: [{ name: 'Detail Security', symbol: 'DTL' }],
-		balances: [
-			{
-				account: 'Alpha Brokerage',
-				security: 'Detail Security',
-				quantity: 10,
-				price: 100,
-				value: 1000,
-				costBasis: 800
-			},
-			{
-				account: 'Beta Brokerage',
-				security: 'Detail Security',
-				quantity: 30,
-				price: 100,
-				value: 3000,
-				costBasis: 2000
-			},
-			{
-				account: 'Gamma Brokerage',
-				security: 'Detail Security',
-				quantity: 20,
-				price: 100,
-				value: 2000,
-				costBasis: 2500
-			}
-		]
-	});
+	} = await seedSecurityDetailPortfolio(user.id);
 
 	await page.goto('/');
 	await signIn(page, user.email);
@@ -318,36 +260,7 @@ test('security detail: clicking Gain/loss header sorts by gain amount descending
 	const user = await seedUser('dominic');
 	const {
 		securities: [security]
-	} = await seedPortfolio(user.id, {
-		accounts: ['Alpha Brokerage', 'Beta Brokerage', 'Gamma Brokerage'],
-		securities: [{ name: 'Detail Security', symbol: 'DTL' }],
-		balances: [
-			{
-				account: 'Alpha Brokerage',
-				security: 'Detail Security',
-				quantity: 10,
-				price: 100,
-				value: 1000,
-				costBasis: 800
-			},
-			{
-				account: 'Beta Brokerage',
-				security: 'Detail Security',
-				quantity: 30,
-				price: 100,
-				value: 3000,
-				costBasis: 2000
-			},
-			{
-				account: 'Gamma Brokerage',
-				security: 'Detail Security',
-				quantity: 20,
-				price: 100,
-				value: 2000,
-				costBasis: 2500
-			}
-		]
-	});
+	} = await seedSecurityDetailPortfolio(user.id);
 
 	await page.goto('/');
 	await signIn(page, user.email);
@@ -372,36 +285,7 @@ test('security detail: sort indicator shows on active column', async ({ page }) 
 	const user = await seedUser('dominic');
 	const {
 		securities: [security]
-	} = await seedPortfolio(user.id, {
-		accounts: ['Alpha Brokerage', 'Beta Brokerage', 'Gamma Brokerage'],
-		securities: [{ name: 'Detail Security', symbol: 'DTL' }],
-		balances: [
-			{
-				account: 'Alpha Brokerage',
-				security: 'Detail Security',
-				quantity: 10,
-				price: 100,
-				value: 1000,
-				costBasis: 800
-			},
-			{
-				account: 'Beta Brokerage',
-				security: 'Detail Security',
-				quantity: 30,
-				price: 100,
-				value: 3000,
-				costBasis: 2000
-			},
-			{
-				account: 'Gamma Brokerage',
-				security: 'Detail Security',
-				quantity: 20,
-				price: 100,
-				value: 2000,
-				costBasis: 2500
-			}
-		]
-	});
+	} = await seedSecurityDetailPortfolio(user.id);
 
 	await page.goto('/');
 	await signIn(page, user.email);
@@ -426,36 +310,7 @@ test('security detail: sort state persists across reload', async ({ page }) => {
 	const user = await seedUser('dominic');
 	const {
 		securities: [security]
-	} = await seedPortfolio(user.id, {
-		accounts: ['Alpha Brokerage', 'Beta Brokerage', 'Gamma Brokerage'],
-		securities: [{ name: 'Detail Security', symbol: 'DTL' }],
-		balances: [
-			{
-				account: 'Alpha Brokerage',
-				security: 'Detail Security',
-				quantity: 10,
-				price: 100,
-				value: 1000,
-				costBasis: 800
-			},
-			{
-				account: 'Beta Brokerage',
-				security: 'Detail Security',
-				quantity: 30,
-				price: 100,
-				value: 3000,
-				costBasis: 2000
-			},
-			{
-				account: 'Gamma Brokerage',
-				security: 'Detail Security',
-				quantity: 20,
-				price: 100,
-				value: 2000,
-				costBasis: 2500
-			}
-		]
-	});
+	} = await seedSecurityDetailPortfolio(user.id);
 
 	await page.goto('/');
 	await signIn(page, user.email);
@@ -526,12 +381,12 @@ test('account positions: positions table sorts by column with order, aria-sort, 
 	const table = page.getByRole('table');
 	const rows = table.getByRole('row');
 
-	// Default sort is value DESC
+	// Default sort is value descending.
 	await expect(rows.nth(1)).toContainText('Beta Position');
 	await expect(rows.nth(2)).toContainText('Gamma Position');
 	await expect(rows.nth(3)).toContainText('Alpha Position');
 
-	// Security header sorts by name DESC first, then ASC
+	// Security sorts by name descending first, then ascending.
 	const securityButton = table.getByRole('button', { name: 'Security', exact: true });
 	const securityHeader = securityButton.locator('xpath=..');
 	const marketValueButton = table.getByRole('button', { name: 'Market value', exact: true });
@@ -551,7 +406,7 @@ test('account positions: positions table sorts by column with order, aria-sort, 
 	await expect(rows.nth(2)).toContainText('Beta Position');
 	await expect(rows.nth(3)).toContainText('Gamma Position');
 
-	// Market value header sorts by value DESC first (switching from the security column)
+	// Switching columns starts market value in descending order.
 	await marketValueButton.click();
 	await expect(page).toHaveURL(/sort=value/);
 	await expect(page).toHaveURL(/dir=desc/);
@@ -559,14 +414,14 @@ test('account positions: positions table sorts by column with order, aria-sort, 
 	await expect(rows.nth(2)).toContainText('Gamma Position');
 	await expect(rows.nth(3)).toContainText('Alpha Position');
 
-	// Clicking it again toggles to value ASC
+	// A second click toggles market value to ascending.
 	await marketValueButton.click();
 	await expect(page).toHaveURL(/dir=asc/);
 	await expect(rows.nth(1)).toContainText('Alpha Position');
 	await expect(rows.nth(2)).toContainText('Gamma Position');
 	await expect(rows.nth(3)).toContainText('Beta Position');
 
-	// Gain/loss header sorts by gain amount DESC first
+	// Gain/loss starts with gain amount descending.
 	await table.getByRole('button', { name: 'Gain/loss', exact: true }).click();
 	await expect(page).toHaveURL(/sort=gainLoss/);
 	await expect(page).toHaveURL(/dir=desc/);
@@ -574,7 +429,7 @@ test('account positions: positions table sorts by column with order, aria-sort, 
 	await expect(rows.nth(2)).toContainText('Alpha Position');
 	await expect(rows.nth(3)).toContainText('Gamma Position');
 
-	// Sort state survives a reload
+	// Sort state must survive a reload.
 	await securityButton.click();
 	await securityButton.click();
 	await expect(page).toHaveURL(/sort=securityName/);

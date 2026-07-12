@@ -50,7 +50,7 @@ test('transactions table responds to period filters', async ({ page }) => {
 		await page.getByRole('button', { name: label }).click();
 		await expect(page.getByLabel('Period')).toContainText(label);
 
-		// After selecting, re-open popover and verify the selected preset is highlighted
+		// Reopening the picker must highlight the active preset.
 		await page.getByLabel('Period').click();
 		const selectedPresetButton = page.getByRole('button', { name: label, exact: true });
 		await expect(selectedPresetButton).toHaveAttribute('data-selected');
@@ -66,8 +66,7 @@ test('transactions table responds to period filters', async ({ page }) => {
 		await expectPeriodFilteredRows(page, transactions, value, now);
 	}
 
-	// Test that sidebar navigation resets filter to match URL state
-	// Currently showing "Lifetime" from previous loop iteration
+	// Sidebar navigation derives fresh defaults from the URL instead of retaining local filter state.
 	await expect(page.getByLabel('Period')).toContainText('Lifetime');
 	await goToPageViaSidebar(page, 'Transactions');
 	// URL has no period param, so filter should reset to default "Last 3 months"
@@ -78,12 +77,6 @@ test('transactions table responds to period filters', async ({ page }) => {
 	await expect(excludedRow).toBeVisible();
 	const excludedAmount = excludedRow.getByText('$75.00');
 	await expect(excludedAmount).toBeVisible();
-
-	const info = test.info();
-	const isMobile = info.project.name?.toLowerCase().includes('mobile') ?? false;
-	if (!isMobile) {
-		await excludedAmount.hover();
-	}
 });
 
 test('transactions table responds to type filters', async ({ page }) => {
@@ -96,7 +89,7 @@ test('transactions table responds to type filters', async ({ page }) => {
 	await expect(page.getByRole('row', { name: 'Invoice Payment' })).toBeVisible();
 	await expect(page.getByLabel('Type')).toContainText('Any amounts');
 
-	// Set period to "Lifetime" so type filter tests can check all transactions
+	// Lifetime keeps date boundaries out of the type-filter cases.
 	await page.getByLabel('Period').click();
 	await page.getByRole('button', { name: 'Lifetime' }).click();
 	await expect(page.getByLabel('Period')).toContainText('Lifetime');
@@ -192,6 +185,7 @@ test('transactions pagination navigates between pages', async ({ page }) => {
 	const lastDescription = seededDescriptions[seededDescriptions.length - 1] ?? '';
 	await expect(page.getByRole('row', { name: lastDescription })).toHaveCount(0);
 
+	// Applying a filter on page 2 must reset to page 1 when only one page remains.
 	await nextButton.click();
 	await expect(rowsForBatch).toHaveCount(5);
 	await expect(page.getByRole('row', { name: lastDescription })).toBeVisible();
@@ -204,8 +198,6 @@ test('transactions pagination navigates between pages', async ({ page }) => {
 	await expect(previousButton).toBeDisabled();
 	await expect(nextButton).toBeEnabled();
 
-	// Edge case: Test that page resets when filter reduces results below current page
-	// Navigate to page 2, then apply a filter that leaves fewer than 50 results
 	await nextButton.click();
 	await expect(rowsForBatch).toHaveCount(5);
 
@@ -270,7 +262,7 @@ test('credits filter paginates across pages client-side', async ({ page }) => {
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Transactions');
 
-	// Use "Lifetime" so every seeded credit is in range regardless of month boundaries
+	// Lifetime keeps every seeded credit in range across month boundaries.
 	await page.getByLabel('Period').click();
 	await page.getByRole('button', { name: 'Lifetime' }).click();
 	await expect(page.getByLabel('Period')).toContainText('Lifetime');
@@ -286,7 +278,7 @@ test('credits filter paginates across pages client-side', async ({ page }) => {
 	await expect(previousButton).toBeDisabled();
 	await expect(nextButton).toBeEnabled();
 
-	// Newest transaction is on page 1; the oldest is on page 2 (client-side slice)
+	// Client-side slicing keeps the newest row on page 1 and the oldest on page 2.
 	const firstDescription = seededDescriptions[0] ?? '';
 	const lastDescription = seededDescriptions[seededDescriptions.length - 1] ?? '';
 	await expect(page.getByRole('row', { name: firstDescription })).toBeVisible();
@@ -535,6 +527,54 @@ async function seedFilteringTransactions(userName: string) {
 	return { user, transactions, now };
 }
 
+async function seedLabelFilteringTransactions(userName: string, includeUnlabeled: boolean) {
+	const user = await seedUser(userName);
+	const account = await seedAccount({
+		name: 'Household Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 2500
+	});
+
+	const groceriesLabel = await seedTransactionLabel({ name: 'Groceries', owner: user.id });
+	const utilitiesLabel = await seedTransactionLabel({ name: 'Utilities', owner: user.id });
+	const date = new UTCDate().toISOString();
+
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date,
+		description: 'Farm Stand Produce',
+		value: -42,
+		labels: [groceriesLabel.id]
+	});
+	await seedTransaction({
+		account: account.id,
+		owner: user.id,
+		date,
+		description: 'Electric Company Bill',
+		value: -118,
+		labels: [utilitiesLabel.id]
+	});
+	if (includeUnlabeled) {
+		await seedTransaction({
+			account: account.id,
+			owner: user.id,
+			date,
+			description: 'Unlabeled Cash Withdrawal',
+			value: -80
+		});
+	}
+
+	return { user, groceriesLabel, utilitiesLabel };
+}
+
 function getPeriodRange(option: PeriodOption, reference: Date) {
 	const startOfThisMonth = startOfMonth(reference);
 	switch (option) {
@@ -614,14 +654,14 @@ test('"Last year" filter correctly handles period boundaries', async ({ page }) 
 	});
 
 	// Calculate dates relative to now for time-independent testing
-	// "Last year" filter range: [Jan 1 of lastYear 00:00:00, Jan 1 of thisYear 00:00:00)
 	// NOTE: This test could theoretically fail if run exactly at midnight on Dec 31st,
 	// as the test's "thisYear" and the backend's "thisYear" could differ by one year.
+	// Last year is a half-open range: start inclusive, end exclusive.
 	const now = new UTCDate();
 	const thisYearStart = startOfYear(now);
 	const lastYearStart = startOfYear(subYears(now, 1));
 
-	// BOUNDARY: 1 second BEFORE period start - should NOT be visible
+	// One second before the start is outside the range.
 	const beforePeriod = new UTCDate(lastYearStart.getTime() - 1000);
 	await seedTransaction({
 		account: account.id,
@@ -642,7 +682,7 @@ test('"Last year" filter correctly handles period boundaries', async ({ page }) 
 		value: 200
 	});
 
-	// INSIDE: Mid-year transaction - should be visible
+	// A mid-year value exercises the unambiguous interior of the range.
 	const midYear = new UTCDate(lastYearStart.getUTCFullYear(), 6, 15, 12, 0, 0, 0);
 	await seedTransaction({
 		account: account.id,
@@ -652,7 +692,7 @@ test('"Last year" filter correctly handles period boundaries', async ({ page }) 
 		value: 300
 	});
 
-	// BOUNDARY: 1 second BEFORE period end - should be visible
+	// One second before the end remains inside the range.
 	const beforePeriodEnd = new UTCDate(thisYearStart.getTime() - 1000);
 	await seedTransaction({
 		account: account.id,
@@ -662,7 +702,7 @@ test('"Last year" filter correctly handles period boundaries', async ({ page }) 
 		value: 400
 	});
 
-	// BOUNDARY: Exactly at period end (Jan 1 of this year) - should NOT be visible (exclusive)
+	// Exactly at the exclusive end is outside the range.
 	const atPeriodEnd = new UTCDate(thisYearStart.getTime());
 	await seedTransaction({
 		account: account.id,
@@ -717,30 +757,14 @@ test('custom date range with periodLabel from URL displays the label and calenda
 	await seedTransaction({
 		account: account.id,
 		owner: user.id,
-		date: new UTCDate(
-			lastMonth.getUTCFullYear(),
-			lastMonth.getUTCMonth(),
-			15,
-			12,
-			0,
-			0,
-			0
-		).toISOString(),
+		date: dateForMonthOffset(lastMonth, 0, 15).toISOString(),
 		description: 'Last Month Salary',
 		value: 5000
 	});
 	await seedTransaction({
 		account: account.id,
 		owner: user.id,
-		date: new UTCDate(
-			thisMonth.getUTCFullYear(),
-			thisMonth.getUTCMonth(),
-			15,
-			12,
-			0,
-			0,
-			0
-		).toISOString(),
+		date: dateForMonthOffset(thisMonth, 0, 15).toISOString(),
 		description: 'This Month Salary',
 		value: 5000
 	});
@@ -753,7 +777,7 @@ test('custom date range with periodLabel from URL displays the label and calenda
 	const toDate = `${thisMonth.getUTCFullYear()}-${String(thisMonth.getUTCMonth() + 1).padStart(2, '0')}-01`;
 	const monthLabel = lastMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-	// Test's explicit purpose is direct-URL initialization with periodLabel (as set by cashflow chart link)
+	// Cashflow links initialize the custom range label directly from the URL.
 	await page.goto(
 		`/transactions?periodFrom=${fromDate}&periodTo=${toDate}&periodLabel=${encodeURIComponent(monthLabel)}`
 	);
@@ -1089,7 +1113,7 @@ test('switching from custom range back to preset clears custom URL params and up
 	// Start with custom date range in URL (last month only)
 	const fromDate = `${lastMonth.getUTCFullYear()}-${String(lastMonth.getUTCMonth() + 1).padStart(2, '0')}-01`;
 	const toDate = `${thisMonth.getUTCFullYear()}-${String(thisMonth.getUTCMonth() + 1).padStart(2, '0')}-01`;
-	// Test's explicit purpose is direct-URL initialization with a custom periodFrom/periodTo range
+	// Initialize the custom range directly from the URL before switching to a preset.
 	await page.goto(`/transactions?periodFrom=${fromDate}&periodTo=${toDate}`);
 
 	// Only last month's transaction should be visible initially
@@ -1145,7 +1169,7 @@ test('invalid date range params fall back to default period', async ({ page }) =
 	await page.goto('/');
 	await signIn(page, user.email);
 
-	// Test's explicit purpose is direct-URL behavior with an invalid date format
+	// An invalid date in a direct URL must fall back safely.
 	await page.goto('/transactions?periodFrom=invalid-date&periodTo=2024-01-31');
 
 	// Should fall back to default period (Last 3 months) or show error
@@ -1153,7 +1177,7 @@ test('invalid date range params fall back to default period', async ({ page }) =
 	await expect(page.getByLabel('Period')).toBeVisible();
 	await expect(page.getByLabel('Period')).toContainText('Last 3 months');
 
-	// Test's explicit purpose is direct-URL behavior with an end date before the start date
+	// A reversed direct-URL range must also fall back safely.
 	await page.goto('/transactions?periodFrom=2024-03-01&periodTo=2024-01-01');
 
 	// Should fall back to default or show error message
@@ -1297,48 +1321,7 @@ test('transactions can be filtered by account', async ({ page }) => {
 });
 
 test('transactions can be filtered by label', async ({ page }) => {
-	const user = await seedUser('nora');
-
-	const account = await seedAccount({
-		name: 'Household Checking',
-		balanceGroup: AccountsBalanceGroupOptions.CASH,
-		owner: user.id,
-		balanceType: 'Checking'
-	});
-	await seedAccountBalance({
-		account: account.id,
-		owner: user.id,
-		asOf: new Date().toISOString(),
-		value: 2500
-	});
-
-	const groceriesLabel = await seedTransactionLabel({ name: 'Groceries', owner: user.id });
-	const utilitiesLabel = await seedTransactionLabel({ name: 'Utilities', owner: user.id });
-	const now = new UTCDate();
-
-	await seedTransaction({
-		account: account.id,
-		owner: user.id,
-		date: now.toISOString(),
-		description: 'Farm Stand Produce',
-		value: -42,
-		labels: [groceriesLabel.id]
-	});
-	await seedTransaction({
-		account: account.id,
-		owner: user.id,
-		date: now.toISOString(),
-		description: 'Electric Company Bill',
-		value: -118,
-		labels: [utilitiesLabel.id]
-	});
-	await seedTransaction({
-		account: account.id,
-		owner: user.id,
-		date: now.toISOString(),
-		description: 'Unlabeled Cash Withdrawal',
-		value: -80
-	});
+	const { user } = await seedLabelFilteringTransactions('nora', true);
 
 	await page.goto('/');
 	await signIn(page, user.email);
@@ -1396,48 +1379,7 @@ test('transactions can be filtered by label', async ({ page }) => {
 });
 
 test('clicking a label chip on a row applies the label filter', async ({ page }) => {
-	const user = await seedUser('sage');
-
-	const account = await seedAccount({
-		name: 'Household Checking',
-		balanceGroup: AccountsBalanceGroupOptions.CASH,
-		owner: user.id,
-		balanceType: 'Checking'
-	});
-	await seedAccountBalance({
-		account: account.id,
-		owner: user.id,
-		asOf: new Date().toISOString(),
-		value: 2500
-	});
-
-	const groceriesLabel = await seedTransactionLabel({ name: 'Groceries', owner: user.id });
-	const utilitiesLabel = await seedTransactionLabel({ name: 'Utilities', owner: user.id });
-	const now = new UTCDate();
-
-	await seedTransaction({
-		account: account.id,
-		owner: user.id,
-		date: now.toISOString(),
-		description: 'Farm Stand Produce',
-		value: -42,
-		labels: [groceriesLabel.id]
-	});
-	await seedTransaction({
-		account: account.id,
-		owner: user.id,
-		date: now.toISOString(),
-		description: 'Electric Company Bill',
-		value: -118,
-		labels: [utilitiesLabel.id]
-	});
-	await seedTransaction({
-		account: account.id,
-		owner: user.id,
-		date: now.toISOString(),
-		description: 'Unlabeled Cash Withdrawal',
-		value: -80
-	});
+	const { user } = await seedLabelFilteringTransactions('sage', true);
 
 	await page.goto('/');
 	await signIn(page, user.email);
@@ -1460,7 +1402,7 @@ test('clicking a label chip on a row applies the label filter', async ({ page })
 	await expect(page.getByText('Unlabeled Cash Withdrawal')).not.toBeVisible();
 	await expect(page).toHaveURL(/label=/);
 
-	// Clicking the active chip again removes the label and returns to the unfiltered view
+	// Clicking the active chip again clears the label filter.
 	await groceriesChip.click();
 
 	await expect(groceriesChip).toHaveAttribute('aria-pressed', 'false');
@@ -1474,41 +1416,7 @@ test('clicking a label chip on a row applies the label filter', async ({ page })
 test('label filter combobox filters options by typing and ignores the record id', async ({
 	page
 }) => {
-	const user = await seedUser('wesley');
-
-	const account = await seedAccount({
-		name: 'Household Checking',
-		balanceGroup: AccountsBalanceGroupOptions.CASH,
-		owner: user.id,
-		balanceType: 'Checking'
-	});
-	await seedAccountBalance({
-		account: account.id,
-		owner: user.id,
-		asOf: new Date().toISOString(),
-		value: 2500
-	});
-
-	const groceriesLabel = await seedTransactionLabel({ name: 'Groceries', owner: user.id });
-	const utilitiesLabel = await seedTransactionLabel({ name: 'Utilities', owner: user.id });
-	const now = new UTCDate();
-
-	await seedTransaction({
-		account: account.id,
-		owner: user.id,
-		date: now.toISOString(),
-		description: 'Farm Stand Produce',
-		value: -42,
-		labels: [groceriesLabel.id]
-	});
-	await seedTransaction({
-		account: account.id,
-		owner: user.id,
-		date: now.toISOString(),
-		description: 'Electric Company Bill',
-		value: -118,
-		labels: [utilitiesLabel.id]
-	});
+	const { user, groceriesLabel } = await seedLabelFilteringTransactions('wesley', false);
 
 	await page.goto('/');
 	await signIn(page, user.email);
@@ -1557,48 +1465,10 @@ test('label filter combobox filters options by typing and ignores the record id'
 });
 
 test('selecting multiple labels filters with OR semantics', async ({ page }) => {
-	const user = await seedUser('willow');
-
-	const account = await seedAccount({
-		name: 'Household Checking',
-		balanceGroup: AccountsBalanceGroupOptions.CASH,
-		owner: user.id,
-		balanceType: 'Checking'
-	});
-	await seedAccountBalance({
-		account: account.id,
-		owner: user.id,
-		asOf: new Date().toISOString(),
-		value: 2500
-	});
-
-	const groceriesLabel = await seedTransactionLabel({ name: 'Groceries', owner: user.id });
-	const utilitiesLabel = await seedTransactionLabel({ name: 'Utilities', owner: user.id });
-	const now = new UTCDate();
-
-	await seedTransaction({
-		account: account.id,
-		owner: user.id,
-		date: now.toISOString(),
-		description: 'Farm Stand Produce',
-		value: -42,
-		labels: [groceriesLabel.id]
-	});
-	await seedTransaction({
-		account: account.id,
-		owner: user.id,
-		date: now.toISOString(),
-		description: 'Electric Company Bill',
-		value: -118,
-		labels: [utilitiesLabel.id]
-	});
-	await seedTransaction({
-		account: account.id,
-		owner: user.id,
-		date: now.toISOString(),
-		description: 'Unlabeled Cash Withdrawal',
-		value: -80
-	});
+	const { user, groceriesLabel, utilitiesLabel } = await seedLabelFilteringTransactions(
+		'willow',
+		true
+	);
 
 	await page.goto('/');
 	await signIn(page, user.email);
@@ -1617,7 +1487,7 @@ test('selecting multiple labels filters with OR semantics', async ({ page }) => 
 	await page.getByRole('option', { name: 'Utilities' }).click();
 	await page.keyboard.press('Escape');
 
-	// OR semantics: a row matching either label stays visible, a row matching neither is hidden
+	// Either selected label may match; an unlabeled row must not.
 	await expect(page.getByText('Farm Stand Produce')).toBeVisible();
 	await expect(page.getByText('Electric Company Bill')).toBeVisible();
 	await expect(page.getByText('Unlabeled Cash Withdrawal')).not.toBeVisible();
@@ -1683,6 +1553,7 @@ test('account filter works with other filters combined', async ({ page }) => {
 		value: -500
 	});
 
+	// Realtime rows must satisfy both the account and amount filters.
 	// Brokerage account: one credit, one debit
 	await seedTransaction({
 		account: brokerageAccount.id,
@@ -1723,8 +1594,6 @@ test('account filter works with other filters combined', async ({ page }) => {
 	await expect(page.getByText('Dividend Income')).not.toBeVisible();
 	await expect(page.getByText('Stock Purchase')).not.toBeVisible();
 
-	// Test that realtime updates respect BOTH filters (account + kind).
-	// Seed two transactions: one that matches both filters, one that only matches kind.
 	await seedTransaction({
 		account: brokerageAccount.id,
 		owner: user.id,
@@ -1756,7 +1625,7 @@ test('account filter works with other filters combined', async ({ page }) => {
 	await expect(page.getByText('Interest Payment')).toBeVisible();
 	await expect(page.getByText('Transfer to Checking')).not.toBeVisible();
 
-	// Clear account filter while keeping type filter
+	// Clearing only the account constraint must preserve the credit constraint.
 	await page.getByLabel('Clear account filter').click();
 
 	// Both credit transactions should now be visible
