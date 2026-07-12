@@ -86,6 +86,9 @@ class AccountsContext {
 	private _activeUserId = '';
 	private _isSubscribed = false;
 	private _teardownCallback = () => this.unsubscribeRealtime();
+	private _reconnectCallback = () => {
+		if (this.currentUserId) void this.refreshForCurrentUser();
+	};
 
 	constructor(
 		pb: PocketBaseContext,
@@ -94,6 +97,7 @@ class AccountsContext {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
+		this._pb.registerRealtimeReconnect(this._reconnectCallback);
 		this._fx = getExchangeRatesContext();
 		this.balanceTypesContext = balanceTypesContext;
 		this.init();
@@ -534,6 +538,7 @@ class AccountsContext {
 
 	dispose() {
 		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
+		this._pb.unregisterRealtimeReconnect(this._reconnectCallback);
 		this.unsubscribeRealtime();
 	}
 }

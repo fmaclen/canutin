@@ -20,8 +20,43 @@ export class PocketBaseContext {
 	setupStatus: SetupStatus = $state('checking');
 	onAuthInvalidated?: () => void;
 
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- never read in a reactive context
+	private _reconnectCallbacks = new Set<() => void>();
+	private _reconnectListening = false;
+	private _pendingReconnect = false;
+
 	constructor() {
 		this.authedClient = new PocketBase(getBackendUrl());
+	}
+
+	// NOTE: the SDK resubmits subscriptions on realtime reconnect but never replays events emitted
+	// while disconnected, so records shared to the user during that gap (e.g. a laptop wake or
+	// network blip) stay invisible until a full re-init. Registered stores refetch on reconnect so a
+	// session converges with what the backend allows without a logout/login.
+	registerRealtimeReconnect(callback: () => void) {
+		this._reconnectCallbacks.add(callback);
+		if (this._reconnectListening) return;
+		this._reconnectListening = true;
+		this.authedClient.realtime.onDisconnect = (activeSubscriptions) => {
+			this._pendingReconnect = activeSubscriptions.length > 0;
+		};
+		void this.authedClient.realtime
+			.subscribe('PB_CONNECT', () => {
+				if (!this._pendingReconnect) return;
+				this._pendingReconnect = false;
+				for (const reconnect of this._reconnectCallbacks) {
+					try {
+						reconnect();
+					} catch (error) {
+						logError('pocketbase', 'reconnect_callback', error);
+					}
+				}
+			})
+			.catch((error) => logError('pocketbase', 'reconnect_subscribe', error));
+	}
+
+	unregisterRealtimeReconnect(callback: () => void) {
+		this._reconnectCallbacks.delete(callback);
 	}
 
 	get backendUrl(): string {
