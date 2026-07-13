@@ -6,20 +6,25 @@ import {
 } from '../src/lib/pocketbase.schema';
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
 import {
+	getUserPB,
 	seedAccount,
 	seedAccountBalance,
 	seedAccountShare,
 	seedAsset,
 	seedAssetBalance,
 	seedAssetShare,
+	seedPortfolio,
 	seedUser,
 	updateAccount,
 	updateAsset
 } from './pocketbase.helpers';
 
-// Holds the first request matching `pattern`, runs `mutate` while it is in flight, then delivers the
-// now-stale snapshot the server read before the mutation. This forces a realtime event to land inside
-// the store's initial fetch window - the race that used to clobber the event with the older snapshot.
+// Holds the store's first fetch matching `pattern`, runs `mutate` while it is in flight, then
+// releases the now-stale snapshot the server read before the mutation. Under the invalidation-only
+// model the mutation fires a realtime event that schedules a debounced follow-up refetch, which reads
+// the post-mutation state and commits under a newer request token. The held first fetch then resolves
+// with pre-mutation data under its older token and is discarded by the latest-wins guard, so the
+// mutation is the state that survives.
 async function holdFirstFetch(page: Page, pattern: string, mutate: () => Promise<unknown>) {
 	let intercepted = false;
 	await page.route(pattern, async (route: Route) => {
@@ -27,8 +32,8 @@ async function holdFirstFetch(page: Page, pattern: string, mutate: () => Promise
 		intercepted = true;
 		const response = await route.fetch();
 		await mutate();
-		// HACK: a buffered realtime event has no UI signal to wait on, so a bounded delay is the only
-		// lever to guarantee the event reaches the browser before the stale snapshot resolves.
+		// HACK: the event-triggered follow-up refetch has no UI signal to wait on, so a bounded delay
+		// is the only lever to let it commit before the stale first fetch resolves.
 		await new Promise((resolve) => setTimeout(resolve, 750));
 		await route.fulfill({ response });
 	});
@@ -232,4 +237,61 @@ test('assets store keeps a realtime share that lands during the initial snapshot
 	const row = page.getByRole('row', { name: 'Family Cabin' });
 	await expect(row).toBeVisible();
 	await expect(row.getByLabel('Shared asset')).toBeVisible();
+});
+
+test('securities store keeps a security delete that lands during the initial snapshot fetch removed', async ({
+	page
+}) => {
+	const user = await seedUser('wynn');
+	const {
+		securities: [doomed]
+	} = await seedPortfolio(user.id, {
+		accounts: ['Wynn Brokerage'],
+		securities: [
+			{ name: 'Doomed Holding', symbol: 'DOOM' },
+			{ name: 'Steady Holding', symbol: 'STDY' }
+		],
+		balances: [
+			{
+				account: 'Wynn Brokerage',
+				security: 'Doomed Holding',
+				quantity: 5,
+				price: 100,
+				value: 500,
+				costBasis: 400
+			},
+			{
+				account: 'Wynn Brokerage',
+				security: 'Steady Holding',
+				quantity: 3,
+				price: 259,
+				value: 777,
+				costBasis: 600
+			}
+		],
+		asOf: new Date().toISOString()
+	});
+
+	await page.goto('/');
+	// Deleting the security cascades to its securityBalances server-side and fires a realtime event
+	// that lands while the store's initial securities snapshot is still held in flight. That event
+	// schedules a fresh full refetch (which reads the post-delete state), while the held pre-delete
+	// snapshot resolves later under an older token and is discarded by the latest-wins guard.
+	await holdFirstFetch(page, '**/api/collections/securities/records**', async () => {
+		const userPb = await getUserPB(user.email);
+		await userPb.collection('securities').delete(doomed.id);
+	});
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Portfolio');
+
+	// Anchor on the surviving position first: its row (and intact balance) proves the store committed a
+	// real post-delete snapshot, so the absence check below runs against rendered data rather than an
+	// unloaded skeleton - otherwise a leading absence assertion would pass trivially before any commit.
+	const survivingRow = page.getByRole('row', { name: /Steady Holding/ });
+	await expect(survivingRow).toContainText('STDY');
+	await expect(survivingRow.locator('td').last()).toHaveText('$777.00');
+
+	// The deleted security and its cascaded balances stay gone: the stale in-flight snapshot never
+	// resurrects them once the latest-wins token discards it.
+	await expect(page.getByRole('row', { name: /Doomed Holding/ })).toHaveCount(0);
 });

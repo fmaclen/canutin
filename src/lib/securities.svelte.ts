@@ -225,7 +225,7 @@ class SecuritiesContext {
 			await this.refreshAll(userId, token);
 		} catch (error) {
 			if (userId !== this._auth.currentUserId || !this.sequence.isCurrent(token)) return;
-			this._pb.handleConnectionError(error, 'securities', 'init');
+			this._pb.handleConnectionError(error, 'securities', 'refresh');
 			this.resolvePositionsLoaded();
 		} finally {
 			if (userId === this._auth.currentUserId && this.sequence.isCurrent(token))

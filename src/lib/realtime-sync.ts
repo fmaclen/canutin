@@ -1,23 +1,23 @@
 // Monotonic latest-request guard. An async refresh takes a token from next() and bails as soon as
 // isCurrent(token) turns false because a newer refresh - or a supersede via bump() - advanced it.
 export class RequestSequence {
-	#value = 0;
+	private value = 0;
 
 	next() {
-		return ++this.#value;
+		return ++this.value;
 	}
 
 	get current() {
-		return this.#value;
+		return this.value;
 	}
 
 	isCurrent(token: number) {
-		return token === this.#value;
+		return token === this.value;
 	}
 
 	// Advance without starting a request, superseding any in-flight refresh (e.g. on logout).
 	bump() {
-		this.#value++;
+		this.value++;
 	}
 }
 

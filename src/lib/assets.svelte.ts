@@ -39,11 +39,17 @@ type AssetDisplayBalanceData = AssetBalanceData & {
 	missingCurrency: string | null;
 };
 
-const DEFAULT_BALANCE_DATA: AssetBalanceData = {
+// The sync-layer cache of each asset's latest balance. Unlike AssetBalanceData it carries no
+// gain/gainPercent - those belong to the display projection (computeBalanceData), not the raw cache.
+type LatestAssetBalance = {
+	marketValue: number;
+	bookValue: number;
+	balanceAsOf: string;
+};
+
+const DEFAULT_BALANCE_DATA: LatestAssetBalance = {
 	marketValue: 0,
 	bookValue: 0,
-	gain: 0,
-	gainPercent: 0,
 	balanceAsOf: ''
 };
 
@@ -74,7 +80,7 @@ class AssetsContext {
 	isLoading = $state(true);
 
 	private rawAssets: AssetsResponse[] = $state([]);
-	private latestBalanceByAsset = new SvelteMap<string, AssetBalanceData>();
+	private latestBalanceByAsset = new SvelteMap<string, LatestAssetBalance>();
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
 	private _fx: ReturnType<typeof getExchangeRatesContext>;
@@ -213,14 +219,9 @@ class AssetsContext {
 			this.latestBalanceByAsset.clear();
 			for (const balance of balances) {
 				if (this.latestBalanceByAsset.has(balance.asset)) continue;
-				const bookValue = balance.bookValue ?? 0;
-				const marketValue = balance.marketValue ?? 0;
 				this.latestBalanceByAsset.set(balance.asset, {
-					marketValue,
-					bookValue,
-					gain: marketValue - bookValue,
-					gainPercent:
-						bookValue !== 0 ? ((marketValue - bookValue) / Math.abs(bookValue)) * 100 : 0,
+					marketValue: balance.marketValue ?? 0,
+					bookValue: balance.bookValue ?? 0,
 					balanceAsOf: balance.asOf
 				});
 			}
@@ -316,7 +317,7 @@ class AssetsContext {
 		};
 	}
 
-	private toAssetWithBalance(asset: AssetsResponse, rawBalanceData: AssetBalanceData) {
+	private toAssetWithBalance(asset: AssetsResponse, rawBalanceData: LatestAssetBalance) {
 		const incomingShare = this.getIncomingShare(asset.id);
 		const isOwner = asset.owner === this.currentUserId;
 		const perspective = isOwner

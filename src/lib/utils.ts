@@ -154,23 +154,3 @@ export function isDuplicateSecurityNameError(error: unknown) {
 		responseFieldCode(error, 'name') === 'security_name_exists'
 	);
 }
-
-// A realtime event buffered while a store's snapshot fetch is in flight, replayed onto the fetched
-// list before it's committed so the older snapshot can't clobber the event.
-export type SnapshotMutation<T> = {
-	deleted: boolean;
-	record: T;
-};
-
-export function upsertById<T extends { id: string }>(list: T[], record: T) {
-	const exists = list.some((r) => r.id === record.id);
-	return {
-		list: exists ? list.map((r) => (r.id === record.id ? record : r)) : [...list, record],
-		inserted: !exists
-	};
-}
-
-export function removeById<T extends { id: string }>(list: T[], id: string) {
-	if (!list.some((r) => r.id === id)) return { list, removed: false };
-	return { list: list.filter((r) => r.id !== id), removed: true };
-}
