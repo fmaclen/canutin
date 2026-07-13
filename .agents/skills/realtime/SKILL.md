@@ -21,7 +21,9 @@ Each store has two layers, and only the first is governed by this contract:
 
 - **Sync layer** — how server truth reaches the store's in-memory cache. Subscriptions, reconnects,
   fetches, and cache commits live here. This is what "invalidation-only" governs: the sync layer never
-  reads an event payload; it only discards its cache and refetches.
+  reads an event payload into state; it only discards its cache and refetches. (Inspecting the payload
+  to decide relevance is fine — account-cashflow filters transaction events to its mounted account —
+  but never to patch state.)
 - **Projection layer** — `$derived` work over the cache: perspective/currency conversion, aggregation,
   sorting, filtering, pagination slicing. Fully reactive, incremental, network-free, and **out of the
   contract's scope**.
