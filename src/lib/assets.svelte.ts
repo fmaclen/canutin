@@ -1,4 +1,3 @@
-import { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 
@@ -14,14 +13,9 @@ import {
 	type AssetsResponse
 } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
+import { Debouncer, RequestSequence } from './realtime-sync';
 import { participantExcluded, projectAssetFinancials } from './sharing';
-import {
-	isUnavailableRecordError,
-	removeById,
-	toPocketBaseDateString,
-	upsertById,
-	type SnapshotMutation
-} from './utils';
+import { toPocketBaseDateString } from './utils';
 
 type AssetBalanceData = {
 	marketValue: number;
@@ -45,11 +39,6 @@ type AssetDisplayBalanceData = AssetBalanceData & {
 	missingCurrency: string | null;
 };
 
-type LatestAssetBalance = AssetBalanceData & {
-	id: string;
-	created: string;
-};
-
 const DEFAULT_BALANCE_DATA: AssetBalanceData = {
 	marketValue: 0,
 	bookValue: 0,
@@ -57,6 +46,8 @@ const DEFAULT_BALANCE_DATA: AssetBalanceData = {
 	gainPercent: 0,
 	balanceAsOf: ''
 };
+
+const DEBOUNCE_MS = 200;
 
 export type AssetWithBalance = AssetsResponse &
 	AssetDisplayBalanceData & {
@@ -79,27 +70,21 @@ class AssetsContext {
 		)
 	);
 	shares: AssetSharesResponse[] = $state([]);
-	lastBalanceEvent: number = $state(0);
-	isLoading: boolean = $state(true);
+	lastBalanceEvent = $state(0);
+	isLoading = $state(true);
 
 	private rawAssets: AssetsResponse[] = $state([]);
-	private latestBalanceByAsset = new SvelteMap<string, LatestAssetBalance>();
+	private latestBalanceByAsset = new SvelteMap<string, AssetBalanceData>();
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
 	private _fx: ReturnType<typeof getExchangeRatesContext>;
 	private balanceTypesContext: ReturnType<typeof setBalanceTypesContext>;
-	private refreshSequence = 0;
-	private activeSnapshotToken: number | null = null;
-	private assetSnapshotMutations: SnapshotMutation<AssetsResponse>[] = [];
-	private shareSnapshotMutations: SnapshotMutation<AssetSharesResponse>[] = [];
-	private snapshotBalanceOwners = new Set<string>();
-	private snapshotShareAssets = new Set<string>();
+	private sequence = new RequestSequence();
+	private debouncer = new Debouncer(DEBOUNCE_MS);
 	private _activeUserId = '';
 	private _isSubscribed = false;
 	private _teardownCallback = () => this.unsubscribeRealtime();
-	private _reconnectCallback = () => {
-		if (this.currentUserId) void this.refreshForCurrentUser();
-	};
+	private _reconnectCallback = () => this.invalidate();
 
 	constructor(
 		pb: PocketBaseContext,
@@ -147,33 +132,22 @@ class AssetsContext {
 		recipientEmail: string,
 		perspective: AssetSharesPerspectiveOptions
 	) {
-		const userId = this.currentUserId;
 		await this._pb.postJson('/api/shares/assets', {
 			assetId,
 			recipientEmail,
 			perspective
 		});
-		await this.refreshShares(userId);
-		if (await this.refreshAsset(assetId, userId)) this.lastBalanceEvent = Date.now();
+		await this.refreshForCurrentUser();
 	}
 
 	async updateShareIncludeInNetWorth(shareId: string, includeInNetWorth: boolean) {
-		const userId = this.currentUserId;
-		const share = await this._pb.authedClient
-			.collection('assetShares')
-			.update<AssetSharesResponse>(shareId, { includeInNetWorth });
-		await this.refreshShares(userId);
-		if (await this.refreshAsset(share.asset, userId)) this.lastBalanceEvent = Date.now();
+		await this._pb.authedClient.collection('assetShares').update(shareId, { includeInNetWorth });
+		await this.refreshForCurrentUser();
 	}
 
 	async revokeShare(shareId: string) {
-		const userId = this.currentUserId;
-		const assetId = this.shares.find((share) => share.id === shareId)?.asset;
 		await this._pb.authedClient.collection('assetShares').delete(shareId);
-		await this.refreshShares(userId);
-		if (assetId && (await this.refreshAsset(assetId, userId))) {
-			this.lastBalanceEvent = Date.now();
-		}
+		await this.refreshForCurrentUser();
 	}
 
 	private init() {
@@ -181,14 +155,10 @@ class AssetsContext {
 			const userId = this.currentUserId;
 			if (userId === this._activeUserId) return;
 			this.unsubscribeRealtime();
-			this.activeSnapshotToken = null;
-			this.assetSnapshotMutations = [];
-			this.shareSnapshotMutations = [];
-			this.snapshotBalanceOwners.clear();
-			this.snapshotShareAssets.clear();
+			this.debouncer.cancel();
+			this.sequence.bump();
 			this._activeUserId = userId;
 			if (!userId) {
-				this.refreshSequence++;
 				this.rawAssets = [];
 				this.latestBalanceByAsset.clear();
 				this.shares = [];
@@ -203,108 +173,65 @@ class AssetsContext {
 		});
 	}
 
-	// NOTE: Realtime events landing while these list fetches are in flight are buffered (records and
-	// shares) or noted by owner (balances). Buffered record/share mutations replay onto the fetched
-	// snapshot before it's committed, and touched owners are refetched afterwards, so an event is
-	// never clobbered by the older snapshot and the store never commits emptier than the database.
-	private async refreshForCurrentUser() {
+	// Realtime events and reconnects are pure invalidation signals: they never patch a payload into
+	// state, they only schedule a full refetch. Deletes, share membership changes, and cross-asset
+	// balance reassignments all resolve for free because the fresh snapshot reflects the database as-is.
+	private invalidate() {
+		this.debouncer.schedule(() => void this.refreshForCurrentUser());
+	}
+
+	async refreshForCurrentUser() {
 		const userId = this.currentUserId;
-		const token = ++this.refreshSequence;
-		this.activeSnapshotToken = token;
-		this.assetSnapshotMutations = [];
-		this.shareSnapshotMutations = [];
-		this.snapshotBalanceOwners.clear();
-		this.snapshotShareAssets.clear();
+		const token = this.sequence.next();
 		try {
-			const [shares, list] = await Promise.all([
+			const [shares, assets, balances] = await Promise.all([
 				this._pb.authedClient.collection('assetShares').getFullList<AssetSharesResponse>({
+					filter: `grantedBy='${userId}' || recipient='${userId}'`,
 					sort: 'recipientEmail',
 					requestKey: null
 				}),
 				this._pb.authedClient.collection('assets').getFullList<AssetsResponse>({
+					filter: `owner='${userId}' || assetShares_via_asset.recipient ?= '${userId}'`,
+					requestKey: null
+				}),
+				// One query for every asset's latest balance instead of N point-queries: the
+				// 'asset,-asOf,-created,-id' sort groups by asset and orders each group newest-first,
+				// so the first row seen per asset wins - the same tiebreakers getList(1,1) used.
+				this._pb.authedClient.collection('assetBalances').getFullList<AssetBalancesResponse>({
+					sort: 'asset,-asOf,-created,-id',
+					fields: 'asset,bookValue,marketValue,asOf',
 					requestKey: null
 				})
 			]);
-			if (userId !== this.currentUserId || token !== this.refreshSequence) return;
-			for (const asset of list) {
+			if (userId !== this.currentUserId || !this.sequence.isCurrent(token)) return;
+			for (const asset of assets) {
 				await this.balanceTypesContext.ensureLoaded(asset.balanceType);
 			}
-			for (const mutation of this.assetSnapshotMutations) {
-				if (!mutation.deleted)
-					await this.balanceTypesContext.ensureLoaded(mutation.record.balanceType);
-			}
-			const latestBalances = await Promise.all(
-				list.map((asset) => this.getLatestAssetBalance(asset.id))
-			);
-			if (userId !== this.currentUserId || token !== this.refreshSequence) return;
+			if (userId !== this.currentUserId || !this.sequence.isCurrent(token)) return;
 
-			let reconciledShares = shares;
-			for (const mutation of this.shareSnapshotMutations) {
-				reconciledShares = mutation.deleted
-					? reconciledShares.filter((share) => share.id !== mutation.record.id)
-					: upsertById(reconciledShares, mutation.record).list;
-			}
-			this.shares = reconciledShares.toSorted((a, b) =>
-				a.recipientEmail.localeCompare(b.recipientEmail)
-			);
-
-			let reconciledAssets = list;
-			for (const mutation of this.assetSnapshotMutations) {
-				reconciledAssets = mutation.deleted
-					? reconciledAssets.filter((asset) => asset.id !== mutation.record.id)
-					: upsertById(reconciledAssets, mutation.record).list;
-			}
+			this.shares = shares.toSorted((a, b) => a.recipientEmail.localeCompare(b.recipientEmail));
 			this.latestBalanceByAsset.clear();
-			list.forEach((asset, index) => {
-				const balance = latestBalances[index];
-				if (balance) this.latestBalanceByAsset.set(asset.id, balance);
-			});
-			this.rawAssets = reconciledAssets;
+			for (const balance of balances) {
+				if (this.latestBalanceByAsset.has(balance.asset)) continue;
+				const bookValue = balance.bookValue ?? 0;
+				const marketValue = balance.marketValue ?? 0;
+				this.latestBalanceByAsset.set(balance.asset, {
+					marketValue,
+					bookValue,
+					gain: marketValue - bookValue,
+					gainPercent:
+						bookValue !== 0 ? ((marketValue - bookValue) / Math.abs(bookValue)) * 100 : 0,
+					balanceAsOf: balance.asOf
+				});
+			}
+			this.rawAssets = assets;
 			this.lastBalanceEvent = Date.now();
 		} catch (error) {
-			if (userId !== this.currentUserId || token !== this.refreshSequence) return;
-			this._pb.handleConnectionError(error, 'assets', 'init');
+			if (userId !== this.currentUserId || !this.sequence.isCurrent(token)) return;
+			this._pb.handleConnectionError(error, 'assets', 'refresh');
 		} finally {
-			if (this.activeSnapshotToken === token) {
-				this.activeSnapshotToken = null;
-				this.assetSnapshotMutations = [];
-				this.shareSnapshotMutations = [];
-			}
-			if (userId === this.currentUserId && token === this.refreshSequence) this.isLoading = false;
+			if (userId === this.currentUserId && this.sequence.isCurrent(token)) this.isLoading = false;
 		}
-
-		// Refetch owners touched by balance events and assets touched by share events so a delete or
-		// membership change that landed during the fetch resolves to the database's current state.
-		if (userId !== this.currentUserId || token !== this.refreshSequence) return;
-		const balanceOwners = [...this.snapshotBalanceOwners];
-		const shareAssets = [...this.snapshotShareAssets];
-		this.snapshotBalanceOwners.clear();
-		this.snapshotShareAssets.clear();
-		let changed = false;
-		try {
-			for (const assetId of shareAssets) {
-				if (await this.refreshAsset(assetId, userId)) changed = true;
-			}
-			for (const assetId of balanceOwners) {
-				if (shareAssets.includes(assetId)) continue;
-				await this.refetchAssetBalance(assetId, userId);
-				changed = true;
-			}
-		} catch (error) {
-			if (userId !== this.currentUserId) return;
-			this._pb.handleConnectionError(error, 'assets', 'snapshot_settle');
-		}
-		if (changed && userId === this.currentUserId) this.lastBalanceEvent = Date.now();
-	}
-
-	private async refreshShares(userId = this.currentUserId, token = this.refreshSequence) {
-		if (!userId || userId !== this.currentUserId || token !== this.refreshSequence) return;
-		const shares = await this._pb.authedClient.collection('assetShares').getFullList({
-			sort: 'recipientEmail',
-			requestKey: null
-		});
-		if (userId !== this.currentUserId || token !== this.refreshSequence) return;
-		this.shares = shares;
 	}
 
 	private realtimeSubscribe(userId = this._activeUserId) {
@@ -312,15 +239,7 @@ class AssetsContext {
 
 		this._pb.authedClient
 			.collection('assets')
-			.subscribe<AssetsResponse>('*', (event) => {
-				void this.onAssetEvent(event, userId).catch((error) => {
-					if (userId === this.currentUserId) {
-						this._pb.handleConnectionError(error, 'assets', 'asset_event');
-					} else {
-						logError('assetsStore', 'stale_event', error);
-					}
-				});
-			})
+			.subscribe('*', () => this.onRealtimeEvent(userId))
 			.catch((error) => {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'assets', 'subscribe_assets');
@@ -330,7 +249,7 @@ class AssetsContext {
 			});
 		this._pb.authedClient
 			.collection('assetBalances')
-			.subscribe<AssetBalancesResponse>('*', (event) => this.onAssetBalanceEvent(event, userId))
+			.subscribe('*', () => this.onRealtimeEvent(userId))
 			.catch((error) => {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'assets', 'subscribe_balances');
@@ -340,7 +259,7 @@ class AssetsContext {
 			});
 		this._pb.authedClient
 			.collection('assetShares')
-			.subscribe<AssetSharesResponse>('*', (event) => this.onAssetShareEvent(event, userId))
+			.subscribe('*', () => this.onRealtimeEvent(userId))
 			.catch((error) => {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'assets', 'subscribe_shares');
@@ -351,123 +270,17 @@ class AssetsContext {
 		this._isSubscribed = true;
 	}
 
+	private onRealtimeEvent(userId: string) {
+		if (!userId || userId !== this._activeUserId) return;
+		this.invalidate();
+	}
+
 	private unsubscribeRealtime() {
 		if (!this._isSubscribed) return;
 		this._isSubscribed = false;
 		this._pb.authedClient.collection('assets').unsubscribe('*');
 		this._pb.authedClient.collection('assetBalances').unsubscribe('*');
 		this._pb.authedClient.collection('assetShares').unsubscribe('*');
-	}
-
-	private async onAssetEvent(e: RecordSubscription<AssetsResponse>, userId: string) {
-		if (userId !== this.currentUserId) return;
-		if (this.activeSnapshotToken !== null) {
-			this.assetSnapshotMutations.push({ deleted: e.action === 'delete', record: e.record });
-			if (e.action === 'create') this.snapshotBalanceOwners.add(e.record.id);
-			return;
-		}
-
-		if (e.action === 'create') {
-			await this.balanceTypesContext.ensureLoaded(e.record.balanceType);
-			const balanceData = await this.getLatestAssetBalance(e.record.id);
-			if (userId !== this.currentUserId) return;
-			this.upsertAssetRecord(e.record);
-			if (balanceData) this.latestBalanceByAsset.set(e.record.id, balanceData);
-		} else if (e.action === 'update') {
-			await this.balanceTypesContext.ensureLoaded(e.record.balanceType);
-			if (userId !== this.currentUserId) return;
-			this.upsertAssetRecord(e.record);
-			if (!this.latestBalanceByAsset.has(e.record.id)) {
-				const balanceData = await this.getLatestAssetBalance(e.record.id);
-				if (userId !== this.currentUserId) return;
-				if (balanceData) this.latestBalanceByAsset.set(e.record.id, balanceData);
-			}
-		} else if (e.action === 'delete') {
-			this.removeAssetRecord(e.record.id);
-			this.latestBalanceByAsset.delete(e.record.id);
-		}
-	}
-
-	private onAssetBalanceEvent(e: RecordSubscription<AssetBalancesResponse>, userId: string) {
-		if (userId !== this.currentUserId) return;
-		if (!e.action) return;
-		if (this.activeSnapshotToken !== null) {
-			this.snapshotBalanceOwners.add(e.record.asset);
-			return;
-		}
-		const assetId = e.record.asset;
-		let displayedAssetId: string | null = null;
-		for (const [key, currentBalance] of this.latestBalanceByAsset) {
-			if (currentBalance.id === e.record.id) {
-				displayedAssetId = key;
-				break;
-			}
-		}
-		if (displayedAssetId && displayedAssetId !== assetId) {
-			void this.refetchAssetBalance(displayedAssetId, userId);
-		}
-
-		if (e.action === 'create' || e.action === 'update') {
-			const asset = this.rawAssets.find((x) => x.id === assetId);
-			if (!asset) {
-				void this.refreshAsset(assetId, userId)
-					.then((refreshed) => {
-						if (userId !== this.currentUserId) return;
-						if (refreshed) this.lastBalanceEvent = Date.now();
-					})
-					.catch((error) => {
-						if (userId === this.currentUserId) {
-							this._pb.handleConnectionError(error, 'assets', 'balance');
-						} else {
-							logError('assetsStore', 'stale_event', error);
-						}
-					});
-				return;
-			}
-
-			const current = this.latestBalanceByAsset.get(assetId);
-			if (current?.id === e.record.id) {
-				void this.refetchAssetBalance(assetId, userId);
-				return;
-			}
-
-			if (!current || this.isAtLeastAsRecent(e.record, current)) {
-				this.latestBalanceByAsset.set(assetId, this.toLatestAssetBalance(e.record));
-				this.lastBalanceEvent = Date.now();
-			}
-		} else if (e.action === 'delete' && displayedAssetId === assetId) {
-			void this.refetchAssetBalance(assetId, userId);
-		}
-	}
-
-	private onAssetShareEvent(e: RecordSubscription<AssetSharesResponse>, userId: string) {
-		if (userId !== this.currentUserId) return;
-		if (this.activeSnapshotToken !== null) {
-			this.shareSnapshotMutations.push({ deleted: e.action === 'delete', record: e.record });
-			this.snapshotShareAssets.add(e.record.asset);
-			return;
-		}
-
-		if (e.action === 'create') {
-			this.shares = [...this.shares, e.record];
-		} else if (e.action === 'update') {
-			this.shares = this.shares.map((share) => (share.id === e.record.id ? e.record : share));
-		} else if (e.action === 'delete') {
-			this.shares = this.shares.filter((share) => share.id !== e.record.id);
-		}
-
-		void this.refreshAsset(e.record.asset, userId)
-			.then((refreshed) => {
-				if (userId !== this.currentUserId) return;
-				if (refreshed) this.lastBalanceEvent = Date.now();
-			})
-			.catch((error) => {
-				if (userId === this.currentUserId) {
-					this._pb.handleConnectionError(error, 'assets', 'share');
-				} else {
-					logError('assetsStore', 'stale_event', error);
-				}
-			});
 	}
 
 	private computeBalanceData(
@@ -540,102 +353,12 @@ class AssetsContext {
 		};
 	}
 
-	private async refetchAssetBalance(assetId: string, userId: string) {
-		if (userId !== this.currentUserId) return;
-
-		try {
-			const balanceData = await this.getLatestAssetBalance(assetId);
-			if (userId !== this.currentUserId) return;
-			if (balanceData) this.latestBalanceByAsset.set(assetId, balanceData);
-			else this.latestBalanceByAsset.delete(assetId);
-			this.lastBalanceEvent = Date.now();
-		} catch (error) {
-			if (userId === this.currentUserId) {
-				logError('assets', 'refetch_balance', error);
-			} else {
-				logError('assetsStore', 'stale_event', error);
-			}
-		}
-	}
-
-	private upsertAssetRecord(asset: AssetsResponse) {
-		this.rawAssets = upsertById(this.rawAssets, asset).list;
-	}
-
-	private removeAssetRecord(assetId: string) {
-		this.rawAssets = removeById(this.rawAssets, assetId).list;
-	}
-
-	private async refreshAsset(assetId: string, userId: string) {
-		if (userId !== this.currentUserId) return false;
-
-		try {
-			const asset = await this._pb.authedClient
-				.collection('assets')
-				.getOne<AssetsResponse>(assetId, { requestKey: null });
-			if (userId !== this.currentUserId) return false;
-			await this.balanceTypesContext.ensureLoaded(asset.balanceType);
-			if (userId !== this.currentUserId) return false;
-			const balanceData = await this.getLatestAssetBalance(assetId);
-			if (userId !== this.currentUserId) return false;
-			this.upsertAssetRecord(asset);
-			if (balanceData) this.latestBalanceByAsset.set(assetId, balanceData);
-			else this.latestBalanceByAsset.delete(assetId);
-			return true;
-		} catch (error) {
-			if (userId !== this.currentUserId) return false;
-			if (isUnavailableRecordError(error)) {
-				this.removeAssetRecord(assetId);
-				this.latestBalanceByAsset.delete(assetId);
-				return true;
-			}
-			throw error;
-		}
-	}
-
-	private async getLatestAssetBalance(assetId: string) {
-		const res = await this._pb.authedClient
-			.collection('assetBalances')
-			.getList<AssetBalancesResponse>(1, 1, {
-				filter: `asset='${assetId}'`,
-				sort: '-asOf,-created,-id',
-				requestKey: null
-			});
-		const balance = res.items[0];
-		return balance ? this.toLatestAssetBalance(balance) : null;
-	}
-
-	private toLatestAssetBalance(balance: AssetBalancesResponse) {
-		return {
-			id: balance.id,
-			marketValue: balance.marketValue ?? 0,
-			bookValue: balance.bookValue ?? 0,
-			gain: (balance.marketValue ?? 0) - (balance.bookValue ?? 0),
-			gainPercent:
-				(balance.bookValue ?? 0) !== 0
-					? (((balance.marketValue ?? 0) - (balance.bookValue ?? 0)) /
-							Math.abs(balance.bookValue ?? 0)) *
-						100
-					: 0,
-			balanceAsOf: balance.asOf,
-			created: balance.created
-		};
-	}
-
-	private isAtLeastAsRecent(
-		balance: Pick<AssetBalancesResponse, 'asOf' | 'created' | 'id'>,
-		current: Pick<LatestAssetBalance, 'balanceAsOf' | 'created' | 'id'>
-	) {
-		if (balance.asOf !== current.balanceAsOf) return balance.asOf > current.balanceAsOf;
-		if (balance.created !== current.created) return balance.created > current.created;
-		return balance.id >= current.id;
-	}
-
 	dispose() {
-		this.refreshSequence++;
+		this.debouncer.cancel();
 		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
 		this._pb.unregisterRealtimeReconnect(this._reconnectCallback);
 		this.unsubscribeRealtime();
+		this.sequence.bump();
 	}
 }
 
