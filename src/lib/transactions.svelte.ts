@@ -17,12 +17,15 @@ import type {
 	TransactionsResponse
 } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
+import { Debouncer } from './realtime-sync';
 import {
 	createSortComparator,
 	toPocketBaseDateString,
 	type SortDirection,
 	type SortState
 } from './utils';
+
+const REFRESH_DEBOUNCE_MS = 200;
 
 type TransactionSortColumn = 'date' | 'description' | 'account' | 'amount';
 
@@ -94,10 +97,11 @@ class TransactionsContext {
 	private _customLabel: string | null = $state(null);
 	private _searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 	private _loadingDelayTimer: ReturnType<typeof setTimeout> | null = null;
-	private _refreshTimer: ReturnType<typeof setTimeout> | null = null;
+	private _refreshDebouncer = new Debouncer(REFRESH_DEBOUNCE_MS);
 	private _activeUserId = '';
 	private _isSubscribed = false;
 	private _teardownCallback = () => this.unsubscribeRealtime();
+	private _reconnectCallback = () => this.invalidate(true);
 	private _unsubscribe: (() => void) | null = null;
 	private _unsubscribeLabels: (() => void) | null = null;
 	private _refreshSequence = 0;
@@ -107,7 +111,6 @@ class TransactionsContext {
 
 	private static readonly LOADING_DELAY_MS = 150;
 	private static readonly SEARCH_DEBOUNCE_MS = 300;
-	private static readonly REFRESH_DEBOUNCE_MS = 200;
 
 	readonly periodOptions: PeriodOption[] = [
 		'this-month',
@@ -130,6 +133,7 @@ class TransactionsContext {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
+		this._pb.registerRealtimeReconnect(this._reconnectCallback);
 		this._accountsContext = getAccountsContext();
 		this._fx = getExchangeRatesContext();
 		this.syncFromUrl(false);
@@ -268,10 +272,7 @@ class TransactionsContext {
 			if (userId === this._activeUserId) return;
 			this.unsubscribeRealtime();
 			this._refreshSequence++;
-			if (this._refreshTimer) {
-				clearTimeout(this._refreshTimer);
-				this._refreshTimer = null;
-			}
+			this._refreshDebouncer.cancel();
 			if (this._loadingDelayTimer) {
 				clearTimeout(this._loadingDelayTimer);
 				this._loadingDelayTimer = null;
@@ -602,16 +603,24 @@ class TransactionsContext {
 		userId: string
 	) {
 		if (!userId || userId !== this._activeUserId) return;
-
 		if (!e.action) return;
-		if (this._refreshTimer) clearTimeout(this._refreshTimer);
-		this._refreshTimer = setTimeout(() => {
-			this._refreshTimer = null;
+		this.invalidate(false);
+	}
+
+	// A transaction event or a realtime reconnect is a pure invalidation signal: it schedules the
+	// debounced page/summary refetch rather than patching the event payload. A reconnect may also
+	// have missed transactionLabels events, so it refreshes labels too; a plain transaction event
+	// cannot change labels and skips them.
+	private invalidate(includeLabels: boolean) {
+		const userId = this._activeUserId;
+		if (!userId) return;
+		this._refreshDebouncer.schedule(() => {
 			if (userId !== this._activeUserId) return;
+			if (includeLabels) void this.refreshLabels(userId);
 			this.refreshTransactions(userId).catch((error) =>
 				this._pb.handleConnectionError(error, 'transactions', 'realtime_refresh')
 			);
-		}, TransactionsContext.REFRESH_DEBOUNCE_MS);
+		});
 	}
 
 	private getPeriodRange(option: PeriodOption) {
@@ -1033,9 +1042,10 @@ class TransactionsContext {
 
 	dispose() {
 		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
+		this._pb.unregisterRealtimeReconnect(this._reconnectCallback);
 		if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
 		if (this._loadingDelayTimer) clearTimeout(this._loadingDelayTimer);
-		if (this._refreshTimer) clearTimeout(this._refreshTimer);
+		this._refreshDebouncer.cancel();
 		this.unsubscribeRealtime();
 	}
 }

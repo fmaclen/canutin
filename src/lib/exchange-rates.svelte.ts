@@ -7,6 +7,7 @@ import { interfacePreferences } from './interface-preferences.svelte';
 import { logError } from './logger';
 import type { ExchangeRatesResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
+import { Debouncer, RequestSequence } from './realtime-sync';
 
 const DEBOUNCE_MS = 200;
 
@@ -57,18 +58,20 @@ class ExchangeRatesContext {
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
 	private _currencies: ReturnType<typeof setCurrenciesContext>;
+	private sequence = new RequestSequence();
+	private debouncer = new Debouncer(DEBOUNCE_MS);
 	private _activeUserId = '';
 	private _isSubscribed = false;
-	private _refreshSequence = 0;
-	private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
 	private _disposed = false;
 	private _teardownCallback = () => this.unsubscribeRealtime();
+	private _reconnectCallback = () => this.invalidate();
 
 	constructor(pb: PocketBaseContext, currencies: ReturnType<typeof setCurrenciesContext>) {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._currencies = currencies;
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
+		this._pb.registerRealtimeReconnect(this._reconnectCallback);
 		this.init();
 	}
 
@@ -77,13 +80,10 @@ class ExchangeRatesContext {
 			const userId = this._auth.currentUserId;
 			if (userId === this._activeUserId) return;
 			this.unsubscribeRealtime();
-			if (this._debounceTimer) {
-				clearTimeout(this._debounceTimer);
-				this._debounceTimer = null;
-			}
+			this.debouncer.cancel();
+			this.sequence.bump();
 			this._activeUserId = userId;
 			if (!userId) {
-				this._refreshSequence++;
 				this._records = [];
 				this._isLoaded = false;
 				return;
@@ -96,19 +96,19 @@ class ExchangeRatesContext {
 
 	private async refresh(userId: string) {
 		if (!userId) return;
-		const sequence = ++this._refreshSequence;
+		const token = this.sequence.next();
 		try {
 			const list = await this._pb.authedClient
 				.collection('exchangeRates')
 				.getFullList<ExchangeRatesResponse>({ requestKey: null });
-			if (this._disposed || userId !== this._activeUserId || sequence !== this._refreshSequence)
+			if (this._disposed || userId !== this._activeUserId || !this.sequence.isCurrent(token))
 				return;
 
 			this._records = list;
 			this._isLoaded = true;
 		} catch (error) {
 			if (userId !== this._activeUserId) return;
-			this._pb.handleConnectionError(error, 'exchange_rates', 'init');
+			this._pb.handleConnectionError(error, 'exchange_rates', 'refresh');
 		}
 	}
 
@@ -117,7 +117,7 @@ class ExchangeRatesContext {
 		this._isSubscribed = true;
 		this._pb.authedClient
 			.collection('exchangeRates')
-			.subscribe('*', this.onEvent.bind(this))
+			.subscribe('*', () => this.invalidate())
 			.catch((error) => {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'exchange_rates', 'subscribe');
@@ -134,13 +134,11 @@ class ExchangeRatesContext {
 	}
 
 	// NOTE: the ensure-rates worker writes many rows per entity, so coalesce the burst into a
-	// single refetch rather than maintaining the sorted index incrementally on each event.
-	private onEvent() {
-		if (this._debounceTimer) clearTimeout(this._debounceTimer);
-		this._debounceTimer = setTimeout(() => {
-			this._debounceTimer = null;
-			void this.refresh(this._activeUserId);
-		}, DEBOUNCE_MS);
+	// single refetch rather than maintaining the sorted index incrementally on each event. Reconnects
+	// route here too, converging on any events missed while the socket was disconnected.
+	private invalidate() {
+		if (!this._activeUserId) return;
+		this.debouncer.schedule(() => void this.refresh(this._activeUserId));
 	}
 
 	get records() {
@@ -206,12 +204,11 @@ class ExchangeRatesContext {
 
 	dispose() {
 		this._disposed = true;
-		if (this._debounceTimer) {
-			clearTimeout(this._debounceTimer);
-			this._debounceTimer = null;
-		}
+		this.debouncer.cancel();
 		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
+		this._pb.unregisterRealtimeReconnect(this._reconnectCallback);
 		this.unsubscribeRealtime();
+		this.sequence.bump();
 	}
 }
 
