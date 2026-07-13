@@ -9,13 +9,18 @@ import { seedUser } from './pocketbase.helpers';
 // The mobile sheet stays mounted (data-state="closed") for its close transition
 // before unmounting, so a plain visibility check would catch it mid-animation -
 // check data-state too, since accounts stays visible until the transition ends.
+// Read existence and data-state in a single evaluateAll call: unlike
+// getAttribute, evaluateAll never waits for a match, so a sheet that finishes
+// unmounting between a separate existence check and state read can't hang the
+// test waiting for a locator that will never rematch.
 async function ensureSidebarOpen(page: Page) {
 	const sidebar = page.getByLabel('Sidebar');
 	const accounts = sidebar.getByRole('link', { name: 'Accounts' });
-	if (await sidebar.count()) {
-		const state = await sidebar.getAttribute('data-state');
-		if (state !== 'closed' && (await accounts.isVisible())) return;
-	}
+	const [state] = await sidebar.evaluateAll((elements) =>
+		elements.map((element) => element.getAttribute('data-state'))
+	);
+	if (state !== undefined && state !== 'closed' && (await accounts.isVisible())) return;
+
 	await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
 	await expect(accounts).toBeVisible();
 }
