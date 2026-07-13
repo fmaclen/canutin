@@ -1,6 +1,5 @@
-import { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
-import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+import { SvelteMap } from 'svelte/reactivity';
 
 import { getAccountsContext } from './accounts.svelte';
 import { getAuthContext } from './auth.svelte';
@@ -8,7 +7,7 @@ import { getExchangeRatesContext } from './exchange-rates.svelte';
 import { logError } from './logger';
 import type { SecuritiesResponse, SecurityBalancesResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
-import { MutationEpochMap, RequestSequence, SnapshotReconciler } from './realtime-sync';
+import { Debouncer, RequestSequence } from './realtime-sync';
 import {
 	compareByValueDescThenName,
 	resolveSecurityBalanceValues,
@@ -16,7 +15,7 @@ import {
 	type SecurityBalanceResolvedValue
 } from './security-balance-values';
 import { projectSignedValue } from './sharing';
-import { toNumber, upsertById } from './utils';
+import { toNumber } from './utils';
 
 type SecurityBalance = SecurityBalancesResponse<number, number, number, number>;
 
@@ -87,7 +86,7 @@ const DEBOUNCE_MS = 200;
 
 class SecuritiesContext {
 	securities: SecuritiesResponse[] = $state([]);
-	isLoading: boolean = $state(true);
+	isLoading = $state(true);
 	positionsLoaded = false;
 
 	positionsValueByAccount = $derived.by(() => {
@@ -139,19 +138,18 @@ class SecuritiesContext {
 	private _auth: ReturnType<typeof getAuthContext>;
 	private _accounts: ReturnType<typeof getAccountsContext>;
 	private _fx: ReturnType<typeof getExchangeRatesContext>;
-	private positionRefreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
-	private positionEpochs = new MutationEpochMap();
 	private sequence = new RequestSequence();
-	private securitiesSnapshot = new SnapshotReconciler<SecuritiesResponse>();
-	private balancesSnapshot = new SnapshotReconciler<SecurityBalance>();
+	private debouncer = new Debouncer(DEBOUNCE_MS);
 	private _activeUserId = '';
 	private _isSubscribed = false;
 	private _teardownCallback = () => this.unsubscribeRealtime();
+	private _reconnectCallback = () => this.invalidate();
 
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
+		this._pb.registerRealtimeReconnect(this._reconnectCallback);
 		this._accounts = getAccountsContext();
 		this._fx = getExchangeRatesContext();
 		this.init();
@@ -185,16 +183,9 @@ class SecuritiesContext {
 			...balanceData,
 			security: securityId
 		});
-		if (
-			await this.refreshPosition(
-				balanceData.account,
-				securityId,
-				this._auth.currentUserId,
-				this.sequence.current
-			)
-		) {
-			this._accounts.notifyBalancesChanged();
-		}
+		// Refresh directly rather than via the debounce so the user's own write shows immediately;
+		// refreshAll notifies accounts of the new balances on commit.
+		await this.refreshForCurrentUser();
 	}
 
 	private init() {
@@ -202,13 +193,10 @@ class SecuritiesContext {
 			const userId = this._auth.currentUserId;
 			if (userId === this._activeUserId) return;
 			this.unsubscribeRealtime();
-			this.securitiesSnapshot.reset();
-			this.balancesSnapshot.reset();
-			this.positionEpochs.clear();
+			this.debouncer.cancel();
+			this.sequence.bump();
 			this._activeUserId = userId;
 			if (!userId) {
-				this.sequence.bump();
-				this.clearPositionRefreshTimers();
 				this.securities = [];
 				this.currentPositions.clear();
 				this.positionsLoaded = false;
@@ -220,6 +208,14 @@ class SecuritiesContext {
 			this.realtimeSubscribe(userId);
 			void this.refreshForCurrentUser();
 		});
+	}
+
+	// Realtime events and reconnects are pure invalidation signals: they never patch a payload into
+	// state, they only schedule a full refetch. A security delete cascades to its securityBalances
+	// server-side, so the deleted rows are simply absent from the next snapshot - no epoch guard or
+	// buffered replay is needed to keep them gone.
+	private invalidate() {
+		this.debouncer.schedule(() => void this.refreshForCurrentUser());
 	}
 
 	private async refreshForCurrentUser() {
@@ -243,38 +239,26 @@ class SecuritiesContext {
 	}
 
 	private async refreshAll(userId: string, token: number) {
-		this.securitiesSnapshot.begin(token);
-		this.balancesSnapshot.begin(token);
-		try {
-			const [securities, securityBalances] = await Promise.all([
-				this._pb.authedClient.collection('securities').getFullList<SecuritiesResponse>({
-					sort: 'name',
-					requestKey: null
-				}),
-				this._pb.authedClient.collection('securityBalances').getFullList<SecurityBalance>({
-					sort: 'security,account,-asOf,-created,-id',
-					requestKey: null
-				})
-			]);
-			if (userId !== this._auth.currentUserId || !this.sequence.isCurrent(token)) return;
+		const [securities, securityBalances] = await Promise.all([
+			this._pb.authedClient.collection('securities').getFullList<SecuritiesResponse>({
+				sort: 'name',
+				requestKey: null
+			}),
+			this._pb.authedClient.collection('securityBalances').getFullList<SecurityBalance>({
+				sort: 'security,account,-asOf,-created,-id',
+				requestKey: null
+			})
+		]);
+		if (userId !== this._auth.currentUserId || !this.sequence.isCurrent(token)) return;
 
-			this.securities = this.securitiesSnapshot
-				.replay(securities)
-				.toSorted((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-			const deletedSecurityIds = this.securitiesSnapshot.deletedIds;
-
-			const reconciledBalances = this.balancesSnapshot.replay(
-				securityBalances.filter((balance) => !deletedSecurityIds.has(balance.security))
-			);
-			this.currentPositions.clear();
-			for (const [key, position] of resolveSecurityBalanceValues(reconciledBalances)) {
-				this.currentPositions.set(key, position);
-			}
-			this.resolvePositionsLoaded();
-		} finally {
-			this.securitiesSnapshot.end(token);
-			this.balancesSnapshot.end(token);
+		this.securities = securities.toSorted((a, b) =>
+			a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+		);
+		this.currentPositions.clear();
+		for (const [key, position] of resolveSecurityBalanceValues(securityBalances)) {
+			this.currentPositions.set(key, position);
 		}
+		this.resolvePositionsLoaded();
 	}
 
 	private realtimeSubscribe(userId = this._activeUserId) {
@@ -282,7 +266,7 @@ class SecuritiesContext {
 
 		this._pb.authedClient
 			.collection('securities')
-			.subscribe<SecuritiesResponse>('*', (event) => this.onSecurityEvent(event, userId))
+			.subscribe('*', () => this.onRealtimeEvent(userId))
 			.catch((error) => {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'securities', 'subscribe');
@@ -292,7 +276,7 @@ class SecuritiesContext {
 			});
 		this._pb.authedClient
 			.collection('securityBalances')
-			.subscribe<SecurityBalance>('*', (event) => this.onSecurityBalanceEvent(event, userId))
+			.subscribe('*', () => this.onRealtimeEvent(userId))
 			.catch((error) => {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'securities', 'subscribe_balances');
@@ -303,120 +287,16 @@ class SecuritiesContext {
 		this._isSubscribed = true;
 	}
 
+	private onRealtimeEvent(userId: string) {
+		if (!userId || userId !== this._activeUserId) return;
+		this.invalidate();
+	}
+
 	private unsubscribeRealtime() {
 		if (!this._isSubscribed) return;
 		this._isSubscribed = false;
 		this._pb.authedClient.collection('securities').unsubscribe('*');
 		this._pb.authedClient.collection('securityBalances').unsubscribe('*');
-	}
-
-	private onSecurityEvent(event: RecordSubscription<SecuritiesResponse>, userId: string) {
-		if (!userId || userId !== this._activeUserId) return;
-		if (!event.action) return;
-		this.securitiesSnapshot.buffer(event.record, event.action === 'delete');
-		if (event.action === 'delete') {
-			this.securities = this.securities.filter((security) => security.id !== event.record.id);
-			this.positionEpochs.bumpMatching((key) => key.endsWith(`:${event.record.id}`));
-			for (const [key, position] of this.currentPositions) {
-				if (position.balance.security === event.record.id) this.currentPositions.delete(key);
-			}
-			if (this.positionsLoaded) this._accounts.notifyBalancesChanged();
-			return;
-		}
-
-		this.upsertSecurity(event.record);
-	}
-
-	private onSecurityBalanceEvent(event: RecordSubscription<SecurityBalance>, userId: string) {
-		if (!userId || userId !== this._activeUserId) return;
-		if (!event.action) return;
-		this.balancesSnapshot.buffer(event.record, event.action === 'delete');
-
-		const key = this.positionKey(event.record.account, event.record.security);
-		const affectedKeys = new SvelteSet([key]);
-		if (event.action === 'update') {
-			for (const [currentKey, position] of this.currentPositions) {
-				if (position.balance.id === event.record.id && currentKey !== key) {
-					const [accountId, securityId] = currentKey.split(':');
-					if (accountId && securityId) affectedKeys.add(currentKey);
-				}
-			}
-		}
-
-		for (const affectedKey of affectedKeys) {
-			this.positionEpochs.bump(affectedKey);
-			const [accountId, securityId] = affectedKey.split(':');
-			if (accountId && securityId) this.schedulePositionRefresh(accountId, securityId, userId);
-		}
-	}
-
-	private schedulePositionRefresh(accountId: string, securityId: string, userId: string) {
-		const key = this.positionKey(accountId, securityId);
-		const existing = this.positionRefreshTimers.get(key);
-		if (existing) clearTimeout(existing);
-
-		this.positionRefreshTimers.set(
-			key,
-			setTimeout(() => {
-				this.positionRefreshTimers.delete(key);
-				const token = this.sequence.current;
-				void this.refreshPosition(accountId, securityId, userId, token)
-					.then((refreshed) => {
-						if (refreshed && this.positionsLoaded) this._accounts.notifyBalancesChanged();
-					})
-					.catch((error) => {
-						if (userId !== this._auth.currentUserId || !this.sequence.isCurrent(token)) return;
-						this._pb.handleConnectionError(error, 'securities', 'position_refresh');
-					});
-			}, DEBOUNCE_MS)
-		);
-	}
-
-	private async refreshPosition(
-		accountId: string,
-		securityId: string,
-		userId: string,
-		token: number
-	) {
-		if (!userId || userId !== this._auth.currentUserId || !this.sequence.isCurrent(token))
-			return false;
-		const key = this.positionKey(accountId, securityId);
-		const mutationEpoch = this.positionEpochs.read(key);
-		const balances = await this._pb.authedClient
-			.collection('securityBalances')
-			.getFullList<SecurityBalance>({
-				filter: `account='${accountId}' && security='${securityId}'`,
-				sort: '-asOf,-created,-id',
-				requestKey: null
-			});
-		if (
-			userId !== this._auth.currentUserId ||
-			!this.sequence.isCurrent(token) ||
-			!this.positionEpochs.isCurrent(key, mutationEpoch)
-		)
-			return false;
-
-		const position = resolveSecurityBalanceValues(balances).get(key);
-		if (position) this.currentPositions.set(key, position);
-		else this.currentPositions.delete(key);
-		return true;
-	}
-
-	private positionKey(accountId: string, securityId: string) {
-		return `${accountId}:${securityId}`;
-	}
-
-	private upsertSecurity(security: SecuritiesResponse) {
-		this.securities = upsertById(this.securities, security).list.toSorted((a, b) =>
-			a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
-		);
-	}
-
-	private clearPositionRefreshTimers() {
-		for (const timer of this.positionRefreshTimers.values()) {
-			clearTimeout(timer);
-		}
-		this.positionRefreshTimers.clear();
 	}
 
 	private getLatestAccountBalanceRows() {
@@ -529,9 +409,11 @@ class SecuritiesContext {
 	}
 
 	dispose() {
+		this.debouncer.cancel();
 		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
-		this.clearPositionRefreshTimers();
+		this._pb.unregisterRealtimeReconnect(this._reconnectCallback);
 		this.unsubscribeRealtime();
+		this.sequence.bump();
 	}
 }
 
