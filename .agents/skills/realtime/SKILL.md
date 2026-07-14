@@ -44,7 +44,8 @@ Every realtime store must satisfy all seven. `src/lib/securities.svelte.ts` is t
 2. **Event → debounced invalidate.** A realtime event calls `invalidate()`, which schedules the
    refetch through the shared `Debouncer` (200ms trailing). Bursts coalesce to one refetch.
 3. **Reconnect → same invalidate.** Register one `registerRealtimeReconnect(() => this.invalidate())`
-   callback per store so a dropped-and-restored socket triggers the identical corrective refetch.
+   callback per store so a restored connection triggers the identical corrective refetch. The
+   registry decides _when_ that fires — see "Connection recovery" below.
 4. **Latest-request-wins commit.** Take a `RequestSequence` token with `sequence.next()` before the
    await; on _every_ path that touches state — the success commit, `catch`, and `finally` — re-check
    both `sequence.isCurrent(token)` and `userId === auth.currentUserId` and bail if either fails. This
@@ -65,6 +66,40 @@ Every realtime store must satisfy all seven. `src/lib/securities.svelte.ts` is t
 (→ session teardown). It holds no list, is self-correcting, and is the **teardown coordinator** every
 other store registers into via `registerRealtimeTeardown`. It is not a data-sync store — do not force
 it into the contract.
+
+## Connection recovery
+
+Reference: `src/lib/pocketbase.svelte.ts` (`registerRealtimeReconnect`, `recoverRealtime`).
+
+**EventSource has no liveness detection.** A dropped network or a slept laptop routinely leaves the
+socket in `readyState === OPEN` forever: no `error` event, no `onDisconnect`, no `PB_CONNECT`, and
+therefore no reconnect from the SDK — which only reconnects on a transport error. The socket can even
+keep delivering events while the network is down, and every refetch they schedule fails and is
+discarded (stores have no retry). A session in that state stays stale indefinitely. The SDK's
+reconnect path is real but covers only the cases where the transport actually errors.
+
+So recovery has **three triggers**, all funneled through the registry:
+
+1. `PB_CONNECT` after an `onDisconnect` with active subscriptions — the SDK's own path.
+2. `window` `online` — the network came back.
+3. `document` `visibilitychange` → visible — covers sleep/wake and long-backgrounded tabs, which
+   `online` alone misses. A hidden tab is deliberately left alone; this trigger picks it up when the
+   user returns.
+
+Triggers 2 and 3 are browser-only, so they are registered behind `browser` from `$app/environment`.
+
+Recovery is **latched, not fire-and-forget**. A refetch issued the instant a trigger fires can still
+hit an unusable network (`online` precedes real connectivity), and a store's failed refetch vanishes.
+So the registry probes `health.check()` on a bounded backoff and fires the registered callbacks only
+once the backend actually answers; after the last delay it gives up and waits for the next trigger,
+so an hour offline costs a handful of probes rather than a hot loop. A single `_recovering` flag
+coalesces the burst — SDK reconnect, `online`, and `visibilitychange` usually arrive together — into
+one round of invalidations.
+
+Testing this: dispatching an `error` event on the EventSource only exercises trigger 1 — it injects
+the very signal whose absence is the real-world failure. A genuine offline needs CDP
+(`Network.emulateNetworkConditions`); Playwright's `context.setOffline()` tears the socket down and
+so exercises trigger 1 as well. Both cases are covered in `e2e/shared-records.test.ts`.
 
 ## Server-side debouncing (Go hooks)
 
@@ -90,6 +125,8 @@ refetches, not one per row.
   the sync/projection split above
 - **Dropping a mid-flight event as "already fetching"** — obligations 2 and 4 together require a
   follow-up refetch so the newer server state wins
+- **Treating the SDK's reconnect as the whole recovery story** — it never fires when the socket stays
+  OPEN, which is the common real-world drop; the browser triggers are part of the contract
 - **`realtime.unsubscribe()`** — kills ALL subscriptions; unsubscribe the specific collection topics
 - **No debouncing** — causes UI flicker and excessive API calls during bulk operations
 
