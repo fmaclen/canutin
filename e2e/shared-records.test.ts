@@ -769,3 +769,199 @@ test('asset share API rejects self-share and unknown recipient', async () => {
 	);
 	expect(response.status).toBe(200);
 });
+
+test('shared account and asset reconcile after a realtime reconnect without relogin', async ({
+	page
+}) => {
+	const owner = await seedUser('dexter');
+	const recipient = await seedUser('gwen');
+
+	const sharedAccount = await seedAccount({
+		name: 'Reconnect savings',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: owner.id,
+		balanceType: 'Savings'
+	});
+	await seedAccountBalance({
+		account: sharedAccount.id,
+		owner: owner.id,
+		asOf: new Date().toISOString(),
+		value: 4200
+	});
+	const sharedAsset = await seedAsset({
+		name: 'Reconnect brokerage',
+		balanceGroup: AssetsBalanceGroupOptions.INVESTMENT,
+		owner: owner.id,
+		balanceType: 'Brokerage'
+	});
+	await seedAssetBalance({
+		asset: sharedAsset.id,
+		owner: owner.id,
+		asOf: new Date().toISOString(),
+		bookValue: 8000,
+		marketValue: 11000
+	});
+
+	// Track the SDK's realtime EventSource so the test can dispatch a transport error on it. This
+	// covers the SDK's own reconnect path - onDisconnect, then PB_CONNECT - and only that path: a
+	// real network drop usually leaves the socket OPEN without ever erroring, which is why the
+	// offline test below drives the browser's online/visibility triggers instead.
+	await page.addInitScript(() => {
+		const NativeEventSource = window.EventSource;
+		const sources: EventSource[] = [];
+		Object.assign(window, { __realtimeSources: sources });
+		window.EventSource = class extends NativeEventSource {
+			constructor(url: string | URL, init?: EventSourceInit) {
+				super(url, init);
+				sources.push(this);
+			}
+		};
+	});
+
+	await page.goto('/');
+	await signIn(page, recipient.email);
+
+	await goToPageViaSidebar(page, 'Accounts');
+	await expect(page.getByRole('row', { name: /Reconnect savings/ })).toHaveCount(0);
+
+	// Hold the realtime connection down while both records are shared, so the create events are
+	// never delivered to this session. Gating the reconnect (rather than aborting it) keeps the SDK
+	// from backing off, so releasing the gate reconnects promptly.
+	let releaseRealtime = () => {};
+	const realtimeGate = new Promise<void>((resolve) => {
+		releaseRealtime = resolve;
+	});
+	await page.route('**/api/realtime', async (route) => {
+		await realtimeGate;
+		await route.continue();
+	});
+	await page.evaluate(() => {
+		const sources = (window as unknown as { __realtimeSources: EventSource[] }).__realtimeSources;
+		for (const source of sources) source.dispatchEvent(new Event('error'));
+	});
+	await Promise.all([
+		seedAccountShare({
+			account: sharedAccount.id,
+			recipient: recipient.id,
+			recipientEmail: recipient.email,
+			grantedBy: owner.id,
+			accessRole: 'VIEWER',
+			perspective: 'NORMAL',
+			includeInNetWorth: true
+		}),
+		seedAssetShare({
+			asset: sharedAsset.id,
+			recipient: recipient.id,
+			recipientEmail: recipient.email,
+			grantedBy: owner.id,
+			accessRole: 'VIEWER',
+			perspective: 'NORMAL',
+			includeInNetWorth: true
+		})
+	]);
+	releaseRealtime();
+
+	// HACK: reconnect reconciliation refetches shares, accounts, and each account's balance in
+	// sequence, which can outrun the default expect timeout under a loaded CI machine; there is no
+	// reconcile-complete signal to await instead.
+	await expect(page.getByRole('row', { name: /Reconnect savings/ })).toContainText('$4,200.00', {
+		timeout: 15000
+	});
+
+	await goToPageViaSidebar(page, 'Assets');
+	await expect(page.getByRole('row', { name: /Reconnect brokerage/ })).toBeVisible();
+});
+
+test('shared account reconciles after the browser goes offline and back online', async ({
+	browserName,
+	page
+}) => {
+	// Only CDP reproduces a real network drop. `context.setOffline()` tears the realtime EventSource
+	// down, so the SDK sees a transport error and reconnects on its own; an actual offline network -
+	// what DevTools' offline mode emulates - leaves the socket OPEN and silent instead.
+	test.skip(browserName !== 'chromium', 'Network emulation is only available through CDP');
+	const cdp = await page.context().newCDPSession(page);
+	await cdp.send('Network.enable');
+	const emulateOffline = (offline: boolean) =>
+		cdp.send('Network.emulateNetworkConditions', {
+			offline,
+			latency: 0,
+			downloadThroughput: -1,
+			uploadThroughput: -1
+		});
+
+	const owner = await seedUser('felix');
+	const recipient = await seedUser('lucia');
+
+	const sharedAccount = await seedAccount({
+		name: 'Offline checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: owner.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: sharedAccount.id,
+		owner: owner.id,
+		asOf: new Date().toISOString(),
+		value: 1500
+	});
+	await seedAccountShare({
+		account: sharedAccount.id,
+		recipient: recipient.id,
+		recipientEmail: recipient.email,
+		grantedBy: owner.id,
+		accessRole: 'VIEWER',
+		perspective: 'NORMAL',
+		includeInNetWorth: true
+	});
+	const lateAccount = await seedAccount({
+		name: 'Offline savings',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: owner.id,
+		balanceType: 'Savings'
+	});
+	await seedAccountBalance({
+		account: lateAccount.id,
+		owner: owner.id,
+		asOf: new Date().toISOString(),
+		value: 900
+	});
+
+	await page.goto('/');
+	await signIn(page, recipient.email);
+
+	await goToPageViaSidebar(page, 'Accounts');
+	const checkingRow = page.getByRole('row', { name: /Offline checking/ });
+	await expect(checkingRow).toContainText('$1,500.00');
+
+	// A real network drop leaves the realtime socket OPEN and error-free, so the SDK never notices it
+	// and never reconnects. The socket even keeps delivering events - but the refetch each one
+	// schedules dies on the dead network and its result is discarded, which is what the connection
+	// toast reports. Waiting for that toast is what makes this test meaningful: it proves the missed
+	// mutations have already been consumed and thrown away before the network returns, so nothing but
+	// recovery can converge the session afterwards.
+	await emulateOffline(true);
+	await seedAccountBalance({
+		account: sharedAccount.id,
+		owner: owner.id,
+		asOf: new Date().toISOString(),
+		value: 4200
+	});
+	await seedAccountShare({
+		account: lateAccount.id,
+		recipient: recipient.id,
+		recipientEmail: recipient.email,
+		grantedBy: owner.id,
+		accessRole: 'VIEWER',
+		perspective: 'NORMAL',
+		includeInNetWorth: true
+	});
+	await expect(page.getByText("Can't connect to the database server")).toBeVisible();
+	await expect(checkingRow).toContainText('$1,500.00');
+	await expect(page.getByRole('row', { name: /Offline savings/ })).toHaveCount(0);
+
+	// Coming back online must reconcile the session on its own: no reload, no further realtime event.
+	await emulateOffline(false);
+	await expect(checkingRow).toContainText('$4,200.00');
+	await expect(page.getByRole('row', { name: /Offline savings/ })).toContainText('$900.00');
+});

@@ -86,9 +86,7 @@
 			};
 
 			await pb.authedClient.collection('accountBalances').create(balanceData);
-			if (await accountsContext.refreshAccount(account.id, currentOwnerId)) {
-				accountsContext.notifyBalancesChanged();
-			}
+			await accountsContext.refreshForCurrentUser();
 
 			toast.success(m.accounts_add_success());
 			await goto(resolve('/accounts'));

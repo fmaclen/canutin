@@ -7,6 +7,7 @@ import { getExchangeRatesContext } from './exchange-rates.svelte';
 import { logError } from './logger';
 import { AccountSharesPerspectiveOptions, type TransactionsResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
+import { Debouncer, RequestSequence } from './realtime-sync';
 
 const DEBOUNCE_MS = 200;
 
@@ -42,23 +43,25 @@ class AccountCashflowContext {
 	private _auth: ReturnType<typeof getAuthContext>;
 	private _fx: ReturnType<typeof getExchangeRatesContext>;
 	private _transactions: TransactionsResponse[] = $state([]);
-	private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
+	private sequence = new RequestSequence();
+	private debouncer = new Debouncer(DEBOUNCE_MS);
 	private _unsubscribe: (() => void) | null = null;
 	private _disposed = false;
 	private _activeUserId = '';
 	private _isSubscribed = false;
-	private _recomputeSequence = 0;
 	private _accountId = '';
 	private _currency = $state('USD');
 	private _perspective = $state<AccountSharesPerspectiveOptions>(
 		AccountSharesPerspectiveOptions.NORMAL
 	);
 	private _teardownCallback = () => this.unsubscribeRealtime();
+	private _reconnectCallback = () => this.invalidate();
 
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
+		this._pb.registerRealtimeReconnect(this._reconnectCallback);
 		this._fx = getExchangeRatesContext();
 		this.init();
 	}
@@ -139,22 +142,25 @@ class AccountCashflowContext {
 	private onTransactionEvent(e: RecordSubscription<TransactionsResponse>) {
 		if (!e.action) return;
 		if (e.record.account !== this._accountId) return;
+		this.invalidate();
+	}
 
-		if (this._debounceTimer) {
-			clearTimeout(this._debounceTimer);
-		}
-
-		this._debounceTimer = setTimeout(() => {
-			this._debounceTimer = null;
-			void this.recomputeAll().catch((error) => {
-				logError('accountCashflow', 'recompute_on_event', error);
-			});
-		}, DEBOUNCE_MS);
+	// A transaction event or a realtime reconnect is a pure invalidation signal: it schedules the
+	// debounced windowed refetch rather than patching the event payload. A reconnect carries no
+	// record, so it recomputes only when an account is active and someone is signed in.
+	private invalidate() {
+		if (!this._activeUserId || !this._accountId) return;
+		this.debouncer.schedule(
+			() =>
+				void this.recomputeAll().catch((error) =>
+					this._pb.handleConnectionError(error, 'accountCashflow', 'refresh')
+				)
+		);
 	}
 
 	private async recomputeAll() {
 		const accountId = this._accountId;
-		const recomputeSequence = ++this._recomputeSequence;
+		const token = this.sequence.next();
 		const window = computeCashflowWindow();
 
 		try {
@@ -166,31 +172,26 @@ class AccountCashflowContext {
 					requestKey: null
 				});
 
-			if (recomputeSequence !== this._recomputeSequence) return;
+			if (!this.sequence.isCurrent(token)) return;
 
 			this._transactions = transactions;
 		} finally {
-			if (!this._disposed && recomputeSequence === this._recomputeSequence) this.isLoading = false;
+			if (!this._disposed && this.sequence.isCurrent(token)) this.isLoading = false;
 		}
 	}
 
 	private reset() {
-		this._recomputeSequence++;
-		if (this._debounceTimer) {
-			clearTimeout(this._debounceTimer);
-			this._debounceTimer = null;
-		}
+		this.sequence.bump();
+		this.debouncer.cancel();
 		this._transactions = [];
 	}
 
 	dispose() {
 		this._disposed = true;
-		this._recomputeSequence++;
-		if (this._debounceTimer) {
-			clearTimeout(this._debounceTimer);
-			this._debounceTimer = null;
-		}
+		this.sequence.bump();
+		this.debouncer.cancel();
 		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
+		this._pb.unregisterRealtimeReconnect(this._reconnectCallback);
 		this.unsubscribeRealtime();
 	}
 }

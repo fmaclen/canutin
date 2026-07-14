@@ -5,6 +5,7 @@ import { getAuthContext } from './auth.svelte';
 import { logError } from './logger';
 import type { CurrenciesResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
+import { Debouncer, RequestSequence } from './realtime-sync';
 
 const DEBOUNCE_MS = 200;
 
@@ -34,17 +35,19 @@ class CurrenciesContext {
 
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
+	private sequence = new RequestSequence();
+	private debouncer = new Debouncer(DEBOUNCE_MS);
 	private _activeUserId = '';
 	private _isSubscribed = false;
-	private _refreshSequence = 0;
-	private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
 	private _disposed = false;
 	private _teardownCallback = () => this.unsubscribeRealtime();
+	private _reconnectCallback = () => this.invalidate();
 
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
+		this._pb.registerRealtimeReconnect(this._reconnectCallback);
 		this.init();
 	}
 
@@ -53,13 +56,10 @@ class CurrenciesContext {
 			const userId = this._auth.currentUserId;
 			if (userId === this._activeUserId) return;
 			this.unsubscribeRealtime();
-			if (this._debounceTimer) {
-				clearTimeout(this._debounceTimer);
-				this._debounceTimer = null;
-			}
+			this.debouncer.cancel();
+			this.sequence.bump();
 			this._activeUserId = userId;
 			if (!userId) {
-				this._refreshSequence++;
 				this._records = [];
 				this._isLoaded = false;
 				return;
@@ -72,7 +72,7 @@ class CurrenciesContext {
 
 	private async refresh(userId: string) {
 		if (!userId) return;
-		const sequence = ++this._refreshSequence;
+		const token = this.sequence.next();
 		try {
 			const list = await this._pb.authedClient
 				.collection('currencies')
@@ -80,14 +80,14 @@ class CurrenciesContext {
 					sort: 'code',
 					requestKey: null
 				});
-			if (this._disposed || userId !== this._activeUserId || sequence !== this._refreshSequence)
+			if (this._disposed || userId !== this._activeUserId || !this.sequence.isCurrent(token))
 				return;
 
 			this._records = list;
 			this._isLoaded = true;
 		} catch (error) {
 			if (userId !== this._activeUserId) return;
-			this._pb.handleConnectionError(error, 'currencies', 'init');
+			this._pb.handleConnectionError(error, 'currencies', 'refresh');
 		}
 	}
 
@@ -96,7 +96,7 @@ class CurrenciesContext {
 		this._isSubscribed = true;
 		this._pb.authedClient
 			.collection('currencies')
-			.subscribe('*', this.onEvent.bind(this))
+			.subscribe('*', () => this.invalidate())
 			.catch((error) => {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'currencies', 'subscribe');
@@ -112,12 +112,11 @@ class CurrenciesContext {
 		this._pb.authedClient.collection('currencies').unsubscribe('*');
 	}
 
-	private onEvent() {
-		if (this._debounceTimer) clearTimeout(this._debounceTimer);
-		this._debounceTimer = setTimeout(() => {
-			this._debounceTimer = null;
-			void this.refresh(this._activeUserId);
-		}, DEBOUNCE_MS);
+	// Realtime events and reconnects are pure invalidation signals: both schedule a debounced full
+	// refetch, so a reconnect converges on any events missed while the socket was disconnected.
+	private invalidate() {
+		if (!this._activeUserId) return;
+		this.debouncer.schedule(() => void this.refresh(this._activeUserId));
 	}
 
 	get currencies() {
@@ -146,12 +145,11 @@ class CurrenciesContext {
 
 	dispose() {
 		this._disposed = true;
-		if (this._debounceTimer) {
-			clearTimeout(this._debounceTimer);
-			this._debounceTimer = null;
-		}
+		this.debouncer.cancel();
 		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
+		this._pb.unregisterRealtimeReconnect(this._reconnectCallback);
 		this.unsubscribeRealtime();
+		this.sequence.bump();
 	}
 }
 

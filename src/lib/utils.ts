@@ -135,16 +135,3 @@ export function isDuplicateSecurityNameError(error: unknown) {
 		responseFieldCode(error, 'name') === 'security_name_exists'
 	);
 }
-
-export function upsertById<T extends { id: string }>(list: T[], record: T) {
-	const exists = list.some((r) => r.id === record.id);
-	return {
-		list: exists ? list.map((r) => (r.id === record.id ? record : r)) : [...list, record],
-		inserted: !exists
-	};
-}
-
-export function removeById<T extends { id: string }>(list: T[], id: string) {
-	if (!list.some((r) => r.id === id)) return { list, removed: false };
-	return { list: list.filter((r) => r.id !== id), removed: true };
-}

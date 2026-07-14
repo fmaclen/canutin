@@ -1,4 +1,3 @@
-import { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 
@@ -14,10 +13,11 @@ import {
 	type AccountsResponse
 } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
+import { Debouncer, RequestSequence } from './realtime-sync';
 import type { AccountPositionsValue } from './securities.svelte';
 import { sumOrUnknown } from './security-balance-values';
 import { participantExcluded, projectSignedValue } from './sharing';
-import { isUnavailableRecordError, removeById, toPocketBaseDateString, upsertById } from './utils';
+import { toPocketBaseDateString } from './utils';
 
 export type AccountWithBalance = AccountsResponse & {
 	// NOTE: `balance` is the perspective-projected total in the account's own currency (null when
@@ -44,13 +44,12 @@ type PositionsSource = {
 	positionsLoaded: boolean;
 };
 
-type LatestAccountBalance = {
-	id: string;
-	account: string;
+type LatestCash = {
 	value: number;
 	asOf: string;
-	created: string;
 };
+
+const DEBOUNCE_MS = 200;
 
 class AccountsContext {
 	accounts: AccountWithBalance[] = $derived.by(() =>
@@ -74,18 +73,19 @@ class AccountsContext {
 	isLoading: boolean = $state(true);
 
 	private rawAccounts: AccountsResponse[] = $state([]);
-	private latestCashByAccount = new SvelteMap<string, LatestAccountBalance>();
+	private latestCashByAccount = new SvelteMap<string, LatestCash>();
 	private positionsSource: PositionsSource | null = $state(null);
 	private accountsLoaded = false;
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
 	private _fx: ReturnType<typeof getExchangeRatesContext>;
 	private balanceTypesContext: ReturnType<typeof setBalanceTypesContext>;
-	private refreshSequence = 0;
-	private mutationEpoch = 0;
+	private sequence = new RequestSequence();
+	private debouncer = new Debouncer(DEBOUNCE_MS);
 	private _activeUserId = '';
 	private _isSubscribed = false;
 	private _teardownCallback = () => this.unsubscribeRealtime();
+	private _reconnectCallback = () => this.invalidate();
 
 	constructor(
 		pb: PocketBaseContext,
@@ -94,6 +94,7 @@ class AccountsContext {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
+		this._pb.registerRealtimeReconnect(this._reconnectCallback);
 		this._fx = getExchangeRatesContext();
 		this.balanceTypesContext = balanceTypesContext;
 		this.init();
@@ -151,25 +152,17 @@ class AccountsContext {
 			recipientEmail,
 			perspective
 		});
-		await this.refreshShares();
-		if (await this.refreshAccount(accountId, this.currentUserId)) this.notifyBalancesChanged();
+		await this.refreshForCurrentUser();
 	}
 
 	async updateShareIncludeInNetWorth(shareId: string, includeInNetWorth: boolean) {
-		const share = await this._pb.authedClient
-			.collection('accountShares')
-			.update<AccountSharesResponse>(shareId, { includeInNetWorth });
-		await this.refreshShares();
-		if (await this.refreshAccount(share.account, this.currentUserId)) this.notifyBalancesChanged();
+		await this._pb.authedClient.collection('accountShares').update(shareId, { includeInNetWorth });
+		await this.refreshForCurrentUser();
 	}
 
 	async revokeShare(shareId: string) {
-		const accountId = this.shares.find((share) => share.id === shareId)?.account;
 		await this._pb.authedClient.collection('accountShares').delete(shareId);
-		await this.refreshShares();
-		if (accountId && (await this.refreshAccount(accountId, this.currentUserId))) {
-			this.notifyBalancesChanged();
-		}
+		await this.refreshForCurrentUser();
 	}
 
 	private init() {
@@ -177,9 +170,10 @@ class AccountsContext {
 			const userId = this.currentUserId;
 			if (userId === this._activeUserId) return;
 			this.unsubscribeRealtime();
+			this.debouncer.cancel();
+			this.sequence.bump();
 			this._activeUserId = userId;
 			if (!userId) {
-				this.refreshSequence++;
 				this.rawAccounts = [];
 				this.latestCashByAccount.clear();
 				this.shares = [];
@@ -196,60 +190,60 @@ class AccountsContext {
 		});
 	}
 
-	private async refreshForCurrentUser() {
+	// Realtime events and reconnects are pure invalidation signals: they never patch a payload into
+	// state, they only schedule a full refetch. Deletes, share membership changes, and cross-account
+	// balance reassignments all resolve for free because the fresh snapshot reflects the database as-is.
+	private invalidate() {
+		this.debouncer.schedule(() => void this.refreshForCurrentUser());
+	}
+
+	async refreshForCurrentUser() {
 		const userId = this.currentUserId;
-		const token = ++this.refreshSequence;
+		const token = this.sequence.next();
 		try {
-			await this.refreshShares(userId, token);
-			await this.refreshAccounts(userId, token);
-			this.notifyBalancesChanged();
-		} catch (error) {
-			if (userId !== this.currentUserId || token !== this.refreshSequence) return;
-			this._pb.handleConnectionError(error, 'accounts', 'init');
-		} finally {
-			if (userId === this.currentUserId && token === this.refreshSequence) this.isLoading = false;
-		}
-	}
+			const [shares, accounts, balances] = await Promise.all([
+				this._pb.authedClient.collection('accountShares').getFullList<AccountSharesResponse>({
+					filter: `grantedBy='${userId}' || recipient='${userId}'`,
+					sort: 'recipientEmail',
+					requestKey: null
+				}),
+				this._pb.authedClient.collection('accounts').getFullList<AccountsResponse>({
+					filter: `owner='${userId}' || accountShares_via_account.recipient ?= '${userId}'`,
+					requestKey: null
+				}),
+				// One query for every account's latest balance instead of N point-queries: the
+				// 'account,-asOf,-created,-id' sort groups by account and orders each group newest-first,
+				// so the first row seen per account wins - the same tiebreakers getList(1,1) used.
+				this._pb.authedClient.collection('accountBalances').getFullList<AccountBalancesResponse>({
+					sort: 'account,-asOf,-created,-id',
+					fields: 'account,value,asOf',
+					requestKey: null
+				})
+			]);
+			if (userId !== this.currentUserId || !this.sequence.isCurrent(token)) return;
+			for (const account of accounts) {
+				await this.balanceTypesContext.ensureLoaded(account.balanceType);
+			}
+			if (userId !== this.currentUserId || !this.sequence.isCurrent(token)) return;
 
-	private async refreshShares(userId = this.currentUserId, token = this.refreshSequence) {
-		if (!userId || userId !== this.currentUserId || token !== this.refreshSequence) return;
-		const shares = await this._pb.authedClient.collection('accountShares').getFullList({
-			filter: `grantedBy='${userId}' || recipient='${userId}'`,
-			sort: 'recipientEmail',
-			requestKey: null
-		});
-		if (userId !== this.currentUserId || token !== this.refreshSequence) return;
-		this.shares = shares;
-	}
-
-	private async refreshAccounts(userId = this.currentUserId, token = this.refreshSequence) {
-		if (!userId || userId !== this.currentUserId || token !== this.refreshSequence) return;
-		const epoch = this.mutationEpoch;
-		const accounts = await this._pb.authedClient
-			.collection('accounts')
-			.getFullList<AccountsResponse>({
-				filter: `owner='${userId}' || accountShares_via_account.recipient ?= '${userId}'`,
-				requestKey: null
-			});
-		for (const account of accounts) {
-			await this.balanceTypesContext.ensureLoaded(account.balanceType);
-		}
-		const latestBalances = await Promise.all(
-			accounts.map((account) => this.getLatestAccountBalance(account.id))
-		);
-		if (userId !== this.currentUserId || token !== this.refreshSequence) return;
-
-		// NOTE: A targeted membership mutation landed while this list was
-		// in flight, so the fetched snapshot is stale; leave membership and
-		// balances to the mutation but still mark the store loaded.
-		if (epoch === this.mutationEpoch) {
+			this.shares = shares.toSorted((a, b) => a.recipientEmail.localeCompare(b.recipientEmail));
 			this.latestCashByAccount.clear();
-			for (const balance of latestBalances) {
-				if (balance) this.latestCashByAccount.set(balance.account, balance);
+			for (const balance of balances) {
+				if (this.latestCashByAccount.has(balance.account)) continue;
+				this.latestCashByAccount.set(balance.account, {
+					value: balance.value ?? 0,
+					asOf: balance.asOf
+				});
 			}
 			this.rawAccounts = accounts;
+			this.accountsLoaded = true;
+			this.notifyBalancesChanged();
+		} catch (error) {
+			if (userId !== this.currentUserId || !this.sequence.isCurrent(token)) return;
+			this._pb.handleConnectionError(error, 'accounts', 'refresh');
+		} finally {
+			if (userId === this.currentUserId && this.sequence.isCurrent(token)) this.isLoading = false;
 		}
-		this.accountsLoaded = true;
 	}
 
 	private realtimeSubscribe(userId = this._activeUserId) {
@@ -257,13 +251,7 @@ class AccountsContext {
 
 		this._pb.authedClient
 			.collection('accounts')
-			.subscribe<AccountsResponse>('*', (event) => {
-				void this.onCollectionEvent(event, userId).catch((error) => {
-					if (userId === this._activeUserId) {
-						this._pb.handleConnectionError(error, 'accounts', 'account_event');
-					}
-				});
-			})
+			.subscribe('*', () => this.onRealtimeEvent(userId))
 			.catch((error) => {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'accounts', 'subscribe_accounts');
@@ -273,13 +261,7 @@ class AccountsContext {
 			});
 		this._pb.authedClient
 			.collection('accountBalances')
-			.subscribe<AccountBalancesResponse>('*', (event) => {
-				void this.onCollectionEvent(event, userId).catch((error) => {
-					if (userId === this._activeUserId) {
-						this._pb.handleConnectionError(error, 'accounts', 'balance_event');
-					}
-				});
-			})
+			.subscribe('*', () => this.onRealtimeEvent(userId))
 			.catch((error) => {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'accounts', 'subscribe_balances');
@@ -289,7 +271,7 @@ class AccountsContext {
 			});
 		this._pb.authedClient
 			.collection('accountShares')
-			.subscribe<AccountSharesResponse>('*', (event) => this.onAccountShareEvent(event, userId))
+			.subscribe('*', () => this.onRealtimeEvent(userId))
 			.catch((error) => {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'accounts', 'subscribe_shares');
@@ -300,181 +282,17 @@ class AccountsContext {
 		this._isSubscribed = true;
 	}
 
+	private onRealtimeEvent(userId: string) {
+		if (!userId || userId !== this._activeUserId) return;
+		this.invalidate();
+	}
+
 	private unsubscribeRealtime() {
 		if (!this._isSubscribed) return;
 		this._isSubscribed = false;
 		this._pb.authedClient.collection('accounts').unsubscribe('*');
 		this._pb.authedClient.collection('accountBalances').unsubscribe('*');
 		this._pb.authedClient.collection('accountShares').unsubscribe('*');
-	}
-
-	private async onCollectionEvent(
-		e: RecordSubscription<AccountsResponse> | RecordSubscription<AccountBalancesResponse>,
-		userId: string
-	) {
-		if (!userId || userId !== this._activeUserId) return;
-		if (!e.action) return;
-		if ('account' in e.record) {
-			await this.onAccountBalanceEvent(e.action, e.record, userId);
-			return;
-		}
-		await this.onAccountEvent(e.action, e.record, userId);
-	}
-
-	private onAccountShareEvent(e: RecordSubscription<AccountSharesResponse>, userId: string) {
-		if (!userId || userId !== this._activeUserId) return;
-		const isRelevantShare = e.record.grantedBy === userId || e.record.recipient === userId;
-		if (e.action === 'create') {
-			if (isRelevantShare) this.shares = [...this.shares, e.record];
-		} else if (e.action === 'update') {
-			if (isRelevantShare)
-				this.shares = this.shares.map((share) => (share.id === e.record.id ? e.record : share));
-		} else if (e.action === 'delete') {
-			this.shares = this.shares.filter((share) => share.id !== e.record.id);
-		}
-
-		void this.refreshAccount(e.record.account, userId)
-			.then(() => this.notifyBalancesChanged())
-			.catch((error) => {
-				if (userId === this.currentUserId)
-					this._pb.handleConnectionError(error, 'accounts', 'share');
-			});
-	}
-
-	private async onAccountEvent(action: string, account: AccountsResponse, userId: string) {
-		if (action === 'delete') {
-			this.removeAccountRecord(account.id);
-			this.latestCashByAccount.delete(account.id);
-			this.notifyBalancesChanged();
-			return;
-		}
-
-		await this.balanceTypesContext.ensureLoaded(account.balanceType);
-		if (userId !== this.currentUserId) return;
-		this.upsertAccountRecord(account);
-		if (!this.latestCashByAccount.has(account.id)) {
-			await this.refreshAccountBalance(account.id, userId);
-		}
-		this.notifyBalancesChanged();
-	}
-
-	private async onAccountBalanceEvent(
-		action: string,
-		balance: AccountBalancesResponse,
-		userId: string
-	) {
-		const accountId = balance.account;
-		let previousAccountId: string | null = null;
-		for (const [key, currentBalance] of this.latestCashByAccount) {
-			if (currentBalance.id === balance.id) {
-				previousAccountId = key;
-				break;
-			}
-		}
-		if (previousAccountId && previousAccountId !== accountId) {
-			await this.refreshAccountBalance(previousAccountId, userId);
-		}
-
-		if (!this.rawAccounts.some((account) => account.id === accountId)) {
-			await this.refreshAccount(accountId, userId);
-			this.notifyBalancesChanged();
-			return;
-		}
-
-		const current = this.latestCashByAccount.get(accountId);
-		if (action === 'delete' || current?.id === balance.id) {
-			await this.refreshAccountBalance(accountId, userId);
-			this.notifyBalancesChanged();
-			return;
-		}
-
-		if (!current || this.isAtLeastAsRecent(balance, current)) {
-			this.latestCashByAccount.set(accountId, this.toLatestAccountBalance(balance));
-			this.notifyBalancesChanged();
-		}
-	}
-
-	// NOTE: Targeted membership changes bump mutationEpoch so an in-flight
-	// refreshAccounts that fetched its list before this mutation aborts its
-	// commit and can't overwrite newer state with a stale snapshot.
-	private upsertAccountRecord(account: AccountsResponse) {
-		const { list, inserted } = upsertById(this.rawAccounts, account);
-		this.rawAccounts = list;
-		if (inserted) this.mutationEpoch++;
-	}
-
-	private removeAccountRecord(accountId: string) {
-		const { list, removed } = removeById(this.rawAccounts, accountId);
-		this.rawAccounts = list;
-		if (removed) this.mutationEpoch++;
-	}
-
-	async refreshAccount(accountId: string, userId: string) {
-		if (!userId || userId !== this.currentUserId) return false;
-		try {
-			const account = await this._pb.authedClient
-				.collection('accounts')
-				.getOne<AccountsResponse>(accountId, { requestKey: null });
-			await this.balanceTypesContext.ensureLoaded(account.balanceType);
-			const balance = await this.getLatestAccountBalance(accountId);
-			if (userId !== this.currentUserId) return false;
-			this.upsertAccountRecord(account);
-			if (balance) this.latestCashByAccount.set(accountId, balance);
-			else this.latestCashByAccount.delete(accountId);
-			return true;
-		} catch (error) {
-			if (isUnavailableRecordError(error)) {
-				this.removeAccountRecord(accountId);
-				this.latestCashByAccount.delete(accountId);
-				return true;
-			}
-			throw error;
-		}
-	}
-
-	private async refreshAccountBalance(accountId: string, userId: string) {
-		const balanceBeforeRefresh = this.latestCashByAccount.get(accountId);
-		const balance = await this.getLatestAccountBalance(accountId);
-		if (userId !== this.currentUserId) return false;
-		if (balance) this.latestCashByAccount.set(accountId, balance);
-		else if (
-			balanceBeforeRefresh &&
-			this.latestCashByAccount.get(accountId)?.id === balanceBeforeRefresh.id
-		) {
-			this.latestCashByAccount.delete(accountId);
-		}
-		return true;
-	}
-
-	private async getLatestAccountBalance(accountId: string) {
-		const res = await this._pb.authedClient
-			.collection('accountBalances')
-			.getList<AccountBalancesResponse>(1, 1, {
-				filter: `account='${accountId}'`,
-				sort: '-asOf,-created,-id',
-				requestKey: null
-			});
-		const balance = res.items[0];
-		return balance ? this.toLatestAccountBalance(balance) : null;
-	}
-
-	private toLatestAccountBalance(balance: AccountBalancesResponse) {
-		return {
-			id: balance.id,
-			account: balance.account,
-			value: balance.value ?? 0,
-			asOf: balance.asOf,
-			created: balance.created
-		};
-	}
-
-	private isAtLeastAsRecent(
-		balance: Pick<AccountBalancesResponse, 'asOf' | 'created' | 'id'>,
-		current: Pick<LatestAccountBalance, 'asOf' | 'created' | 'id'>
-	) {
-		if (balance.asOf !== current.asOf) return balance.asOf > current.asOf;
-		if (balance.created !== current.created) return balance.created > current.created;
-		return balance.id >= current.id;
 	}
 
 	private toAccountWithBalance(
@@ -533,8 +351,11 @@ class AccountsContext {
 	}
 
 	dispose() {
+		this.debouncer.cancel();
 		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
+		this._pb.unregisterRealtimeReconnect(this._reconnectCallback);
 		this.unsubscribeRealtime();
+		this.sequence.bump();
 	}
 }
 

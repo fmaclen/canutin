@@ -1,4 +1,3 @@
-import { type RecordSubscription } from 'pocketbase';
 import { getContext, setContext, untrack } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 
@@ -15,6 +14,7 @@ import { getExchangeRatesContext } from './exchange-rates.svelte';
 import { logError } from './logger';
 import { AccountSharesPerspectiveOptions, type TransactionsResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
+import { Debouncer, RequestSequence } from './realtime-sync';
 
 const DEBOUNCE_MS = 200;
 
@@ -51,23 +51,25 @@ class CashflowContext {
 	private _auth: ReturnType<typeof getAuthContext>;
 	private _fx: ReturnType<typeof getExchangeRatesContext>;
 	private _accountsContext: ReturnType<typeof getAccountsContext>;
-	private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
+	private debouncer = new Debouncer(DEBOUNCE_MS);
 	private _unsubscribe: (() => void) | null = null;
 	private _disposed = false;
 	private _activeUserId = '';
 	private _isSubscribed = false;
-	private _recomputeSequence = 0;
+	private sequence = new RequestSequence();
 	private _recomputeAllInFlight = 0;
 	private _transactionsById = new SvelteMap<string, TransactionsResponse>();
 	private _activeWindow: CashflowWindow | null = null;
 	private _hasTransactionSnapshot = false;
 	private _watchedAccountsKey: string | null = null;
 	private _teardownCallback = () => this.unsubscribeRealtime();
+	private _reconnectCallback = () => this.invalidate();
 
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
+		this._pb.registerRealtimeReconnect(this._reconnectCallback);
 		this._fx = getExchangeRatesContext();
 		this._accountsContext = getAccountsContext();
 		this.init();
@@ -78,13 +80,10 @@ class CashflowContext {
 			const userId = this._auth.currentUserId;
 			if (userId === this._activeUserId) return;
 			this.unsubscribeRealtime();
+			this.debouncer.cancel();
+			this.sequence.bump();
 			this._activeUserId = userId;
 			if (!userId) {
-				this._recomputeSequence++;
-				if (this._debounceTimer) {
-					clearTimeout(this._debounceTimer);
-					this._debounceTimer = null;
-				}
 				this._transactionsById = new SvelteMap();
 				this._activeWindow = null;
 				this._hasTransactionSnapshot = false;
@@ -174,7 +173,7 @@ class CashflowContext {
 		this._isSubscribed = true;
 		this._pb.authedClient
 			.collection('transactions')
-			.subscribe('*', this.onTransactionEvent.bind(this))
+			.subscribe('*', () => this.onRealtimeEvent(userId))
 			.then((unsubscribe) => {
 				if (this._disposed || userId !== this._activeUserId) {
 					unsubscribe();
@@ -200,72 +199,26 @@ class CashflowContext {
 		this._unsubscribe = null;
 	}
 
-	private onTransactionEvent(e: RecordSubscription<TransactionsResponse>) {
-		if (!e.action) return;
+	private onRealtimeEvent(userId: string) {
+		if (!userId || userId !== this._activeUserId) return;
+		this.invalidate();
+	}
 
-		const cashflowWindow = this.getCashflowWindow();
-		const activeWindow = this._activeWindow;
-		let shouldRecomputeAll = false;
-		let shouldRecomputeFromMap = false;
-
-		if (
-			!this._hasTransactionSnapshot ||
-			!activeWindow ||
-			activeWindow.earliestKey !== cashflowWindow.earliestKey ||
-			activeWindow.startNextMonthKey !== cashflowWindow.startNextMonthKey
-		) {
-			shouldRecomputeAll = true;
-		} else {
-			if (e.action === 'delete') {
-				if (this._transactionsById.delete(e.record.id)) {
-					shouldRecomputeFromMap = true;
-				} else {
-					const membership = this.transactionWindowMembership(e.record, activeWindow);
-					shouldRecomputeAll = membership !== false;
-				}
-			} else if (e.action === 'create' || e.action === 'update') {
-				const membership = this.transactionWindowMembership(e.record, activeWindow);
-
-				if (membership === null) {
-					shouldRecomputeAll = true;
-				} else if (membership) {
-					if (!this._accountsContext.accounts.some((account) => account.id === e.record.account)) {
-						shouldRecomputeAll = true;
-					} else {
-						this._transactionsById.set(e.record.id, e.record);
-						shouldRecomputeFromMap = true;
-					}
-				} else if (this._transactionsById.delete(e.record.id)) {
-					shouldRecomputeFromMap = true;
-				}
-			} else {
-				shouldRecomputeAll = true;
-			}
-
-			if (shouldRecomputeFromMap) {
-				shouldRecomputeAll = this._recomputeAllInFlight > 0;
-				this._recomputeSequence++;
-				this.recomputeFromTransactionMap(this._accountsContext.accounts, activeWindow);
-				if (!shouldRecomputeAll) return;
-			}
-		}
-
-		if (!shouldRecomputeAll) return;
-
-		if (this._debounceTimer) {
-			clearTimeout(this._debounceTimer);
-		}
-
-		this._debounceTimer = setTimeout(() => {
-			this._debounceTimer = null;
-			void this.recomputeAll(this._accountsContext.accounts).catch((error) => {
-				logError('cashflow', 'recompute_on_event', error);
-			});
-		}, DEBOUNCE_MS);
+	// A transaction event (or a reconnect) is a pure invalidation signal: instead of patching the
+	// in-memory transaction map from the event payload, it schedules a debounced full refetch of the
+	// windowed transactions via recomputeAll. Projection (recomputeFromTransactionMap driven by the
+	// accounts effect) stays incremental and network-free; only this sync path was ever a refetch.
+	private invalidate() {
+		this.debouncer.schedule(
+			() =>
+				void this.recomputeAll(this._accountsContext.accounts).catch((error) =>
+					this._pb.handleConnectionError(error, 'cashflow', 'refresh')
+				)
+		);
 	}
 
 	private async recomputeAll(accounts: AccountWithBalance[]) {
-		const recomputeSequence = ++this._recomputeSequence;
+		const token = this.sequence.next();
 		const cashflowWindow = this.getCashflowWindow();
 
 		this._recomputeAllInFlight++;
@@ -278,7 +231,7 @@ class CashflowContext {
 					requestKey: null
 				});
 
-			if (recomputeSequence !== this._recomputeSequence) return;
+			if (!this.sequence.isCurrent(token)) return;
 
 			this._transactionsById = new SvelteMap(
 				txns.map((transaction) => [transaction.id, transaction])
@@ -289,28 +242,12 @@ class CashflowContext {
 			this.recomputeFromTransactionMap(accounts, cashflowWindow);
 		} finally {
 			this._recomputeAllInFlight--;
-			if (!this._disposed && recomputeSequence === this._recomputeSequence) this.isLoading = false;
+			if (!this._disposed && this.sequence.isCurrent(token)) this.isLoading = false;
 		}
 	}
 
 	private getCashflowWindow() {
 		return computeCashflowWindow();
-	}
-
-	private transactionWindowMembership(
-		transaction: TransactionsResponse,
-		cashflowWindow: CashflowWindow
-	) {
-		if (!transaction.date || !('excluded' in transaction)) return null;
-
-		const date = new Date(transaction.date);
-		if (Number.isNaN(date.valueOf())) return null;
-
-		return (
-			date >= cashflowWindow.earliest &&
-			date < cashflowWindow.startNextMonth &&
-			!transaction.excluded
-		);
 	}
 
 	private recomputeFromTransactionMap(
@@ -344,12 +281,10 @@ class CashflowContext {
 
 	dispose() {
 		this._disposed = true;
-		this._recomputeSequence++;
-		if (this._debounceTimer) {
-			clearTimeout(this._debounceTimer);
-			this._debounceTimer = null;
-		}
+		this.sequence.bump();
+		this.debouncer.cancel();
 		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
+		this._pb.unregisterRealtimeReconnect(this._reconnectCallback);
 		this.unsubscribeRealtime();
 	}
 }
