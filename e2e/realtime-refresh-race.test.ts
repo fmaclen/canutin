@@ -47,14 +47,22 @@ async function holdFirstFetch(page: Page, pattern: string, mutate: () => Promise
 		// HACK: the event-triggered follow-up refetch has no UI signal to wait on, so a bounded delay
 		// is the only lever to let the reloaded page's fetch commit before the stale first fetch resolves.
 		await new Promise((resolve) => setTimeout(resolve, 750));
-		await route.fulfill({ response });
-		// HACK: releasing the stale snapshot has no UI signal to wait on either. Hop a frame plus a
-		// macrotask in the page so any effect of the release has quiesced before `settled` resolves -
-		// same spirit as the delay above, kept harness-internal rather than a waitForTimeout at the
-		// assertion level.
-		await page.evaluate(
-			() => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)))
-		);
+		try {
+			await route.fulfill({ response });
+			// HACK: releasing the stale snapshot has no UI signal to wait on either. Hop a frame plus a
+			// macrotask in the page so any effect of the release has quiesced before `settled` resolves -
+			// same spirit as the delay above, kept harness-internal rather than a waitForTimeout at the
+			// assertion level.
+			await page.evaluate(
+				() => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)))
+			);
+		} catch {
+			// HACK: `goToPageViaSidebar` does a full page.goto that discards this document (and its held
+			// request) before the delayed fulfill lands, so on a slow machine the fulfill or the quiesce
+			// hop can race the teardown and throw "Execution context was destroyed"/"Request is already
+			// handled". The release is best-effort - the stale snapshot dies with its document regardless -
+			// so swallow the teardown error and still resolve `settled` below so the test can't hang.
+		}
 		resolveSettled();
 	});
 	return { settled };
