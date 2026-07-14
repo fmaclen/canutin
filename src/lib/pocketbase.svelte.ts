@@ -2,12 +2,19 @@ import PocketBase, { ClientResponseError } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
 import { toast } from 'svelte-sonner';
 
+import { browser } from '$app/environment';
+
 import { logError } from './logger';
 import { m } from './paraglide/messages';
 import type { TypedPocketBase } from './pocketbase.schema';
 import { getBackendUrl } from './utils';
 
 export type SetupStatus = 'checking' | 'ready' | 'needs-setup' | 'unreachable';
+
+// Waits between backend health probes during a recovery attempt. The list doubles as the attempt
+// budget: after the last delay the attempt gives up and waits for the next trigger, so a user who
+// stays offline for an hour is probed a handful of times, not continuously.
+const RECOVERY_PROBE_DELAYS_MS = [1000, 2000, 4000, 8000, 16000, 30000];
 
 enum ToastId {
 	CONNECTION_ERROR = 'connection-error',
@@ -24,6 +31,14 @@ export class PocketBaseContext {
 	private _reconnectCallbacks = new Set<() => void>();
 	private _reconnectListening = false;
 	private _pendingReconnect = false;
+	private _recovering = false;
+	// Fires on the two browser signals that a dead connection may be usable again: the network
+	// coming back, and the tab becoming visible after a sleep/wake or a backgrounded stretch. While
+	// hidden the tab is left alone - the visibility signal picks it up when the user returns.
+	private _recoveryTrigger = () => {
+		if (document.visibilityState !== 'visible') return;
+		void this.recoverRealtime();
+	};
 
 	constructor() {
 		this.authedClient = new PocketBase(getBackendUrl());
@@ -33,6 +48,12 @@ export class PocketBaseContext {
 	// while disconnected, so records shared to the user during that gap (e.g. a laptop wake or
 	// network blip) stay invisible until a full re-init. Registered stores refetch on reconnect so a
 	// session converges with what the backend allows without a logout/login.
+	//
+	// The SDK only reconnects when the EventSource reports a transport error, and EventSource has no
+	// liveness detection: an offline network or a slept laptop routinely leaves the socket in an OPEN
+	// state that never errors, so `onDisconnect` never fires and nothing would ever refetch. The
+	// browser's `online` and `visibilitychange` signals are therefore part of the recovery contract,
+	// not a nicety - they are the only trigger in the failing case.
 	registerRealtimeReconnect(callback: () => void) {
 		this._reconnectCallbacks.add(callback);
 		if (this._reconnectListening) return;
@@ -44,19 +65,49 @@ export class PocketBaseContext {
 			.subscribe('PB_CONNECT', () => {
 				if (!this._pendingReconnect) return;
 				this._pendingReconnect = false;
-				for (const reconnect of this._reconnectCallbacks) {
-					try {
-						reconnect();
-					} catch (error) {
-						logError('pocketbase', 'reconnect_callback', error);
-					}
-				}
+				void this.recoverRealtime();
 			})
 			.catch((error) => logError('pocketbase', 'reconnect_subscribe', error));
+		if (!browser) return;
+		window.addEventListener('online', this._recoveryTrigger);
+		document.addEventListener('visibilitychange', this._recoveryTrigger);
 	}
 
 	unregisterRealtimeReconnect(callback: () => void) {
 		this._reconnectCallbacks.delete(callback);
+	}
+
+	// A refetch issued the instant a trigger fires can still hit a network that is not usable yet (an
+	// `online` event precedes real connectivity, and a store refetch that fails is discarded), so
+	// recovery is latched: it probes the backend on a bounded backoff and only invalidates the stores
+	// once the backend actually answers. `_recovering` coalesces a burst of triggers - an SDK
+	// reconnect, `online`, and `visibilitychange` typically arrive together - into a single refetch.
+	private async recoverRealtime() {
+		if (this._recovering || !this.authedClient.authStore.isValid) return;
+		this._recovering = true;
+		try {
+			for (let attempt = 0; ; attempt++) {
+				try {
+					await this.authedClient.health.check({ requestKey: null });
+					break;
+				} catch (error) {
+					if (attempt === RECOVERY_PROBE_DELAYS_MS.length) {
+						logError('pocketbase', 'recovery_unreachable', error);
+						return;
+					}
+					await new Promise((resolve) => setTimeout(resolve, RECOVERY_PROBE_DELAYS_MS[attempt]));
+				}
+			}
+			for (const reconnect of this._reconnectCallbacks) {
+				try {
+					reconnect();
+				} catch (error) {
+					logError('pocketbase', 'reconnect_callback', error);
+				}
+			}
+		} finally {
+			this._recovering = false;
+		}
 	}
 
 	get backendUrl(): string {
