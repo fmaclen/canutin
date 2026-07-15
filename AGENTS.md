@@ -4,6 +4,12 @@ Canutin is a personal finance application: SvelteKit on the frontend, PocketBase
 
 > This file is `AGENTS.md`. `CLAUDE.md` is a symlink to it - edit `AGENTS.md`.
 
+## Worktree workflow
+
+The checkout at the repository root is the primary worktree and control plane. Keep it on `next`, use it to manage linked worktrees, and do not do feature work there. Create or resume feature work in managed checkouts under `/.worktrees/` as documented in the [setup skill](./.agents/skills/setup/SKILL.md); the manager can be invoked from either the primary worktree or a linked worktree.
+
+> **Warning:** Never run double-force Git clean with ignored files from the primary checkout, such as `git clean -ffdx`. It can delete the nested `/.worktrees/` checkouts.
+
 ## Your role
 
 Before you call any other tool, read any other file, or respond to the user, open your role skill. The skill body is not auto-injected - opening it is your first action.

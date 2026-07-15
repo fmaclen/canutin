@@ -43,3 +43,6 @@ SCRATCHPAD.md
 
 # Worktree-local config
 .worktree.json
+
+# Managed worktrees
+/.worktrees/

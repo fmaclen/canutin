@@ -7,5 +7,6 @@ bun.lockb
 
 # Miscellaneous
 /static/
+/.worktrees/
 pocketbase
 src/lib/pocketbase.schema.ts
