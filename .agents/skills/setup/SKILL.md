@@ -1,156 +1,111 @@
 ---
 name: setup
-description: Worktree creation, dependency install, environment initialization for autonomous work
+description: Managed worktree creation, recovery, inspection, and safe removal
 ---
 
 # Setup
 
-## Overview
+## Control Plane
 
-Create an isolated worktree so you can work on an issue without interfering with the main repo or other worktrees running on the same machine. Each worktree gets its own branch, dependencies, `.env`, and port assignments.
+The checkout at the repository root is the primary worktree and control plane. Keep it on `next`; do feature work only in managed linked worktrees. `scripts/worktree.ts` discovers the primary checkout through Git, so its commands work from the primary checkout or any linked worktree.
 
-## Worktree Layout
+Managed worktrees are nested under the ignored `/.worktrees/` directory:
 
-Worktrees are created as siblings of the main repo under a `worktrees/` directory:
+> **Warning:** Never run double-force Git clean with ignored files from the primary checkout, such as `git clean -ffdx`. It can delete every nested managed checkout under `/.worktrees/`.
 
-```
-<parent>/
-├── canutin/                         # main repo (default ports, never touched by worktree setup)
-└── worktrees/
-    ├── worktree-1/                  # isolated worktree
-    ├── worktree-2/
-    └── worktree-3/
+```text
+<repo>/                              # primary worktree on next
+└── .worktrees/
+    ├── 01--feat-new-feature/        # feat/new-feature
+    └── 02--fix-bug-123/             # fix/bug-123
 ```
 
-## Port Allocation
+The directory name is the slot padded to at least two digits, followed by `--` and a lowercase branch name with non-alphanumeric runs replaced by `-`.
 
-Each worktree gets 2 ports, dynamically allocated from free ports at setup time:
+## CLI
 
-- **Vite** — both dev (`VITE_PORT`) and preview (`VITE_PREVIEW_PORT`, falls back to `VITE_PORT`)
-- **PocketBase** — `PB_PORT`, with `PUBLIC_PB_URL` set to match
+The package aliases map directly to `scripts/worktree.ts`:
 
-Ports are stored in `.worktree.json` and written as env vars into `.env`.
+| Command                                                                    | Behavior                                                                 |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `bun run worktree:create <branch> [--base <base>]`                         | Create, reuse, or recover a managed worktree; the default base is `next` |
+| `bun run worktree:list`                                                    | List managed worktrees and their status                                  |
+| `bun run worktree:remove <branch\|slot\|path> [--force] [--delete-branch]` | Safely remove one managed worktree                                       |
+| `bun run worktree:sweep`                                                   | Report removable merged, clean worktrees without changing them           |
 
-## Before Creating a Worktree
+`bun run worktree <command>` exposes the same `create`, `list`, `remove`, and `sweep` commands.
 
-1. **List existing worktrees**:
-
-   ```bash
-   git worktree list
-   ```
-
-2. **Assess each numbered worktree**:
-   - **Active** — dev servers listening on its ports (`lsof -i :<port> -t` using the `VITE_PORT` / `PB_PORT` from its `.env` or `.worktree.json`)
-   - **Has uncommitted work** — `git -C <path> status --porcelain` shows output
-   - **Has unpushed work** — `git -C <path> log origin/next..HEAD --oneline` shows commits
-   - **Stale** — no running processes, no uncommitted changes, branch merged or matches base
-
-3. **Decide**:
-   - Already exists for the same branch → **reuse it**
-   - Stale → **offer to tear it down** (`bun run worktree:teardown <N>`) and reuse the slot
-   - All active → **pick the next available number**
-   - Always tell the user what you found before proceeding
-
-## Creating a Worktree
-
-Run **from the main repo**:
+## Create
 
 ```bash
-bun run worktree:setup <number> <branch> [--base <base-branch>]
+bun run worktree:create feat/new-feature
+bun run worktree:create fix/bug-123 --base origin/next
 ```
 
-Examples:
+The manager serializes concurrent creates, recovering an allocator lock left stale by a process that is no longer running, then chooses the lowest unoccupied slot whose deterministic port pair is available. Slots and ports are not user inputs:
+
+- Vite and preview: `42069 + slot * 100`
+- PocketBase: `42070 + slot * 100`
+
+For example, slot 1 uses Vite port `42169` and PocketBase port `42170`. If a free slot's pair is already in use, creation continues to the next eligible slot in the same run.
+
+For a new branch, the manager creates it from `next` or `--base`. If the local branch already exists but is not checked out, it checks out that branch and does not use the base. If the branch is already at its valid managed path, creation reuses a complete checkout or finishes interrupted initialization. It refuses to adopt the branch from an unmanaged or inconsistent path.
+
+Initialization writes:
+
+| File             | Generated content                                                         |
+| ---------------- | ------------------------------------------------------------------------- |
+| `.env`           | `VITE_PORT`, matching `VITE_PREVIEW_PORT`, `PB_PORT`, and `PUBLIC_PB_URL` |
+| `.worktree.json` | Slot, branch, deterministic ports, and initialization state               |
+
+It runs `bun install` between writing `.env` and marking `.worktree.json` initialized. Repeating the same create command recovers a valid partially initialized checkout.
+
+## List
 
 ```bash
-bun run worktree:setup 1 feat/new-feature
-bun run worktree:setup 2 fix/bug-123 --base origin/next
+bun run worktree:list
 ```
 
-The script:
+Only directories under `/.worktrees/` with valid `.worktree.json` files are managed. The listing reports registration and branch consistency, clean or dirty state, commits not reachable from any remote, configured ports, and listeners. A listener is owned only when its process working directory is inside that worktree; listeners from other directories are reported as foreign.
 
-1. Scans existing worktrees and reports their state
-2. Dynamically finds free ports for Vite and PocketBase
-3. Creates the worktree via `git worktree add`
-4. Writes `.env` with `VITE_PORT`, `PB_PORT`, `PUBLIC_PB_URL`
-5. Writes `.worktree.json` with the worktree config (ports, branch, number)
-6. Runs `bun install`
-7. Prints agent-launch commands for each installed coding agent
+## Work
 
-## Starting a New Agent Session
-
-After setup, the script prints ready-to-copy commands:
-
-```
-opencode <worktree-path> --prompt "task description"
-codex -C <worktree-path> "task description"
-cd <worktree-path> && claude
-```
-
-You must start a **new** agent session in the worktree directory. The existing session cannot change its working directory.
-
-## Working in a Worktree
-
-Start dev servers as normal — they read ports from `.env`:
+Commands inside a managed worktree read its generated `.env`:
 
 ```bash
-bun run pb       # PocketBase on the worktree's PB_PORT
-bun run dev      # SvelteKit on the worktree's VITE_PORT
+bun run pb
+bun run dev
 ```
 
-Both commands pick up the correct ports automatically. No special flags needed.
+Do not edit the generated slot, ports, or worktree config by hand.
 
-## Seeding a User for QA
-
-After PocketBase is up, seed a basic user for manual QA:
+## Remove
 
 ```bash
-bun -e "import('./e2e/pocketbase.helpers').then(m => m.seedUser('alice').then(u => console.log(u.email)))"
+bun run worktree:remove feat/new-feature
+bun run worktree:remove 1
+bun run worktree:remove .worktrees/01--feat-new-feature
 ```
 
-Log in with the printed email and `DEFAULT_PASSWORD` (`123qweasdzxc`).
+The identifier may be a branch, slot, managed directory name, or path. By default removal keeps the local branch and refuses a dirty worktree or commits not reachable from any remote. `--force` overrides those two worktree-removal checks; a merged GitHub PR whose recorded head exactly matches the worktree head also protects otherwise unpushed commits.
 
-## Tearing Down a Worktree
+Add `--delete-branch` to delete the local branch after removing the worktree. Branch deletion requires the exact reviewed worktree head to be either an ancestor of local `next` or the head of a merged GitHub PR. The manager rechecks that the branch still points to that exact commit before deletion and refuses to delete a branch that moved. `--force` does not bypass these requirements. Removal without `--delete-branch` does not require the branch to be merged, and the manager never deletes the remote branch.
 
-```bash
-bun run worktree:teardown <number>          # remove worktree, keep branch
-bun run worktree:teardown <number> --prune  # remove worktree and delete branch
-```
+Before removal, the manager sends `TERM` only to listeners whose working directory belongs to the worktree. After two seconds it sends `KILL` only to owned listeners still running. It leaves foreign listeners untouched and reports them.
 
-Teardown kills any processes on the worktree's ports and removes the git worktree.
+## Sweep and Post-Merge Cleanup
 
-## Key Files
+`bun run worktree:sweep` makes no changes. It reports registered worktrees that are clean and whose exact head is merged into local `next` or belongs to a merged GitHub PR. A candidate with commits unreachable from remotes is reported only when exact merged-PR evidence protects that head. Active owned and foreign listeners are included in the report.
 
-| File             | Purpose                                                        |
-| ---------------- | -------------------------------------------------------------- |
-| `.worktree.json` | Worktree number, port assignments, branch                      |
-| `.env`           | `VITE_PORT`, `PB_PORT`, `PUBLIC_PB_URL` for this worktree only |
+After merge:
 
-## Agent Behavior
+1. Run `bun run worktree:sweep` to inspect eligible worktrees.
+2. Run `bun run worktree:remove <branch|slot|path> --delete-branch` to stop owned processes, remove the worktree, and delete the proven-merged local branch.
+3. Delete the remote branch separately if repository automation did not already do so.
 
-- **DO** run `bun run worktree:setup` from the main repo before starting work
-- **DO** tell the user to start a new agent session in the worktree directory
-- **DO** use `bun run dev` and `bun run pb` as normal (ports are automatic)
-- **DON'T** modify the main repo's env files or ports
-- **DON'T** hardcode port numbers — always let `.env` drive them
-- **DON'T** create worktrees outside the `worktrees/` sibling directory
-- **DON'T** skip `bun install` — TypeScript LSP and ESLint need it
-
-## After Finishing Work
-
-- After a PR is merged:
-  1. `bun run worktree:teardown <N> --prune` (removes worktree and local branch)
-  2. `git push origin --delete <branch-name>` (removes remote branch)
-- If the user is done but hasn't merged, leave the worktree and branches in place
-
-## Troubleshooting
-
-**Port conflict**: Re-run `bun run worktree:setup` — ports are dynamically allocated, a retry will find different free ports. Or kill the offender: `lsof -ti:<port> | xargs kill -9`.
-
-**Missing env vars**: Re-run setup to re-write `.env` and `.worktree.json`.
-
-**Paraglide messages missing** (svelte-check errors about `$lib/paraglide/messages`): `bunx @inlang/paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide`. The Vite plugin usually handles this during dev/build.
+If work is not merged, keep the worktree and branch unless explicitly choosing `--force` while preserving anything important elsewhere.
 
 ## See Also
 
-- [verify.md](../verify/SKILL.md) - Local verification workflow
-- [failure-discipline.md](../failure-discipline/SKILL.md) - Error diagnosis rules
+- [verify](../verify/SKILL.md) - Local verification workflow
+- [failure discipline](../failure-discipline/SKILL.md) - Error diagnosis rules

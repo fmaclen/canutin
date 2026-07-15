@@ -63,8 +63,11 @@
 		"pb": "IS_DEV=true PUBLIC_DEMO_ENABLED=true bun scripts/pb-server.ts",
 		"pb:import": "bun scripts/pb-import.ts",
 		"pb:reset": "bun scripts/pb-reset.ts",
-		"worktree:setup": "bun scripts/worktree-setup.ts",
-		"worktree:teardown": "bun scripts/worktree-teardown.ts"
+		"worktree": "bun scripts/worktree.ts",
+		"worktree:create": "bun scripts/worktree.ts create",
+		"worktree:list": "bun scripts/worktree.ts list",
+		"worktree:remove": "bun scripts/worktree.ts remove",
+		"worktree:sweep": "bun scripts/worktree.ts sweep"
 	},
 	"type": "module"
 }
