@@ -71,4 +71,4 @@ Before creating the issue, fetch the current repository labels and apply the one
 ## See Also
 
 - [code-quality.md](../code-quality/SKILL.md) - Shared writing and repo conventions
-- [deliver.md](../deliver/SKILL.md) - PR guidance once the issue work is complete
+- [commits-and-prs](../commits-and-prs/SKILL.md) - PR guidance once the issue work is complete

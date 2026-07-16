@@ -9,7 +9,7 @@ Canutin is a SvelteKit + PocketBase personal finance application using Bun.
 
 ## Backend: PocketBase
 
-- Dev server: `http://127.0.0.1:42070` by default, run with `bun run pb`, override with `PB_PORT`.
+- Dev server URL, ports, and start commands: see [local-servers](../local-servers/SKILL.md).
 - Types are generated in `src/lib/pocketbase.schema.ts`.
 - Custom Go hooks for balance calculations live in `pocketbase/main.go`.
 - Core collections: accounts, transactions, assets, assetBalances, accountBalances, balanceTypes, transactionLabels, accountShares, assetShares, users.
@@ -46,4 +46,4 @@ bun run build     # Production build
 bun run pb        # PocketBase backend
 ```
 
-Assume every existing Vite or PocketBase listener belongs to the user: reuse healthy listeners and never stop or replace them. By default, do not start local servers. Agents may run `bun run dev` or `bun run pb` from the active worktree when explicitly requested; track the process and stop it only if the current agent started it.
+Server ownership, ports, and start/stop rules live in the [local-servers skill](../local-servers/SKILL.md).

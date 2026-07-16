@@ -4,15 +4,7 @@ Canutin is a personal finance application: SvelteKit on the frontend, PocketBase
 
 > This file is `AGENTS.md`. `CLAUDE.md` is a symlink to it - edit `AGENTS.md`.
 
-## Worktree workflow
-
-The checkout at the repository root is the primary worktree and control plane. Keep it on `next`, use it to manage linked worktrees, and do not do feature work there. Create or resume feature work in managed checkouts under `/.worktrees/` as documented in the [setup skill](./.agents/skills/setup/SKILL.md); the manager can be invoked from either the primary worktree or a linked worktree.
-
-> **Warning:** Never run double-force Git clean with ignored files from the primary checkout, such as `git clean -ffdx`. It can delete the nested `/.worktrees/` checkouts.
-
-## Local servers
-
-Assume existing local servers belong to the user: do not start, stop, or replace them by default. When the user explicitly asks, agents may start Vite (`bun run dev`) and PocketBase (`bun run pb`) from the active managed worktree. Check the worktree's assigned ports and existing listeners first, reuse healthy servers, and track any processes you start. For ordinary agent actions, stop only processes that the agent started and tracked; never terminate a foreign process. Managed worktree removal is governed separately by the [setup skill](./.agents/skills/setup/SKILL.md) and the manager's ownership safeguards.
+Feature work happens in managed worktrees under `/.worktrees/` - see the [setup skill](./.agents/skills/setup/SKILL.md).
 
 ## Your role
 
@@ -62,6 +54,7 @@ Each skill lives at `.agents/skills/<slug>/SKILL.md`.
 | Synopsis                                               | Slug               |
 | ------------------------------------------------------ | ------------------ |
 | How to create and reuse worktrees for autonomous work  | setup              |
+| Local server ownership, ports, and start/stop rules    | local-servers      |
 | How to verify changes locally before requesting review | verify             |
 | How to diagnose failed checks and avoid wasting CI     | failure-discipline |
 | How to change PocketBase schema safely                 | pb-migrate         |
@@ -82,9 +75,3 @@ Load when your tool list matches the harness. The agent must check tool availabi
 | ---------------------------------------------------------------------------------------- | -------- |
 | Harness-specific quirks for Codex sessions - spawn_agent rules and validation gotchas    | codex    |
 | Harness-specific quirks for opencode sessions - plan mode rules and delegation reminders | opencode |
-
-> `pocketbase/skill.go` hand-maintains the behavioral semantics - custom endpoints, behavioral
-> constraints, and auth - of the `/api/canutin/skill` reference; the import payload shape is
-> generated from the Go structs. Update the hand-maintained sections whenever custom routes or
-> backend hooks change. CI enforces this: a change under `pocketbase/**/*.go` without a matching
-> `pocketbase/skill.go` or `.agents/skills/` update fails the PR unless labeled `skip-skill-check`.

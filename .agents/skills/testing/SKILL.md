@@ -103,11 +103,11 @@ bun run test -- e2e/file.test.ts --repeat-each=10
 
 Wait for each test run to finish before starting the next. Two test commands running at the same time fight over the same backend and preview server and produce false flake. To run several files together, pass them to a single Playwright invocation instead of launching multiple processes.
 
-If a previous run ended early (Ctrl-C, killed terminal, crashed reporter), the preview server may linger and the next run will fail to bind. Assume any existing preview, dev, or backend listener belongs to the user. Stop only a server process the current agent started and tracked; otherwise report the port conflict instead of killing the listener.
+If a previous run ended early (Ctrl-C, killed terminal, crashed reporter), the preview server may linger and the next run will fail to bind. Ownership rules for existing listeners: see [local-servers](../local-servers/SKILL.md).
 
 ### Local verification before push
 
-Run one or two targeted smoke tests related to the change before pushing - never the full file when a focused `-g` pattern covers the behavior you actually touched. CI will run the whole suite; your job locally is to catch the obvious regression cheaply.
+The full pre-push workflow (quality checks plus Playwright) lives in [verify](../verify/SKILL.md). Locally, run one or two targeted smoke tests related to the change - never the full file when a focused `-g` pattern covers the behavior you actually touched. CI will run the whole suite; your job locally is to catch the obvious regression cheaply.
 
 ```bash
 bun run test -- -g 'name of the test you care about'
@@ -134,6 +134,6 @@ Test code follows the same rules as production code (see [code-quality](../code-
 
 ## Troubleshooting
 
-- **Preview server port already in use** - check the port in `.env` or `.worktree.json`. Stop and rerun only if the current agent started and tracked that preview process; otherwise report the conflict because the listener is user-owned.
-- **PocketBase port already in use** - check `.env` or `.worktree.json` for the actual `PB_PORT` and reuse a healthy listener. Do not stop it because existing backend listeners are user-owned.
+- **Preview server port already in use** - check the port in `.env` or `.worktree.json`; follow the ownership rules in [local-servers](../local-servers/SKILL.md) before stopping anything.
+- **PocketBase port already in use** - check `.env` or `.worktree.json` for the actual `PB_PORT` and reuse a healthy listener per [local-servers](../local-servers/SKILL.md).
 - **Generated messages missing** - run the relevant quality/build command so Paraglide regenerates output; do not hand-edit generated files.

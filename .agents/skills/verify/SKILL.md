@@ -7,17 +7,11 @@ description: Local verification workflow - quality checks, running Playwright te
 
 ## Overview
 
-Before handing work off (see [deliver.md](../deliver/SKILL.md)), verify against local PocketBase and the local SvelteKit preview. Canutin has no preview-deployment system; all verification is local.
+Before handing work off (see [commits-and-prs.md](../commits-and-prs/SKILL.md)), verify against local PocketBase and the local SvelteKit preview. Canutin has no preview-deployment system; all verification is local.
 
 ## Local Servers
 
-PocketBase and Vite may already be running in the background. Assume every existing listener belongs to the user: reuse healthy listeners and never stop or replace them. Agents may launch Vite or PocketBase when explicitly requested; before doing so, check the ports from the worktree's `.env` (or `.worktree.json` if the worktree scripts created it), and track the process. Stop only processes the current agent started and tracked.
-
-- Vite dev — default `:5173`, overridable via `VITE_PORT`
-- Vite preview — default `:42069`, overridable via `VITE_PREVIEW_PORT` (falls back to `VITE_PORT`)
-- PocketBase — default `:42070`, overridable via `PB_PORT` (`PUBLIC_PB_URL` points the client at the same host)
-
-Check the worktree's `.env` for the actual numbers before curling or opening a browser.
+Verification runs against the local Vite and PocketBase servers. Ownership rules, ports, and start commands: see [local-servers](../local-servers/SKILL.md).
 
 ## Quality Check
 
@@ -57,5 +51,5 @@ Wipes the PocketBase dev database. The superuser (`superadmin@example.com` / `12
 ## See Also
 
 - [testing.md](../testing/SKILL.md) - Playwright conventions
-- [deliver.md](../deliver/SKILL.md) - PR handoff
+- [commits-and-prs.md](../commits-and-prs/SKILL.md) - PR handoff
 - [failure-discipline.md](../failure-discipline/SKILL.md) - What to do when something fails
