@@ -144,10 +144,15 @@ Backend hooks enforce invariants that are not visible in the access rules:
   ` + "`securityBalances`" + ` holding snapshots. Holdings come exclusively from ` + "`securityBalances`" + `;
   ` + "`securityTransactions`" + ` are display-only trade history that never affect balances. Writing
   portfolio value into an account balance double-counts it.
-- Number fields on ` + "`securityBalances`" + ` and ` + "`securityTransactions`" + ` are nullable and the
-  distinction matters: ` + "`null`" + ` (or an omitted field) means unknown and is carried forward from the
-  last known snapshot, ` + "`0`" + ` is a known zero, and ` + "`quantity = 0`" + ` closes a position and stops
-  carry-forward. Never send ` + "`0`" + ` for a value you do not know.
+- Number fields on ` + "`securityBalances`" + ` and ` + "`securityTransactions`" + ` are nullable:
+  ` + "`null`" + ` (or an omitted field) means unknown, while ` + "`0`" + ` is a known zero. When resolving
+  ` + "`securityBalances`" + ` snapshots, market value (` + "`value`" + `) carries forward from the most recent
+  known value, while ` + "`price`" + ` does not carry forward. ` + "`costBasis`" + ` carries forward only while
+  the current and prior quantities are both known and unchanged. After a quantity-changing event,
+  importers must explicitly provide the resulting basis when known, including after a split; otherwise
+  leave it ` + "`null`" + `. ` + "`quantity = 0`" + `
+  closes the position, resolves value and basis to zero, and stops carry-forward at that lot boundary, so
+  a later re-buy cannot reuse the old lot's data. Never send ` + "`0`" + ` for a value you do not know.
 - Setting ` + "`autoCalculated`" + ` on an account makes the engine recompute its latest cash balance by
   summing imported cash transactions into a new ` + "`source = derived`" + ` row stamped with the current
   time, which overrides any imported cash snapshot and re-fires on later transaction edits. Leave it

@@ -395,7 +395,9 @@ class SecuritiesContext {
 			balances.map((balance) => (balance.isUnconverted ? 0 : balance.value))
 		);
 		const costBasis = sumOrUnknown(
-			balances.map((balance) => (balance.isUnconverted ? 0 : balance.costBasis))
+			balances.map((balance) =>
+				balance.isUnconverted && balance.costBasis !== null ? 0 : balance.costBasis
+			)
 		);
 
 		return {
