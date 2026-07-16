@@ -103,7 +103,7 @@ bun run test -- e2e/file.test.ts --repeat-each=10
 
 Wait for each test run to finish before starting the next. Two test commands running at the same time fight over the same backend and preview server and produce false flake. To run several files together, pass them to a single Playwright invocation instead of launching multiple processes.
 
-If a previous run ended early (Ctrl-C, killed terminal, crashed reporter) the preview server may linger and the next run will fail to bind. Killing a preview server is always safe - preview only exists to serve tests. Never kill a dev server or backend server; the user owns those.
+If a previous run ended early (Ctrl-C, killed terminal, crashed reporter), the preview server may linger and the next run will fail to bind. Assume any existing preview, dev, or backend listener belongs to the user. Stop only a server process the current agent started and tracked; otherwise report the port conflict instead of killing the listener.
 
 ### Local verification before push
 
@@ -134,6 +134,6 @@ Test code follows the same rules as production code (see [code-quality](../code-
 
 ## Troubleshooting
 
-- **Preview server port already in use** - Playwright's preview server lingered from a previous run that ended early. Kill it and rerun after checking the port in `.env` or `.worktree.json`. Preview servers are always safe to kill. Never apply this to a dev or backend server - those belong to the user.
-- **PocketBase port already in use** - check `.env` or `.worktree.json` for the actual `PB_PORT`. Do not kill the user's main dev backend.
+- **Preview server port already in use** - check the port in `.env` or `.worktree.json`. Stop and rerun only if the current agent started and tracked that preview process; otherwise report the conflict because the listener is user-owned.
+- **PocketBase port already in use** - check `.env` or `.worktree.json` for the actual `PB_PORT` and reuse a healthy listener. Do not stop it because existing backend listeners are user-owned.
 - **Generated messages missing** - run the relevant quality/build command so Paraglide regenerates output; do not hand-edit generated files.

@@ -11,7 +11,7 @@ Before handing work off (see [deliver.md](../deliver/SKILL.md)), verify against 
 
 ## Local Servers
 
-PocketBase and Vite dev are always running in the background. Do not start them. In a worktree, they run on the ports from the worktree's `.env` (or `.worktree.json` if the worktree scripts created it):
+PocketBase and Vite may already be running in the background. Assume every existing listener belongs to the user: reuse healthy listeners and never stop or replace them. Agents may launch Vite or PocketBase when explicitly requested; before doing so, check the ports from the worktree's `.env` (or `.worktree.json` if the worktree scripts created it), and track the process. Stop only processes the current agent started and tracked.
 
 - Vite dev — default `:5173`, overridable via `VITE_PORT`
 - Vite preview — default `:42069`, overridable via `VITE_PREVIEW_PORT` (falls back to `VITE_PORT`)

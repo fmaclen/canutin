@@ -46,4 +46,4 @@ bun run build     # Production build
 bun run pb        # PocketBase backend
 ```
 
-Dev servers are owned by the user. Do not run `bun run dev`.
+Assume every existing Vite or PocketBase listener belongs to the user: reuse healthy listeners and never stop or replace them. By default, do not start local servers. Agents may run `bun run dev` or `bun run pb` from the active worktree when explicitly requested; track the process and stop it only if the current agent started it.

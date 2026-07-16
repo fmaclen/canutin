@@ -10,6 +10,10 @@ The checkout at the repository root is the primary worktree and control plane. K
 
 > **Warning:** Never run double-force Git clean with ignored files from the primary checkout, such as `git clean -ffdx`. It can delete the nested `/.worktrees/` checkouts.
 
+## Local servers
+
+Assume existing local servers belong to the user: do not start, stop, or replace them by default. When the user explicitly asks, agents may start Vite (`bun run dev`) and PocketBase (`bun run pb`) from the active managed worktree. Check the worktree's assigned ports and existing listeners first, reuse healthy servers, and track any processes you start. For ordinary agent actions, stop only processes that the agent started and tracked; never terminate a foreign process. Managed worktree removal is governed separately by the [setup skill](./.agents/skills/setup/SKILL.md) and the manager's ownership safeguards.
+
 ## Your role
 
 Before you call any other tool, read any other file, or respond to the user, open your role skill. The skill body is not auto-injected - opening it is your first action.

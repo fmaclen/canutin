@@ -12,7 +12,8 @@ Backend runtime and database for canutin. Custom Go hooks extend PocketBase with
 ## Dev Environment
 
 - Base URL: `http://127.0.0.1:42070` (default; override with `PB_PORT` env var)
-- Server is always running in background — don't start it
+- Assume an existing server belongs to the user; reuse it when healthy and never stop or replace it
+- Agents may start one when explicitly requested; track the process and stop it only if the current agent started it
 - Start/rebuild: `bun run pb` (compiles the Go binary on first run)
 - Reset DB: `bun run pb:reset`
 - Types auto-generated in `src/lib/pocketbase.schema.ts` on schema changes
@@ -78,7 +79,7 @@ Pattern for new hooks:
 
 - **Dev credentials in production** — these are for local development only
 - **Hand-written migrations** — always go through the admin API
-- **Starting the PB server** — it's already running; don't start it
+- **Starting PocketBase by default** — reuse a healthy existing listener; start one only when explicitly requested
 - **Raw `app.Save()` Go calls for schema** — use the collection API endpoints so automigrate hooks fire
 
 ## See Also
