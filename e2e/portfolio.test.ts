@@ -461,13 +461,13 @@ test('portfolio carries basis only across unchanged quantities', async ({ page }
 		owner: user.id
 	});
 	await seedCurrency({ owner: user.id, code: 'ARS', name: 'Argentine peso', autoUpdate: false });
-	const missingFxSecurity = await seedSecurity({
+	const pb = await getUserPB(user.email);
+	const missingFxSecurity = await pb.collection('securities').create({
 		name: 'Missing FX Basis Fund',
 		symbol: 'MFX',
-		owner: user.id
+		owner: user.id,
+		currency: 'ARS'
 	});
-	const pb = await getUserPB(user.email);
-	await pb.collection('securities').update(missingFxSecurity.id, { currency: 'ARS' });
 	await seedSecurityBalance({
 		account: growthAccount.id,
 		owner: user.id,
