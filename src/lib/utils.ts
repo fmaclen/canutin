@@ -27,20 +27,10 @@ export function formatPercent(value: number) {
 }
 
 export function sumPartial(values: Array<number | null | undefined>) {
-	let total = 0;
-	let isPartial = false;
-	let hasValue = false;
-
-	for (const value of values) {
-		if (value === null || value === undefined) {
-			isPartial = true;
-			continue;
-		}
-		hasValue = true;
-		total += value;
-	}
-
-	return { total: values.length > 0 && !hasValue ? null : total, isPartial };
+	const known = values.filter((value) => value != null);
+	const total =
+		values.length && !known.length ? null : known.reduce((sum, value) => sum + value, 0);
+	return { total, isPartial: known.length < values.length };
 }
 
 // Validates a `?from=` redirect target. Returns the value only if it is a

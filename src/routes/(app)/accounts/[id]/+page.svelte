@@ -388,8 +388,8 @@
 		});
 		return rows.sort(comparator);
 	});
-	const topPositionIds = $derived(
-		new Set(
+	const topPositionsRows = $derived.by(() => {
+		const topPositionIds = new Set(
 			[...positionsRows]
 				.sort(
 					compareByValueDescThenName(
@@ -399,9 +399,9 @@
 				)
 				.slice(0, SAMPLE_LIMIT)
 				.map((row) => row.id)
-		)
-	);
-	const topPositionsRows = $derived(positionsRows.filter((row) => topPositionIds.has(row.id)));
+		);
+		return positionsRows.filter((row) => topPositionIds.has(row.id));
+	});
 	const dateFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
 		year: 'numeric',
 		month: 'short',

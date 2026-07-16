@@ -44,19 +44,12 @@
 		symbol: string | null;
 		accounts: Array<{ id: string; name: string }>;
 	};
-	type Props =
-		| {
-				rows: PositionRow[];
-				entity: 'account' | 'security';
-				sortState: SortState;
-				onSort: (column: string) => void;
-		  }
-		| {
-				rows: AggregatePositionRow[];
-				entity: 'aggregate';
-				sortState: SortState;
-				onSort: (column: string) => void;
-		  };
+	type Props = {
+		rows: PositionRow[] | AggregatePositionRow[];
+		entity: 'account' | 'security' | 'aggregate';
+		sortState: SortState;
+		onSort: (column: string) => void;
+	};
 
 	let { rows, entity, sortState, onSort }: Props = $props();
 

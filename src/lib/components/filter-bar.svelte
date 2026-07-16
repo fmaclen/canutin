@@ -59,30 +59,19 @@
 		};
 	});
 
-	function getPeriodLabel(option: PeriodOption) {
-		switch (option) {
-			case 'this-month':
-				return m.transactions_filter_period_this_month();
-			case 'last-month':
-				return m.transactions_filter_period_last_month();
-			case 'last-3-months':
-				return m.transactions_filter_period_last_3_months();
-			case 'last-6-months':
-				return m.transactions_filter_period_last_6_months();
-			case 'last-12-months':
-				return m.transactions_filter_period_last_12_months();
-			case 'year-to-date':
-				return m.transactions_filter_period_year_to_date();
-			case 'last-year':
-				return m.transactions_filter_period_last_year();
-			case 'lifetime':
-			default:
-				return m.transactions_filter_period_lifetime();
-		}
-	}
+	const periodLabels: Record<PeriodOption, () => string> = {
+		'this-month': m.transactions_filter_period_this_month,
+		'last-month': m.transactions_filter_period_last_month,
+		'last-3-months': m.transactions_filter_period_last_3_months,
+		'last-6-months': m.transactions_filter_period_last_6_months,
+		'last-12-months': m.transactions_filter_period_last_12_months,
+		'year-to-date': m.transactions_filter_period_year_to_date,
+		'last-year': m.transactions_filter_period_last_year,
+		lifetime: m.transactions_filter_period_lifetime
+	};
 
 	const periodTriggerText = $derived.by(() => {
-		if (!customRange) return period ? getPeriodLabel(period) : '';
+		if (!customRange) return period ? periodLabels[period]() : '';
 		if (customRange.label) return customRange.label;
 		const dateFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
 			month: 'short',
@@ -137,7 +126,7 @@
 									periodPopoverOpen = false;
 								}}
 							>
-								{getPeriodLabel(option)}
+								{periodLabels[option]()}
 							</Button>
 						{/each}
 					</div>

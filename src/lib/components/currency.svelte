@@ -99,14 +99,18 @@
 	);
 </script>
 
-{#if isPartial}
+{#if isPartial || isUnconverted}
 	{#if showFxTooltip}
 		<Tooltip.Root>
 			<Tooltip.Trigger
 				aria-label={fxLabel}
-				class="{unconvertedClasses} inline-flex items-baseline gap-1 border-b border-dashed leading-none hover:border-current"
+				class="{unconvertedClasses} {isPartial
+					? 'inline-flex items-baseline gap-1'
+					: 'inline-block'} border-b border-dashed leading-none hover:border-current"
 			>
-				<span class={onColoredSurface ? 'text-white/70' : 'text-muted-foreground'}>~</span>
+				{#if isPartial}
+					<span class={onColoredSurface ? 'text-white/70' : 'text-muted-foreground'}>~</span>
+				{/if}
 				<Number value={formattedValue} {sentiment} />
 			</Tooltip.Trigger>
 			<Tooltip.Content sideOffset={6}>
@@ -115,27 +119,13 @@
 		</Tooltip.Root>
 	{:else}
 		<span
-			class="{unconvertedClasses} inline-flex items-baseline gap-1 border-b border-dashed leading-none"
+			class="{unconvertedClasses} {isPartial
+				? 'inline-flex items-baseline gap-1'
+				: 'inline-block'} border-b border-dashed leading-none"
 		>
-			<span class={onColoredSurface ? 'text-white/70' : 'text-muted-foreground'}>~</span>
-			<Number value={formattedValue} {sentiment} />
-		</span>
-	{/if}
-{:else if isUnconverted}
-	{#if showFxTooltip}
-		<Tooltip.Root>
-			<Tooltip.Trigger
-				aria-label={fxLabel}
-				class="{unconvertedClasses} inline-block border-b border-dashed leading-none hover:border-current"
-			>
-				<Number value={formattedValue} {sentiment} />
-			</Tooltip.Trigger>
-			<Tooltip.Content sideOffset={6}>
-				<p class="text-xs leading-snug font-normal">{fxLabel}</p>
-			</Tooltip.Content>
-		</Tooltip.Root>
-	{:else}
-		<span class="{unconvertedClasses} inline-block border-b border-dashed leading-none">
+			{#if isPartial}
+				<span class={onColoredSurface ? 'text-white/70' : 'text-muted-foreground'}>~</span>
+			{/if}
 			<Number value={formattedValue} {sentiment} />
 		</span>
 	{/if}
