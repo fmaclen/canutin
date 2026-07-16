@@ -230,6 +230,8 @@
 	"assets_delete_failed": "No se pudo eliminar el activo",
 	"portfolio_section_positions": "Posiciones",
 	"portfolio_empty": "Aún no hay posiciones",
+	"portfolio_search_placeholder": "Buscar posiciones",
+	"portfolio_table_empty": "No hay posiciones que coincidan con los filtros seleccionados",
 	"securities_empty": "No hay títulos todavía",
 	"securities_add_page_title": "Agregar título",
 	"securities_section_details": "Detalles",

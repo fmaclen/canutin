@@ -230,6 +230,8 @@
 	"assets_delete_failed": "Couldn't delete asset",
 	"portfolio_section_positions": "Positions",
 	"portfolio_empty": "No positions yet",
+	"portfolio_search_placeholder": "Search positions",
+	"portfolio_table_empty": "No positions match the selected filters",
 	"securities_empty": "No securities yet",
 	"securities_add_page_title": "Add security",
 	"securities_section_details": "Details",

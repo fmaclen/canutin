@@ -32,11 +32,11 @@
 		isLoading: boolean;
 		searchPlaceholder: string;
 		setSearch: (query: string) => void;
-		period: PeriodOption;
-		periodOptions: PeriodOption[];
-		customRange: CustomRange | null;
-		setPresetPeriod: (option: PeriodOption) => void;
-		setCustomRange: (from: Date, to: Date) => void;
+		period?: PeriodOption;
+		periodOptions?: PeriodOption[];
+		customRange?: CustomRange | null;
+		setPresetPeriod?: (option: PeriodOption) => void;
+		setCustomRange?: (from: Date, to: Date) => void;
 		controls: Snippet;
 	} = $props();
 
@@ -82,7 +82,7 @@
 	}
 
 	const periodTriggerText = $derived.by(() => {
-		if (!customRange) return getPeriodLabel(period);
+		if (!customRange) return period ? getPeriodLabel(period) : '';
 		if (customRange.label) return customRange.label;
 		const dateFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
 			month: 'short',
@@ -116,48 +116,50 @@
 			</div>
 		{/if}
 	</div>
-	<Popover.Root bind:open={periodPopoverOpen}>
-		<Popover.SelectTrigger
-			aria-label={m.transactions_filter_period_label()}
-			class="bg-background w-full sm:w-fit"
-		>
-			<span class="truncate">{periodTriggerText}</span>
-		</Popover.SelectTrigger>
-		<Popover.Content class="w-auto p-0" align="start" collisionPadding={32}>
-			<div class="flex">
-				<div class="flex flex-col border-r p-2">
-					{#each periodOptions as option (option)}
-						<Button
-							variant="ghost"
-							class="data-[selected]:bg-accent data-[selected]:text-accent-foreground justify-start font-normal"
-							data-selected={!customRange && period === option ? '' : undefined}
-							onclick={() => {
-								setPresetPeriod(option);
+	{#if period}
+		<Popover.Root bind:open={periodPopoverOpen}>
+			<Popover.SelectTrigger
+				aria-label={m.transactions_filter_period_label()}
+				class="bg-background w-full sm:w-fit"
+			>
+				<span class="truncate">{periodTriggerText}</span>
+			</Popover.SelectTrigger>
+			<Popover.Content class="w-auto p-0" align="start" collisionPadding={32}>
+				<div class="flex">
+					<div class="flex flex-col border-r p-2">
+						{#each periodOptions ?? [] as option (option)}
+							<Button
+								variant="ghost"
+								class="data-[selected]:bg-accent data-[selected]:text-accent-foreground justify-start font-normal"
+								data-selected={!customRange && period === option ? '' : undefined}
+								onclick={() => {
+									setPresetPeriod?.(option);
+									periodPopoverOpen = false;
+								}}
+							>
+								{getPeriodLabel(option)}
+							</Button>
+						{/each}
+					</div>
+					<div class="p-2">
+						<RangeCalendar
+							value={calendarValue}
+							onValueChange={(value) => {
+								if (!value?.start || !value?.end) return;
+								setCustomRange?.(
+									new Date(Date.UTC(value.start.year, value.start.month - 1, value.start.day)),
+									addDays(new Date(Date.UTC(value.end.year, value.end.month - 1, value.end.day)), 1)
+								);
 								periodPopoverOpen = false;
 							}}
-						>
-							{getPeriodLabel(option)}
-						</Button>
-					{/each}
+							numberOfMonths={2}
+							placeholder={calendarValue?.start}
+							disableDaysOutsideMonth
+						/>
+					</div>
 				</div>
-				<div class="p-2">
-					<RangeCalendar
-						value={calendarValue}
-						onValueChange={(value) => {
-							if (!value?.start || !value?.end) return;
-							setCustomRange(
-								new Date(Date.UTC(value.start.year, value.start.month - 1, value.start.day)),
-								addDays(new Date(Date.UTC(value.end.year, value.end.month - 1, value.end.day)), 1)
-							);
-							periodPopoverOpen = false;
-						}}
-						numberOfMonths={2}
-						placeholder={calendarValue?.start}
-						disableDaysOutsideMonth
-					/>
-				</div>
-			</div>
-		</Popover.Content>
-	</Popover.Root>
+			</Popover.Content>
+		</Popover.Root>
+	{/if}
 	{@render controls()}
 </div>

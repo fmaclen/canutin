@@ -1,9 +1,12 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
+
 	import { afterNavigate, replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import AccountPicker from '$lib/components/account-picker.svelte';
 	import Empty from '$lib/components/empty.svelte';
+	import FilterBar from '$lib/components/filter-bar.svelte';
 	import Page from '$lib/components/page.svelte';
 	import PositionsSummary from '$lib/components/positions-summary.svelte';
 	import PositionsTable from '$lib/components/positions-table.svelte';
@@ -19,6 +22,9 @@
 	const securitiesContext = getSecuritiesContext();
 	const accountsContext = getAccountsContext();
 	let accountFilter = $state<string | null>(null);
+	let search = $state('');
+	let filteredSearch = $state('');
+	let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 
 	afterNavigate(({ to }) => {
 		if (to?.url.pathname !== resolve('/portfolio')) return;
@@ -31,6 +37,9 @@
 	});
 
 	function syncFromUrl(url: URL) {
+		if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+		search = url.searchParams.get('q') ?? '';
+		filteredSearch = search;
 		const accountParam = url.searchParams.get('account');
 		accountFilter =
 			accountParam &&
@@ -39,6 +48,24 @@
 				? accountParam
 				: null;
 	}
+
+	function setSearch(query: string) {
+		search = query;
+		const url = new URL(window.location.href);
+		if (query.trim()) url.searchParams.set('q', query.trim());
+		else url.searchParams.delete('q');
+		// eslint-disable-next-line svelte/no-navigation-without-resolve -- dynamic URL preserves other params
+		replaceState(url.href, {});
+
+		if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+		searchDebounceTimer = setTimeout(() => {
+			filteredSearch = query;
+		}, 300);
+	}
+
+	onDestroy(() => {
+		if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+	});
 
 	function setAccountFilter(accountId: string | null) {
 		accountFilter = accountId;
@@ -52,7 +79,24 @@
 	const selectedAccount = $derived(
 		accountFilter ? accountsContext.accounts.find((account) => account.id === accountFilter) : null
 	);
-	const rows = $derived(securitiesContext.getAggregateRows(accountFilter));
+	const accountRows = $derived(securitiesContext.getAggregateRows(accountFilter));
+	const searchTerms = $derived(
+		filteredSearch
+			.toLocaleLowerCase()
+			.split(/[\s,]+/)
+			.filter(Boolean)
+	);
+	const rows = $derived(
+		searchTerms.length
+			? accountRows.filter((row) =>
+					searchTerms.some(
+						(term) =>
+							row.name.toLocaleLowerCase().includes(term) ||
+							row.symbol?.toLocaleLowerCase().includes(term)
+					)
+				)
+			: accountRows
+	);
 	const totalRows = $derived(rows.flatMap((row) => row.balances));
 
 	type PortfolioSortColumn =
@@ -96,22 +140,29 @@
 		{#if securitiesContext.isLoading}
 			<Skeleton class="h-64" showSpinner />
 		{:else}
-			<div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-				<AccountPicker
-					accounts={accountsContext.accounts}
-					value={accountFilter ?? ''}
-					{selectedAccount}
-					onValueChange={(value) => setAccountFilter(value || null)}
-					onClear={() => setAccountFilter(null)}
-					clearLabel={m.transactions_filter_account_clear()}
-					ariaLabel={m.transactions_filter_account_label()}
-					triggerClass="bg-background sm:w-fit sm:max-w-64"
-					selectedNameClass="max-w-40 truncate"
-					placeholder={m.transactions_filter_account_all()}
-				/>
-			</div>
+			<FilterBar
+				{search}
+				isLoading={false}
+				searchPlaceholder={m.portfolio_search_placeholder()}
+				{setSearch}
+			>
+				{#snippet controls()}
+					<AccountPicker
+						accounts={accountsContext.accounts}
+						value={accountFilter ?? ''}
+						{selectedAccount}
+						onValueChange={(value) => setAccountFilter(value || null)}
+						onClear={() => setAccountFilter(null)}
+						clearLabel={m.transactions_filter_account_clear()}
+						ariaLabel={m.transactions_filter_account_label()}
+						triggerClass="sm:w-fit sm:max-w-64"
+						selectedNameClass="max-w-40 truncate"
+						placeholder={m.transactions_filter_account_all()}
+					/>
+				{/snippet}
+			</FilterBar>
 			{#if rows.length === 0}
-				<Empty>{m.portfolio_empty()}</Empty>
+				<Empty>{accountRows.length === 0 ? m.portfolio_empty() : m.portfolio_table_empty()}</Empty>
 			{:else}
 				<PositionsSummary rows={totalRows} />
 				<PositionsTable
