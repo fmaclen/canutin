@@ -12,9 +12,7 @@ Backend runtime and database for canutin. Custom Go hooks extend PocketBase with
 ## Dev Environment
 
 - Base URL: `http://127.0.0.1:42070` (default; override with `PB_PORT` env var)
-- Server is always running in background — don't start it
-- Start/rebuild: `bun run pb` (compiles the Go binary on first run)
-- Reset DB: `bun run pb:reset`
+- Server ownership, ports, and start/reset commands: see [local-servers](../local-servers/SKILL.md)
 - Types auto-generated in `src/lib/pocketbase.schema.ts` on schema changes
 
 ## Authentication
@@ -68,6 +66,10 @@ Pattern for new hooks:
 - Handle account reassignment in update hooks (old and new account)
 - Split into multiple files when `main.go` becomes unwieldy
 
+## Served Skill Reference
+
+`pocketbase/skill.go` hand-maintains the behavioral semantics — custom endpoints, behavioral constraints, auth — of the `/api/canutin/skill` reference; the import payload shape is generated from the Go structs. Update the hand-maintained sections whenever custom routes or backend hooks change. CI enforces this: a change under `pocketbase/**/*.go` without a matching `pocketbase/skill.go` or `.agents/skills/` update fails the PR unless labeled `skip-skill-check`.
+
 ## Schema Changes
 
 - **Never** write migration files by hand
@@ -78,7 +80,7 @@ Pattern for new hooks:
 
 - **Dev credentials in production** — these are for local development only
 - **Hand-written migrations** — always go through the admin API
-- **Starting the PB server** — it's already running; don't start it
+- **Starting PocketBase by default** — follow the ownership rules in [local-servers](../local-servers/SKILL.md)
 - **Raw `app.Save()` Go calls for schema** — use the collection API endpoints so automigrate hooks fire
 
 ## See Also

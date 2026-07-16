@@ -71,13 +71,13 @@ Consequences you must design for:
 
 ### Nullable numbers on securities (carry-forward)
 
-`securityBalances` and `securityTransactions` number fields (`quantity`, `price`, `value`, `costBasis`, `amount`, `fees`) are **nullable**, and the distinction is load-bearing:
+`securityBalances` and `securityTransactions` number fields (`quantity`, `price`, `value`, `costBasis`, `amount`, `fees`) are **nullable**. `null` (or omitted) means unknown; `0` means a known zero. For `securityBalances` holding snapshots, carry-forward depends on the field:
 
-- **`null` (or omitted) = unknown.** The frontend carries the value forward from the most recent prior snapshot that had a known value.
-- **`0` = a known zero**, not carried forward.
-- **`quantity: 0` closes a position.** Value and cost basis resolve to 0 and carry-forward **stops** at that row (a later re-buy with no fresh value stays unknown, not the old lot's value).
+- **Market value (`value`)** carries forward from the most recent prior snapshot with a known value. **`price` does not carry forward.**
+- **`costBasis`** carries forward only while the current and prior quantities are both known and unchanged. After any quantity-changing event, importers must explicitly provide the resulting `costBasis` when it is known, including after a split; otherwise leave it `null`.
+- **`quantity: 0` closes a position.** Value and cost basis resolve to 0 and carry-forward **stops** at that lot boundary (a later re-buy with no fresh value or cost basis stays unknown, rather than reusing the old lot's data).
 
-Rule of thumb: send `value`/`price`/`costBasis` explicitly on every snapshot you actually know; leave them `null` only when genuinely unknown. **Never emit `0` for an unknown value** — it will be read as a real zero. Post a `quantity: 0` snapshot to close out a holding.
+Rule of thumb: send `value`/`price`/`costBasis` explicitly on every snapshot you actually know; leave them `null` only when genuinely unknown. **Never emit `0` for an unknown value** — it will be read as a real zero. Always send the resulting basis when known after quantity changes, including splits, and post a `quantity: 0` snapshot to close out a holding.
 
 ### currencies[]
 

@@ -30,7 +30,7 @@ If CI is failing on infrastructure issues (PocketBase dev server not starting, G
 - **DO** read CI logs and PocketBase logs before diagnosing failures
 - **DO** verify each push succeeded before moving on
 - **DO** stop and report after two consecutive failures
-- **DO** run `bun run quality` and the relevant Playwright project locally before pushing
+- **DO** verify locally before pushing - see [verify](../verify/SKILL.md)
 - **DON'T** push speculative fixes — diagnose from logs first
 - **DON'T** re-trigger CI when it fails on infrastructure issues
 - **DON'T** change test files or timeouts when debugging CI flakiness
