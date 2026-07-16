@@ -53,6 +53,7 @@ export type SecurityAggregate = {
 	name: string;
 	symbol: string | null;
 	accounts: Array<{ id: string; name: string }>;
+	balances: SecurityAccountBalance[];
 	quantity: number | null;
 	value: number | null;
 	costBasis: number | null;
@@ -153,10 +154,6 @@ class SecuritiesContext {
 		this._accounts = getAccountsContext();
 		this._fx = getExchangeRatesContext();
 		this.init();
-	}
-
-	get aggregateRows() {
-		return this.computeAggregateRows();
 	}
 
 	getSecurity(id: string) {
@@ -355,11 +352,11 @@ class SecuritiesContext {
 		return this._fx.convert(value, currency, date);
 	}
 
-	private computeAggregateRows() {
+	getAggregateRows(accountId: string | null) {
 		const securitiesById = this.securitiesById;
 		const balancesBySecurity = new SvelteMap<string, SecurityAccountBalance[]>();
 		for (const row of this.getLatestAccountBalanceRows()) {
-			if (row.quantity === 0) continue;
+			if (row.quantity === 0 || (accountId && row.accountId !== accountId)) continue;
 			const rows = balancesBySecurity.get(row.securityId) ?? [];
 			rows.push(row);
 			balancesBySecurity.set(row.securityId, rows);
@@ -377,6 +374,7 @@ class SecuritiesContext {
 				accounts: balances
 					.map((balance) => ({ id: balance.accountId, name: balance.accountName }))
 					.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+				balances,
 				...summary
 			});
 		}

@@ -19,7 +19,7 @@
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import { TableSort } from '$lib/sorting.svelte';
-	import { createSortComparator, formatPercent, type SortState } from '$lib/utils';
+	import { createSortComparator, formatPercent, sumPartial, type SortState } from '$lib/utils';
 
 	type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
 
@@ -140,7 +140,7 @@
 		return map;
 	});
 
-	type AssetsTotal = { value: number; isUnconverted: boolean };
+	type AssetsTotal = { value: number | null; isPartial: boolean };
 
 	const totalsByFilter = $derived.by(() => {
 		const totals = new SvelteMap<FilterOption, AssetsTotal>();
@@ -151,10 +151,12 @@
 			const contributing = rows.filter(
 				(row) => !(option.key === 'owned' && row.participantExcluded)
 			);
-			const value = contributing.reduce((sum, row) => sum + row.marketValue, 0);
+			const result = sumPartial(
+				contributing.map((row) => (row.isUnconverted ? null : row.marketValue))
+			);
 			totals.set(option.key, {
-				value,
-				isUnconverted: contributing.some((row) => row.isUnconverted)
+				value: result.total,
+				isPartial: result.isPartial
 			});
 		}
 		return totals;
@@ -212,8 +214,8 @@
 					<Tabs.Content value={option.key} class="flex flex-col space-y-2">
 						{@const rowsForOption = rowsByFilter.get(option.key) ?? []}
 						{@const total = totalsByFilter.get(option.key) ?? {
-							value: 0,
-							isUnconverted: false
+							value: null,
+							isPartial: false
 						}}
 						<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
 							<KeyValue
@@ -227,7 +229,7 @@
 								value={total.value}
 								variant="outline"
 								decimalScale={2}
-								isUnconverted={total.isUnconverted}
+								isPartial={total.isPartial}
 							/>
 						</div>
 						{#if rowsForOption.length === 0}

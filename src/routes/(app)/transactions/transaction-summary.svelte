@@ -28,8 +28,8 @@
 	{#if showCredits}
 		<KeyValue
 			title={m.summary_net_credits()}
-			value={txContext.creditsTotal.value}
-			isUnconverted={txContext.creditsTotal.isUnconverted}
+			value={txContext.creditsTotal.total}
+			isPartial={txContext.creditsTotal.isPartial}
 			variant="outline"
 			decimalScale={2}
 		/>
@@ -37,16 +37,16 @@
 	{#if showDebits}
 		<KeyValue
 			title={m.summary_net_debits()}
-			value={txContext.debitsTotal.value}
-			isUnconverted={txContext.debitsTotal.isUnconverted}
+			value={txContext.debitsTotal.total}
+			isPartial={txContext.debitsTotal.isPartial}
 			variant="outline"
 			decimalScale={2}
 		/>
 	{/if}
 	<KeyValue
 		title={m.summary_net_amount()}
-		value={txContext.netBalance.value}
-		isUnconverted={txContext.netBalance.isUnconverted}
+		value={txContext.netBalance.total}
+		isPartial={txContext.netBalance.isPartial}
 		variant="outline"
 		decimalScale={2}
 	/>

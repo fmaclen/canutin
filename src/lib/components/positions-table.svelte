@@ -14,36 +14,51 @@
 	} from '$lib/security-balance-values';
 	import { formatPercent, type SortState } from '$lib/utils';
 
-	type PositionRow = {
+	type PositionValueRow = {
 		id: string;
-		asOf: string;
-		entityId: string;
-		entityName: string;
-		nativeCurrency: string;
 		quantity: number | null;
-		price: number | null;
 		costBasis: number | null;
 		gainLoss: number | null;
 		value: number | null;
 		isConverted: boolean;
 		isUnconverted: boolean;
+		missingCurrency?: string | null;
+		nativeCurrency?: string;
+		nativeValue?: number | null;
+		nativeCostBasis?: number | null;
+		nativeGainLoss?: number | null;
+	};
+	type PositionRow = PositionValueRow & {
+		asOf: string;
+		entityId: string;
+		entityName: string;
+		nativeCurrency: string;
+		price: number | null;
 		missingCurrency: string | null;
 		nativeValue: number | null;
 		nativeCostBasis: number | null;
 		nativeGainLoss: number | null;
 	};
+	type AggregatePositionRow = PositionValueRow & {
+		name: string;
+		symbol: string | null;
+		accounts: Array<{ id: string; name: string }>;
+	};
+	type Props =
+		| {
+				rows: PositionRow[];
+				entity: 'account' | 'security';
+				sortState: SortState;
+				onSort: (column: string) => void;
+		  }
+		| {
+				rows: AggregatePositionRow[];
+				entity: 'aggregate';
+				sortState: SortState;
+				onSort: (column: string) => void;
+		  };
 
-	let {
-		rows,
-		entity,
-		sortState,
-		onSort
-	}: {
-		rows: PositionRow[];
-		entity: 'account' | 'security';
-		sortState: SortState;
-		onSort: (column: string) => void;
-	} = $props();
+	let { rows, entity, sortState, onSort }: Props = $props();
 
 	const fx = getExchangeRatesContext();
 	const dateFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
@@ -58,26 +73,50 @@
 	<Table.Root>
 		<Table.Header>
 			<Table.Row>
-				<Table.SortableHead
-					class="text-left whitespace-nowrap"
-					column="asOf"
-					sortColumn={sortState.column}
-					sortDirection={sortState.direction}
-					{onSort}
-				>
-					{m.securities_table_header_as_of()}
-				</Table.SortableHead>
-				<Table.SortableHead
-					class="text-left whitespace-nowrap"
-					column={entity === 'account' ? 'accountName' : 'securityName'}
-					sortColumn={sortState.column}
-					sortDirection={sortState.direction}
-					{onSort}
-				>
-					{entity === 'account'
-						? m.securities_table_header_account()
-						: m.securities_table_header_security()}
-				</Table.SortableHead>
+				{#if entity === 'aggregate'}
+					<Table.SortableHead
+						class="text-left whitespace-nowrap"
+						column="name"
+						sortColumn={sortState.column}
+						sortDirection={sortState.direction}
+						{onSort}
+					>
+						{m.securities_table_header_security()}
+					</Table.SortableHead>
+					<Table.SortableHead
+						class="text-left whitespace-nowrap"
+						column="symbol"
+						sortColumn={sortState.column}
+						sortDirection={sortState.direction}
+						{onSort}
+					>
+						{m.securities_table_header_symbol()}
+					</Table.SortableHead>
+					<Table.Head class="text-left whitespace-nowrap">
+						{m.securities_table_header_accounts()}
+					</Table.Head>
+				{:else}
+					<Table.SortableHead
+						class="text-left whitespace-nowrap"
+						column="asOf"
+						sortColumn={sortState.column}
+						sortDirection={sortState.direction}
+						{onSort}
+					>
+						{m.securities_table_header_as_of()}
+					</Table.SortableHead>
+					<Table.SortableHead
+						class="text-left whitespace-nowrap"
+						column={entity === 'account' ? 'accountName' : 'securityName'}
+						sortColumn={sortState.column}
+						sortDirection={sortState.direction}
+						{onSort}
+					>
+						{entity === 'account'
+							? m.securities_table_header_account()
+							: m.securities_table_header_security()}
+					</Table.SortableHead>
+				{/if}
 				<Table.SortableHead
 					class="text-right whitespace-nowrap"
 					column="quantity"
@@ -87,15 +126,17 @@
 				>
 					{m.securities_table_header_quantity()}
 				</Table.SortableHead>
-				<Table.SortableHead
-					class="text-right whitespace-nowrap"
-					column="price"
-					sortColumn={sortState.column}
-					sortDirection={sortState.direction}
-					{onSort}
-				>
-					{m.securities_table_header_price()}
-				</Table.SortableHead>
+				{#if entity !== 'aggregate'}
+					<Table.SortableHead
+						class="text-right whitespace-nowrap"
+						column="price"
+						sortColumn={sortState.column}
+						sortDirection={sortState.direction}
+						{onSort}
+					>
+						{m.securities_table_header_price()}
+					</Table.SortableHead>
+				{/if}
 				<Table.SortableHead
 					class="text-right whitespace-nowrap"
 					column="costBasis"
@@ -138,21 +179,51 @@
 			{#each rows as row (row.id)}
 				{@const gainLossPercent = gainLossPercentOrNull(row.gainLoss, row.costBasis)}
 				<Table.Row>
-					<Table.Cell
-						class="text-muted-foreground font-mono whitespace-nowrap uppercase tabular-nums"
-					>
-						{dateFormatter.format(new Date(row.asOf))}
-					</Table.Cell>
-					<Table.Cell>
-						<Link
-							href={entity === 'account'
-								? resolve(`/accounts/${row.entityId}`)
-								: resolve(`/securities/${row.entityId}`)}
-							class="text-foreground/90 text-sm font-medium"
+					{#if entity === 'aggregate' && 'accounts' in row}
+						<Table.Cell>
+							<Link
+								href={resolve(`/securities/${row.id}`)}
+								class="text-foreground/90 text-sm font-medium"
+							>
+								{row.name}
+							</Link>
+						</Table.Cell>
+						<Table.Cell class="text-foreground/80 text-sm tracking-wide uppercase">
+							{#if row.symbol}
+								{row.symbol}
+							{:else}
+								<span class="text-muted-foreground">~</span>
+							{/if}
+						</Table.Cell>
+						<Table.Cell class="text-foreground/80 max-w-80 text-sm">
+							<div class="flex flex-wrap gap-x-1.5 gap-y-0.5">
+								{#each row.accounts as account (account.id)}
+									<Link
+										href={resolve(`/accounts/${account.id}`)}
+										class="text-foreground/80 text-sm"
+									>
+										{account.name}
+									</Link>
+								{/each}
+							</div>
+						</Table.Cell>
+					{:else if 'entityId' in row}
+						<Table.Cell
+							class="text-muted-foreground font-mono whitespace-nowrap uppercase tabular-nums"
 						>
-							{row.entityName}
-						</Link>
-					</Table.Cell>
+							{dateFormatter.format(new Date(row.asOf))}
+						</Table.Cell>
+						<Table.Cell>
+							<Link
+								href={entity === 'account'
+									? resolve(`/accounts/${row.entityId}`)
+									: resolve(`/securities/${row.entityId}`)}
+								class="text-foreground/90 text-sm font-medium"
+							>
+								{row.entityName}
+							</Link>
+						</Table.Cell>
+					{/if}
 					<Table.Cell class="text-right tabular-nums">
 						{#if row.quantity === null}
 							<span class="text-muted-foreground">~</span>
@@ -160,22 +231,24 @@
 							<NumberDisplay value={formatSecurityQuantity(row.quantity)} />
 						{/if}
 					</Table.Cell>
-					<Table.Cell class="text-right tabular-nums">
-						{#if row.price === null}
-							<span class="text-muted-foreground">~</span>
-						{:else}
-							{@const priceFx = fx.convert(row.price, row.nativeCurrency, row.asOf)}
-							<Currency
-								value={priceFx.value}
-								decimalScale={2}
-								isConverted={priceFx.isConverted}
-								isUnconverted={priceFx.isUnconverted}
-								missingCurrency={priceFx.missingCurrency}
-								nativeCurrency={row.nativeCurrency}
-								nativeValue={row.price}
-							/>
-						{/if}
-					</Table.Cell>
+					{#if entity !== 'aggregate' && 'price' in row}
+						<Table.Cell class="text-right tabular-nums">
+							{#if row.price === null}
+								<span class="text-muted-foreground">~</span>
+							{:else}
+								{@const priceFx = fx.convert(row.price, row.nativeCurrency, row.asOf)}
+								<Currency
+									value={priceFx.value}
+									decimalScale={2}
+									isConverted={priceFx.isConverted}
+									isUnconverted={priceFx.isUnconverted}
+									missingCurrency={priceFx.missingCurrency}
+									nativeCurrency={row.nativeCurrency}
+									nativeValue={row.price}
+								/>
+							{/if}
+						</Table.Cell>
+					{/if}
 					<Table.Cell class="text-right tabular-nums">
 						{#if row.costBasis === null}
 							<span class="text-muted-foreground">~</span>

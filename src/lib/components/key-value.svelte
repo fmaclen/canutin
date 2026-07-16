@@ -1,7 +1,9 @@
 <script lang="ts">
 	import Currency from '$lib/components/currency.svelte';
 	import Number from '$lib/components/number.svelte';
+	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
+	import { m } from '$lib/paraglide/messages';
 	import { formatPercent } from '$lib/utils';
 
 	type Variant = 'filled' | 'outline' | 'cash' | 'debt' | 'investment' | 'other';
@@ -12,7 +14,8 @@
 		variant = 'filled',
 		format = 'currency',
 		decimalScale = 0,
-		isUnconverted = false
+		isUnconverted = false,
+		isPartial = false
 	}: {
 		title: string;
 		value: number | null;
@@ -20,6 +23,7 @@
 		format?: 'currency' | 'number' | 'percent';
 		decimalScale?: number;
 		isUnconverted?: boolean;
+		isPartial?: boolean;
 	} = $props();
 
 	const variantClasses: Record<Variant, string> = {
@@ -46,11 +50,28 @@
 		{#if value === null}
 			<span class="text-muted-foreground">~</span>
 		{:else if format === 'percent'}
-			<Number value={formatPercent(value)} />
+			{#if isPartial}
+				<Tooltip.Root>
+					<Tooltip.Trigger
+						aria-label={m.fx_partial_total()}
+						class="{onColoredSurface
+							? 'border-white/66 text-white'
+							: 'text-muted-foreground border-border'} inline-flex items-baseline gap-1 border-b border-dashed leading-none hover:border-current"
+					>
+						<span class={onColoredSurface ? 'text-white/70' : 'text-muted-foreground'}>~</span>
+						<Number value={formatPercent(value)} />
+					</Tooltip.Trigger>
+					<Tooltip.Content sideOffset={6}>
+						<p class="text-xs leading-snug font-normal">{m.fx_partial_total()}</p>
+					</Tooltip.Content>
+				</Tooltip.Root>
+			{:else}
+				<Number value={formatPercent(value)} />
+			{/if}
 		{:else if format === 'number'}
 			<Number value={value.toLocaleString(getFormattingLocale())} />
 		{:else}
-			<Currency {value} {decimalScale} {isUnconverted} {onColoredSurface} />
+			<Currency {value} {decimalScale} {isUnconverted} {isPartial} {onColoredSurface} />
 		{/if}
 	</div>
 </div>

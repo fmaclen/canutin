@@ -20,6 +20,7 @@ import type { PocketBaseContext } from './pocketbase.svelte';
 import { Debouncer } from './realtime-sync';
 import {
 	createSortComparator,
+	sumPartial,
 	toPocketBaseDateString,
 	type SortDirection,
 	type SortState
@@ -794,21 +795,12 @@ class TransactionsContext {
 		return this.mapTransactions(this.rawTransactions);
 	}
 
-	private summarize(rows: TransactionRow[]) {
-		let value = 0;
-		let isUnconverted = false;
-		for (const row of rows) {
-			if (row.isUnconverted) {
-				isUnconverted = true;
-				continue;
-			}
-			value += row.displayValue;
-		}
-		return { value, isUnconverted };
-	}
-
 	get netBalance() {
-		return this.summarize(this.filteredRows.filter((row) => !row.excluded));
+		return sumPartial(
+			this.filteredRows
+				.filter((row) => !row.excluded)
+				.map((row) => (row.isUnconverted ? null : row.displayValue))
+		);
 	}
 
 	private get creditRows() {
@@ -824,11 +816,11 @@ class TransactionsContext {
 	}
 
 	get creditsTotal() {
-		return this.summarize(this.creditRows);
+		return sumPartial(this.creditRows.map((row) => (row.isUnconverted ? null : row.displayValue)));
 	}
 
 	get debitsTotal() {
-		return this.summarize(this.debitRows);
+		return sumPartial(this.debitRows.map((row) => (row.isUnconverted ? null : row.displayValue)));
 	}
 
 	get hasCredits() {
@@ -845,14 +837,6 @@ class TransactionsContext {
 
 	get customToDate() {
 		return this._customToDate;
-	}
-
-	get customLabel() {
-		return this._customLabel;
-	}
-
-	get isCustomRange() {
-		return this._customFromDate !== null && this._customToDate !== null;
 	}
 
 	get customRange(): { from: Date; to: Date; label: string | null } | null {

@@ -11,7 +11,7 @@
 	import Section from '$lib/components/section.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/paraglide/messages';
-	import { sumOrUnknown } from '$lib/security-balance-values';
+	import { sumPartial } from '$lib/utils';
 
 	type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
 
@@ -43,12 +43,12 @@
 			id: string;
 			name: string;
 			total: number | null;
-			isUnconverted: boolean;
+			isPartial: boolean;
 			items: Item[];
 		};
 		type Group = {
 			total: number | null;
-			isUnconverted: boolean;
+			isPartial: boolean;
 			types: BalanceType[];
 		};
 
@@ -66,7 +66,7 @@
 				!trimmed || trimmed === '(Unknown)' ? `id:${typeId}` : `name:${trimmed.toLowerCase()}`;
 			let entry = map.get(key);
 			if (!entry) {
-				entry = { id: key, name, total: null, isUnconverted: false, items: [] };
+				entry = { id: key, name, total: null, isPartial: false, items: [] };
 				map.set(key, entry);
 			}
 			return entry;
@@ -117,21 +117,33 @@
 		}
 
 		const groups: Record<BalanceGroup, Group> = {
-			CASH: { total: null, isUnconverted: false, types: [] },
-			DEBT: { total: null, isUnconverted: false, types: [] },
-			INVESTMENT: { total: null, isUnconverted: false, types: [] },
-			OTHER: { total: null, isUnconverted: false, types: [] }
+			CASH: { total: null, isPartial: false, types: [] },
+			DEBT: { total: null, isPartial: false, types: [] },
+			INVESTMENT: { total: null, isPartial: false, types: [] },
+			OTHER: { total: null, isPartial: false, types: [] }
 		};
 		for (const g of Object.keys(typeMaps) as BalanceGroup[]) {
 			const types = Array.from(typeMaps[g].values());
+			const groupValues: Array<number | null> = [];
+			let groupHasMixedAccounts = false;
 			for (const balanceType of types) {
 				const included = balanceType.items.filter((item) => !item.excluded);
-				balanceType.total = sumOrUnknown(included.map((item) => item.balance));
-				balanceType.isUnconverted = included.some((item) => item.isUnconverted);
+				const values = included.map((item) =>
+					item.type === 'asset' && item.isUnconverted ? null : item.balance
+				);
+				const hasMixedAccounts = included.some(
+					(item) => item.type === 'account' && item.isUnconverted
+				);
+				const result = sumPartial(values);
+				balanceType.total = result.total;
+				balanceType.isPartial = result.isPartial || hasMixedAccounts;
+				groupValues.push(...values);
+				groupHasMixedAccounts ||= hasMixedAccounts;
 			}
 			groups[g].types = types.sort((a, b) => Math.abs(b.total ?? 0) - Math.abs(a.total ?? 0));
-			groups[g].total = sumOrUnknown(types.map((balanceType) => balanceType.total));
-			groups[g].isUnconverted = types.some((balanceType) => balanceType.isUnconverted);
+			const result = sumPartial(groupValues);
+			groups[g].total = result.total;
+			groups[g].isPartial = result.isPartial || groupHasMixedAccounts;
 		}
 
 		return groups;
@@ -148,7 +160,7 @@
 						title={balanceGroupMeta[balanceGroup].label}
 						value={grouped[balanceGroup].total}
 						variant={balanceGroupMeta[balanceGroup].variant}
-						isUnconverted={grouped[balanceGroup].isUnconverted}
+						isPartial={grouped[balanceGroup].isPartial}
 					/>
 					{#if isLoading}
 						<Skeleton class="min-h-32" showSpinner />
@@ -167,10 +179,7 @@
 										{#if balanceType.total === null}
 											<span class="text-muted-foreground">~</span>
 										{:else}
-											<Currency
-												value={balanceType.total}
-												isUnconverted={balanceType.isUnconverted}
-											/>
+											<Currency value={balanceType.total} isPartial={balanceType.isPartial} />
 										{/if}
 									</div>
 								</div>
