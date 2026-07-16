@@ -7,8 +7,8 @@
 	import AccountPicker from '$lib/components/account-picker.svelte';
 	import Empty from '$lib/components/empty.svelte';
 	import FilterBar from '$lib/components/filter-bar.svelte';
+	import KeyValue from '$lib/components/key-value.svelte';
 	import Page from '$lib/components/page.svelte';
-	import PositionsSummary from '$lib/components/positions-summary.svelte';
 	import PositionsTable from '$lib/components/positions-table.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
@@ -17,7 +17,7 @@
 	import { getSecuritiesContext, type SecurityAggregate } from '$lib/securities.svelte';
 	import { gainLossPercentOrNull } from '$lib/security-balance-values';
 	import { TableSort } from '$lib/sorting.svelte';
-	import { createSortComparator, type SortState } from '$lib/utils';
+	import { createSortComparator, sumPartial, type SortState } from '$lib/utils';
 
 	const securitiesContext = getSecuritiesContext();
 	const accountsContext = getAccountsContext();
@@ -98,6 +98,16 @@
 			: accountRows
 	);
 	const totalRows = $derived(rows.flatMap((row) => row.balances));
+	const marketValueTotal = $derived(
+		sumPartial(totalRows.map((row) => (row.isUnconverted ? null : row.value)))
+	);
+	const gainLossTotal = $derived(
+		sumPartial(totalRows.map((row) => (row.isUnconverted ? null : row.gainLoss)))
+	);
+	const costBasisTotal = $derived(
+		sumPartial(totalRows.map((row) => (row.isUnconverted ? null : row.costBasis)))
+	);
+	const gainPercent = $derived(gainLossPercentOrNull(gainLossTotal.total, costBasisTotal.total));
 
 	type PortfolioSortColumn =
 		| 'name'
@@ -164,7 +174,29 @@
 			{#if rows.length === 0}
 				<Empty>{accountRows.length === 0 ? m.portfolio_empty() : m.portfolio_table_empty()}</Empty>
 			{:else}
-				<PositionsSummary rows={totalRows} />
+				<div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+					<KeyValue
+						title={m.summary_net_gain_loss()}
+						value={gainLossTotal.total}
+						variant="outline"
+						decimalScale={2}
+						isPartial={gainLossTotal.isPartial}
+					/>
+					<KeyValue
+						title={m.summary_net_gain_percent()}
+						value={gainPercent}
+						variant="outline"
+						format="percent"
+						isPartial={gainLossTotal.isPartial || costBasisTotal.isPartial}
+					/>
+					<KeyValue
+						title={m.summary_net_market_value()}
+						value={marketValueTotal.total}
+						variant="outline"
+						decimalScale={2}
+						isPartial={marketValueTotal.isPartial}
+					/>
+				</div>
 				<PositionsTable
 					rows={sortedRows}
 					entity="aggregate"

@@ -122,7 +122,6 @@ test('portfolio and trades flow covers security creation, balances, filters, and
 	await expect(page.getByRole('row', { name: /Vanguard Total Stock Market ETF/ })).toContainText(
 		'$2,000.00'
 	);
-	await expect(page.getByRole('region', { name: 'Net market value' })).toContainText('$2,000.00');
 
 	await goToEditTab(page);
 	await expect(page).toHaveURL(`/accounts/${brokerageAccount.id}/edit`);
@@ -334,9 +333,6 @@ test('portfolio unknown values render as unknown and do not inflate account tota
 	await expect(portfolioMarketValue.getByLabel(partialTotalLabel)).toBeVisible();
 
 	await row.getByRole('link', { name: 'Unknown Value Brokerage' }).click();
-	const accountMarketValue = page.getByRole('region', { name: 'Net market value' });
-	await expect(accountMarketValue).toContainText('~ $0.00');
-	await expect(accountMarketValue.getByLabel(partialTotalLabel)).toBeVisible();
 	const positionRow = page.getByRole('table').getByRole('row', { name: /Private Fund/ });
 	// Gain/loss % cell (index 6) and Value cell (last) both stay unknown — never coerced to 0.
 	await expect(positionRow.locator('td').nth(6)).toHaveText('~');

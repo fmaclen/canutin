@@ -14,7 +14,6 @@
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
 	import Link from '$lib/components/link.svelte';
-	import PositionsSummary from '$lib/components/positions-summary.svelte';
 	import PositionsTable from '$lib/components/positions-table.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
@@ -451,7 +450,6 @@
 		{#if !loaded || securitiesContext.isLoading || !account}
 			<Skeleton class="h-64" showSpinner />
 		{:else if positionsRows.length > 0}
-			<PositionsSummary rows={positionsRows} ariaLabel={m.account_section_top_positions()} />
 			<div
 				class="grid overflow-hidden rounded-sm shadow-md [&>div]:rounded-none [&>div]:shadow-none"
 			>
