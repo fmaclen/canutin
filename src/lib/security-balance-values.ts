@@ -91,12 +91,13 @@ export function resolveSecurityBalanceValues(balances: SecurityBalanceValueInput
 		// means UNKNOWN (no recorded value) - distinct from a known `0`. This differs from
 		// assetBalances, which uses native number fields and has no unknown state. This resolver
 		// must therefore preserve `null` as unknown and never coerce it to `0`.
-		if (toNumber(latest.quantity) === 0) {
+		const latestQuantity = toNumber(latest.quantity);
+		if (latestQuantity === 0) {
 			resolved.set(key, { balance: latest, value: 0, costBasis: 0 });
 			continue;
 		}
 
-		// The latest holding has quantity > 0 but possibly no recorded value. Carry forward the
+		// The latest holding is not sold out but possibly has no recorded value. Carry forward the
 		// most recent known value, but stop at a sold-out (quantity 0) balance: its `0` belongs to
 		// the prior lot, so a re-bought holding with no fresh value is genuinely UNKNOWN, not 0.
 		let value = toNumber(latest.value);
@@ -112,9 +113,9 @@ export function resolveSecurityBalanceValues(balances: SecurityBalanceValueInput
 		}
 
 		let costBasis = toNumber(latest.costBasis);
-		if (costBasis === null) {
+		if (costBasis === null && latestQuantity !== null) {
 			for (const balance of sorted) {
-				if (toNumber(balance.quantity) === 0) break;
+				if (toNumber(balance.quantity) !== latestQuantity) break;
 				const known = toNumber(balance.costBasis);
 				if (known !== null) {
 					costBasis = known;

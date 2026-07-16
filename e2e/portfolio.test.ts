@@ -17,6 +17,7 @@ import {
 	getUserPB,
 	seedAccount,
 	seedAccountBalance,
+	seedCurrency,
 	seedSecurity,
 	seedSecurityBalance,
 	seedTrade,
@@ -497,7 +498,225 @@ test('portfolio hides sold-out positions while preserving activity history', asy
 	await expect(page.getByRole('row', { name: /Exit Round Trip Stock/ })).toBeVisible();
 });
 
-test('portfolio carries a re-buy after a sell-out forward as unknown', async ({ page }) => {
+test('portfolio carries basis only across unchanged quantities', async ({ page }) => {
+	const user = await seedUser('cassia');
+	const growthAccount = await seedAccount({
+		name: 'Growth Brokerage',
+		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+		owner: user.id,
+		balanceType: 'Brokerage'
+	});
+	const stableAccount = await seedAccount({
+		name: 'Stable Brokerage',
+		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+		owner: user.id,
+		balanceType: 'Brokerage'
+	});
+	const changedSecurity = await seedSecurity({
+		name: 'Changed Basis Fund',
+		symbol: 'CBF',
+		owner: user.id
+	});
+	const partialSaleSecurity = await seedSecurity({
+		name: 'Partial Sale Fund',
+		symbol: 'PSF',
+		owner: user.id
+	});
+	const splitSecurity = await seedSecurity({
+		name: 'Split Fund',
+		symbol: 'SPF',
+		owner: user.id
+	});
+	const unknownQuantitySecurity = await seedSecurity({
+		name: 'Unknown Quantity Fund',
+		symbol: 'UQF',
+		owner: user.id
+	});
+	await seedCurrency({ owner: user.id, code: 'ARS', name: 'Argentine peso', autoUpdate: false });
+	const pb = await getUserPB(user.email);
+	const missingFxSecurity = await pb.collection('securities').create({
+		name: 'Missing FX Basis Fund',
+		symbol: 'MFX',
+		owner: user.id,
+		currency: 'ARS'
+	});
+	await seedSecurityBalance({
+		account: growthAccount.id,
+		owner: user.id,
+		security: changedSecurity.id,
+		asOf: '2026-01-01 00:00:00.000Z',
+		quantity: 10,
+		price: 10,
+		value: 100,
+		costBasis: 80
+	});
+	await seedSecurityBalance({
+		account: growthAccount.id,
+		owner: user.id,
+		security: changedSecurity.id,
+		asOf: '2026-02-01 00:00:00.000Z',
+		quantity: 15,
+		price: 10,
+		value: 150,
+		costBasis: null
+	});
+	await seedSecurityBalance({
+		account: stableAccount.id,
+		owner: user.id,
+		security: changedSecurity.id,
+		asOf: '2026-01-01 00:00:00.000Z',
+		quantity: 5,
+		price: 10,
+		value: 50,
+		costBasis: 40
+	});
+	await seedSecurityBalance({
+		account: stableAccount.id,
+		owner: user.id,
+		security: changedSecurity.id,
+		asOf: '2026-02-01 00:00:00.000Z',
+		quantity: 5,
+		price: 12,
+		value: 60,
+		costBasis: null
+	});
+	await seedSecurityBalance({
+		account: growthAccount.id,
+		owner: user.id,
+		security: partialSaleSecurity.id,
+		asOf: '2026-01-01 00:00:00.000Z',
+		quantity: 20,
+		price: 10,
+		value: 200,
+		costBasis: 160
+	});
+	await seedSecurityBalance({
+		account: growthAccount.id,
+		owner: user.id,
+		security: partialSaleSecurity.id,
+		asOf: '2026-02-01 00:00:00.000Z',
+		quantity: 12,
+		price: null,
+		value: null,
+		costBasis: null
+	});
+	await seedSecurityBalance({
+		account: growthAccount.id,
+		owner: user.id,
+		security: splitSecurity.id,
+		asOf: '2026-01-01 00:00:00.000Z',
+		quantity: 2,
+		price: 50,
+		value: 100,
+		costBasis: 80
+	});
+	await seedSecurityBalance({
+		account: growthAccount.id,
+		owner: user.id,
+		security: splitSecurity.id,
+		asOf: '2026-02-01 00:00:00.000Z',
+		quantity: 4,
+		price: 60,
+		value: 240,
+		costBasis: null
+	});
+	await seedSecurityBalance({
+		account: growthAccount.id,
+		owner: user.id,
+		security: unknownQuantitySecurity.id,
+		asOf: '2026-01-01 00:00:00.000Z',
+		quantity: 3,
+		price: 30,
+		value: 90,
+		costBasis: 60
+	});
+	await seedSecurityBalance({
+		account: growthAccount.id,
+		owner: user.id,
+		security: unknownQuantitySecurity.id,
+		asOf: '2026-02-01 00:00:00.000Z',
+		quantity: null,
+		price: null,
+		value: null,
+		costBasis: 70
+	});
+	await seedSecurityBalance({
+		account: growthAccount.id,
+		owner: user.id,
+		security: unknownQuantitySecurity.id,
+		asOf: '2026-03-01 00:00:00.000Z',
+		quantity: null,
+		price: null,
+		value: null,
+		costBasis: null
+	});
+	await seedSecurityBalance({
+		account: growthAccount.id,
+		owner: user.id,
+		security: missingFxSecurity.id,
+		asOf: '2026-02-01 00:00:00.000Z',
+		quantity: 2,
+		price: 500,
+		value: 1000,
+		costBasis: null
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Portfolio');
+	const changedRow = page.getByRole('row', { name: /Changed Basis Fund/ });
+	await expect(changedRow.locator('td').nth(3)).toHaveText('20');
+	await expect(changedRow.locator('td').nth(4)).toHaveText('~');
+	await expect(changedRow.locator('td').nth(5)).toHaveText('~');
+	await expect(changedRow.locator('td').nth(6)).toHaveText('~');
+	await expect(changedRow.locator('td').last()).toHaveText('$210.00');
+
+	const partialSaleRow = page.getByRole('row', { name: /Partial Sale Fund/ });
+	await expect(partialSaleRow.locator('td').nth(4)).toHaveText('~');
+	await expect(partialSaleRow.locator('td').nth(5)).toHaveText('~');
+	await expect(partialSaleRow.locator('td').nth(6)).toHaveText('~');
+	await expect(partialSaleRow.locator('td').last()).toHaveText('$200.00');
+
+	const splitRow = page.getByRole('row', { name: /Split Fund/ });
+	await expect(splitRow.locator('td').nth(4)).toHaveText('~');
+	await expect(splitRow.locator('td').nth(5)).toHaveText('~');
+	await expect(splitRow.locator('td').nth(6)).toHaveText('~');
+	await expect(splitRow.locator('td').last()).toHaveText('$240.00');
+
+	const unknownQuantityRow = page.getByRole('row', { name: /Unknown Quantity Fund/ });
+	await expect(unknownQuantityRow.locator('td').nth(3)).toHaveText('~');
+	await expect(unknownQuantityRow.locator('td').nth(4)).toHaveText('~');
+	await expect(unknownQuantityRow.locator('td').nth(5)).toHaveText('~');
+	await expect(unknownQuantityRow.locator('td').nth(6)).toHaveText('~');
+	await expect(unknownQuantityRow.locator('td').last()).toHaveText('$90.00');
+
+	const missingFxRow = page.getByRole('row', { name: /Missing FX Basis Fund/ });
+	await expect(missingFxRow.locator('td').nth(4)).toHaveText('~');
+	await expect(missingFxRow.locator('td').nth(5)).toHaveText('~');
+	await expect(missingFxRow.locator('td').nth(6)).toHaveText('~');
+	await expect(missingFxRow.locator('td').last()).toHaveText('$0.00');
+	await expect(
+		missingFxRow.locator('td').last().getByLabel('Includes currencies that could not be converted')
+	).toBeVisible();
+	await expect(page.getByRole('region', { name: 'Net gain/loss' })).toHaveText(/~/);
+	await expect(page.getByRole('region', { name: 'Net gain %' })).toHaveText(/~/);
+	await expect(page.getByRole('region', { name: 'Net market value' })).toContainText('$740.00');
+
+	await changedRow.getByRole('link', { name: 'Changed Basis Fund' }).click();
+	const growthRow = page.getByRole('row', { name: /Growth Brokerage/ });
+	await expect(growthRow.locator('td').nth(4)).toHaveText('~');
+	await expect(growthRow.locator('td').nth(5)).toHaveText('~');
+	await expect(growthRow.locator('td').nth(6)).toHaveText('~');
+	await expect(growthRow.locator('td').last()).toHaveText('$150.00');
+
+	const stableRow = page.getByRole('row', { name: /Stable Brokerage/ });
+	await expect(stableRow.locator('td').nth(4)).toHaveText('$40.00');
+	await expect(stableRow.locator('td').nth(5)).toHaveText('$20.00');
+	await expect(stableRow.locator('td').nth(6)).toHaveText('+50.0%');
+	await expect(stableRow.locator('td').last()).toHaveText('$60.00');
+});
+
+test('portfolio stops carry-forward after a sell-out and re-buy', async ({ page }) => {
 	const user = await seedUser('wren');
 	const account = await seedAccount({
 		name: 'Rebuy Brokerage',
@@ -542,6 +761,9 @@ test('portfolio carries a re-buy after a sell-out forward as unknown', async ({ 
 	await goToPageViaSidebar(page, 'Portfolio');
 	const row = page.getByRole('row', { name: /Rebought Stock/ });
 	await expect(row).toContainText('RBT');
+	await expect(row.locator('td').nth(4)).toHaveText('~');
+	await expect(row.locator('td').nth(5)).toHaveText('~');
+	await expect(row.locator('td').nth(6)).toHaveText('~');
 	await expect(row.locator('td').last()).toHaveText('~');
 
 	await row.getByRole('link', { name: 'Rebought Stock' }).click();
