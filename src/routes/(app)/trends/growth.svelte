@@ -333,7 +333,7 @@
 <svelte:window onpointerup={() => chartCompare.end()} onpointercancel={() => chartCompare.end()} />
 
 {#if isLoading}
-	<Skeleton class="h-[30vh] min-h-[220px]" showSpinner />
+	<Skeleton class="h-[38vh] min-h-[275px]" showSpinner />
 {:else if isEmpty}
 	<Empty>{m.trends_empty()}</Empty>
 {:else}
@@ -348,7 +348,7 @@
 	>
 		<Chart.Container
 			config={chartConfig}
-			class="h-[30vh] min-h-[220px] w-full select-none"
+			class="h-[38vh] min-h-[275px] w-full select-none"
 			onpointerdown={(event) => chartCompare.start(event, hovered)}
 		>
 			<LineChart
@@ -433,37 +433,26 @@
 									.toISOString()
 									.slice(0, 10)}
 							</div>
-							<div class="grid gap-1.5">
+							<div class="grid grid-cols-[auto_1fr_auto_auto] items-center gap-x-2 gap-y-1.5">
 								{#each comparison.rows as row (row.key)}
-									<div class="flex w-full items-center gap-2">
-										<div
-											style="--color-bg: {chartConfig[row.key].color};"
-											class="size-2.5 shrink-0 rounded-lg bg-(--color-bg)"
-										></div>
-										<div
-											class="flex flex-1 shrink-0 items-center justify-between gap-4 text-base leading-none"
-										>
-											<span class="text-muted-foreground text-sm">{chartConfig[row.key].label}</span
-											>
-											<span
-												class="flex items-baseline gap-2 {row.diff >= 0
-													? 'text-cash'
-													: 'text-debt'}"
-											>
-												<span class="font-mono tabular-nums"
-													>{row.diff >= 0 ? '+' : ''}<Currency
-														value={row.diff}
-														isUnconverted={row.isUnconverted}
-													/></span
-												>
-												{#if row.percent !== null}
-													<span class="text-sm">
-														{row.percent >= 0 ? '+' : ''}{row.percent.toFixed(1)}%
-													</span>
-												{/if}
-											</span>
-										</div>
-									</div>
+									{@const trendClass = row.diff >= 0 ? 'text-cash' : 'text-debt'}
+									<div
+										style="--color-bg: {chartConfig[row.key].color};"
+										class="size-2.5 shrink-0 rounded-lg bg-(--color-bg)"
+									></div>
+									<span class="text-muted-foreground text-sm">{chartConfig[row.key].label}</span>
+									<span
+										class="text-right font-mono text-base leading-none tabular-nums {trendClass}"
+										>{row.diff >= 0 ? '+' : ''}<Currency
+											value={row.diff}
+											isUnconverted={row.isUnconverted}
+										/></span
+									>
+									<span class="text-right font-mono text-sm leading-none tabular-nums {trendClass}">
+										{#if row.percent !== null}
+											{row.percent >= 0 ? '+' : ''}{row.percent.toFixed(1)}%
+										{/if}
+									</span>
 								{/each}
 							</div>
 						</Chart.Tooltip>

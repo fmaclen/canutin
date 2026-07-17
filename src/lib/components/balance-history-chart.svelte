@@ -64,7 +64,7 @@
 
 <Chart.Container
 	config={chartConfig}
-	class="h-[30vh] min-h-[220px] w-full select-none"
+	class="h-[38vh] min-h-[275px] w-full select-none"
 	role="img"
 	aria-label={seriesLabel}
 	onpointerdown={(event) => chartCompare.start(event, hovered)}
@@ -127,23 +127,26 @@
 		{#snippet tooltip()}
 			{#if compare}
 				<Chart.Tooltip>
+					{@const trendClass = compare.diff >= 0 ? 'text-cash' : 'text-debt'}
 					<div class="border-border -mx-2.5 border-b px-2.5 pb-1.5 text-sm font-medium">
 						{compare.a.date.toISOString().slice(0, 10)} → {compare.b.date
 							.toISOString()
 							.slice(0, 10)}
 					</div>
-					<div
-						class="flex items-center justify-between gap-4 font-mono text-base leading-none tabular-nums {compare.diff >=
-						0
-							? 'text-cash'
-							: 'text-debt'}"
-					>
-						<span>{compare.diff >= 0 ? '+' : ''}{formatTooltipValue(compare.diff)}</span>
-						{#if compare.percent !== null}
-							<span class="text-sm">
+					<div class="grid grid-cols-[auto_1fr_auto_auto] items-center gap-x-2 gap-y-1.5">
+						<div
+							style="--color-bg: {chartConfig.series.color};"
+							class="size-2.5 shrink-0 rounded-lg bg-(--color-bg)"
+						></div>
+						<span class="text-muted-foreground text-sm">{chartConfig.series.label}</span>
+						<span class="text-right font-mono text-base leading-none tabular-nums {trendClass}"
+							>{compare.diff >= 0 ? '+' : ''}{formatTooltipValue(compare.diff)}</span
+						>
+						<span class="text-right font-mono text-sm leading-none tabular-nums {trendClass}">
+							{#if compare.percent !== null}
 								{compare.percent >= 0 ? '+' : ''}{compare.percent.toFixed(1)}%
-							</span>
-						{/if}
+							{/if}
+						</span>
 					</div>
 				</Chart.Tooltip>
 			{:else}
