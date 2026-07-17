@@ -4,6 +4,7 @@
 	import { curveBumpX } from 'd3-shape';
 	import { eachDayOfInterval } from 'date-fns';
 	import { LineChart } from 'layerchart';
+	import { cubicOut } from 'svelte/easing';
 	import { SvelteMap } from 'svelte/reactivity';
 
 	import {
@@ -81,12 +82,14 @@
 		series.some((row) => Object.values(row.fx).some((f) => f.isUnconverted))
 	);
 
+	// NOTE: reference the raw tokens (--cash, not --color-cash): ChartStyle re-emits each config
+	// color as --color-<key> per chart, so var(--color-cash) would be a circular reference.
 	const chartConfig = {
-		net: { label: m.trends_series_net_label(), color: '#45403C' },
-		cash: { label: m.trends_series_cash_label(), color: '#00a36f' },
-		debt: { label: m.trends_series_debt_label(), color: '#e75258' },
-		investment: { label: m.trends_series_investment_label(), color: '#b19b70' },
-		other: { label: m.trends_series_other_label(), color: '#5255ac' }
+		net: { label: m.trends_series_net_label(), color: 'var(--foreground)' },
+		cash: { label: m.trends_series_cash_label(), color: 'var(--cash)' },
+		debt: { label: m.trends_series_debt_label(), color: 'var(--debt)' },
+		investment: { label: m.trends_series_investment_label(), color: 'var(--investment)' },
+		other: { label: m.trends_series_other_label(), color: 'var(--other-assets)' }
 	} satisfies Chart.ChartConfig;
 
 	const yDomain = $derived.by(() => {
@@ -336,7 +339,11 @@
 				]}
 				legend={{ placement: 'top' }}
 				props={{
-					spline: { curve: curveBumpX, motion: 'tween', strokeWidth: 1.25 },
+					spline: {
+						curve: curveBumpX,
+						motion: { type: 'tween', duration: 150, easing: cubicOut },
+						strokeWidth: 1.25
+					},
 					xAxis: {
 						format: (v: Date) => v.toISOString().slice(0, 10),
 						ticks: 6

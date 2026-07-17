@@ -2,6 +2,7 @@
 	import { scaleUtc } from 'd3-scale';
 	import { curveBumpX } from 'd3-shape';
 	import { LineChart } from 'layerchart';
+	import { cubicOut } from 'svelte/easing';
 
 	import { axisTicks } from '$lib/components/ui/chart/chart-utils.js';
 	import * as Chart from '$lib/components/ui/chart/index.js';
@@ -19,7 +20,7 @@
 	} = $props();
 
 	const chartConfig = $derived({
-		series: { label: seriesLabel, color: '#45403C' }
+		series: { label: seriesLabel, color: 'var(--brand)' }
 	} satisfies Chart.ChartConfig);
 
 	const yDomain = $derived.by(() => {
@@ -59,7 +60,11 @@
 		padding={{ top: 16, right: 48, bottom: 24, left: leftPadding }}
 		series={[{ key: 'value', label: chartConfig.series.label, color: chartConfig.series.color }]}
 		props={{
-			spline: { curve: curveBumpX, motion: 'tween', strokeWidth: 1.25 },
+			spline: {
+				curve: curveBumpX,
+				motion: { type: 'tween', duration: 150, easing: cubicOut },
+				strokeWidth: 1.25
+			},
 			xAxis: { format: (v: Date) => v.toISOString().slice(0, 10), ticks: 6 },
 			yAxis: {
 				format: (v: number) => formatAxisValue(v),
