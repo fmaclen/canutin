@@ -142,7 +142,7 @@
 						<span class="text-right font-mono text-base leading-none tabular-nums {trendClass}"
 							>{compare.diff >= 0 ? '+' : ''}{formatTooltipValue(compare.diff)}</span
 						>
-						<span class="text-right font-mono text-sm leading-none tabular-nums {trendClass}">
+						<span class="text-right font-mono text-base leading-none tabular-nums {trendClass}">
 							{#if compare.percent !== null}
 								{compare.percent >= 0 ? '+' : ''}{compare.percent.toFixed(1)}%
 							{/if}

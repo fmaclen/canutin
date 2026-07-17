@@ -441,14 +441,13 @@
 										class="size-2.5 shrink-0 rounded-lg bg-(--color-bg)"
 									></div>
 									<span class="text-muted-foreground text-sm">{chartConfig[row.key].label}</span>
-									<span
-										class="text-right font-mono text-base leading-none tabular-nums {trendClass}"
+									<span class="text-right font-mono text-base leading-none uppercase {trendClass}"
 										>{row.diff >= 0 ? '+' : ''}<Currency
 											value={row.diff}
 											isUnconverted={row.isUnconverted}
 										/></span
 									>
-									<span class="text-right font-mono text-sm leading-none tabular-nums {trendClass}">
+									<span class="text-right font-mono text-base leading-none uppercase {trendClass}">
 										{#if row.percent !== null}
 											{row.percent >= 0 ? '+' : ''}{row.percent.toFixed(1)}%
 										{/if}
