@@ -333,7 +333,7 @@
 <svelte:window onpointerup={() => chartCompare.end()} onpointercancel={() => chartCompare.end()} />
 
 {#if isLoading}
-	<Skeleton class="h-[38vh] min-h-[275px]" showSpinner />
+	<Skeleton class="h-[30vh] min-h-96" showSpinner />
 {:else if isEmpty}
 	<Empty>{m.trends_empty()}</Empty>
 {:else}
@@ -348,7 +348,7 @@
 	>
 		<Chart.Container
 			config={chartConfig}
-			class="h-[38vh] min-h-[275px] w-full select-none"
+			class="h-[30vh] min-h-96 w-full select-none"
 			onpointerdown={(event) => chartCompare.start(event, hovered)}
 		>
 			<LineChart

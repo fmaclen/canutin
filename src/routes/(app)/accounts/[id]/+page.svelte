@@ -414,7 +414,7 @@
 <Section>
 	<SectionTitle title={m.balance_history_section_title()} />
 	{#if !loaded || balanceHistoryLoading || !account}
-		<Skeleton class="h-[38vh] min-h-[275px]" showSpinner />
+		<Skeleton class="h-[30vh] min-h-96" showSpinner />
 	{:else if balanceHistory.length >= 2}
 		<div class="bg-background overflow-visible rounded-sm shadow-md">
 			<BalanceHistoryChart
@@ -425,7 +425,7 @@
 			/>
 		</div>
 	{:else}
-		<div class="h-[38vh] min-h-[275px]">
+		<div class="h-[30vh] min-h-96">
 			<Empty class="h-full">{m.balance_history_empty()}</Empty>
 		</div>
 	{/if}

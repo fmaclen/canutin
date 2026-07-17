@@ -64,7 +64,7 @@
 
 <Chart.Container
 	config={chartConfig}
-	class="h-[38vh] min-h-[275px] w-full select-none"
+	class="h-[30vh] min-h-96 w-full select-none"
 	role="img"
 	aria-label={seriesLabel}
 	onpointerdown={(event) => chartCompare.start(event, hovered)}
