@@ -3,60 +3,56 @@
 	import { getAssetsContext } from '$lib/assets.svelte';
 	import Currency from '$lib/components/currency.svelte';
 	import KeyValue from '$lib/components/key-value.svelte';
-	import { sumOrUnknown } from '$lib/security-balance-values';
+	import { m } from '$lib/paraglide/messages';
+	import { sumPartial } from '$lib/utils';
 
 	const accountsContext = getAccountsContext();
 	const assetsContext = getAssetsContext();
 
 	type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
-	type GroupTotal = { value: number | null; isUnconverted: boolean };
 
-	// NOTE: big picture hides the converted-amount indicator (page-scoped FX rule), so only the
-	// unconvertible warning bubbles up here; accounts/assets still carry their own display-currency
-	// conversion (displayBalance/displayMarketValue), this just sums those.
+	// NOTE: big picture hides the converted-amount indicator (page-scoped FX rule); its totals use
+	// the display-currency account and asset values and mark unavailable values as partial.
 	const totals = $derived.by(() => {
-		const groups: Record<BalanceGroup, { values: Array<number | null>; isUnconverted: boolean }> = {
-			CASH: { values: [], isUnconverted: false },
-			DEBT: { values: [], isUnconverted: false },
-			INVESTMENT: { values: [], isUnconverted: false },
-			OTHER: { values: [], isUnconverted: false }
+		const groups: Record<BalanceGroup, Array<number | null>> = {
+			CASH: [],
+			DEBT: [],
+			INVESTMENT: [],
+			OTHER: []
+		};
+		const hasMixedAccounts: Record<BalanceGroup, boolean> = {
+			CASH: false,
+			DEBT: false,
+			INVESTMENT: false,
+			OTHER: false
 		};
 
-		const addValue = (group: BalanceGroup, value: number | null, isUnconverted: boolean) => {
-			const bucket = groups[group];
-			bucket.values.push(value);
-			if (value === null) return;
-			bucket.isUnconverted ||= isUnconverted;
-		};
-
-		for (const a of accountsContext.accounts)
-			if (!a.participantExcluded && !a.closed)
-				addValue(a.balanceGroup as BalanceGroup, a.displayBalance, a.isUnconverted);
+		for (const a of accountsContext.accounts) {
+			if (a.participantExcluded || a.closed) continue;
+			const group = a.balanceGroup as BalanceGroup;
+			groups[group].push(a.displayBalance);
+			hasMixedAccounts[group] ||= a.isUnconverted;
+		}
 		for (const a of assetsContext.assets)
 			if (!a.participantExcluded && !a.sold)
-				addValue(a.balanceGroup as BalanceGroup, a.displayMarketValue, a.isUnconverted);
+				groups[a.balanceGroup as BalanceGroup].push(a.isUnconverted ? null : a.displayMarketValue);
 
-		const toGroupTotal = (group: BalanceGroup) => ({
-			value: sumOrUnknown(groups[group].values),
-			isUnconverted: groups[group].isUnconverted
-		});
-
-		const totalsByGroup: Record<BalanceGroup, GroupTotal> = {
-			CASH: toGroupTotal('CASH'),
-			DEBT: toGroupTotal('DEBT'),
-			INVESTMENT: toGroupTotal('INVESTMENT'),
-			OTHER: toGroupTotal('OTHER')
+		const totalsByGroup = {
+			CASH: sumPartial(groups.CASH),
+			DEBT: sumPartial(groups.DEBT),
+			INVESTMENT: sumPartial(groups.INVESTMENT),
+			OTHER: sumPartial(groups.OTHER)
 		};
+		for (const group of Object.keys(groups) as BalanceGroup[])
+			totalsByGroup[group].isPartial ||= hasMixedAccounts[group];
 
-		const netWorth: GroupTotal = {
-			value: sumOrUnknown([
-				...groups.CASH.values,
-				...groups.DEBT.values,
-				...groups.INVESTMENT.values,
-				...groups.OTHER.values
-			]),
-			isUnconverted: Object.values(groups).some((group) => group.isUnconverted)
-		};
+		const netWorth = sumPartial([
+			...groups.CASH,
+			...groups.DEBT,
+			...groups.INVESTMENT,
+			...groups.OTHER
+		]);
+		netWorth.isPartial ||= Object.values(hasMixedAccounts).some(Boolean);
 
 		return { totalsByGroup, netWorth } as const;
 	});
@@ -66,43 +62,45 @@
 	<div
 		class="flex flex-col justify-between rounded-sm bg-stone-700 p-4 shadow-md md:row-span-2"
 		role="region"
-		aria-label="Net worth"
+		aria-label={m.big_picture_summary_net_worth()}
 	>
-		<div class="text-sm leading-none font-semibold tracking-tight">Net worth</div>
+		<div class="text-sm leading-none font-semibold tracking-tight">
+			{m.big_picture_summary_net_worth()}
+		</div>
 		<div class="translate-y-1.5 text-4xl">
-			{#if totals.netWorth.value === null}
+			{#if totals.netWorth.total === null}
 				<span class="text-white/70">~</span>
 			{:else}
 				<Currency
-					value={totals.netWorth.value}
-					isUnconverted={totals.netWorth.isUnconverted}
+					value={totals.netWorth.total}
+					isPartial={totals.netWorth.isPartial}
 					onColoredSurface
 				/>
 			{/if}
 		</div>
 	</div>
 	<KeyValue
-		title="Cash"
-		value={totals.totalsByGroup.CASH.value}
+		title={m.big_picture_summary_cash()}
+		value={totals.totalsByGroup.CASH.total}
 		variant="cash"
-		isUnconverted={totals.totalsByGroup.CASH.isUnconverted}
+		isPartial={totals.totalsByGroup.CASH.isPartial}
 	/>
 	<KeyValue
-		title="Investments"
-		value={totals.totalsByGroup.INVESTMENT.value}
+		title={m.big_picture_summary_investments()}
+		value={totals.totalsByGroup.INVESTMENT.total}
 		variant="investment"
-		isUnconverted={totals.totalsByGroup.INVESTMENT.isUnconverted}
+		isPartial={totals.totalsByGroup.INVESTMENT.isPartial}
 	/>
 	<KeyValue
-		title="Debt"
-		value={totals.totalsByGroup.DEBT.value}
+		title={m.big_picture_summary_debt()}
+		value={totals.totalsByGroup.DEBT.total}
 		variant="debt"
-		isUnconverted={totals.totalsByGroup.DEBT.isUnconverted}
+		isPartial={totals.totalsByGroup.DEBT.isPartial}
 	/>
 	<KeyValue
-		title="Other assets"
-		value={totals.totalsByGroup.OTHER.value}
+		title={m.big_picture_summary_other_assets()}
+		value={totals.totalsByGroup.OTHER.total}
 		variant="other"
-		isUnconverted={totals.totalsByGroup.OTHER.isUnconverted}
+		isPartial={totals.totalsByGroup.OTHER.isPartial}
 	/>
 </div>

@@ -485,10 +485,6 @@ class TradesContext {
 		}
 	}
 
-	get isCustomRange() {
-		return this._customFromDate !== null && this._customToDate !== null;
-	}
-
 	get customRange(): { from: Date; to: Date; label: string | null } | null {
 		if (this._customFromDate && this._customToDate) {
 			return { from: this._customFromDate, to: this._customToDate, label: this._customLabel };

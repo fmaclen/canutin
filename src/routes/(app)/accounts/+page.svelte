@@ -19,9 +19,8 @@
 	import { m } from '$lib/paraglide/messages';
 	import type { TransactionsResponse } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
-	import { sumOrUnknown } from '$lib/security-balance-values';
 	import { TableSort } from '$lib/sorting.svelte';
-	import { createSortComparator, type SortState } from '$lib/utils';
+	import { createSortComparator, sumPartial, type SortState } from '$lib/utils';
 
 	type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
 
@@ -131,7 +130,7 @@
 		return map;
 	});
 
-	type AccountsTotal = { value: number | null; isUnconverted: boolean };
+	type AccountsTotal = { value: number | null; isPartial: boolean };
 
 	const totalsByFilter = $derived.by(() => {
 		const totals = new SvelteMap<FilterOption, AccountsTotal>();
@@ -142,10 +141,10 @@
 			const contributing = rows.filter(
 				(row) => !(option.key === 'open' && row.participantExcluded)
 			);
-			const value = sumOrUnknown(contributing.map((row) => row.balance));
+			const result = sumPartial(contributing.map((row) => row.balance));
 			totals.set(option.key, {
-				value,
-				isUnconverted: contributing.some((row) => row.isUnconverted)
+				value: result.total,
+				isPartial: result.isPartial || contributing.some((row) => row.isUnconverted)
 			});
 		}
 		return totals;
@@ -211,7 +210,7 @@
 	}
 </script>
 
-<Page pageTitle={m.sidebar_accounts()}>
+<Page pageTitle={m.accounts_title()}>
 	{#snippet actions()}
 		<Link href={resolve('/accounts/add')} class="text-sm">{m.accounts_add_page_title()}</Link>
 	{/snippet}
@@ -233,11 +232,11 @@
 						{@const rowsForOption = rowsByFilter.get(option.key) ?? []}
 						{@const total = totalsByFilter.get(option.key) ?? {
 							value: null,
-							isUnconverted: false
+							isPartial: false
 						}}
 						<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
 							<KeyValue
-								title={m.sidebar_accounts()}
+								title={m.accounts_summary_count_label()}
 								value={rowsForOption.length}
 								variant="outline"
 								format="number"
@@ -247,7 +246,7 @@
 								value={total.value}
 								variant="outline"
 								decimalScale={2}
-								isUnconverted={total.isUnconverted}
+								isPartial={total.isPartial}
 							/>
 						</div>
 						{#if rowsForOption.length === 0}

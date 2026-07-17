@@ -60,7 +60,7 @@
 
 <Page pageTitle={m.trades_title()} {actions}>
 	<Section>
-		<SectionTitle title={m.trades_title()} />
+		<SectionTitle title={m.trades_section_title()} />
 		<div class="flex flex-col space-y-2">
 			<TradesFilters />
 			<TradeSummary />

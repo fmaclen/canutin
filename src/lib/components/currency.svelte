@@ -53,6 +53,7 @@
 		sentiment?: Sentiment;
 		isConverted?: boolean;
 		isUnconverted?: boolean;
+		isPartial?: boolean;
 		missingCurrency?: string | null;
 		nativeCurrency?: string;
 		nativeValue?: number;
@@ -66,6 +67,7 @@
 		sentiment = 'undefined',
 		isConverted = false,
 		isUnconverted = false,
+		isPartial = false,
 		missingCurrency = null,
 		nativeCurrency,
 		nativeValue,
@@ -78,30 +80,37 @@
 	);
 
 	const formattedValue = $derived.by(() => {
-		if (isUnconverted && nativeCurrency !== undefined && nativeValue !== undefined) {
+		if (!isPartial && isUnconverted && nativeCurrency !== undefined && nativeValue !== undefined) {
 			return formatNativeCurrency(nativeValue, decimalScale, nativeCurrency);
 		}
 		return formatCurrency(value, decimalScale);
 	});
 
 	const fxLabel = $derived(
-		getCurrencyFxLabel({
-			decimalScale,
-			isUnconverted,
-			missingCurrency,
-			nativeCurrency,
-			nativeValue
-		})
+		isPartial
+			? m.fx_partial_total()
+			: getCurrencyFxLabel({
+					decimalScale,
+					isUnconverted,
+					missingCurrency,
+					nativeCurrency,
+					nativeValue
+				})
 	);
 </script>
 
-{#if isUnconverted}
+{#if isPartial || isUnconverted}
 	{#if showFxTooltip}
 		<Tooltip.Root>
 			<Tooltip.Trigger
 				aria-label={fxLabel}
-				class="{unconvertedClasses} inline-block border-b border-dashed leading-none hover:border-current"
+				class="{unconvertedClasses} {isPartial
+					? 'inline-flex items-baseline gap-1'
+					: 'inline-block'} border-b border-dashed leading-none hover:border-current"
 			>
+				{#if isPartial}
+					<span class={onColoredSurface ? 'text-white/70' : 'text-muted-foreground'}>~</span>
+				{/if}
 				<Number value={formattedValue} {sentiment} />
 			</Tooltip.Trigger>
 			<Tooltip.Content sideOffset={6}>
@@ -109,7 +118,14 @@
 			</Tooltip.Content>
 		</Tooltip.Root>
 	{:else}
-		<span class="{unconvertedClasses} inline-block border-b border-dashed leading-none">
+		<span
+			class="{unconvertedClasses} {isPartial
+				? 'inline-flex items-baseline gap-1'
+				: 'inline-block'} border-b border-dashed leading-none"
+		>
+			{#if isPartial}
+				<span class={onColoredSurface ? 'text-white/70' : 'text-muted-foreground'}>~</span>
+			{/if}
 			<Number value={formattedValue} {sentiment} />
 		</span>
 	{/if}
