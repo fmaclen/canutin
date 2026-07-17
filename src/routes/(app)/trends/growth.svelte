@@ -3,7 +3,7 @@
 	import { scaleUtc } from 'd3-scale';
 	import { curveBumpX } from 'd3-shape';
 	import { eachDayOfInterval } from 'date-fns';
-	import { LineChart } from 'layerchart';
+	import { LineChart, type ChartState } from 'layerchart';
 	import { cubicOut } from 'svelte/easing';
 	import { SvelteMap } from 'svelte/reactivity';
 
@@ -13,6 +13,7 @@
 		type TrendSecurityBalance,
 		type TrendSecurityValueState
 	} from '$lib/balance-series';
+	import { ChartCompare, diffPercent } from '$lib/components/chart-compare.svelte.js';
 	import { formatCurrency } from '$lib/components/currency';
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
@@ -81,6 +82,31 @@
 	const hasUnconverted = $derived(
 		series.some((row) => Object.values(row.fx).some((f) => f.isUnconverted))
 	);
+
+	let chartContext = $state<ChartState<Row>>();
+	const hovered: Row | null = $derived(chartContext?.tooltip.data ?? null);
+
+	const chartCompare = new ChartCompare<Row>();
+	$effect(() => chartCompare.track(hovered));
+
+	const groupKeys = ['net', 'cash', 'debt', 'investment', 'other'] as const;
+	const comparison = $derived.by(() => {
+		if (!chartCompare.range) return null;
+		const [a, b] = chartCompare.range;
+		// Legend toggling narrows the chart's visible series; the compare tooltip follows it
+		const visibleKeys = new Set(chartContext?.series.visibleSeries.map((s) => s.key) ?? []);
+		return {
+			a,
+			b,
+			rows: groupKeys
+				.filter((key) => visibleKeys.has(key))
+				.map((key) => ({
+					key,
+					...diffPercent(a[key], b[key]),
+					isUnconverted: a.fx[key].isUnconverted || b.fx[key].isUnconverted
+				}))
+		};
+	});
 
 	// NOTE: reference the raw tokens (--cash, not --color-cash): ChartStyle re-emits each config
 	// color as --color-<key> per chart, so var(--color-cash) would be a circular reference.
@@ -305,6 +331,8 @@
 	$effect(() => recomputeSeries());
 </script>
 
+<svelte:window onpointerup={() => chartCompare.end()} onpointercancel={() => chartCompare.end()} />
+
 {#if isLoading}
 	<Skeleton class="h-[30vh] min-h-[220px]" showSpinner />
 {:else if isEmpty}
@@ -319,8 +347,13 @@
 		data-growth-start-net={firstSeriesRow?.net}
 		data-growth-end-net={lastSeriesRow?.net}
 	>
-		<Chart.Container config={chartConfig} class="h-[30vh] min-h-[220px] w-full">
+		<Chart.Container
+			config={chartConfig}
+			class="h-[30vh] min-h-[220px] w-full select-none"
+			onpointerdown={(event) => chartCompare.start(event, hovered)}
+		>
 			<LineChart
+				bind:context={chartContext}
 				data={series}
 				x="date"
 				xScale={scaleUtc()}
@@ -359,8 +392,85 @@
 					highlight: { points: { r: 3 } }
 				}}
 			>
+				{#snippet aboveMarks({ context })}
+					{#if comparison}
+						{@const xA = context.xScale(comparison.a.date)}
+						{@const xB = context.xScale(comparison.b.date)}
+						<!-- Neutral band: with five series a gain/loss tint has no single sign to follow -->
+						<rect
+							x={Math.min(xA, xB)}
+							y={0}
+							width={Math.abs(xB - xA)}
+							height={context.height}
+							class="fill-foreground/5"
+						/>
+						<line
+							x1={xA}
+							y1={0}
+							x2={xA}
+							y2={context.height}
+							stroke-dasharray="2,2"
+							class="stroke-foreground/30"
+						/>
+						{#each comparison.rows as row (row.key)}
+							<circle
+								cx={xA}
+								cy={context.yScale(comparison.a[row.key])}
+								r={3}
+								fill={chartConfig[row.key].color}
+							/>
+							<circle
+								cx={xB}
+								cy={context.yScale(comparison.b[row.key])}
+								r={3}
+								fill={chartConfig[row.key].color}
+							/>
+						{/each}
+					{/if}
+				{/snippet}
 				{#snippet tooltip()}
-					{#if hasUnconverted}
+					{#if comparison}
+						<Chart.Tooltip>
+							<div class="border-border -mx-2.5 border-b px-2.5 pb-1.5 text-sm font-medium">
+								{comparison.a.date.toISOString().slice(0, 10)} → {comparison.b.date
+									.toISOString()
+									.slice(0, 10)}
+							</div>
+							<div class="grid gap-1.5">
+								{#each comparison.rows as row (row.key)}
+									<div class="flex w-full items-center gap-2">
+										<div
+											style="--color-bg: {chartConfig[row.key].color};"
+											class="size-2.5 shrink-0 rounded-lg bg-(--color-bg)"
+										></div>
+										<div
+											class="flex flex-1 shrink-0 items-center justify-between gap-4 text-base leading-none"
+										>
+											<span class="text-muted-foreground text-sm">{chartConfig[row.key].label}</span
+											>
+											<span
+												class="flex items-baseline gap-2 {row.diff >= 0
+													? 'text-cash'
+													: 'text-debt'}"
+											>
+												<span class="font-mono tabular-nums"
+													>{row.diff >= 0 ? '+' : ''}<Currency
+														value={row.diff}
+														isUnconverted={row.isUnconverted}
+													/></span
+												>
+												{#if row.percent !== null}
+													<span class="text-sm">
+														{row.percent >= 0 ? '+' : ''}{row.percent.toFixed(1)}%
+													</span>
+												{/if}
+											</span>
+										</div>
+									</div>
+								{/each}
+							</div>
+						</Chart.Tooltip>
+					{:else if hasUnconverted}
 						<Chart.Tooltip>
 							{#snippet formatter({ value, item, data })}
 								{@const key = item.key as GroupKey}

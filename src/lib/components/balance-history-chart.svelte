@@ -4,6 +4,7 @@
 	import { LineChart, type ChartState } from 'layerchart';
 	import { cubicOut } from 'svelte/easing';
 
+	import { ChartCompare, diffPercent } from '$lib/components/chart-compare.svelte.js';
 	import { axisTicks } from '$lib/components/ui/chart/chart-utils.js';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 
@@ -21,47 +22,16 @@
 		formatTooltipValue: (value: number) => string;
 	} = $props();
 
-	// Drag-to-compare: press at point A, drag to point B, tooltip shows the difference.
-	// Layerchart's own hit-testing keeps `chartContext.tooltip.data` on the nearest point,
-	// so dragging only needs an anchor captured at pointerdown and the hovered point after it.
 	let chartContext = $state<ChartState<Point>>();
-	let dragging = $state(false);
-	let anchor = $state<Point | null>(null);
-	let current = $state<Point | null>(null);
-
 	const hovered: Point | null = $derived(chartContext?.tooltip.data ?? null);
 
-	$effect(() => {
-		if (!dragging || !hovered) return;
-		// Touch has no hover before the press, so the anchor is the first point hit after it
-		if (!anchor) anchor = hovered;
-		current = hovered;
-	});
-
-	function startCompare(event: PointerEvent) {
-		if (event.button !== 0) return;
-		dragging = true;
-		anchor = hovered;
-		current = hovered;
-	}
-
-	function endCompare() {
-		dragging = false;
-		anchor = null;
-		current = null;
-	}
+	const chartCompare = new ChartCompare<Point>();
+	$effect(() => chartCompare.track(hovered));
 
 	const compare = $derived.by(() => {
-		if (!anchor || !current || anchor === current) return null;
-		const [a, b] = anchor.date <= current.date ? [anchor, current] : [current, anchor];
-		const diff = b.value - a.value;
-		return {
-			a,
-			b,
-			diff,
-			// Percent is relative to |earlier value| so the sign follows the diff; null (hidden) on a zero baseline
-			percent: a.value === 0 ? null : (diff / Math.abs(a.value)) * 100
-		};
+		if (!chartCompare.range) return null;
+		const [a, b] = chartCompare.range;
+		return { a, b, ...diffPercent(a.value, b.value) };
 	});
 
 	const chartConfig = $derived({
@@ -91,14 +61,14 @@
 	});
 </script>
 
-<svelte:window onpointerup={endCompare} onpointercancel={endCompare} />
+<svelte:window onpointerup={() => chartCompare.end()} onpointercancel={() => chartCompare.end()} />
 
 <Chart.Container
 	config={chartConfig}
 	class="h-[30vh] min-h-[220px] w-full select-none"
 	role="img"
 	aria-label={seriesLabel}
-	onpointerdown={startCompare}
+	onpointerdown={(event) => chartCompare.start(event, hovered)}
 >
 	<LineChart
 		bind:context={chartContext}

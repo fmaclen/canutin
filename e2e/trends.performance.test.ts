@@ -281,4 +281,41 @@ test('trends performance table', async ({ page }) => {
 	await expect(debtCells.nth(6).getByRole('button', { name: '+42.9%' })).toBeVisible(); // 2Y
 	await expect(debtCells.nth(7).getByRole('button', { name: '+50%' })).toBeVisible(); // 5Y
 	await expect(debtCells.nth(8).getByRole('button', { name: '+200%' })).toBeVisible(); // MAX
+
+	// Drag edge to edge across the MAX growth chart: nearest-point hit-testing clamps to the
+	// window endpoints, so the compare tooltip shows the full-history change per series.
+	// Cash went 1,000 -> 8,000 (+700%); the table's percent strings collide with the tooltip's,
+	// so assertions are scoped to the tooltip via its date-range header.
+	const maxChartBox = await maxChart.boundingBox();
+	if (!maxChartBox) throw new Error('Growth chart has no bounding box');
+	const chartMiddleY = maxChartBox.y + maxChartBox.height * 0.6;
+	await page.mouse.move(maxChartBox.x + 4, chartMiddleY);
+	await page.mouse.down();
+	await page.mouse.move(maxChartBox.x + maxChartBox.width - 4, chartMiddleY, { steps: 5 });
+	const compareHeader = `${earliest.toISOString().slice(0, 10)} → ${now.toISOString().slice(0, 10)}`;
+	const compareTooltip = page.getByText(compareHeader).locator('..');
+	await expect(compareTooltip.getByText('+$7,000')).toBeVisible();
+	await expect(compareTooltip.getByText('+700.0%')).toBeVisible();
+	await expect(compareTooltip.getByText('-$2,000')).toBeVisible();
+	await expect(compareTooltip.getByText('-70.6%')).toBeVisible();
+
+	// Releasing restores the regular hover tooltip
+	await page.mouse.up();
+	await expect(page.getByText(compareHeader)).not.toBeVisible();
+
+	// Clicking a legend item isolates that series; the compare tooltip follows the
+	// legend's visibility and drops the hidden series
+	await page.getByRole('button', { name: 'Cash', exact: true }).click();
+	// Recapture the box: the legend click can scroll the chart and stale coords miss it
+	const isolatedChartBox = await maxChart.boundingBox();
+	if (!isolatedChartBox) throw new Error('Growth chart has no bounding box');
+	const isolatedMiddleY = isolatedChartBox.y + isolatedChartBox.height * 0.6;
+	await page.mouse.move(isolatedChartBox.x + 4, isolatedMiddleY);
+	await page.mouse.down();
+	await page.mouse.move(isolatedChartBox.x + isolatedChartBox.width - 4, isolatedMiddleY, {
+		steps: 5
+	});
+	await expect(compareTooltip.getByText('+$7,000')).toBeVisible();
+	await expect(compareTooltip.getByText('Net worth')).not.toBeVisible();
+	await page.mouse.up();
 });
