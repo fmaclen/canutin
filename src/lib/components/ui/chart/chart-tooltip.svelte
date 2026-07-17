@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getTooltipContext, Tooltip as TooltipPrimitive } from 'layerchart';
+	import { getChartContext, Tooltip as TooltipPrimitive } from 'layerchart';
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 
@@ -46,33 +46,47 @@
 					item: TooltipPayload;
 					index: number;
 					payload: TooltipPayload[];
+					data: unknown;
 				}
 			]
 		>;
 	} = $props();
 
 	const chart = useChart();
-	const tooltipCtx = getTooltipContext();
+	const chartCtx = getChartContext();
+
+	// Only series with a value for the hovered point (item-based charts like Pie/Arc
+	// populate a value on the hovered series alone)
+	const visibleSeries = $derived(
+		chartCtx.tooltip.series.filter((s) => s.visible && s.value !== undefined)
+	);
 
 	const formattedLabel = $derived.by(() => {
-		if (hideLabel || !tooltipCtx.payload?.length) return null;
+		if (hideLabel || !visibleSeries.length) return null;
 
-		const [item] = tooltipCtx.payload;
-		const key = labelKey ?? item?.label ?? item?.name ?? 'value';
+		const [item] = visibleSeries;
+		const tooltipData = chartCtx.tooltip.data;
+		// The x-axis value for the hovered point (e.g. a Date)
+		const dataLabel = tooltipData != null ? chartCtx.x(tooltipData) : undefined;
 
+		const key = labelKey ?? item.label;
 		const itemConfig = getPayloadConfigFromPayload(chart.config, item, key);
 
-		const value =
-			!labelKey && typeof label === 'string'
-				? (chart.config[label as keyof typeof chart.config]?.label ?? label)
-				: (itemConfig?.label ?? item.label);
+		let value: unknown;
+		if (!labelKey && typeof label === 'string') {
+			value = chart.config[label as keyof typeof chart.config]?.label ?? label;
+		} else if (labelKey) {
+			value = itemConfig?.label ?? dataLabel;
+		} else {
+			value = dataLabel;
+		}
 
 		if (value === undefined) return null;
 		if (!labelFormatter) return value;
-		return labelFormatter(value, tooltipCtx.payload);
+		return labelFormatter(value, visibleSeries);
 	});
 
-	const nestLabel = $derived(tooltipCtx.payload.length === 1 && indicator !== 'dot');
+	const nestLabel = $derived(visibleSeries.length === 1 && indicator !== 'dot');
 </script>
 
 {#snippet TooltipLabel()}
@@ -101,23 +115,24 @@
 			{@render TooltipLabel()}
 		{/if}
 		<div class="grid gap-1.5">
-			{#each tooltipCtx.payload as item, i (item.key + i)}
-				{@const key = `${nameKey || item.key || item.name || 'value'}`}
+			{#each visibleSeries as item, i (item.key + i)}
+				{@const key = nameKey || item.key}
 				{@const itemConfig = getPayloadConfigFromPayload(chart.config, item, key)}
-				{@const indicatorColor = color || item.payload?.color || item.color}
+				{@const indicatorColor = color || item.color}
 				<div
 					class={cn(
 						'[&>svg]:text-muted-foreground flex w-full flex-wrap items-stretch gap-2 [&>svg]:size-2.5',
 						indicator === 'dot' && 'items-center'
 					)}
 				>
-					{#if formatter && item.value !== undefined && item.name}
+					{#if formatter && item.value !== undefined}
 						{@render formatter({
 							value: item.value,
-							name: item.name,
+							name: item.label,
 							item,
 							index: i,
-							payload: tooltipCtx.payload
+							payload: visibleSeries,
+							data: chartCtx.tooltip.data
 						})}
 					{:else}
 						{#if itemConfig?.icon}
@@ -144,7 +159,7 @@
 									{@render TooltipLabel()}
 								{/if}
 								<span class="text-muted-foreground text-sm">
-									{itemConfig?.label || item.name}
+									{itemConfig?.label || item.label}
 								</span>
 							</div>
 							{#if item.value !== undefined}

@@ -355,10 +355,10 @@
 				{#snippet tooltip()}
 					{#if hasUnconverted}
 						<Chart.Tooltip>
-							{#snippet formatter({ value, item })}
+							{#snippet formatter({ value, item, data })}
 								{@const key = item.key as GroupKey}
 								{@const seriesConfig = chartConfig[key]}
-								{@const row = item.payload as Row}
+								{@const row = data as Row}
 								{@const conversion = row.fx[key]}
 								<div
 									style="--color-bg: {seriesConfig.color}; --color-border: {seriesConfig.color};"

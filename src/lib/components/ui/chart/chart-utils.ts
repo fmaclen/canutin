@@ -1,5 +1,5 @@
 import type { Tooltip } from 'layerchart';
-import { getContext, setContext, type Component, type ComponentProps, type Snippet } from 'svelte';
+import { getContext, setContext, type Component } from 'svelte';
 
 export const THEMES = { light: '', dark: '.dark' } as const;
 
@@ -20,11 +20,7 @@ export function axisTicks(min: number, max: number) {
 	return [...new Set(ticks)];
 }
 
-export type ExtractSnippetParams<T> = T extends Snippet<[infer P]> ? P : never;
-
-export type TooltipPayload = ExtractSnippetParams<
-	ComponentProps<typeof Tooltip.Root>['children']
->['payload'][number];
+export type TooltipPayload = Tooltip.TooltipSeries;
 
 // Helper to extract item config from a payload.
 export function getPayloadConfigFromPayload(
@@ -34,25 +30,21 @@ export function getPayloadConfigFromPayload(
 ) {
 	if (typeof payload !== 'object' || payload === null) return undefined;
 
-	const payloadPayload =
-		'payload' in payload && typeof payload.payload === 'object' && payload.payload !== null
-			? payload.payload
+	const payloadConfig =
+		'config' in payload && typeof payload.config === 'object' && payload.config !== null
+			? payload.config
 			: undefined;
 
 	let configLabelKey: string = key;
 
-	if (payload.key === key) {
-		configLabelKey = payload.key;
-	} else if (payload.name === key) {
-		configLabelKey = payload.name;
-	} else if (key in payload && typeof payload[key as keyof typeof payload] === 'string') {
+	if (key in payload && typeof payload[key as keyof typeof payload] === 'string') {
 		configLabelKey = payload[key as keyof typeof payload] as string;
 	} else if (
-		payloadPayload !== undefined &&
-		key in payloadPayload &&
-		typeof payloadPayload[key as keyof typeof payloadPayload] === 'string'
+		payloadConfig !== undefined &&
+		key in payloadConfig &&
+		typeof payloadConfig[key as keyof typeof payloadConfig] === 'string'
 	) {
-		configLabelKey = payloadPayload[key as keyof typeof payloadPayload] as string;
+		configLabelKey = payloadConfig[key as keyof typeof payloadConfig] as string;
 	}
 
 	return configLabelKey in config ? config[configLabelKey] : config[key as keyof typeof config];
