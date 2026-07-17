@@ -93,7 +93,7 @@
 				}
 			},
 			grid: { x: true, y: true, xTicks: 6, yTicks: [0] },
-			highlight: { points: { r: 3 } }
+			highlight: { motion: 'none', points: { r: 3 } }
 		}}
 	>
 		{#snippet aboveMarks({ context })}
