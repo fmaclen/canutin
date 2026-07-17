@@ -246,6 +246,9 @@
 			const sequence = ++refreshSequence;
 			const start = computeBoundedHistoryStart('5y');
 			if (!start) return;
+			// Snapshot the signature this refresh reflects; the signature effect treats any later
+			// divergence - including one committed while this refresh is in flight - as a change.
+			lastIncludedSignature = includedSignature;
 			const accountIds = Array.from(includedAccounts.keys());
 			const assetIds = Array.from(includedAssets.keys());
 			const accountFilter = filterByIds('account', accountIds);
@@ -421,7 +424,7 @@
 	>(event: RecordSubscription<TRecord>, config: BalanceRealtimeConfig<TRecord, TBalance>) {
 		if (!event.action) return;
 		if (!bootstrapped) {
-			pendingRefresh = true;
+			if (refreshInFlight) pendingRefresh = true;
 			return;
 		}
 		const records = config.records();
@@ -481,7 +484,6 @@
 	}
 
 	function scheduleRefresh() {
-		if (!bootstrapped) return;
 		if (refreshTimer) clearTimeout(refreshTimer);
 		refreshTimer = window.setTimeout(() => {
 			refreshTimer = null;
@@ -560,7 +562,12 @@
 		};
 	});
 
+	// Defer the bootstrap refresh until the accounts and assets contexts have finished their
+	// initial load - refreshing earlier would query with empty inclusion maps and resolve to a
+	// false empty state before the contexts ever land.
 	$effect(() => {
+		if (bootstrapped) return;
+		if (accountsCtx?.isLoading || assetsCtx?.isLoading) return;
 		untrack(() => {
 			void doRefresh().then(() => {
 				bootstrapped = true;
@@ -570,12 +577,13 @@
 
 	$effect(() => {
 		const signature = includedSignature;
-		if (!bootstrapped) {
-			lastIncludedSignature = signature;
-			return;
-		}
 		if (signature === lastIncludedSignature) return;
 		lastIncludedSignature = signature;
+		if (refreshInFlight) {
+			pendingRefresh = true;
+			return;
+		}
+		if (!bootstrapped) return;
 		scheduleRefresh();
 	});
 </script>
