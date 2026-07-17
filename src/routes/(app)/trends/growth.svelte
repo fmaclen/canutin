@@ -89,11 +89,13 @@
 	$effect(() => chartCompare.track(hovered));
 
 	const groupKeys = ['net', 'cash', 'debt', 'investment', 'other'] as const;
+	// Legend toggling narrows the chart's visible series; the compare tooltip and y-domain follow it
+	const visibleKeys = $derived(
+		new Set(chartContext?.series.visibleSeries.map((s) => s.key) ?? groupKeys)
+	);
 	const comparison = $derived.by(() => {
 		if (!chartCompare.range) return null;
 		const [a, b] = chartCompare.range;
-		// Legend toggling narrows the chart's visible series; the compare tooltip follows it
-		const visibleKeys = new Set(chartContext?.series.visibleSeries.map((s) => s.key) ?? []);
 		return {
 			a,
 			b,
@@ -122,13 +124,16 @@
 	} satisfies Chart.ChartConfig;
 
 	const yDomain = $derived.by(() => {
-		if (!series.length) return null as [number, number] | null;
 		let min = Number.POSITIVE_INFINITY;
 		let max = Number.NEGATIVE_INFINITY;
 		for (const r of series) {
-			min = Math.min(min, r.net, r.cash, r.debt, r.investment, r.other);
-			max = Math.max(max, r.net, r.cash, r.debt, r.investment, r.other);
+			for (const key of groupKeys) {
+				if (!visibleKeys.has(key)) continue;
+				min = Math.min(min, r[key]);
+				max = Math.max(max, r[key]);
+			}
 		}
+		if (min > max) return null as [number, number] | null;
 		const pad = Math.max(1, (max - min) * 0.05);
 		return [min - pad, max + pad] as [number, number];
 	});
