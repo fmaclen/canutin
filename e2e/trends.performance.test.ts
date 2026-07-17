@@ -286,6 +286,8 @@ test('trends performance table', async ({ page }) => {
 	// window endpoints, so the compare tooltip shows the full-history change per series.
 	// Cash went 1,000 -> 8,000 (+700%); the table's percent strings collide with the tooltip's,
 	// so assertions are scoped to the tooltip via its date-range header.
+	// Debt follows the table's magnitude convention: -1,000 -> -3,000 is +$2,000 more debt
+	// (+200%, same sign as the table's MAX cell above) and is colored as bad (text-debt).
 	const maxChartBox = await maxChart.boundingBox();
 	if (!maxChartBox) throw new Error('Growth chart has no bounding box');
 	const chartMiddleY = maxChartBox.y + maxChartBox.height * 0.6;
@@ -296,7 +298,9 @@ test('trends performance table', async ({ page }) => {
 	const compareTooltip = page.getByText(compareHeader).locator('..');
 	await expect(compareTooltip.getByText('+$7,000')).toBeVisible();
 	await expect(compareTooltip.getByText('+700.0%')).toBeVisible();
-	await expect(compareTooltip.getByText('-$2,000')).toBeVisible();
+	await expect(compareTooltip.getByText('+$2,000')).toBeVisible();
+	await expect(compareTooltip.getByText('+200.0%')).toBeVisible();
+	await expect(compareTooltip.getByText('+200.0%')).toHaveClass(/text-debt/);
 	await expect(compareTooltip.getByText('-70.6%')).toBeVisible();
 
 	// Releasing restores the regular hover tooltip

@@ -101,7 +101,11 @@
 				.filter((key) => visibleKeys.has(key))
 				.map((key) => ({
 					key,
-					...diffPercent(a[key], b[key]),
+					// Debt follows the performance table's magnitude convention: more debt is a
+					// positive change (bad), less debt is negative (good)
+					...(key === 'debt'
+						? diffPercent(Math.abs(a.debt), Math.abs(b.debt))
+						: diffPercent(a[key], b[key])),
 					isUnconverted: a.fx[key].isUnconverted || b.fx[key].isUnconverted
 				}))
 		};
@@ -435,7 +439,10 @@
 							</div>
 							<div class="grid grid-cols-[auto_1fr_auto_auto] items-center gap-x-2 gap-y-1.5">
 								{#each comparison.rows as row (row.key)}
-									{@const trendClass = row.diff >= 0 ? 'text-cash' : 'text-debt'}
+									<!-- Debt inverts the coloring (matches the performance table): more debt is red -->
+									{@const trendClass = (row.key === 'debt' ? row.diff <= 0 : row.diff >= 0)
+										? 'text-cash'
+										: 'text-debt'}
 									<div
 										style="--color-bg: {chartConfig[row.key].color};"
 										class="size-2.5 shrink-0 rounded-lg bg-(--color-bg)"
