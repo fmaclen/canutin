@@ -2,7 +2,6 @@
 	import { scaleUtc } from 'd3-scale';
 	import { curveBumpX } from 'd3-shape';
 	import { LineChart, type ChartState } from 'layerchart';
-	import { cubicOut } from 'svelte/easing';
 
 	import { ChartCompare, diffPercent } from '$lib/components/chart-compare.svelte.js';
 	import { axisTicks } from '$lib/components/ui/chart/chart-utils.js';
@@ -79,11 +78,7 @@
 		padding={{ top: 16, right: 48, bottom: 24, left: leftPadding }}
 		series={[{ key: 'value', label: chartConfig.series.label, color: chartConfig.series.color }]}
 		props={{
-			spline: {
-				curve: curveBumpX,
-				motion: { type: 'tween', duration: 150, easing: cubicOut },
-				strokeWidth: 1.25
-			},
+			spline: { curve: curveBumpX, strokeWidth: 1.25 },
 			xAxis: { format: (v: Date) => v.toISOString().slice(0, 10), ticks: 6 },
 			yAxis: {
 				format: (v: number) => formatAxisValue(v),

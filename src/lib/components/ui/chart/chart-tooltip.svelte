@@ -104,9 +104,10 @@
 	{/if}
 {/snippet}
 
-<!-- Anchor x to the highlighted point's crosshair with an offset so the tooltip sits beside
-the point instead of covering it; the default `contained="container"` flips it at chart edges -->
-<TooltipPrimitive.Root variant="none" x="data" xOffset={12} yOffset={12}>
+<!-- Pinned to the top of the plot area (fixed y, below any top legend) with snap positioning
+(motion "none") so the tooltip never chases or eases after the cursor; x still anchors to the
+highlighted point's crosshair and the default `contained="container"` flips it at chart edges -->
+<TooltipPrimitive.Root variant="none" motion="none" x="data" xOffset={12} y={chartCtx.padding.top}>
 	<div
 		class={cn(
 			'bg-background grid min-w-[9rem] items-start gap-1.5 rounded-lg px-2.5 py-1.5 shadow-xl',

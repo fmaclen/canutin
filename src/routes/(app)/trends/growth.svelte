@@ -4,7 +4,6 @@
 	import { curveBumpX } from 'd3-shape';
 	import { eachDayOfInterval } from 'date-fns';
 	import { LineChart, type ChartState } from 'layerchart';
-	import { cubicOut } from 'svelte/easing';
 	import { SvelteMap } from 'svelte/reactivity';
 
 	import {
@@ -372,11 +371,9 @@
 				]}
 				legend={{ placement: 'top' }}
 				props={{
-					spline: {
-						curve: curveBumpX,
-						motion: { type: 'tween', duration: 150, easing: cubicOut },
-						strokeWidth: 1.25
-					},
+					// opacity 1 opts out of layerchart's series highlight, which dims the other
+					// series to 0.1 while a spline or highlight point is hovered
+					spline: { curve: curveBumpX, opacity: 1, strokeWidth: 1.25 },
 					xAxis: {
 						format: (v: Date) => v.toISOString().slice(0, 10),
 						ticks: 6
@@ -389,7 +386,7 @@
 						}
 					},
 					grid: { x: true, y: true, xTicks: 6, yTicks: [0] },
-					highlight: { motion: 'none', points: { r: 3 } }
+					highlight: { motion: 'none', points: { r: 3, opacity: 1 } }
 				}}
 			>
 				{#snippet aboveMarks({ context })}
