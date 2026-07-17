@@ -67,6 +67,14 @@
 		// Tick labels on th x/y axes
 		'[&_.lc-axis-tick-label]:fill-muted-foreground [&_.lc-axis-tick-label]:font-normal',
 		'[&_.lc-tooltip-rects-g]:fill-transparent',
+
+		// The tooltip hit surface is inset by the chart padding, leaving the horizontal
+		// gutters dead and the first/last points hard to hover. Stretch it across the full
+		// width; the inner container's negative offset compensates for the outer inset, so
+		// both need overriding to keep the chart content in place. Coupled to layerchart 2.0.1's
+		// inset-compensation scheme; if an upgrade changes it, the symptom is visible layout shift.
+		'[&_.lc-tooltip-context]:left-0! [&_.lc-tooltip-context]:w-full!',
+		'[&_.lc-tooltip-context-container]:left-0!',
 		'[&_.lc-layout-svg-g]:fill-transparent',
 		'[&_.lc-root-container]:w-full',
 		'py-4',

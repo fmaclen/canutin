@@ -103,7 +103,9 @@
 	{/if}
 {/snippet}
 
-<TooltipPrimitive.Root variant="none">
+<!-- Anchor x to the highlighted point's crosshair with an offset so the tooltip sits beside
+the point instead of covering it; the default `contained="container"` flips it at chart edges -->
+<TooltipPrimitive.Root variant="none" x="data" xOffset={12} yOffset={12}>
 	<div
 		class={cn(
 			'bg-background grid min-w-[9rem] items-start gap-1.5 rounded-lg px-2.5 py-1.5 shadow-xl',
