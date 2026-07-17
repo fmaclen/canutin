@@ -4,7 +4,7 @@
 	import type { HTMLAttributes } from 'svelte/elements';
 
 	import Currency from '$lib/components/currency.svelte';
-	import { cn, type WithElementRef, type WithoutChildren } from '$lib/utils.js';
+	import { cn, type WithElementRef } from '$lib/utils.js';
 
 	import { getPayloadConfigFromPayload, useChart, type TooltipPayload } from './chart-utils.js';
 
@@ -27,8 +27,9 @@
 		formatter,
 		nameKey,
 		color,
+		children,
 		...restProps
-	}: WithoutChildren<WithElementRef<HTMLAttributes<HTMLDivElement>>> & {
+	}: WithElementRef<HTMLAttributes<HTMLDivElement>> & {
 		hideLabel?: boolean;
 		label?: string;
 		indicator?: 'line' | 'dot' | 'dashed';
@@ -113,64 +114,69 @@ the point instead of covering it; the default `contained="container"` flips it a
 		)}
 		{...restProps}
 	>
-		{#if !nestLabel}
-			{@render TooltipLabel()}
-		{/if}
-		<div class="grid gap-1.5">
-			{#each visibleSeries as item, i (item.key + i)}
-				{@const key = nameKey || item.key}
-				{@const itemConfig = getPayloadConfigFromPayload(chart.config, item, key)}
-				{@const indicatorColor = color || item.color}
-				<div
-					class={cn(
-						'[&>svg]:text-muted-foreground flex w-full flex-wrap items-stretch gap-2 [&>svg]:size-2.5',
-						indicator === 'dot' && 'items-center'
-					)}
-				>
-					{#if formatter && item.value !== undefined}
-						{@render formatter({
-							value: item.value,
-							name: item.label,
-							item,
-							index: i,
-							payload: visibleSeries,
-							data: chartCtx.tooltip.data
-						})}
-					{:else}
-						{#if itemConfig?.icon}
-							<itemConfig.icon />
-						{:else if !hideIndicator}
-							<div
-								style="--color-bg: {indicatorColor}; --color-border: {indicatorColor};"
-								class={cn('shrink-0 rounded-lg border-(--color-border) bg-(--color-bg)', {
-									'size-2.5': indicator === 'dot',
-									'h-full w-1': indicator === 'line',
-									'w-0 border-[1.5px] border-dashed bg-transparent': indicator === 'dashed',
-									'my-0.5': nestLabel && indicator === 'dashed'
-								})}
-							></div>
-						{/if}
-						<div
-							class={cn(
-								'flex flex-1 shrink-0 justify-between gap-4 text-base leading-none',
-								nestLabel ? 'items-end' : 'items-center'
-							)}
-						>
-							<div class="grid gap-1.5">
-								{#if nestLabel}
-									{@render TooltipLabel()}
-								{/if}
-								<span class="text-muted-foreground text-sm">
-									{itemConfig?.label || item.label}
-								</span>
-							</div>
-							{#if item.value !== undefined}
-								<Currency value={item.value} />
+		{#if children}
+			<!-- Escape hatch: custom tooltips reuse the Root + container chrome and render their own body -->
+			{@render children()}
+		{:else}
+			{#if !nestLabel}
+				{@render TooltipLabel()}
+			{/if}
+			<div class="grid gap-1.5">
+				{#each visibleSeries as item, i (item.key + i)}
+					{@const key = nameKey || item.key}
+					{@const itemConfig = getPayloadConfigFromPayload(chart.config, item, key)}
+					{@const indicatorColor = color || item.color}
+					<div
+						class={cn(
+							'[&>svg]:text-muted-foreground flex w-full flex-wrap items-stretch gap-2 [&>svg]:size-2.5',
+							indicator === 'dot' && 'items-center'
+						)}
+					>
+						{#if formatter && item.value !== undefined}
+							{@render formatter({
+								value: item.value,
+								name: item.label,
+								item,
+								index: i,
+								payload: visibleSeries,
+								data: chartCtx.tooltip.data
+							})}
+						{:else}
+							{#if itemConfig?.icon}
+								<itemConfig.icon />
+							{:else if !hideIndicator}
+								<div
+									style="--color-bg: {indicatorColor}; --color-border: {indicatorColor};"
+									class={cn('shrink-0 rounded-lg border-(--color-border) bg-(--color-bg)', {
+										'size-2.5': indicator === 'dot',
+										'h-full w-1': indicator === 'line',
+										'w-0 border-[1.5px] border-dashed bg-transparent': indicator === 'dashed',
+										'my-0.5': nestLabel && indicator === 'dashed'
+									})}
+								></div>
 							{/if}
-						</div>
-					{/if}
-				</div>
-			{/each}
-		</div>
+							<div
+								class={cn(
+									'flex flex-1 shrink-0 justify-between gap-4 text-base leading-none',
+									nestLabel ? 'items-end' : 'items-center'
+								)}
+							>
+								<div class="grid gap-1.5">
+									{#if nestLabel}
+										{@render TooltipLabel()}
+									{/if}
+									<span class="text-muted-foreground text-sm">
+										{itemConfig?.label || item.label}
+									</span>
+								</div>
+								{#if item.value !== undefined}
+									<Currency value={item.value} />
+								{/if}
+							</div>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		{/if}
 	</div>
 </TooltipPrimitive.Root>

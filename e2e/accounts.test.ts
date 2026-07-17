@@ -496,6 +496,22 @@ test('account overview keeps the balance history section and swaps its empty sta
 	});
 	await expect(page.getByText('No balance history yet')).not.toBeVisible();
 	await expect(page.getByRole('img', { name: 'Balance' })).toBeVisible();
+
+	// Drag across the chart from the first balance point to the second to compare them
+	const chartBox = await page.getByRole('img', { name: 'Balance' }).boundingBox();
+	if (!chartBox) throw new Error('Balance history chart has no bounding box');
+	const chartMiddleY = chartBox.y + chartBox.height / 2;
+	await page.mouse.move(chartBox.x + chartBox.width * 0.25, chartMiddleY);
+	await page.mouse.down();
+	await page.mouse.move(chartBox.x + chartBox.width * 0.75, chartMiddleY, { steps: 5 });
+	await expect(page.getByText('2025-01-01 → 2025-02-01')).toBeVisible();
+	await expect(page.getByText('+$1,000.00')).toBeVisible();
+	await expect(page.getByText('+100.0%')).toBeVisible();
+
+	// Releasing restores the regular single-point tooltip
+	await page.mouse.up();
+	await expect(page.getByText('2025-01-01 → 2025-02-01')).not.toBeVisible();
+	await expect(page.getByText('Balance', { exact: true })).toBeVisible();
 });
 
 test('account overview charts an auto-calculated account from its transaction history', async ({
