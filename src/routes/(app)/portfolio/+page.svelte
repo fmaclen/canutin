@@ -74,18 +74,18 @@
 		};
 	});
 
-	// Total securities market value per day, account-agnostic: each account+security position is
-	// forward-filled from the first balance to today, converted to the display currency at its own
-	// balance date, and summed. Unconvertible values are skipped with no unconverted indicator on
-	// the chart - the Net market value tile below already carries the FX warning.
-	const valueSeries = $derived.by(() => {
-		if (securityBalanceHistory.length === 0) return [];
+	// Market value per day, account-agnostic: each account+security position is forward-filled
+	// from the first balance to today, converted to the display currency at its own balance date,
+	// and summed. Unconvertible values are skipped with no unconverted indicator on the chart -
+	// the Net market value tile below already carries the FX warning.
+	function buildValueSeries(history: TrendSecurityBalance[]) {
+		if (history.length === 0) return [];
 		const accountById = new Map(accountsContext.accounts.map((account) => [account.id, account]));
 		const currencyBySecurity = new Map(
 			securitiesContext.securities.map((security) => [security.id, security.currency])
 		);
 		const balancesByKey = Map.groupBy(
-			securityBalanceHistory,
+			history,
 			(balance) => `${balance.account}:${balance.security}`
 		);
 		const positions = [...balancesByKey.values()].map((balances) => {
@@ -93,7 +93,7 @@
 			return { balances, state };
 		});
 		const datePoints = eachDayOfInterval({
-			start: new UTCDate(new Date(securityBalanceHistory[0].asOf).getTime()),
+			start: new UTCDate(new Date(history[0].asOf).getTime()),
 			end: new UTCDate()
 		});
 		return datePoints.map((datePoint) => {
@@ -113,7 +113,9 @@
 			}
 			return { date: datePoint, value };
 		});
-	});
+	}
+
+	const valueSeries = $derived(buildValueSeries(securityBalanceHistory));
 
 	let accountFilter = $state<string | null>(null);
 	let search = $state('');
@@ -206,6 +208,20 @@
 	// The treemap can only size known, positive market values; unknown (~) and zero-value
 	// positions stay visible in the table below.
 	const allocationRows = $derived(rows.filter((row) => row.value !== null && row.value > 0));
+
+	// One small chart per charted position, largest first. A single balance date yields one
+	// series point, which is not enough to draw a line, so those positions get no card.
+	const historyBySecurity = $derived(Map.groupBy(securityBalanceHistory, (b) => b.security));
+	const securityCharts = $derived(
+		[...allocationRows]
+			.sort((a, b) => (b.value ?? 0) - (a.value ?? 0))
+			.map((row) => ({
+				id: row.id,
+				title: row.symbol || row.name,
+				points: buildValueSeries(historyBySecurity.get(row.id) ?? [])
+			}))
+			.filter((chart) => chart.points.length >= 2)
+	);
 
 	let allocationMode: 'value' | 'gain' = $state('value');
 
@@ -348,4 +364,23 @@
 			{/if}
 		</Section>
 	</Tabs.Root>
+
+	{#if !securitiesContext.isLoading && !accountsContext.isLoading && !balanceHistoryLoading}
+		<div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+			{#each securityCharts as chart (chart.id)}
+				<Section>
+					<SectionTitle title={chart.title} />
+					<div class="bg-background overflow-visible rounded-sm shadow-md">
+						<BalanceHistoryChart
+							points={chart.points}
+							seriesLabel={chart.title}
+							class="h-48"
+							formatAxisValue={(value) => formatCurrency(Math.round(value))}
+							formatTooltipValue={(value) => formatCurrency(value, 2)}
+						/>
+					</div>
+				</Section>
+			{/each}
+		</div>
+	{/if}
 </Page>
