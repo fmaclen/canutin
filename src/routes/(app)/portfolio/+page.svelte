@@ -1,5 +1,17 @@
 <script lang="ts">
+	import { UTCDate } from '@date-fns/utc';
+	import { eachDayOfInterval } from 'date-fns';
+	import { SvelteMap } from 'svelte/reactivity';
+
 	import { resolve } from '$app/paths';
+	import { getAccountsContext } from '$lib/accounts.svelte';
+	import {
+		advanceTrendSecurityValue,
+		type TrendSecurityBalance,
+		type TrendSecurityValueState
+	} from '$lib/balance-series';
+	import BalanceHistoryChart from '$lib/components/balance-history-chart.svelte';
+	import { formatCurrency } from '$lib/components/currency';
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
 	import KeyValue from '$lib/components/key-value.svelte';
@@ -10,21 +22,116 @@
 	import Section from '$lib/components/section.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Table from '$lib/components/ui/table/index';
+	import * as Tabs from '$lib/components/ui/tabs/index';
+	import { getExchangeRatesContext } from '$lib/exchange-rates.svelte';
 	import { m } from '$lib/paraglide/messages';
+	import type { SecurityBalancesResponse } from '$lib/pocketbase.schema';
+	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { getSecuritiesContext, type SecurityAggregate } from '$lib/securities.svelte';
 	import {
 		formatSecurityQuantity,
 		gainLossPercentOrNull,
 		sentiment
 	} from '$lib/security-balance-values';
+	import { projectSignedValue } from '$lib/sharing';
 	import { TableSort } from '$lib/sorting.svelte';
 	import { createSortComparator, formatPercent, type SortState } from '$lib/utils';
 
+	import AllocationTreemap from './allocation-treemap.svelte';
+
 	const securitiesContext = getSecuritiesContext();
+	const accountsContext = getAccountsContext();
+	const fx = getExchangeRatesContext();
+	const pb = getPocketBaseContext();
+
+	let securityBalanceHistory: TrendSecurityBalance[] = $state([]);
+	let balanceHistoryLoading = $state(true);
+
+	$effect(() => {
+		// The securities context whole-cache-replaces `securities` on every realtime refresh, so
+		// tracking it here refetches the history in step with the positions table; only the first
+		// load shows the skeleton - later refetches replace the series silently. While the context
+		// is still loading its first commit, skip the fetch - it would run against the empty cache
+		// and be immediately superseded.
+		if (securitiesContext.isLoading) return;
+		void securitiesContext.securities;
+		let cancelled = false;
+		pb.authedClient
+			.collection('securityBalances')
+			.getFullList<SecurityBalancesResponse<number, number, number, number>>({
+				sort: 'asOf,created,id',
+				fields: 'id,account,security,value,quantity,asOf,created',
+				requestKey: null
+			})
+			.then((records) => {
+				if (cancelled) return;
+				securityBalanceHistory = records;
+				balanceHistoryLoading = false;
+			})
+			.catch((error) => {
+				if (cancelled) return;
+				pb.handleConnectionError(error, 'portfolio', 'balance_history');
+				balanceHistoryLoading = false;
+			});
+		return () => {
+			cancelled = true;
+		};
+	});
+
+	// Total securities market value per day, account-agnostic: each account+security position is
+	// forward-filled from the first balance to today, converted to the display currency at its own
+	// balance date, and summed. Unconvertible values are skipped with no unconverted indicator on
+	// the chart - the Net market value tile below already carries the FX warning.
+	const valueSeries = $derived.by(() => {
+		if (securityBalanceHistory.length === 0) return [];
+		const accountById = new SvelteMap(
+			accountsContext.accounts.map((account) => [account.id, account])
+		);
+		const currencyBySecurity = new SvelteMap(
+			securitiesContext.securities.map((security) => [security.id, security.currency])
+		);
+		const balancesByKey = new SvelteMap<string, TrendSecurityBalance[]>();
+		for (const balance of securityBalanceHistory) {
+			const key = `${balance.account}:${balance.security}`;
+			const group = balancesByKey.get(key) ?? [];
+			group.push(balance);
+			balancesByKey.set(key, group);
+		}
+		const states = new SvelteMap<string, TrendSecurityValueState>();
+		const datePoints = eachDayOfInterval({
+			start: new UTCDate(new Date(securityBalanceHistory[0].asOf).getTime()),
+			end: new UTCDate()
+		});
+		return datePoints.map((datePoint) => {
+			let value = 0;
+			for (const [key, balances] of balancesByKey) {
+				const account = accountById.get(balances[0].account);
+				if (!account) continue;
+				if (account.closed && datePoint >= new Date(account.closed)) continue;
+				const state = states.get(key) ?? { index: -1, lastKnownValue: null, soldOut: false };
+				states.set(key, state);
+				const rawValue = advanceTrendSecurityValue(balances, datePoint, state);
+				if (rawValue === null) continue;
+				const conversion = fx.convert(
+					projectSignedValue(rawValue, account.perspective),
+					currencyBySecurity.get(balances[0].security) ?? account.currency,
+					balances[state.index].asOf
+				);
+				if (!conversion.isUnconverted) value += conversion.value;
+			}
+			return { date: datePoint, value };
+		});
+	});
 
 	// NOTE: aggregateRows already carries its own display-currency conversion (value/costBasis/
 	// gainLoss + isConverted/isUnconverted); this just sorts and sums those.
 	const rows = $derived(securitiesContext.aggregateRows);
+
+	// The treemap can only size known, positive market values; unknown (~) and zero-value
+	// positions stay visible in the table below.
+	const allocationRows = $derived(rows.filter((row) => row.value !== null && row.value > 0));
+
+	let allocationMode: 'value' | 'gain' = $state('value');
 
 	type PortfolioSortColumn =
 		| 'name'
@@ -256,11 +363,7 @@
 									{:else}
 										<NumberDisplay
 											value={formatPercent(gainLossPercent)}
-											sentiment={gainLossPercent > 0
-												? 'positive'
-												: gainLossPercent < 0
-													? 'negative'
-													: 'neutral'}
+											sentiment={sentiment(gainLossPercent)}
 										/>
 									{/if}
 								</Table.Cell>
@@ -284,4 +387,46 @@
 			</div>
 		{/if}
 	</Section>
+
+	<Section>
+		<SectionTitle title={m.market_value_section_title()} />
+		{#if securitiesContext.isLoading || accountsContext.isLoading || balanceHistoryLoading}
+			<Skeleton class="h-[30vh] min-h-96" showSpinner />
+		{:else if valueSeries.length >= 2}
+			<div class="bg-background overflow-visible rounded-sm shadow-md">
+				<BalanceHistoryChart
+					points={valueSeries}
+					seriesLabel={m.market_value_series_label()}
+					formatAxisValue={(value) => formatCurrency(Math.round(value))}
+					formatTooltipValue={(value) => formatCurrency(value, 2)}
+				/>
+			</div>
+		{:else}
+			<div class="h-[30vh] min-h-96">
+				<Empty class="h-full">{m.market_value_empty()}</Empty>
+			</div>
+		{/if}
+	</Section>
+
+	<Tabs.Root bind:value={allocationMode}>
+		<Section>
+			<SectionTitle title={m.allocation_section_title()}>
+				<Tabs.List>
+					<Tabs.Trigger value="value">{m.allocation_mode_market_value()}</Tabs.Trigger>
+					<Tabs.Trigger value="gain">{m.allocation_mode_gain()}</Tabs.Trigger>
+				</Tabs.List>
+			</SectionTitle>
+			{#if securitiesContext.isLoading}
+				<Skeleton class="h-[30vh] min-h-96" showSpinner />
+			{:else if allocationRows.length === 0}
+				<div class="h-[30vh] min-h-96">
+					<Empty class="h-full">{m.allocation_empty()}</Empty>
+				</div>
+			{:else}
+				<div class="bg-background overflow-hidden rounded-sm shadow-md">
+					<AllocationTreemap rows={allocationRows} mode={allocationMode} />
+				</div>
+			{/if}
+		</Section>
+	</Tabs.Root>
 </Page>
