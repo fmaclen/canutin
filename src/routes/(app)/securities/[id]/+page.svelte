@@ -13,9 +13,9 @@
 	import type { SecurityBalancesResponse } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { getSecuritiesContext, type SecurityAccountBalance } from '$lib/securities.svelte';
-	import { gainLossPercentOrNull, sumOrUnknown } from '$lib/security-balance-values';
+	import { gainLossPercentOrNull } from '$lib/security-balance-values';
 	import { TableSort } from '$lib/sorting.svelte';
-	import { createSortComparator, type SortState } from '$lib/utils';
+	import { createSortComparator, sumPartial, type SortState } from '$lib/utils';
 
 	const securitiesContext = getSecuritiesContext();
 	const fx = getExchangeRatesContext();
@@ -67,10 +67,9 @@
 			cancelled = true;
 		};
 	});
-	const balancesMarketValue = $derived({
-		value: sumOrUnknown(accountBalances.map((row) => (row.isUnconverted ? 0 : row.value))),
-		isUnconverted: accountBalances.some((row) => row.isUnconverted)
-	});
+	const balancesMarketValue = $derived(
+		sumPartial(accountBalances.map((row) => (row.isUnconverted ? null : row.value)))
+	);
 
 	type BalanceSortColumn =
 		| 'asOf'
@@ -136,27 +135,27 @@
 </Section>
 
 <Section>
-	<SectionTitle title={m.securities_section_balances()} />
+	<SectionTitle title={m.securities_section_positions()} />
 	{#if !loaded || !security}
 		<Skeleton class="h-64" showSpinner />
 	{:else if accountBalances.length > 0}
 		<div
 			role="region"
-			aria-label={m.securities_section_balances()}
+			aria-label={m.securities_section_positions()}
 			class="grid grid-cols-1 gap-2 sm:grid-cols-2"
 		>
 			<KeyValue
-				title={m.securities_section_balances()}
+				title={m.securities_summary_count_label()}
 				value={accountBalances.length}
 				variant="outline"
 				format="number"
 			/>
 			<KeyValue
 				title={m.summary_net_market_value()}
-				value={balancesMarketValue.value}
+				value={balancesMarketValue.total}
 				variant="outline"
 				decimalScale={2}
-				isUnconverted={balancesMarketValue.isUnconverted}
+				isPartial={balancesMarketValue.isPartial}
 			/>
 		</div>
 		<PositionsTable
@@ -166,6 +165,6 @@
 			onSort={sort.toggle}
 		/>
 	{:else}
-		<Empty>{m.securities_balances_empty()}</Empty>
+		<Empty>{m.securities_positions_empty()}</Empty>
 	{/if}
 </Section>

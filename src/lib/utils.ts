@@ -26,6 +26,13 @@ export function formatPercent(value: number) {
 	})}%`;
 }
 
+export function sumPartial(values: Array<number | null | undefined>) {
+	const known = values.filter((value) => value != null);
+	const total =
+		values.length && !known.length ? null : known.reduce((sum, value) => sum + value, 0);
+	return { total, isPartial: known.length < values.length };
+}
+
 // Validates a `?from=` redirect target. Returns the value only if it is a
 // same-origin relative path (starts with a single `/`, not `//` or `/\`, and
 // contains no protocol scheme before the first slash). Returns null otherwise.

@@ -157,7 +157,11 @@ test('a US-dollar account renders without any exchange-rate indicators', async (
 	await expect(page.getByLabel(/Converted from/)).toHaveCount(0);
 	await expect(page.getByLabel('Includes converted amounts')).toHaveCount(0);
 	await expect(page.getByLabel(/No exchange rate/)).toHaveCount(0);
-	await expect(page.getByLabel('Includes currencies that could not be converted')).toHaveCount(0);
+	await expect(
+		page.getByLabel(
+			'Some items are missing values or conversion rates and are excluded from this total'
+		)
+	).toHaveCount(0);
 
 	await goToPageViaSidebar(page, 'Accounts');
 	await expect(page.getByRole('region', { name: 'Net balance' })).toContainText('$2,500.00');
@@ -165,12 +169,12 @@ test('a US-dollar account renders without any exchange-rate indicators', async (
 	await expect(page.getByLabel('Includes converted amounts')).toHaveCount(0);
 });
 
-test('unconvertible balances render native amounts and are excluded from totals', async ({
-	page
-}) => {
+test('unconvertible balances render native amounts and mark partial totals', async ({ page }) => {
 	const user = await seedUser('noelia');
 	const noRateTooltip =
 		'No exchange rate for ARS — add a quote or enable automatic updates in Currencies';
+	const partialTotalTooltip =
+		'Some items are missing values or conversion rates and are excluded from this total';
 
 	await seedCurrency({ owner: user.id, code: 'ARS', name: 'Argentine peso', autoUpdate: false });
 	const arsAccount = await seedAccount({
@@ -210,9 +214,17 @@ test('unconvertible balances render native amounts and are excluded from totals'
 	await expect(row.getByText(/\$\s1\.495\.000,00/)).toBeVisible();
 
 	const netBalance = page.getByRole('region', { name: 'Net balance' });
-	await expect(netBalance).toContainText('$200.00');
-	await expect(
-		netBalance.getByLabel('Includes currencies that could not be converted')
-	).toBeVisible();
+	await expect(netBalance).toContainText('~ $200.00');
+	await expect(netBalance.getByLabel(partialTotalTooltip)).toBeVisible();
 	await expect(netBalance).not.toContainText('$1,495,200.00');
+
+	await goToPageViaSidebar(page, 'Big picture');
+	const netWorth = page.getByRole('region', { name: 'Net worth' });
+	await expect(netWorth).toContainText('~ $200');
+	await expect(netWorth.getByLabel(partialTotalTooltip)).toBeVisible();
+
+	await goToPageViaSidebar(page, 'Balance sheet');
+	const cash = page.getByRole('region', { name: 'Cash' });
+	await expect(cash).toContainText('~ $200');
+	await expect(cash.getByLabel(partialTotalTooltip)).toBeVisible();
 });

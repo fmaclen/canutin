@@ -10,6 +10,7 @@ import {
 	seedAccount,
 	seedAccountBalance,
 	seedCurrency,
+	seedPortfolio,
 	seedSecurity,
 	seedSecurityBalance,
 	seedTrade,
@@ -668,8 +669,12 @@ test('account overview samples transactions and trades with links to filtered le
 	await goToRecordDetail(page, 'Accounts', 'Brokerage One');
 	await expect(page.getByText('Dividend payout')).toBeVisible();
 	await expect(page.getByText('Bought Acme')).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Recent transactions' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Recent trades' })).toBeVisible();
 
-	const brokeragePositions = await page.getByRole('heading', { name: 'Positions' }).boundingBox();
+	const brokeragePositions = await page
+		.getByRole('heading', { name: 'Top positions' })
+		.boundingBox();
 	const brokerageCashflow = await page
 		.getByRole('heading', { name: 'Trailing cashflow' })
 		.boundingBox();
@@ -692,7 +697,7 @@ test('account overview samples transactions and trades with links to filtered le
 	await expect(page.getByRole('link', { name: /View all/ })).not.toBeVisible();
 
 	const emptyAccountPositions = await page
-		.getByRole('heading', { name: 'Positions' })
+		.getByRole('heading', { name: 'Top positions' })
 		.boundingBox();
 	const emptyAccountCashflow = await page
 		.getByRole('heading', { name: 'Trailing cashflow' })
@@ -700,4 +705,40 @@ test('account overview samples transactions and trades with links to filtered le
 	expect(emptyAccountPositions).not.toBeNull();
 	expect(emptyAccountCashflow).not.toBeNull();
 	expect(emptyAccountCashflow!.y).toBeLessThan(emptyAccountPositions!.y);
+});
+
+test('account overview caps top positions at five and links to the filtered portfolio', async ({
+	page
+}) => {
+	const user = await seedUser('dorian');
+	const securities = Array.from({ length: 6 }, (_, index) => ({
+		name: `Position ${index + 1}`,
+		symbol: `P${index + 1}`
+	}));
+	const {
+		accounts: [account]
+	} = await seedPortfolio(user.id, {
+		accounts: ['Focused Brokerage'],
+		securities,
+		balances: securities.map((security, index) => ({
+			account: 'Focused Brokerage',
+			security: security.name,
+			quantity: index + 1,
+			price: 100,
+			value: (index + 1) * 100,
+			costBasis: (index + 1) * 80
+		}))
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToRecordDetail(page, 'Accounts', 'Focused Brokerage');
+
+	const positionsTable = page.getByRole('table').first();
+	await expect(positionsTable.getByRole('row')).toHaveCount(6);
+	await expect(positionsTable.getByRole('row', { name: /Position 6/ })).toBeVisible();
+	await expect(positionsTable.getByRole('row', { name: /Position 1/ })).not.toBeVisible();
+
+	const viewAll = page.getByRole('link', { name: 'View all 6 positions' });
+	await expect(viewAll).toHaveAttribute('href', `/portfolio?account=${account.id}`);
 });

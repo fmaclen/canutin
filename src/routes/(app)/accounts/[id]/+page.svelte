@@ -13,7 +13,6 @@
 	import { formatNativeCurrency } from '$lib/components/currency';
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
-	import KeyValue from '$lib/components/key-value.svelte';
 	import Link from '$lib/components/link.svelte';
 	import PositionsTable from '$lib/components/positions-table.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
@@ -37,7 +36,11 @@
 	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
-	import { gainLossPercentOrNull, sentiment, sumOrUnknown } from '$lib/security-balance-values';
+	import {
+		compareByValueDescThenName,
+		gainLossPercentOrNull,
+		sentiment
+	} from '$lib/security-balance-values';
 	import { projectSignedValue } from '$lib/sharing';
 	import { TableSort } from '$lib/sorting.svelte';
 	import { createSortComparator, toNumber, type SortState } from '$lib/utils';
@@ -65,7 +68,7 @@
 	type BalanceHistoryPoint = { date: Date; value: number };
 	type SecurityBalanceRow = SecurityBalancesResponse<number, number, number, number>;
 
-	const SAMPLE_LIMIT = 10;
+	const SAMPLE_LIMIT = 5;
 
 	let transactionSamples = $state<TransactionSample[]>([]);
 	let transactionTotal = $state(0);
@@ -384,9 +387,19 @@
 		});
 		return rows.sort(comparator);
 	});
-	const positionsMarketValue = $derived({
-		value: sumOrUnknown(positionsRows.map((row) => (row.isUnconverted ? 0 : row.value))),
-		isUnconverted: positionsRows.some((row) => row.isUnconverted)
+	const topPositionsRows = $derived.by(() => {
+		const topPositionIds = new Set(
+			[...positionsRows]
+				.sort(
+					compareByValueDescThenName(
+						(row) => row.value,
+						(row) => row.entityName
+					)
+				)
+				.slice(0, SAMPLE_LIMIT)
+				.map((row) => row.id)
+		);
+		return positionsRows.filter((row) => topPositionIds.has(row.id));
 	});
 	const dateFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
 		year: 'numeric',
@@ -433,36 +446,40 @@
 
 {#snippet positionsAndTrades()}
 	<Section>
-		<SectionTitle title={m.portfolio_section_positions()} />
+		<SectionTitle title={m.account_section_top_positions()} />
 		{#if !loaded || securitiesContext.isLoading || !account}
 			<Skeleton class="h-64" showSpinner />
 		{:else if positionsRows.length > 0}
 			<div
-				role="region"
-				aria-label={m.portfolio_section_positions()}
-				class="grid grid-cols-1 gap-2"
+				class="grid overflow-hidden rounded-sm shadow-md [&>div]:rounded-none [&>div]:shadow-none"
 			>
-				<KeyValue
-					title={m.summary_net_market_value()}
-					value={positionsMarketValue.value}
-					variant="outline"
-					decimalScale={2}
-					isUnconverted={positionsMarketValue.isUnconverted}
+				<PositionsTable
+					rows={topPositionsRows}
+					entity="security"
+					sortState={sort.state}
+					onSort={sort.toggle}
 				/>
+				<div class="bg-background overflow-hidden">
+					<Table.Root>
+						<TableViewAllRow
+							href={`${resolve('/portfolio')}?account=${account.id}`}
+							label={positionsRows.length === 1
+								? m.accounts_overview_view_all_positions_one()
+								: m.accounts_overview_view_all_positions_other({
+										count: positionsRows.length
+									})}
+							colspan={1}
+						/>
+					</Table.Root>
+				</div>
 			</div>
-			<PositionsTable
-				rows={positionsRows}
-				entity="security"
-				sortState={sort.state}
-				onSort={sort.toggle}
-			/>
 		{:else}
 			<Empty>{m.accounts_overview_positions_empty()}</Empty>
 		{/if}
 	</Section>
 
 	<Section>
-		<SectionTitle title={m.trades_title()} />
+		<SectionTitle title={m.account_section_recent_trades()} />
 		{#if !loaded || samplesLoading || !account}
 			<Skeleton class="h-64" showSpinner />
 		{:else if tradeRows.length > 0}
@@ -573,7 +590,7 @@
 	</Section>
 
 	<Section>
-		<SectionTitle title={m.sidebar_transactions()} />
+		<SectionTitle title={m.account_section_recent_transactions()} />
 		{#if !loaded || samplesLoading || !account}
 			<Skeleton class="h-64" showSpinner />
 		{:else if transactionRows.length > 0}

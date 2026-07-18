@@ -54,6 +54,10 @@ test('security overview shows price history once it has at least two priced quot
 	await goToRecordDetail(page, 'Securities', security.name);
 	await expect(page.getByRole('heading', { name: 'Price history' })).toBeVisible();
 	await expect(page.getByText('No price history yet')).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Positions' })).toBeVisible();
+	const positionsRegions = page.getByRole('region', { name: 'Positions' });
+	await expect(positionsRegions).toHaveCount(2);
+	await expect(positionsRegions.last()).toContainText('1');
 
 	await seedSecurityBalance({
 		account: account.id,

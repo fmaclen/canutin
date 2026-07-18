@@ -135,7 +135,6 @@ test('portfolio and trades flow covers security creation, balances, filters, and
 	await expect(page.getByRole('row', { name: /Vanguard Total Stock Market ETF/ })).toContainText(
 		'$2,000.00'
 	);
-	await expect(page.getByRole('region', { name: 'Net market value' })).toContainText('$2,000.00');
 
 	await goToEditTab(page);
 	await expect(page).toHaveURL(`/accounts/${brokerageAccount.id}/edit`);
@@ -182,6 +181,108 @@ test('portfolio and trades flow covers security creation, balances, filters, and
 	await page.getByRole('button', { name: 'Account', exact: true }).click();
 	await page.getByRole('option', { name: 'Core Brokerage' }).click();
 	await expect(activityRow).toBeVisible();
+});
+
+test('portfolio search and account filters update and restore the URL, rows, and summary cards', async ({
+	page
+}) => {
+	const user = await seedUser('cassia');
+	const alphaAccount = await seedAccount({
+		name: 'Alpha Brokerage',
+		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+		owner: user.id,
+		balanceType: 'Brokerage'
+	});
+	const betaAccount = await seedAccount({
+		name: 'Beta Brokerage',
+		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+		owner: user.id,
+		balanceType: 'Brokerage'
+	});
+	const alphaSecurity = await seedSecurity({ name: 'Alpha Fund', symbol: 'MELI', owner: user.id });
+	const betaSecurity = await seedSecurity({ name: 'Beta Fund', symbol: 'MELID', owner: user.id });
+	await seedSecurityBalance({
+		account: alphaAccount.id,
+		owner: user.id,
+		security: alphaSecurity.id,
+		asOf: new Date().toISOString(),
+		quantity: 10,
+		price: 100,
+		value: 1000,
+		costBasis: 800
+	});
+	await seedSecurityBalance({
+		account: betaAccount.id,
+		owner: user.id,
+		security: betaSecurity.id,
+		asOf: new Date().toISOString(),
+		quantity: 20,
+		price: 150,
+		value: 3000,
+		costBasis: 2000
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Portfolio');
+	await expect(page.getByRole('row', { name: /Alpha Fund/ })).toBeVisible();
+	await expect(page.getByRole('row', { name: /Beta Fund/ })).toBeVisible();
+	await expect(page.getByRole('region', { name: 'Net market value' })).toContainText('$4,000.00');
+
+	const searchInput = page.getByPlaceholder('Search positions');
+	await searchInput.fill('alpha');
+	await expect(page).toHaveURL('/portfolio?q=alpha');
+	await expect(page.getByRole('row', { name: /Alpha Fund/ })).toBeVisible();
+	await expect(page.getByRole('row', { name: /Beta Fund/ })).not.toBeVisible();
+	await expect(page.getByRole('region', { name: 'Net gain/loss' })).toContainText('$200.00');
+	await expect(page.getByRole('region', { name: 'Net gain %' })).toContainText('+25.0%');
+	await expect(page.getByRole('region', { name: 'Net market value' })).toContainText('$1,000.00');
+
+	await searchInput.fill('ALPHA, beta');
+	await expect(page).toHaveURL('/portfolio?q=ALPHA%2C+beta');
+	await expect(page.getByRole('row', { name: /Alpha Fund/ })).toBeVisible();
+	await expect(page.getByRole('row', { name: /Beta Fund/ })).toBeVisible();
+	await expect(page.getByRole('region', { name: 'Net market value' })).toContainText('$4,000.00');
+
+	await searchInput.fill('meli');
+	await expect(page).toHaveURL('/portfolio?q=meli');
+	await expect(page.getByRole('row', { name: /Alpha Fund.*MELI/ })).toBeVisible();
+	await expect(page.getByRole('row', { name: /Beta Fund.*MELID/ })).toBeVisible();
+	await expect(page.getByRole('region', { name: 'Net market value' })).toContainText('$4,000.00');
+
+	const accountPicker = page.getByRole('button', { name: 'Account', exact: true });
+	await accountPicker.click();
+	await page.getByRole('option', { name: 'Alpha Brokerage' }).click();
+	await expect(page).toHaveURL(`/portfolio?q=meli&account=${alphaAccount.id}`);
+	await expect(page.getByRole('row', { name: /Alpha Fund/ })).toBeVisible();
+	await expect(page.getByRole('row', { name: /Beta Fund/ })).not.toBeVisible();
+	await expect(page.getByRole('region', { name: 'Net gain/loss' })).toContainText('$200.00');
+	await expect(page.getByRole('region', { name: 'Net gain %' })).toContainText('+25.0%');
+	await expect(page.getByRole('region', { name: 'Net market value' })).toContainText('$1,000.00');
+
+	await page.reload();
+	await expect(page).toHaveURL(`/portfolio?q=meli&account=${alphaAccount.id}`);
+	await expect(searchInput).toHaveValue('meli');
+	await expect(accountPicker).toContainText('Alpha Brokerage');
+	await expect(page.getByRole('row', { name: /Alpha Fund/ })).toBeVisible();
+	await expect(page.getByRole('row', { name: /Beta Fund/ })).not.toBeVisible();
+	await expect(page.getByRole('region', { name: 'Net market value' })).toContainText('$1,000.00');
+
+	await searchInput.fill('missing');
+	await expect(page.getByText('No positions match the selected filters')).toBeVisible();
+	await expect(page.getByText('No positions yet')).not.toBeVisible();
+
+	await page.getByLabel('Clear search').click();
+	await expect(page).toHaveURL(`/portfolio?account=${alphaAccount.id}`);
+	await expect(page.getByRole('row', { name: /Alpha Fund/ })).toBeVisible();
+
+	// This test explicitly covers combined filter initialization from a direct portfolio URL.
+	await page.goto(`/portfolio?q=BETA&account=${betaAccount.id}`);
+	await expect(searchInput).toHaveValue('BETA');
+	await expect(accountPicker).toContainText('Beta Brokerage');
+	await expect(page.getByRole('row', { name: /Alpha Fund/ })).not.toBeVisible();
+	await expect(page.getByRole('row', { name: /Beta Fund/ })).toBeVisible();
+	await expect(page.getByRole('region', { name: 'Net market value' })).toContainText('$3,000.00');
 });
 
 test('portfolio charts total securities value across accounts with drag-to-compare', async ({
@@ -332,8 +433,13 @@ test('portfolio unknown values render as unknown and do not inflate account tota
 	// Unknown and zero market values can't size a treemap rect, so the allocation stays empty
 	await expect(page.getByText('No allocation yet')).toBeVisible();
 
+	const partialTotalLabel =
+		'Some items are missing values or conversion rates and are excluded from this total';
+	const portfolioMarketValue = page.getByRole('region', { name: 'Net market value' });
+	await expect(portfolioMarketValue).toContainText('~ $0.00');
+	await expect(portfolioMarketValue.getByLabel(partialTotalLabel)).toBeVisible();
+
 	await row.getByRole('link', { name: 'Unknown Value Brokerage' }).click();
-	await expect(page.getByRole('region', { name: 'Net market value' })).toHaveText(/~/);
 	const positionRow = page.getByRole('table').getByRole('row', { name: /Private Fund/ });
 	// Gain/loss % cell (index 6) and Value cell (last) both stay unknown — never coerced to 0.
 	await expect(positionRow.locator('td').nth(6)).toHaveText('~');
