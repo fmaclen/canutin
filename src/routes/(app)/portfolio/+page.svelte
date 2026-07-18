@@ -309,7 +309,7 @@
 		{/if}
 	</Section>
 
-	<div class="grid grid-cols-1 gap-8 sm:grid-cols-2">
+	<div class="grid grid-cols-1 gap-8 xl:grid-cols-2">
 		<Section>
 			<SectionTitle title={m.market_value_section_title()} />
 			{#if securitiesContext.isLoading || accountsContext.isLoading || balanceHistoryLoading}
