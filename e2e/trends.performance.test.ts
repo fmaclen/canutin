@@ -26,6 +26,7 @@ test('trends performance table', async ({ page }) => {
 	await goToPageViaSidebar(page, 'Trends');
 	await expect(page.getByText('No accounts or assets yet')).toHaveCount(2);
 	await expect(page.locator('[data-growth-period]')).toHaveCount(0);
+	await expect(page.getByRole('img', { name: 'Cash', exact: true })).toHaveCount(0);
 	await goToPageViaSidebar(page, 'Big picture');
 
 	const cashAccount = await seedAccount({
@@ -215,6 +216,14 @@ test('trends performance table', async ({ page }) => {
 
 	await goToPageViaSidebar(page, 'Trends');
 
+	// Below the performance table, one small chart per balance group over the growth window
+	await expect(
+		page.getByRole('heading', { name: /^(Cash|Debt|Investments|Other assets)$/ })
+	).toHaveText(['Cash', 'Debt', 'Investments', 'Other assets']);
+	await expect(
+		page.getByRole('img', { name: /^(Cash|Debt|Investments|Other assets)$/ })
+	).toHaveCount(4);
+
 	await page.getByRole('tab', { name: '2Y' }).click();
 	const growthChart = page.locator('[data-growth-period="2y"]');
 	await expect(growthChart).toHaveAttribute(
@@ -310,12 +319,13 @@ test('trends performance table', async ({ page }) => {
 	// Clicking a legend item isolates that series; the compare tooltip follows the
 	// legend's visibility and drops the hidden series, and the y-axis rescales from the
 	// full-range domain to just the visible series (cash 1,000..8,000, padded then niced
-	// by the scale to 0..9,000)
-	await expect(page.getByText('$45,000', { exact: true })).toBeVisible();
-	await expect(page.getByText('$9,000', { exact: true })).not.toBeVisible();
+	// by the scale to 0..9,000). Tick texts are scoped to the growth chart because the
+	// per-group cash chart below nices to the same $9,000 tick.
+	await expect(maxChart.getByText('$45,000', { exact: true })).toBeVisible();
+	await expect(maxChart.getByText('$9,000', { exact: true })).not.toBeVisible();
 	await page.getByRole('button', { name: 'Cash', exact: true }).click();
-	await expect(page.getByText('$9,000', { exact: true })).toBeVisible();
-	await expect(page.getByText('$45,000', { exact: true })).not.toBeVisible();
+	await expect(maxChart.getByText('$9,000', { exact: true })).toBeVisible();
+	await expect(maxChart.getByText('$45,000', { exact: true })).not.toBeVisible();
 	// Recapture the box: the legend click can scroll the chart and stale coords miss it
 	const isolatedChartBox = await maxChart.boundingBox();
 	if (!isolatedChartBox) throw new Error('Growth chart has no bounding box');
@@ -331,6 +341,6 @@ test('trends performance table', async ({ page }) => {
 
 	// Toggling the series back restores the full-range y-axis
 	await page.getByRole('button', { name: 'Cash', exact: true }).click();
-	await expect(page.getByText('$45,000', { exact: true })).toBeVisible();
-	await expect(page.getByText('$9,000', { exact: true })).not.toBeVisible();
+	await expect(maxChart.getByText('$45,000', { exact: true })).toBeVisible();
+	await expect(maxChart.getByText('$9,000', { exact: true })).not.toBeVisible();
 });

@@ -6,9 +6,12 @@
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAssetsContext } from '$lib/assets.svelte';
 	import { type TrendSecurityBalance } from '$lib/balance-series';
+	import BalanceHistoryChart from '$lib/components/balance-history-chart.svelte';
+	import { formatCurrency } from '$lib/components/currency';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
+	import Skeleton from '$lib/components/ui/skeleton/skeleton.svelte';
 	import * as Tabs from '$lib/components/ui/tabs/index';
 	import { m } from '$lib/paraglide/messages';
 	import type {
@@ -25,7 +28,12 @@
 
 	import ChartNetWorth from './growth.svelte';
 	import Performance from './performance.svelte';
-	import { buildPreparedMaps, computeBoundedHistoryStart, type PeriodKey } from './trends';
+	import {
+		buildPreparedMaps,
+		computeBoundedHistoryStart,
+		type PeriodKey,
+		type TrendSeriesRow
+	} from './trends';
 
 	const pb = getPocketBaseContext();
 	const accountsCtx = getAccountsContext();
@@ -36,6 +44,7 @@
 	const isLoading = $derived(!bootstrapped);
 
 	let period: PeriodKey = $state('1y');
+	let series: TrendSeriesRow[] = $state([]);
 	let rawAccounts: AccountsResponse[] = $state([]);
 	let rawAssets: AssetsResponse[] = $state([]);
 	let rawAccountBalances: AccountBalancesResponse[] = $state([]);
@@ -586,6 +595,16 @@
 		if (!bootstrapped) return;
 		scheduleRefresh();
 	});
+
+	const isEmpty = $derived(!rawAccounts.length && !rawAssets.length);
+	// NOTE: reference the raw tokens (--cash, not --color-cash): ChartStyle re-emits each config
+	// color as --color-<key> per chart, so var(--color-cash) would be a circular reference.
+	const groupCharts = [
+		{ key: 'cash', label: m.trends_series_cash_label(), color: 'var(--cash)' },
+		{ key: 'debt', label: m.trends_series_debt_label(), color: 'var(--debt)' },
+		{ key: 'investment', label: m.trends_series_investment_label(), color: 'var(--investment)' },
+		{ key: 'other', label: m.trends_series_other_label(), color: 'var(--other-assets)' }
+	] as const;
 </script>
 
 <Page pageTitle={m.trends_page_title()}>
@@ -605,6 +624,7 @@
 
 			<ChartNetWorth
 				bind:period
+				bind:series
 				{isLoading}
 				prepared={period === 'max' ? fullHistoryPrepared : prepared}
 				{rawAccounts}
@@ -631,4 +651,28 @@
 			{rawFullHistoryAssetBalances}
 		/>
 	</Section>
+
+	{#if isLoading || !isEmpty}
+		<div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+			{#each groupCharts as group (group.key)}
+				<Section>
+					<SectionTitle title={group.label} />
+					{#if isLoading}
+						<Skeleton class="h-48" showSpinner />
+					{:else}
+						<div class="bg-background overflow-visible rounded-sm shadow-md">
+							<BalanceHistoryChart
+								points={series.map((row) => ({ date: row.date, value: row[group.key] }))}
+								seriesLabel={group.label}
+								color={group.color}
+								class="h-48"
+								formatAxisValue={(value) => formatCurrency(Math.round(value))}
+								formatTooltipValue={(value) => formatCurrency(value, 2)}
+							/>
+						</div>
+					{/if}
+				</Section>
+			{/each}
+		</div>
+	{/if}
 </Page>

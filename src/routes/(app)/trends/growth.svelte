@@ -31,12 +31,16 @@
 	import {
 		computeRangeForPeriod,
 		type BalanceGroup,
+		type TrendFxFlags as FxFlags,
+		type TrendGroupKey as GroupKey,
 		type PeriodKey,
-		type PreparedTrendMaps
+		type PreparedTrendMaps,
+		type TrendSeriesRow as Row
 	} from './trends';
 
 	let {
 		period = $bindable(),
+		series = $bindable(),
 		isLoading,
 		prepared,
 		rawAccounts,
@@ -46,6 +50,7 @@
 		rawAssetBalances
 	}: {
 		period: PeriodKey;
+		series: Row[];
 		isLoading: boolean;
 		prepared: PreparedTrendMaps;
 		rawAccounts: AccountsResponse[];
@@ -55,27 +60,11 @@
 		rawAssetBalances: AssetBalancesResponse[];
 	} = $props();
 
-	type GroupKey = 'net' | 'cash' | 'debt' | 'investment' | 'other';
-	// NOTE: trends hides the converted-amount indicator (page-scoped FX rule), so only the
-	// unconvertible warning is tracked per group; the converted values themselves are unchanged.
-	type FxFlags = { isUnconverted: boolean };
 	type GroupSums = Record<Exclude<GroupKey, 'net'>, number>;
 	type GroupFxFlags = Record<Exclude<GroupKey, 'net'>, FxFlags>;
 
-	type Row = {
-		date: Date;
-		net: number;
-		cash: number;
-		debt: number;
-		investment: number;
-		other: number;
-		fx: Record<GroupKey, FxFlags>;
-	};
-
 	const fx = getExchangeRatesContext();
 	const isEmpty = $derived(!rawAccounts.length && !rawAssets.length);
-
-	let series: Row[] = $state([]);
 	const firstSeriesRow = $derived(series[0] ?? null);
 	const lastSeriesRow = $derived(series.at(-1) ?? null);
 	const hasUnconverted = $derived(

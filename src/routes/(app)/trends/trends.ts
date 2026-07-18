@@ -13,6 +13,20 @@ import type {
 export type PeriodKey = '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | 'max';
 export type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
 
+export type TrendGroupKey = 'net' | 'cash' | 'debt' | 'investment' | 'other';
+// NOTE: trends hides the converted-amount indicator (page-scoped FX rule), so only the
+// unconvertible warning is tracked per group; the converted values themselves are unchanged.
+export type TrendFxFlags = { isUnconverted: boolean };
+export type TrendSeriesRow = {
+	date: Date;
+	net: number;
+	cash: number;
+	debt: number;
+	investment: number;
+	other: number;
+	fx: Record<TrendGroupKey, TrendFxFlags>;
+};
+
 export function computeBoundedHistoryStart(period: PeriodKey) {
 	const now = startOfDay(new UTCDate());
 	if (period === '3m') return subMonths(now, 3);
