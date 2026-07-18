@@ -25,17 +25,13 @@
 	const sizedRows = $derived(
 		mode === 'value' ? rows : rows.filter((row) => row.gainLoss !== null && row.gainLoss !== 0)
 	);
-	const sizeOf = $derived(
-		mode === 'value'
-			? (row: SecurityAggregate) => row.value ?? 0
-			: (row: SecurityAggregate) => Math.abs(row.gainLoss ?? 0)
-	);
-
 	// d3's hierarchy wants a single root; wrap the flat rows as its children.
 	type TreemapDatum = SecurityAggregate | { children: SecurityAggregate[] };
 	const root = $derived(
 		hierarchy<TreemapDatum>({ children: sizedRows })
-			.sum((datum) => ('id' in datum ? sizeOf(datum) : 0))
+			.sum((datum) =>
+				'id' in datum ? (mode === 'value' ? (datum.value ?? 0) : Math.abs(datum.gainLoss ?? 0)) : 0
+			)
 			.sort((a, b) => (b.value ?? 0) - (a.value ?? 0))
 	);
 

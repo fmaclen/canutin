@@ -2,7 +2,6 @@
 	import { UTCDate } from '@date-fns/utc';
 	import { eachDayOfInterval } from 'date-fns';
 	import { onDestroy } from 'svelte';
-	import { SvelteMap } from 'svelte/reactivity';
 
 	import { afterNavigate, replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -81,32 +80,28 @@
 	// the chart - the Net market value tile below already carries the FX warning.
 	const valueSeries = $derived.by(() => {
 		if (securityBalanceHistory.length === 0) return [];
-		const accountById = new SvelteMap(
-			accountsContext.accounts.map((account) => [account.id, account])
-		);
-		const currencyBySecurity = new SvelteMap(
+		const accountById = new Map(accountsContext.accounts.map((account) => [account.id, account]));
+		const currencyBySecurity = new Map(
 			securitiesContext.securities.map((security) => [security.id, security.currency])
 		);
-		const balancesByKey = new SvelteMap<string, TrendSecurityBalance[]>();
-		for (const balance of securityBalanceHistory) {
-			const key = `${balance.account}:${balance.security}`;
-			const group = balancesByKey.get(key) ?? [];
-			group.push(balance);
-			balancesByKey.set(key, group);
-		}
-		const states = new SvelteMap<string, TrendSecurityValueState>();
+		const balancesByKey = Map.groupBy(
+			securityBalanceHistory,
+			(balance) => `${balance.account}:${balance.security}`
+		);
+		const positions = [...balancesByKey.values()].map((balances) => {
+			const state: TrendSecurityValueState = { index: -1, lastKnownValue: null, soldOut: false };
+			return { balances, state };
+		});
 		const datePoints = eachDayOfInterval({
 			start: new UTCDate(new Date(securityBalanceHistory[0].asOf).getTime()),
 			end: new UTCDate()
 		});
 		return datePoints.map((datePoint) => {
 			let value = 0;
-			for (const [key, balances] of balancesByKey) {
+			for (const { balances, state } of positions) {
 				const account = accountById.get(balances[0].account);
 				if (!account) continue;
 				if (account.closed && datePoint >= new Date(account.closed)) continue;
-				const state = states.get(key) ?? { index: -1, lastKnownValue: null, soldOut: false };
-				states.set(key, state);
 				const rawValue = advanceTrendSecurityValue(balances, datePoint, state);
 				if (rawValue === null) continue;
 				const conversion = fx.convert(
