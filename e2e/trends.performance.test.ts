@@ -26,7 +26,7 @@ test('trends performance table', async ({ page }) => {
 	await goToPageViaSidebar(page, 'Trends');
 	await expect(page.getByText('No accounts or assets yet')).toHaveCount(2);
 	await expect(page.locator('[data-growth-period]')).toHaveCount(0);
-	await expect(page.getByRole('img', { name: 'Cash', exact: true })).toHaveCount(0);
+	await expect(page.getByRole('heading', { name: 'Cash', exact: true })).toHaveCount(0);
 	await goToPageViaSidebar(page, 'Big picture');
 
 	const cashAccount = await seedAccount({
@@ -216,13 +216,17 @@ test('trends performance table', async ({ page }) => {
 
 	await goToPageViaSidebar(page, 'Trends');
 
-	// Below the performance table, one small chart per balance group over the growth window
+	// Below the performance table, one chart per balance group charting each member account
+	// or asset as its own series; excluded entities never become a series
 	await expect(
 		page.getByRole('heading', { name: /^(Cash|Debt|Investments|Other assets)$/ })
 	).toHaveText(['Cash', 'Debt', 'Investments', 'Other assets']);
-	await expect(
-		page.getByRole('img', { name: /^(Cash|Debt|Investments|Other assets)$/ })
-	).toHaveCount(4);
+	await expect(page.getByRole('button', { name: 'Perf Test', exact: true })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Perf Debt', exact: true })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Sold Asset', exact: true })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Closed Other', exact: true })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Excluded Invest' })).toHaveCount(0);
+	await expect(page.getByRole('button', { name: 'Excluded Debt Asset' })).toHaveCount(0);
 
 	await page.getByRole('tab', { name: '2Y' }).click();
 	const growthChart = page.locator('[data-growth-period="2y"]');

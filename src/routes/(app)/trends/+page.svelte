@@ -6,8 +6,6 @@
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAssetsContext } from '$lib/assets.svelte';
 	import { type TrendSecurityBalance } from '$lib/balance-series';
-	import BalanceHistoryChart from '$lib/components/balance-history-chart.svelte';
-	import { formatCurrency } from '$lib/components/currency';
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
@@ -26,13 +24,14 @@
 	import { projectSignedValue } from '$lib/sharing';
 	import { toNumber } from '$lib/utils';
 
+	import GroupChart from './group-chart.svelte';
 	import ChartNetWorth from './growth.svelte';
 	import Performance from './performance.svelte';
 	import {
 		buildPreparedMaps,
 		computeBoundedHistoryStart,
 		type PeriodKey,
-		type TrendSeriesRow
+		type TrendMemberSeries
 	} from './trends';
 
 	const pb = getPocketBaseContext();
@@ -44,7 +43,7 @@
 	const isLoading = $derived(!bootstrapped);
 
 	let period: PeriodKey = $state('1y');
-	let series: TrendSeriesRow[] = $state([]);
+	let memberSeries: TrendMemberSeries = $state({ members: [], rows: [] });
 	let rawAccounts: AccountsResponse[] = $state([]);
 	let rawAssets: AssetsResponse[] = $state([]);
 	let rawAccountBalances: AccountBalancesResponse[] = $state([]);
@@ -605,6 +604,12 @@
 		{ key: 'investment', label: m.trends_series_investment_label(), color: 'var(--investment)' },
 		{ key: 'other', label: m.trends_series_other_label(), color: 'var(--other-assets)' }
 	] as const;
+	const membersByGroup = $derived(
+		Map.groupBy(
+			memberSeries.members.toSorted((a, b) => a.label.localeCompare(b.label)),
+			(member) => member.group
+		)
+	);
 </script>
 
 <Page pageTitle={m.trends_page_title()}>
@@ -624,7 +629,7 @@
 
 			<ChartNetWorth
 				bind:period
-				bind:series
+				bind:memberSeries
 				{isLoading}
 				prepared={period === 'max' ? fullHistoryPrepared : prepared}
 				{rawAccounts}
@@ -653,25 +658,21 @@
 	</Section>
 
 	{#if isLoading || !isEmpty}
-		<div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+		<div class="grid grid-cols-1 gap-8 sm:grid-cols-2">
 			{#each groupCharts as group (group.key)}
-				<Section>
-					<SectionTitle title={group.label} />
-					{#if isLoading}
-						<Skeleton class="h-48" showSpinner />
-					{:else}
-						<div class="bg-background overflow-visible rounded-sm shadow-md">
-							<BalanceHistoryChart
-								points={series.map((row) => ({ date: row.date, value: row[group.key] }))}
-								seriesLabel={group.label}
-								color={group.color}
-								class="h-48"
-								formatAxisValue={(value) => formatCurrency(Math.round(value))}
-								formatTooltipValue={(value) => formatCurrency(value, 2)}
-							/>
-						</div>
-					{/if}
-				</Section>
+				{@const members = membersByGroup.get(group.key) ?? []}
+				{#if isLoading || members.length}
+					<Section>
+						<SectionTitle title={group.label} />
+						{#if isLoading}
+							<Skeleton class="h-[30vh] min-h-96" showSpinner />
+						{:else}
+							<div class="bg-background overflow-visible rounded-sm shadow-md">
+								<GroupChart {members} rows={memberSeries.rows} color={group.color} />
+							</div>
+						{/if}
+					</Section>
+				{/if}
 			{/each}
 		</div>
 	{/if}

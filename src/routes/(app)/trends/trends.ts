@@ -27,6 +27,13 @@ export type TrendSeriesRow = {
 	fx: Record<TrendGroupKey, TrendFxFlags>;
 };
 
+// Per-entity daily series for the group charts: each member is an account (its balance plus
+// its positions) or an asset, mapped into its balance group. Entities with no balance data in
+// the charted window are omitted.
+export type TrendMember = { key: string; label: string; group: Exclude<TrendGroupKey, 'net'> };
+export type TrendMemberRow = { date: Date; values: Record<string, number> };
+export type TrendMemberSeries = { members: TrendMember[]; rows: TrendMemberRow[] };
+
 export function computeBoundedHistoryStart(period: PeriodKey) {
 	const now = startOfDay(new UTCDate());
 	if (period === '3m') return subMonths(now, 3);

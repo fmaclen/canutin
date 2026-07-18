@@ -35,12 +35,13 @@
 		type TrendGroupKey as GroupKey,
 		type PeriodKey,
 		type PreparedTrendMaps,
-		type TrendSeriesRow as Row
+		type TrendSeriesRow as Row,
+		type TrendMemberSeries
 	} from './trends';
 
 	let {
 		period = $bindable(),
-		series = $bindable(),
+		memberSeries = $bindable(),
 		isLoading,
 		prepared,
 		rawAccounts,
@@ -50,7 +51,7 @@
 		rawAssetBalances
 	}: {
 		period: PeriodKey;
-		series: Row[];
+		memberSeries: TrendMemberSeries;
 		isLoading: boolean;
 		prepared: PreparedTrendMaps;
 		rawAccounts: AccountsResponse[];
@@ -65,6 +66,8 @@
 
 	const fx = getExchangeRatesContext();
 	const isEmpty = $derived(!rawAccounts.length && !rawAssets.length);
+
+	let series: Row[] = $state([]);
 	const firstSeriesRow = $derived(series[0] ?? null);
 	const lastSeriesRow = $derived(series.at(-1) ?? null);
 	const hasUnconverted = $derived(
@@ -165,6 +168,16 @@
 		return fx.convert(rawValue(balance), currency, balance.asOf);
 	}
 
+	function groupKey(group: BalanceGroup) {
+		return group === 'CASH'
+			? 'cash'
+			: group === 'DEBT'
+				? 'debt'
+				: group === 'INVESTMENT'
+					? 'investment'
+					: 'other';
+	}
+
 	function accumulateGroup(
 		sums: GroupSums,
 		flags: GroupFxFlags,
@@ -172,14 +185,7 @@
 		value: number,
 		conversion: FxFlags
 	) {
-		const key =
-			group === 'CASH'
-				? 'cash'
-				: group === 'DEBT'
-					? 'debt'
-					: group === 'INVESTMENT'
-						? 'investment'
-						: 'other';
+		const key = groupKey(group);
 		if (!conversion.isUnconverted) sums[key] += value;
 		flags[key] = {
 			isUnconverted: flags[key].isUnconverted || conversion.isUnconverted
@@ -189,6 +195,7 @@
 	function recomputeSeries() {
 		if (!rawAccounts.length && !rawAssets.length) {
 			series = [];
+			memberSeries = { members: [], rows: [] };
 			return;
 		}
 		const { start, end } = computeRangeForPeriod(
@@ -217,8 +224,21 @@
 		for (const [assetId, balances] of assetBalancesByAssetId)
 			assetIndexPointer.set(assetId, latestIndexBeforeOrEqual(balances, datePoints[0], -1));
 
+		// Per-entity daily values for the group charts, keyed by account/asset id. An entity only
+		// enters the map once it contributes a balance in the window, so entities with no data
+		// (e.g. closed before the window start) never become a series.
+		const memberValues = new SvelteMap<string, number[]>();
+		function addMemberValue(id: string, pointIndex: number, value: number) {
+			let values = memberValues.get(id);
+			if (!values) {
+				values = new Array<number>(datePoints.length).fill(0);
+				memberValues.set(id, values);
+			}
+			values[pointIndex] += value;
+		}
+
 		const rows: Row[] = [];
-		for (const datePoint of datePoints) {
+		for (const [pointIndex, datePoint] of datePoints.entries()) {
 			const sums: GroupSums = { cash: 0, debt: 0, investment: 0, other: 0 };
 			const flags: GroupFxFlags = {
 				cash: { isUnconverted: false },
@@ -248,11 +268,14 @@
 					conversion.value,
 					conversion
 				);
+				if (index >= 0 && !(meta.closed && datePoint >= new Date(meta.closed)))
+					addMemberValue(accountId, pointIndex, conversion.isUnconverted ? 0 : conversion.value);
 			}
 
 			for (const [key, balances] of securityBalancesByAccountSecurity) {
 				const accountId = balances[0]?.account;
-				const meta = accountId ? accountById.get(accountId) : null;
+				if (!accountId) continue;
+				const meta = accountById.get(accountId);
 				if (!meta) continue;
 				if (meta.closed && datePoint >= new Date(meta.closed)) continue;
 				const state = securityValueState.get(key) ?? {
@@ -278,6 +301,8 @@
 					conversion.value,
 					conversion
 				);
+				// Positions roll up into their owning account's series
+				addMemberValue(accountId, pointIndex, conversion.isUnconverted ? 0 : conversion.value);
 			}
 
 			for (const [assetId, balances] of assetBalancesByAssetId) {
@@ -301,6 +326,8 @@
 					conversion.value,
 					conversion
 				);
+				if (index >= 0 && !(meta.sold && datePoint >= new Date(meta.sold)))
+					addMemberValue(assetId, pointIndex, conversion.isUnconverted ? 0 : conversion.value);
 			}
 
 			const net = sums.cash + sums.debt + sums.investment + sums.other;
@@ -323,6 +350,21 @@
 		}
 
 		series = rows;
+		memberSeries = {
+			members: [...rawAccounts, ...rawAssets]
+				.filter((entity) => memberValues.has(entity.id))
+				.map((entity) => ({
+					key: entity.id,
+					label: entity.name,
+					group: groupKey(entity.balanceGroup as BalanceGroup)
+				})),
+			rows: datePoints.map((date, index) => ({
+				date,
+				values: Object.fromEntries(
+					[...memberValues].map(([id, values]) => [id, values[index]] as const)
+				)
+			}))
+		};
 	}
 
 	$effect(() => recomputeSeries());

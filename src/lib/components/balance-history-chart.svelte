@@ -13,16 +13,12 @@
 		points,
 		seriesLabel,
 		formatAxisValue,
-		formatTooltipValue,
-		color = 'var(--brand)',
-		class: className = 'h-[30vh] min-h-96'
+		formatTooltipValue
 	}: {
 		points: Point[];
 		seriesLabel: string;
 		formatAxisValue: (value: number) => string;
 		formatTooltipValue: (value: number) => string;
-		color?: string;
-		class?: string;
 	} = $props();
 
 	let chartContext = $state<ChartState<Point>>();
@@ -38,7 +34,7 @@
 	});
 
 	const chartConfig = $derived({
-		series: { label: seriesLabel, color }
+		series: { label: seriesLabel, color: 'var(--brand)' }
 	} satisfies Chart.ChartConfig);
 
 	const yDomain = $derived.by(() => {
@@ -68,7 +64,7 @@
 
 <Chart.Container
 	config={chartConfig}
-	class="{className} w-full select-none"
+	class="h-[30vh] min-h-96 w-full select-none"
 	role="img"
 	aria-label={seriesLabel}
 	onpointerdown={(event) => chartCompare.start(event, hovered)}
