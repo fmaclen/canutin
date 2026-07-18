@@ -209,20 +209,6 @@
 	// positions stay visible in the table below.
 	const allocationRows = $derived(rows.filter((row) => row.value !== null && row.value > 0));
 
-	// One small chart per charted position, largest first. A single balance date yields one
-	// series point, which is not enough to draw a line, so those positions get no card.
-	const historyBySecurity = $derived(Map.groupBy(securityBalanceHistory, (b) => b.security));
-	const securityCharts = $derived(
-		[...allocationRows]
-			.sort((a, b) => (b.value ?? 0) - (a.value ?? 0))
-			.map((row) => ({
-				id: row.id,
-				title: row.symbol || row.name,
-				points: buildValueSeries(historyBySecurity.get(row.id) ?? [])
-			}))
-			.filter((chart) => chart.points.length >= 2)
-	);
-
 	let allocationMode: 'value' | 'gain' = $state('value');
 
 	type PortfolioSortColumn =
@@ -323,64 +309,47 @@
 		{/if}
 	</Section>
 
-	<Section>
-		<SectionTitle title={m.market_value_section_title()} />
-		{#if securitiesContext.isLoading || accountsContext.isLoading || balanceHistoryLoading}
-			<Skeleton class="h-[30vh] min-h-96" showSpinner />
-		{:else if valueSeries.length >= 2}
-			<div class="bg-background overflow-visible rounded-sm shadow-md">
-				<BalanceHistoryChart
-					points={valueSeries}
-					seriesLabel={m.market_value_series_label()}
-					formatAxisValue={(value) => formatCurrency(Math.round(value))}
-					formatTooltipValue={(value) => formatCurrency(value, 2)}
-				/>
-			</div>
-		{:else}
-			<div class="h-[30vh] min-h-96">
-				<Empty class="h-full">{m.market_value_empty()}</Empty>
-			</div>
-		{/if}
-	</Section>
-
-	<Tabs.Root bind:value={allocationMode}>
+	<div class="grid grid-cols-1 gap-8 sm:grid-cols-2">
 		<Section>
-			<SectionTitle title={m.allocation_section_title()}>
-				<Tabs.List>
-					<Tabs.Trigger value="value">{m.allocation_mode_market_value()}</Tabs.Trigger>
-					<Tabs.Trigger value="gain">{m.allocation_mode_gain()}</Tabs.Trigger>
-				</Tabs.List>
-			</SectionTitle>
-			{#if securitiesContext.isLoading}
+			<SectionTitle title={m.market_value_section_title()} />
+			{#if securitiesContext.isLoading || accountsContext.isLoading || balanceHistoryLoading}
 				<Skeleton class="h-[30vh] min-h-96" showSpinner />
-			{:else if allocationRows.length === 0}
-				<div class="h-[30vh] min-h-96">
-					<Empty class="h-full">{m.allocation_empty()}</Empty>
+			{:else if valueSeries.length >= 2}
+				<div class="bg-background overflow-visible rounded-sm shadow-md">
+					<BalanceHistoryChart
+						points={valueSeries}
+						seriesLabel={m.market_value_series_label()}
+						formatAxisValue={(value) => formatCurrency(Math.round(value))}
+						formatTooltipValue={(value) => formatCurrency(value, 2)}
+					/>
 				</div>
 			{:else}
-				<div class="bg-background overflow-hidden rounded-sm shadow-md">
-					<AllocationTreemap rows={allocationRows} mode={allocationMode} />
+				<div class="h-[30vh] min-h-96">
+					<Empty class="h-full">{m.market_value_empty()}</Empty>
 				</div>
 			{/if}
 		</Section>
-	</Tabs.Root>
 
-	{#if !securitiesContext.isLoading && !accountsContext.isLoading && !balanceHistoryLoading}
-		<div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
-			{#each securityCharts as chart (chart.id)}
-				<Section>
-					<SectionTitle title={chart.title} />
-					<div class="bg-background overflow-visible rounded-sm shadow-md">
-						<BalanceHistoryChart
-							points={chart.points}
-							seriesLabel={chart.title}
-							class="h-48"
-							formatAxisValue={(value) => formatCurrency(Math.round(value))}
-							formatTooltipValue={(value) => formatCurrency(value, 2)}
-						/>
+		<Tabs.Root bind:value={allocationMode}>
+			<Section>
+				<SectionTitle title={m.allocation_section_title()}>
+					<Tabs.List>
+						<Tabs.Trigger value="value">{m.allocation_mode_market_value()}</Tabs.Trigger>
+						<Tabs.Trigger value="gain">{m.allocation_mode_gain()}</Tabs.Trigger>
+					</Tabs.List>
+				</SectionTitle>
+				{#if securitiesContext.isLoading}
+					<Skeleton class="h-[30vh] min-h-96" showSpinner />
+				{:else if allocationRows.length === 0}
+					<div class="h-[30vh] min-h-96">
+						<Empty class="h-full">{m.allocation_empty()}</Empty>
 					</div>
-				</Section>
-			{/each}
-		</div>
-	{/if}
+				{:else}
+					<div class="bg-background overflow-hidden rounded-sm shadow-md">
+						<AllocationTreemap rows={allocationRows} mode={allocationMode} />
+					</div>
+				{/if}
+			</Section>
+		</Tabs.Root>
+	</div>
 </Page>

@@ -60,7 +60,7 @@ test('portfolio and trades flow covers security creation, balances, filters, and
 	await expect(page.getByText('No positions yet')).toBeVisible();
 	await expect(page.getByText('No market value history yet')).toBeVisible();
 	await expect(page.getByText('No allocation yet')).toBeVisible();
-	// Sections read positions first, then the market value chart, then the allocation treemap
+	// Positions first, then the market value chart and allocation treemap side by side
 	await expect(
 		page.getByRole('heading', { name: /^(Positions|Market value|Allocation)$/ })
 	).toHaveText(['Positions', 'Market value', 'Allocation']);
@@ -93,11 +93,10 @@ test('portfolio and trades flow covers security creation, balances, filters, and
 	await goToPageViaSidebar(page, 'Portfolio');
 	const portfolioRow = page.getByRole('row', { name: /Vanguard Total Stock Market ETF/ });
 	await expect(portfolioRow).toBeVisible();
-	// A single balance date yields one series point, which is not enough to draw a line -
-	// neither the total chart nor a per-security card renders
+	// A single balance date yields one series point, which is not enough to draw a line,
+	// so the market value chart stays empty
 	await expect(page.getByText('No market value history yet')).toBeVisible();
 	await expect(page.getByRole('img', { name: 'Market value' })).not.toBeVisible();
-	await expect(page.getByRole('heading', { name: 'VTI' })).toHaveCount(0);
 	await expect(portfolioRow).toContainText('VTI');
 	await expect(portfolioRow).toContainText('Core Brokerage');
 	await expect(portfolioRow).toContainText('10');
@@ -354,10 +353,6 @@ test('portfolio charts total securities value across accounts with drag-to-compa
 	await expect(page.getByRole('heading', { name: 'Market value' })).toBeVisible();
 	await expect(page.getByRole('img', { name: 'Market value' })).toBeVisible();
 	await expect(page.getByRole('region', { name: 'Net market value' })).toContainText('$3,000.00');
-	// Below the allocation section, one small chart per position, largest market value first
-	await expect(page.getByRole('heading', { name: /^(CAF|CBT)$/ })).toHaveText(['CAF', 'CBT']);
-	await expect(page.getByRole('img', { name: 'CAF' })).toBeVisible();
-	await expect(page.getByRole('img', { name: 'CBT' })).toBeVisible();
 
 	// Drag across the chart: a quarter in lands in the $1,000 stretch, three quarters in lands in
 	// the $3,000 stretch, so the compare tooltip reports the account-spanning total's change.
