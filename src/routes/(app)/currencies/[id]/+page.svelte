@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import BalanceHistoryChart from '$lib/components/balance-history-chart.svelte';
 	import { formatNativeCurrency } from '$lib/components/currency';
 	import Empty from '$lib/components/empty.svelte';
 	import KeyValue from '$lib/components/key-value.svelte';
 	import NumberDisplay from '$lib/components/number.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
+	import TimeSeriesChart from '$lib/components/time-series-chart.svelte';
 	import * as Pagination from '$lib/components/ui/pagination/index';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Table from '$lib/components/ui/table/index';
@@ -119,23 +119,24 @@
 
 {#if !isUsd}
 	<Section>
-		<SectionTitle title={m.currencies_rate_history_section_title()} />
-		{#if !loaded || rateHistoryLoading}
-			<Skeleton class="h-[30vh] min-h-96" showSpinner />
-		{:else if currency && ratePoints.length >= 2}
-			<div class="bg-background overflow-visible rounded-sm shadow-md">
-				<BalanceHistoryChart
-					points={ratePoints}
-					seriesLabel={m.currencies_table_header_rate()}
-					formatAxisValue={(value) => formatNativeCurrency(value, 2, currency.code)}
-					formatTooltipValue={(value) => formatNativeCurrency(value, 2, currency.code)}
-				/>
-			</div>
-		{:else}
-			<div class="h-[30vh] min-h-96">
-				<Empty class="h-full">{m.currencies_rate_history_empty()}</Empty>
-			</div>
-		{/if}
+		<!-- The USD fallback is never hit: the chart only renders once the currency has loaded -->
+		<TimeSeriesChart
+			title={m.currencies_rate_history_section_title()}
+			isLoading={!loaded || rateHistoryLoading}
+			rows={ratePoints}
+			period="max"
+			series={[
+				{
+					key: 'value',
+					label: m.currencies_table_header_rate(),
+					color: 'var(--brand)',
+					value: (point) => point.value
+				}
+			]}
+			emptyMessage={m.currencies_rate_history_empty()}
+			formatAxisValue={(value) => formatNativeCurrency(value, 2, currency?.code ?? 'USD')}
+			formatTooltipValue={(value) => formatNativeCurrency(value, 2, currency?.code ?? 'USD')}
+		/>
 	</Section>
 
 	<Section>

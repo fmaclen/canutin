@@ -513,6 +513,20 @@ test('account overview keeps the balance history section and swaps its empty sta
 	await page.mouse.up();
 	await expect(page.getByText('2025-01-01 → 2025-02-01')).not.toBeVisible();
 	await expect(page.getByText('Balance', { exact: true })).toBeVisible();
+
+	// The chart's period tabs window the series: both balances predate the 3M window, so it
+	// swaps to the period empty state; MAX restores the full series
+	await expect(page.locator('[data-chart-period="max"]')).toBeVisible();
+	await page
+		.getByRole('tablist', { name: 'Balance history period' })
+		.getByRole('tab', { name: '3M' })
+		.click();
+	await expect(page.getByText('No data in this period')).toBeVisible();
+	await page
+		.getByRole('tablist', { name: 'Balance history period' })
+		.getByRole('tab', { name: 'MAX' })
+		.click();
+	await expect(page.getByRole('img', { name: 'Balance' })).toBeVisible();
 });
 
 test('account overview charts an auto-calculated account from its transaction history', async ({

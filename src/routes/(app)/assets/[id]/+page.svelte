@@ -1,13 +1,12 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { getAssetsContext } from '$lib/assets.svelte';
-	import BalanceHistoryChart from '$lib/components/balance-history-chart.svelte';
 	import { formatNativeCurrency } from '$lib/components/currency';
-	import Empty from '$lib/components/empty.svelte';
 	import KeyValue from '$lib/components/key-value.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import SharedRecordReadonlyBanner from '$lib/components/shared-record-readonly-banner.svelte';
+	import TimeSeriesChart from '$lib/components/time-series-chart.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import type { AssetBalancesResponse } from '$lib/pocketbase.schema';
@@ -108,21 +107,23 @@
 </Section>
 
 <Section>
-	<SectionTitle title={m.balance_history_section_title()} />
-	{#if !loaded || balanceHistoryLoading || !asset}
-		<Skeleton class="h-[30vh] min-h-96" showSpinner />
-	{:else if balanceHistory.length >= 2}
-		<div class="bg-background overflow-visible rounded-sm shadow-md">
-			<BalanceHistoryChart
-				points={balanceHistory}
-				seriesLabel={m.balance_history_series_label()}
-				formatAxisValue={(value) => formatNativeCurrency(Math.round(value), 0, asset.currency)}
-				formatTooltipValue={(value) => formatNativeCurrency(value, 2, asset.currency)}
-			/>
-		</div>
-	{:else}
-		<div class="h-[30vh] min-h-96">
-			<Empty class="h-full">{m.balance_history_empty()}</Empty>
-		</div>
-	{/if}
+	<!-- The USD fallback is never hit: the chart only renders once the asset has loaded -->
+	<TimeSeriesChart
+		title={m.balance_history_section_title()}
+		isLoading={!loaded || balanceHistoryLoading || !asset}
+		rows={balanceHistory}
+		period="max"
+		series={[
+			{
+				key: 'value',
+				label: m.balance_history_series_label(),
+				color: 'var(--brand)',
+				value: (point) => point.value
+			}
+		]}
+		emptyMessage={m.balance_history_empty()}
+		formatAxisValue={(value) =>
+			formatNativeCurrency(Math.round(value), 0, asset?.currency ?? 'USD')}
+		formatTooltipValue={(value) => formatNativeCurrency(value, 2, asset?.currency ?? 'USD')}
+	/>
 </Section>

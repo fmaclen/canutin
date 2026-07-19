@@ -303,6 +303,7 @@
 	"period_5y_label": "5A",
 	"period_max_label": "MÁX",
 	"period_tabs_label": "Período de {section}",
+	"chart_period_empty": "No hay datos en este período",
 	"transactions_filter_period_label": "Período",
 	"transactions_filter_period_this_month": "Este mes",
 	"transactions_filter_period_last_month": "Mes pasado",

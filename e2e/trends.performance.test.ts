@@ -25,7 +25,7 @@ test('trends performance table', async ({ page }) => {
 	// two matches means both skeletons cleared.
 	await goToPageViaSidebar(page, 'Trends');
 	await expect(page.getByText('No accounts or assets yet')).toHaveCount(2);
-	await expect(page.locator('[data-growth-period]')).toHaveCount(0);
+	await expect(page.locator('[data-growth-chart]')).toHaveCount(0);
 	await expect(page.getByRole('heading', { name: 'Cash', exact: true })).toHaveCount(0);
 	await goToPageViaSidebar(page, 'Big picture');
 
@@ -230,22 +230,22 @@ test('trends performance table', async ({ page }) => {
 
 	const growthPeriodTabs = page.getByRole('tablist', { name: 'Growth period' });
 	await growthPeriodTabs.getByRole('tab', { name: '2Y' }).click();
-	const growthChart = page.locator('[data-growth-period="2y"]');
+	const growthChart = page.locator('[data-growth-chart][data-chart-period="2y"]');
 	await expect(growthChart).toHaveAttribute(
-		'data-growth-start',
+		'data-chart-start',
 		twoYearsStart.toISOString().slice(0, 10)
 	);
-	await expect(growthChart).toHaveAttribute('data-growth-start-net', '22500');
-	await expect(growthChart).toHaveAttribute('data-growth-end-net', '5000');
+	await expect(growthChart).toHaveAttribute('data-chart-start-value', '22500');
+	await expect(growthChart).toHaveAttribute('data-chart-end-value', '5000');
 
 	// Wide windows downsample to weekly resolution (~105 points for 2Y instead of ~731 daily
 	// rows), while 1Y and narrower keep every daily row.
-	const twoYearPoints = Number(await growthChart.getAttribute('data-growth-points'));
+	const twoYearPoints = Number(await growthChart.getAttribute('data-chart-points'));
 	expect(twoYearPoints).toBeGreaterThan(90);
 	expect(twoYearPoints).toBeLessThan(140);
 	await growthPeriodTabs.getByRole('tab', { name: '1Y' }).click();
-	await expect(page.locator('[data-growth-period="1y"]')).toHaveAttribute(
-		'data-growth-points',
+	await expect(page.locator('[data-growth-chart][data-chart-period="1y"]')).toHaveAttribute(
+		'data-chart-points',
 		/^36[67]$/
 	);
 
@@ -253,14 +253,14 @@ test('trends performance table', async ({ page }) => {
 	// full-history balances, so its range start reaches the earliest seeded balance (6 years
 	// back) rather than the 2Y window start.
 	await growthPeriodTabs.getByRole('tab', { name: 'MAX' }).click();
-	const maxChart = page.locator('[data-growth-period="max"]');
-	await expect(maxChart).toHaveAttribute('data-growth-start', earliest.toISOString().slice(0, 10));
+	const maxChart = page.locator('[data-growth-chart][data-chart-period="max"]');
+	await expect(maxChart).toHaveAttribute('data-chart-start', earliest.toISOString().slice(0, 10));
 	await expect(maxChart).not.toHaveAttribute(
-		'data-growth-start',
+		'data-chart-start',
 		twoYearsStart.toISOString().slice(0, 10)
 	);
 	// Six years of daily rows (~2,193) thin to weekly scale
-	const maxPoints = Number(await maxChart.getAttribute('data-growth-points'));
+	const maxPoints = Number(await maxChart.getAttribute('data-chart-points'));
 	expect(maxPoints).toBeGreaterThan(250);
 	expect(maxPoints).toBeLessThan(400);
 
@@ -367,16 +367,34 @@ test('trends performance table', async ({ page }) => {
 	// Each chart windows independently: switching the Cash group chart to 2Y leaves the growth
 	// chart on MAX and the other group charts on their 1Y default.
 	const cashChart = page.locator('[data-group-chart="cash"]');
-	await expect(cashChart).toHaveAttribute('data-group-period', '1y');
+	await expect(cashChart).toHaveAttribute('data-chart-period', '1y');
 	await page.getByRole('tablist', { name: 'Cash period' }).getByRole('tab', { name: '2Y' }).click();
-	await expect(cashChart).toHaveAttribute('data-group-period', '2y');
+	await expect(cashChart).toHaveAttribute('data-chart-period', '2y');
 	await expect(cashChart).toHaveAttribute(
-		'data-group-start',
+		'data-chart-start',
 		twoYearsStart.toISOString().slice(0, 10)
 	);
 	await expect(page.locator('[data-group-chart="debt"]')).toHaveAttribute(
-		'data-group-period',
+		'data-chart-period',
 		'1y'
 	);
-	await expect(maxChart).toHaveAttribute('data-growth-start', earliest.toISOString().slice(0, 10));
+	await expect(maxChart).toHaveAttribute('data-chart-start', earliest.toISOString().slice(0, 10));
+
+	// Group charts share the drag-to-compare interaction: dragging edge to edge across the
+	// 2Y Cash chart compares its lone member from the window start (2,600) to today (8,000)
+	const cashChartBox = await cashChart.boundingBox();
+	if (!cashChartBox) throw new Error('Cash chart has no bounding box');
+	const cashMiddleY = cashChartBox.y + cashChartBox.height * 0.6;
+	await page.mouse.move(cashChartBox.x + 4, cashMiddleY);
+	await page.mouse.down();
+	await page.mouse.move(cashChartBox.x + cashChartBox.width - 4, cashMiddleY, { steps: 5 });
+	const cashCompareHeader = `${twoYearsStart.toISOString().slice(0, 10)} → ${now.toISOString().slice(0, 10)}`;
+	const cashCompareTooltip = page.getByText(cashCompareHeader).locator('..');
+	await expect(cashCompareTooltip.getByText('Perf Test')).toBeVisible();
+	await expect(cashCompareTooltip.getByText('+$5,400')).toBeVisible();
+	await expect(cashCompareTooltip.getByText('+207.7%')).toBeVisible();
+
+	// Releasing dismisses the compare tooltip
+	await page.mouse.up();
+	await expect(page.getByText(cashCompareHeader)).not.toBeVisible();
 });

@@ -8,15 +8,16 @@
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAssetsContext } from '$lib/assets.svelte';
 	import { type TrendSecurityBalance } from '$lib/balance-series';
+	import { formatCurrency } from '$lib/components/currency';
 	import Page from '$lib/components/page.svelte';
-	import PeriodTabs, {
+	import {
 		computeBoundedHistoryStart,
 		slicePeriodRows,
 		type PeriodKey
 	} from '$lib/components/period-tabs.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
-	import Skeleton from '$lib/components/ui/skeleton/skeleton.svelte';
+	import TimeSeriesChart from '$lib/components/time-series-chart.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import type {
 		AccountBalancesResponse,
@@ -30,10 +31,14 @@
 	import { projectSignedValue } from '$lib/sharing';
 	import { toNumber } from '$lib/utils';
 
-	import GroupChart from './group-chart.svelte';
 	import ChartNetWorth from './growth.svelte';
 	import Performance from './performance.svelte';
-	import { buildPreparedMaps, findEarliestBalanceDate, type TrendMemberSeries } from './trends';
+	import {
+		buildPreparedMaps,
+		findEarliestBalanceDate,
+		type TrendMemberRow,
+		type TrendMemberSeries
+	} from './trends';
 
 	const pb = getPocketBaseContext();
 	const accountsCtx = getAccountsContext();
@@ -43,7 +48,6 @@
 	let bootstrapped = $state(false);
 	const isLoading = $derived(!bootstrapped);
 
-	let period: PeriodKey = $state('1y');
 	// Raw state: the balance collections and derived series are large (thousands of rows),
 	// always replaced wholesale, and never mutated in place - deep proxies would only add
 	// per-property traps to the recompute loops and charts that read them.
@@ -614,6 +618,10 @@
 			(member) => member.group
 		)
 	);
+	// Shades of the group color, stepping toward the background so the chart reads as its group
+	function memberColor(color: string, index: number, count: number) {
+		return `color-mix(in oklab, ${color}, var(--background) ${Math.round((index * 60) / count)}%)`;
+	}
 	const groupPeriods = $state<Record<(typeof groupCharts)[number]['key'], PeriodKey>>({
 		cash: '1y',
 		debt: '1y',
@@ -634,15 +642,7 @@
 
 <Page pageTitle={m.trends_page_title()}>
 	<Section>
-		<SectionTitle title={m.trends_growth_section_title()}>
-			<PeriodTabs
-				bind:value={period}
-				label={m.period_tabs_label({ section: m.trends_growth_section_title() })}
-			/>
-		</SectionTitle>
-
 		<ChartNetWorth
-			{period}
 			{maxStart}
 			bind:memberSeries
 			{isLoading}
@@ -672,28 +672,35 @@
 				{@const members = membersByGroup.get(group.key) ?? []}
 				{#if isLoading || members.length}
 					<Section>
-						<SectionTitle title={group.label}>
-							<PeriodTabs
-								bind:value={groupPeriods[group.key]}
-								label={m.period_tabs_label({ section: group.label })}
-							/>
-						</SectionTitle>
-						{#if isLoading}
-							<Skeleton class="h-[30vh] min-h-96" showSpinner />
-						{:else}
-							{@const rows = slicePeriodRows(memberSeries.rows, groupPeriods[group.key], maxStart)}
-							{@const windowedMembers = members.filter((member) =>
-								rows.some((row) => row.values[member.key] !== null)
-							)}
-							<div
-								class="bg-background overflow-visible rounded-sm shadow-md"
-								data-group-chart={group.key}
-								data-group-period={groupPeriods[group.key]}
-								data-group-start={rows[0]?.date.toISOString().slice(0, 10)}
-							>
-								<GroupChart members={windowedMembers} {rows} color={group.color} />
-							</div>
-						{/if}
+						<!-- The window is sliced here as well as inside the chart so members with no
+						data in the chosen period drop out of the series entirely (null means "no
+						data in this window", not a contributed zero) -->
+						{@const windowedRows = slicePeriodRows(
+							memberSeries.rows,
+							groupPeriods[group.key],
+							maxStart
+						)}
+						{@const windowedMembers = members.filter((member) =>
+							windowedRows.some((row) => row.values[member.key] !== null)
+						)}
+						<TimeSeriesChart
+							title={group.label}
+							{isLoading}
+							rows={memberSeries.rows}
+							bind:period={groupPeriods[group.key]}
+							{maxStart}
+							series={windowedMembers.map((member, index) => ({
+								key: member.key,
+								label: member.label,
+								color: memberColor(group.color, index, windowedMembers.length),
+								value: (row: TrendMemberRow) => row.values[member.key] ?? 0
+							}))}
+							emptyMessage={m.trends_empty()}
+							formatAxisValue={(value) => formatCurrency(Math.round(value))}
+							formatTooltipValue={(value) => formatCurrency(value)}
+							showLegend
+							data-group-chart={group.key}
+						/>
 					</Section>
 				{/if}
 			{/each}

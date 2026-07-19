@@ -379,16 +379,16 @@ test('portfolio charts total securities value across accounts with drag-to-compa
 
 	// The chart's period chooser reslices the x-axis span: the MAX default spans from the first
 	// balance six months back, 3M clips the same series to the last three months.
-	await expect(page.locator('[data-market-value-period="max"]')).toHaveAttribute(
-		'data-market-value-start',
+	await expect(page.locator('[data-chart-period="max"]')).toHaveAttribute(
+		'data-chart-start',
 		start.slice(0, 10)
 	);
 	await page
 		.getByRole('tablist', { name: 'Market value period' })
 		.getByRole('tab', { name: '3M' })
 		.click();
-	await expect(page.locator('[data-market-value-period="3m"]')).toHaveAttribute(
-		'data-market-value-start',
+	await expect(page.locator('[data-chart-period="3m"]')).toHaveAttribute(
+		'data-chart-start',
 		subMonths(startOfDay(new UTCDate()), 3).toISOString().slice(0, 10)
 	);
 });
