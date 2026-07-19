@@ -4,7 +4,6 @@
 	import { curveBumpX } from 'd3-shape';
 	import { eachDayOfInterval, startOfDay, subYears } from 'date-fns';
 	import { LineChart, type ChartState } from 'layerchart';
-	import { SvelteMap } from 'svelte/reactivity';
 
 	import {
 		advanceTrendSecurityValue,
@@ -56,8 +55,10 @@
 	const fx = getExchangeRatesContext();
 	const isEmpty = $derived(!rawAccounts.length && !rawAssets.length);
 
-	// Full-range rows computed once per data change; the period chooser only reslices them
-	let series: Row[] = $state([]);
+	// Full-range rows computed once per data change; the period chooser only reslices them.
+	// Raw state: the rows are replaced wholesale and never mutated, so the charts skip
+	// per-property proxy traps over the ~1,800-row series.
+	let series: Row[] = $state.raw([]);
 	const periodSeries = $derived(slicePeriodRows(series, period, maxStart));
 	const firstSeriesRow = $derived(periodSeries[0] ?? null);
 	const lastSeriesRow = $derived(periodSeries.at(-1) ?? null);
@@ -207,24 +208,22 @@
 			securityCurrencyById
 		} = prepared;
 
-		const accountIndexPointer = new SvelteMap<string, number>();
+		// Plain records for the scratch state: it is written tens of thousands of times per
+		// recompute and needs no reactivity of its own.
+		const accountIndexPointer: Record<string, number> = {};
 		for (const [accountId, balances] of accountBalancesByAccountId)
-			accountIndexPointer.set(accountId, latestIndexBeforeOrEqual(balances, datePoints[0], -1));
-		const securityValueState = new SvelteMap<string, TrendSecurityValueState>();
-		const assetIndexPointer = new SvelteMap<string, number>();
+			accountIndexPointer[accountId] = latestIndexBeforeOrEqual(balances, datePoints[0], -1);
+		const securityValueState: Record<string, TrendSecurityValueState> = {};
+		const assetIndexPointer: Record<string, number> = {};
 		for (const [assetId, balances] of assetBalancesByAssetId)
-			assetIndexPointer.set(assetId, latestIndexBeforeOrEqual(balances, datePoints[0], -1));
+			assetIndexPointer[assetId] = latestIndexBeforeOrEqual(balances, datePoints[0], -1);
 
 		// Per-entity daily values for the group charts, keyed by account/asset id. Days without a
 		// contribution stay null so a windowed slice can tell "no data in this window" (member
 		// dropped) apart from a contributed zero.
-		const memberValues = new SvelteMap<string, Array<number | null>>();
+		const memberValues: Record<string, Array<number | null>> = {};
 		function addMemberValue(id: string, pointIndex: number, value: number) {
-			let values = memberValues.get(id);
-			if (!values) {
-				values = new Array<number | null>(datePoints.length).fill(null);
-				memberValues.set(id, values);
-			}
+			const values = (memberValues[id] ??= new Array<number | null>(datePoints.length).fill(null));
 			values[pointIndex] = (values[pointIndex] ?? 0) + value;
 		}
 
@@ -241,9 +240,9 @@
 			for (const [accountId, balances] of accountBalancesByAccountId) {
 				const meta = accountById.get(accountId);
 				if (!meta) continue;
-				const previousIndex = accountIndexPointer.get(accountId) ?? -1;
+				const previousIndex = accountIndexPointer[accountId] ?? -1;
 				const index = latestIndexBeforeOrEqual(balances, datePoint, previousIndex);
-				accountIndexPointer.set(accountId, index);
+				accountIndexPointer[accountId] = index;
 				const conversion = convertSnapshot(
 					balances,
 					index,
@@ -269,12 +268,11 @@
 				const meta = accountById.get(accountId);
 				if (!meta) continue;
 				if (meta.closed && datePoint >= new Date(meta.closed)) continue;
-				const state = securityValueState.get(key) ?? {
+				const state = (securityValueState[key] ??= {
 					index: -1,
 					lastKnownValue: null,
 					soldOut: false
-				};
-				securityValueState.set(key, state);
+				});
 				const rawValue = advanceTrendSecurityValue(balances, datePoint, state);
 				if (rawValue === null) continue;
 				// NOTE: securities load from a different context than these balances, so their currency
@@ -299,9 +297,9 @@
 			for (const [assetId, balances] of assetBalancesByAssetId) {
 				const meta = assetById.get(assetId);
 				if (!meta) continue;
-				const previousIndex = assetIndexPointer.get(assetId) ?? -1;
+				const previousIndex = assetIndexPointer[assetId] ?? -1;
 				const index = latestIndexBeforeOrEqual(balances, datePoint, previousIndex);
-				assetIndexPointer.set(assetId, index);
+				assetIndexPointer[assetId] = index;
 				const conversion = convertSnapshot(
 					balances,
 					index,
@@ -343,7 +341,7 @@
 		series = rows;
 		memberSeries = {
 			members: [...rawAccounts, ...rawAssets]
-				.filter((entity) => memberValues.has(entity.id))
+				.filter((entity) => entity.id in memberValues)
 				.map((entity) => ({
 					key: entity.id,
 					label: entity.name,
@@ -352,7 +350,7 @@
 			rows: datePoints.map((date, index) => ({
 				date,
 				values: Object.fromEntries(
-					[...memberValues].map(([id, values]) => [id, values[index]] as const)
+					Object.entries(memberValues).map(([id, values]) => [id, values[index]] as const)
 				)
 			}))
 		};

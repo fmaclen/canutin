@@ -41,7 +41,9 @@
 	const fx = getExchangeRatesContext();
 	const pb = getPocketBaseContext();
 
-	let securityBalanceHistory: TrendSecurityBalance[] = $state([]);
+	// Raw state: replaced wholesale on every fetch and only read by buildValueSeries, which
+	// walks every balance daily - deep proxies would tax each of those property reads.
+	let securityBalanceHistory: TrendSecurityBalance[] = $state.raw([]);
 	let balanceHistoryLoading = $state(true);
 
 	$effect(() => {

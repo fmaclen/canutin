@@ -44,15 +44,18 @@
 	const isLoading = $derived(!bootstrapped);
 
 	let period: PeriodKey = $state('1y');
-	let memberSeries: TrendMemberSeries = $state({ members: [], rows: [] });
-	let rawAccounts: AccountsResponse[] = $state([]);
-	let rawAssets: AssetsResponse[] = $state([]);
-	let rawAccountBalances: AccountBalancesResponse[] = $state([]);
-	let rawSecurityBalances: TrendSecurityBalance[] = $state([]);
-	let rawAssetBalances: AssetBalancesResponse[] = $state([]);
-	let rawFullHistoryAccountBalances: AccountBalancesResponse[] = $state([]);
-	let rawFullHistorySecurityBalances: TrendSecurityBalance[] = $state([]);
-	let rawFullHistoryAssetBalances: AssetBalancesResponse[] = $state([]);
+	// Raw state: the balance collections and derived series are large (thousands of rows),
+	// always replaced wholesale, and never mutated in place - deep proxies would only add
+	// per-property traps to the recompute loops and charts that read them.
+	let memberSeries: TrendMemberSeries = $state.raw({ members: [], rows: [] });
+	let rawAccounts: AccountsResponse[] = $state.raw([]);
+	let rawAssets: AssetsResponse[] = $state.raw([]);
+	let rawAccountBalances: AccountBalancesResponse[] = $state.raw([]);
+	let rawSecurityBalances: TrendSecurityBalance[] = $state.raw([]);
+	let rawAssetBalances: AssetBalancesResponse[] = $state.raw([]);
+	let rawFullHistoryAccountBalances: AccountBalancesResponse[] = $state.raw([]);
+	let rawFullHistorySecurityBalances: TrendSecurityBalance[] = $state.raw([]);
+	let rawFullHistoryAssetBalances: AssetBalancesResponse[] = $state.raw([]);
 	let historyStart: Date | null = $state(null);
 
 	const includedAccounts = $derived.by(
