@@ -1,6 +1,6 @@
 <script module lang="ts">
 	import { UTCDate } from '@date-fns/utc';
-	import { startOfDay, startOfYear, subMonths, subYears } from 'date-fns';
+	import { isSameWeek, startOfDay, startOfYear, subMonths, subYears } from 'date-fns';
 
 	export type PeriodKey = '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | 'max';
 
@@ -15,6 +15,10 @@
 		return null;
 	}
 
+	// Above this row count a window renders more points than pixels, so it thins to weekly
+	// resolution. Bounded windows up to 1Y (~367 daily rows) always pass through untouched.
+	const DOWNSAMPLE_THRESHOLD = 400;
+
 	// Windows a precomputed daily series to a period: charts compute their full-range rows once
 	// and reslice on every chooser change. `maxStart` anchors the MAX tab (e.g. the earliest
 	// balance date); null means MAX keeps every row.
@@ -24,8 +28,15 @@
 		maxStart: Date | null
 	) {
 		const start = period === 'max' ? maxStart : computeBoundedHistoryStart(period);
-		if (!start) return rows;
-		return rows.filter((row) => row.date >= start);
+		const sliced = start ? rows.filter((row) => row.date >= start) : rows;
+		if (sliced.length <= DOWNSAMPLE_THRESHOLD) return sliced;
+		// Balances are state-as-of series, so each week's LAST row is its honest representative
+		// (never an average). The window's first and final rows always survive so the range
+		// anchors and today's value stay exact.
+		return sliced.filter(
+			(row, index) =>
+				index === 0 || index === sliced.length - 1 || !isSameWeek(row.date, sliced[index + 1].date)
+		);
 	}
 </script>
 

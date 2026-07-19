@@ -238,6 +238,17 @@ test('trends performance table', async ({ page }) => {
 	await expect(growthChart).toHaveAttribute('data-growth-start-net', '22500');
 	await expect(growthChart).toHaveAttribute('data-growth-end-net', '5000');
 
+	// Wide windows downsample to weekly resolution (~105 points for 2Y instead of ~731 daily
+	// rows), while 1Y and narrower keep every daily row.
+	const twoYearPoints = Number(await growthChart.getAttribute('data-growth-points'));
+	expect(twoYearPoints).toBeGreaterThan(90);
+	expect(twoYearPoints).toBeLessThan(140);
+	await growthPeriodTabs.getByRole('tab', { name: '1Y' }).click();
+	await expect(page.locator('[data-growth-period="1y"]')).toHaveAttribute(
+		'data-growth-points',
+		/^36[67]$/
+	);
+
 	// The performance table is bounded to 5 years, but the MAX growth chart receives the
 	// full-history balances, so its range start reaches the earliest seeded balance (6 years
 	// back) rather than the 2Y window start.
@@ -248,6 +259,10 @@ test('trends performance table', async ({ page }) => {
 		'data-growth-start',
 		twoYearsStart.toISOString().slice(0, 10)
 	);
+	// Six years of daily rows (~2,193) thin to weekly scale
+	const maxPoints = Number(await maxChart.getAttribute('data-growth-points'));
+	expect(maxPoints).toBeGreaterThan(250);
+	expect(maxPoints).toBeLessThan(400);
 
 	// Table columns: Group | 1W | 1M | 6M | YTD | 1Y | 2Y | 5Y | MAX | Allocation
 	// Columns 1-5 (1W, 1M, 6M, YTD, 1Y) can have date collisions depending on
