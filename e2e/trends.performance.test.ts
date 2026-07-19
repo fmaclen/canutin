@@ -228,7 +228,8 @@ test('trends performance table', async ({ page }) => {
 	await expect(page.getByRole('button', { name: 'Excluded Invest' })).toHaveCount(0);
 	await expect(page.getByRole('button', { name: 'Excluded Debt Asset' })).toHaveCount(0);
 
-	await page.getByRole('tab', { name: '2Y' }).click();
+	const growthPeriodTabs = page.getByRole('tablist', { name: 'Growth period' });
+	await growthPeriodTabs.getByRole('tab', { name: '2Y' }).click();
 	const growthChart = page.locator('[data-growth-period="2y"]');
 	await expect(growthChart).toHaveAttribute(
 		'data-growth-start',
@@ -240,7 +241,7 @@ test('trends performance table', async ({ page }) => {
 	// The performance table is bounded to 5 years, but the MAX growth chart receives the
 	// full-history balances, so its range start reaches the earliest seeded balance (6 years
 	// back) rather than the 2Y window start.
-	await page.getByRole('tab', { name: 'MAX' }).click();
+	await growthPeriodTabs.getByRole('tab', { name: 'MAX' }).click();
 	const maxChart = page.locator('[data-growth-period="max"]');
 	await expect(maxChart).toHaveAttribute('data-growth-start', earliest.toISOString().slice(0, 10));
 	await expect(maxChart).not.toHaveAttribute(
@@ -347,4 +348,20 @@ test('trends performance table', async ({ page }) => {
 	await page.getByRole('button', { name: 'Cash', exact: true }).click();
 	await expect(maxChart.getByText('$45,000', { exact: true })).toBeVisible();
 	await expect(maxChart.getByText('$9,000', { exact: true })).not.toBeVisible();
+
+	// Each chart windows independently: switching the Cash group chart to 2Y leaves the growth
+	// chart on MAX and the other group charts on their 1Y default.
+	const cashChart = page.locator('[data-group-chart="cash"]');
+	await expect(cashChart).toHaveAttribute('data-group-period', '1y');
+	await page.getByRole('tablist', { name: 'Cash period' }).getByRole('tab', { name: '2Y' }).click();
+	await expect(cashChart).toHaveAttribute('data-group-period', '2y');
+	await expect(cashChart).toHaveAttribute(
+		'data-group-start',
+		twoYearsStart.toISOString().slice(0, 10)
+	);
+	await expect(page.locator('[data-group-chart="debt"]')).toHaveAttribute(
+		'data-group-period',
+		'1y'
+	);
+	await expect(maxChart).toHaveAttribute('data-growth-start', earliest.toISOString().slice(0, 10));
 });

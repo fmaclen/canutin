@@ -2,63 +2,52 @@
 	import { UTCDate } from '@date-fns/utc';
 	import { scaleUtc } from 'd3-scale';
 	import { curveBumpX } from 'd3-shape';
-	import { eachDayOfInterval } from 'date-fns';
+	import { eachDayOfInterval, startOfDay, subYears } from 'date-fns';
 	import { LineChart, type ChartState } from 'layerchart';
 	import { SvelteMap } from 'svelte/reactivity';
 
 	import {
 		advanceTrendSecurityValue,
 		latestIndexBeforeOrEqual,
-		type TrendSecurityBalance,
 		type TrendSecurityValueState
 	} from '$lib/balance-series';
 	import { ChartCompare, diffPercent } from '$lib/components/chart-compare.svelte.js';
 	import { formatCurrency } from '$lib/components/currency';
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
+	import { slicePeriodRows, type PeriodKey } from '$lib/components/period-tabs.svelte';
 	import { axisTicks } from '$lib/components/ui/chart/chart-utils.js';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import Skeleton from '$lib/components/ui/skeleton/skeleton.svelte';
 	import { getExchangeRatesContext } from '$lib/exchange-rates.svelte';
 	import { m } from '$lib/paraglide/messages';
-	import type {
-		AccountBalancesResponse,
-		AccountsResponse,
-		AssetBalancesResponse,
-		AssetsResponse
-	} from '$lib/pocketbase.schema';
+	import type { AccountsResponse, AssetsResponse } from '$lib/pocketbase.schema';
 
 	import {
-		computeRangeForPeriod,
 		type BalanceGroup,
 		type TrendFxFlags as FxFlags,
 		type TrendGroupKey as GroupKey,
-		type PeriodKey,
 		type PreparedTrendMaps,
 		type TrendSeriesRow as Row,
 		type TrendMemberSeries
 	} from './trends';
 
 	let {
-		period = $bindable(),
+		period,
+		maxStart,
 		memberSeries = $bindable(),
 		isLoading,
 		prepared,
 		rawAccounts,
-		rawAssets,
-		rawAccountBalances,
-		rawSecurityBalances,
-		rawAssetBalances
+		rawAssets
 	}: {
 		period: PeriodKey;
+		maxStart: Date | null;
 		memberSeries: TrendMemberSeries;
 		isLoading: boolean;
 		prepared: PreparedTrendMaps;
 		rawAccounts: AccountsResponse[];
 		rawAssets: AssetsResponse[];
-		rawAccountBalances: AccountBalancesResponse[];
-		rawSecurityBalances: TrendSecurityBalance[];
-		rawAssetBalances: AssetBalancesResponse[];
 	} = $props();
 
 	type GroupSums = Record<Exclude<GroupKey, 'net'>, number>;
@@ -67,11 +56,13 @@
 	const fx = getExchangeRatesContext();
 	const isEmpty = $derived(!rawAccounts.length && !rawAssets.length);
 
+	// Full-range rows computed once per data change; the period chooser only reslices them
 	let series: Row[] = $state([]);
-	const firstSeriesRow = $derived(series[0] ?? null);
-	const lastSeriesRow = $derived(series.at(-1) ?? null);
+	const periodSeries = $derived(slicePeriodRows(series, period, maxStart));
+	const firstSeriesRow = $derived(periodSeries[0] ?? null);
+	const lastSeriesRow = $derived(periodSeries.at(-1) ?? null);
 	const hasUnconverted = $derived(
-		series.some((row) => Object.values(row.fx).some((f) => f.isUnconverted))
+		periodSeries.some((row) => Object.values(row.fx).some((f) => f.isUnconverted))
 	);
 
 	let chartContext = $state<ChartState<Row>>();
@@ -118,7 +109,7 @@
 	const yDomain = $derived.by(() => {
 		let min = Number.POSITIVE_INFINITY;
 		let max = Number.NEGATIVE_INFINITY;
-		for (const r of series) {
+		for (const r of periodSeries) {
 			for (const key of groupKeys) {
 				if (!visibleKeys.has(key)) continue;
 				min = Math.min(min, r[key]);
@@ -198,14 +189,14 @@
 			memberSeries = { members: [], rows: [] };
 			return;
 		}
-		const { start, end } = computeRangeForPeriod(
-			period,
-			rawAccountBalances,
-			rawSecurityBalances,
-			rawAssetBalances
-		);
+		// The rows always span the widest choosable window - five years, or the earliest balance
+		// when it is older - so every period (including MAX) is a slice of the same computation.
+		// Days before the first balance sum to zero, matching the bounded windows' zero lead-in.
+		const now = startOfDay(new UTCDate());
+		const fiveYearsAgo = subYears(now, 5);
+		const start = maxStart && maxStart < fiveYearsAgo ? maxStart : fiveYearsAgo;
 
-		const datePoints = eachDayOfInterval({ start: new UTCDate(start), end: new UTCDate(end) });
+		const datePoints = eachDayOfInterval({ start: new UTCDate(start), end: new UTCDate(now) });
 
 		const {
 			accountBalancesByAccountId,
@@ -224,17 +215,17 @@
 		for (const [assetId, balances] of assetBalancesByAssetId)
 			assetIndexPointer.set(assetId, latestIndexBeforeOrEqual(balances, datePoints[0], -1));
 
-		// Per-entity daily values for the group charts, keyed by account/asset id. An entity only
-		// enters the map once it contributes a balance in the window, so entities with no data
-		// (e.g. closed before the window start) never become a series.
-		const memberValues = new SvelteMap<string, number[]>();
+		// Per-entity daily values for the group charts, keyed by account/asset id. Days without a
+		// contribution stay null so a windowed slice can tell "no data in this window" (member
+		// dropped) apart from a contributed zero.
+		const memberValues = new SvelteMap<string, Array<number | null>>();
 		function addMemberValue(id: string, pointIndex: number, value: number) {
 			let values = memberValues.get(id);
 			if (!values) {
-				values = new Array<number>(datePoints.length).fill(0);
+				values = new Array<number | null>(datePoints.length).fill(null);
 				memberValues.set(id, values);
 			}
-			values[pointIndex] += value;
+			values[pointIndex] = (values[pointIndex] ?? 0) + value;
 		}
 
 		const rows: Row[] = [];
@@ -380,7 +371,7 @@
 	<div
 		class="bg-background overflow-visible rounded-sm shadow-md"
 		data-growth-period={period}
-		data-growth-points={series.length}
+		data-growth-points={periodSeries.length}
 		data-growth-start={firstSeriesRow?.date.toISOString().slice(0, 10)}
 		data-growth-end={lastSeriesRow?.date.toISOString().slice(0, 10)}
 		data-growth-start-net={firstSeriesRow?.net}
@@ -393,7 +384,7 @@
 		>
 			<LineChart
 				bind:context={chartContext}
-				data={series}
+				data={periodSeries}
 				x="date"
 				xScale={scaleUtc()}
 				yDomain={yDomain ?? undefined}

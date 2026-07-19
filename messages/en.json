@@ -302,6 +302,7 @@
 	"period_2y_label": "2Y",
 	"period_5y_label": "5Y",
 	"period_max_label": "MAX",
+	"period_tabs_label": "{section} period",
 	"transactions_filter_period_label": "Period",
 	"transactions_filter_period_this_month": "This month",
 	"transactions_filter_period_last_month": "Last month",

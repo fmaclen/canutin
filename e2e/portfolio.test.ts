@@ -1,6 +1,6 @@
 import { UTCDate } from '@date-fns/utc';
 import { expect, test } from '@playwright/test';
-import { subDays } from 'date-fns';
+import { startOfDay, subDays, subMonths } from 'date-fns';
 
 import {
 	AccountsBalanceGroupOptions,
@@ -376,6 +376,21 @@ test('portfolio charts total securities value across accounts with drag-to-compa
 	await expect(
 		page.locator('.lc-tooltip-content').getByText('Market value', { exact: true })
 	).toBeVisible();
+
+	// The chart's period chooser reslices the x-axis span: the MAX default spans from the first
+	// balance six months back, 3M clips the same series to the last three months.
+	await expect(page.locator('[data-market-value-period="max"]')).toHaveAttribute(
+		'data-market-value-start',
+		start.slice(0, 10)
+	);
+	await page
+		.getByRole('tablist', { name: 'Market value period' })
+		.getByRole('tab', { name: '3M' })
+		.click();
+	await expect(page.locator('[data-market-value-period="3m"]')).toHaveAttribute(
+		'data-market-value-start',
+		subMonths(startOfDay(new UTCDate()), 3).toISOString().slice(0, 10)
+	);
 });
 
 test('portfolio unknown values render as unknown and do not inflate account totals', async ({

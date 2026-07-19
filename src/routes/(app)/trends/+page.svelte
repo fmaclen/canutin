@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { UTCDate } from '@date-fns/utc';
+	import { startOfDay } from 'date-fns';
 	import type { RecordSubscription } from 'pocketbase';
 	import { untrack } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
@@ -7,10 +9,14 @@
 	import { getAssetsContext } from '$lib/assets.svelte';
 	import { type TrendSecurityBalance } from '$lib/balance-series';
 	import Page from '$lib/components/page.svelte';
+	import PeriodTabs, {
+		computeBoundedHistoryStart,
+		slicePeriodRows,
+		type PeriodKey
+	} from '$lib/components/period-tabs.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import Skeleton from '$lib/components/ui/skeleton/skeleton.svelte';
-	import * as Tabs from '$lib/components/ui/tabs/index';
 	import { m } from '$lib/paraglide/messages';
 	import type {
 		AccountBalancesResponse,
@@ -27,12 +33,7 @@
 	import GroupChart from './group-chart.svelte';
 	import ChartNetWorth from './growth.svelte';
 	import Performance from './performance.svelte';
-	import {
-		buildPreparedMaps,
-		computeBoundedHistoryStart,
-		type PeriodKey,
-		type TrendMemberSeries
-	} from './trends';
+	import { buildPreparedMaps, findEarliestBalanceDate, type TrendMemberSeries } from './trends';
 
 	const pb = getPocketBaseContext();
 	const accountsCtx = getAccountsContext();
@@ -610,38 +611,43 @@
 			(member) => member.group
 		)
 	);
+	const groupPeriods = $state<Record<(typeof groupCharts)[number]['key'], PeriodKey>>({
+		cash: '1y',
+		debt: '1y',
+		investment: '1y',
+		other: '1y'
+	});
+	// Anchors every chart's MAX window at the earliest balance instead of the base range start,
+	// so MAX never pads a zero lead-in when history is shorter than five years
+	const maxStart = $derived.by(() => {
+		const earliest = findEarliestBalanceDate(
+			rawFullHistoryAccountBalances,
+			rawFullHistorySecurityBalances,
+			rawFullHistoryAssetBalances
+		);
+		return earliest ? startOfDay(new UTCDate(earliest.getTime())) : null;
+	});
 </script>
 
 <Page pageTitle={m.trends_page_title()}>
-	<Tabs.Root bind:value={period}>
-		<Section>
-			<SectionTitle title={m.trends_growth_section_title()}>
-				<Tabs.List>
-					<Tabs.Trigger value="3m">{m.period_3m_label()}</Tabs.Trigger>
-					<Tabs.Trigger value="6m">{m.period_6m_label()}</Tabs.Trigger>
-					<Tabs.Trigger value="ytd">{m.period_ytd_label()}</Tabs.Trigger>
-					<Tabs.Trigger value="1y">{m.period_1y_label()}</Tabs.Trigger>
-					<Tabs.Trigger value="2y">{m.period_2y_label()}</Tabs.Trigger>
-					<Tabs.Trigger value="5y">{m.period_5y_label()}</Tabs.Trigger>
-					<Tabs.Trigger value="max">{m.period_max_label()}</Tabs.Trigger>
-				</Tabs.List>
-			</SectionTitle>
-
-			<ChartNetWorth
-				bind:period
-				bind:memberSeries
-				{isLoading}
-				prepared={period === 'max' ? fullHistoryPrepared : prepared}
-				{rawAccounts}
-				{rawAssets}
-				rawAccountBalances={period === 'max' ? rawFullHistoryAccountBalances : rawAccountBalances}
-				rawSecurityBalances={period === 'max'
-					? rawFullHistorySecurityBalances
-					: rawSecurityBalances}
-				rawAssetBalances={period === 'max' ? rawFullHistoryAssetBalances : rawAssetBalances}
+	<Section>
+		<SectionTitle title={m.trends_growth_section_title()}>
+			<PeriodTabs
+				bind:value={period}
+				label={m.period_tabs_label({ section: m.trends_growth_section_title() })}
 			/>
-		</Section>
-	</Tabs.Root>
+		</SectionTitle>
+
+		<ChartNetWorth
+			{period}
+			{maxStart}
+			bind:memberSeries
+			{isLoading}
+			prepared={fullHistoryPrepared}
+			{rawAccounts}
+			{rawAssets}
+		/>
+	</Section>
 
 	<Section>
 		<SectionTitle title={m.trends_performance_section_title()} />
@@ -663,12 +669,26 @@
 				{@const members = membersByGroup.get(group.key) ?? []}
 				{#if isLoading || members.length}
 					<Section>
-						<SectionTitle title={group.label} />
+						<SectionTitle title={group.label}>
+							<PeriodTabs
+								bind:value={groupPeriods[group.key]}
+								label={m.period_tabs_label({ section: group.label })}
+							/>
+						</SectionTitle>
 						{#if isLoading}
 							<Skeleton class="h-[30vh] min-h-96" showSpinner />
 						{:else}
-							<div class="bg-background overflow-visible rounded-sm shadow-md">
-								<GroupChart {members} rows={memberSeries.rows} color={group.color} />
+							{@const rows = slicePeriodRows(memberSeries.rows, groupPeriods[group.key], maxStart)}
+							{@const windowedMembers = members.filter((member) =>
+								rows.some((row) => row.values[member.key] !== null)
+							)}
+							<div
+								class="bg-background overflow-visible rounded-sm shadow-md"
+								data-group-chart={group.key}
+								data-group-period={groupPeriods[group.key]}
+								data-group-start={rows[0]?.date.toISOString().slice(0, 10)}
+							>
+								<GroupChart members={windowedMembers} {rows} color={group.color} />
 							</div>
 						{/if}
 					</Section>

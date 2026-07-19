@@ -1,6 +1,3 @@
-import { UTCDate } from '@date-fns/utc';
-import { startOfDay, startOfYear, subMonths, subYears } from 'date-fns';
-
 import { type TrendSecurityBalance } from '$lib/balance-series';
 import type {
 	AccountBalancesResponse,
@@ -10,7 +7,6 @@ import type {
 	SecuritiesResponse
 } from '$lib/pocketbase.schema';
 
-export type PeriodKey = '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | 'max';
 export type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
 
 export type TrendGroupKey = 'net' | 'cash' | 'debt' | 'investment' | 'other';
@@ -28,22 +24,12 @@ export type TrendSeriesRow = {
 };
 
 // Per-entity daily series for the group charts: each member is an account (its balance plus
-// its positions) or an asset, mapped into its balance group. Entities with no balance data in
-// the charted window are omitted.
+// its positions) or an asset, mapped into its balance group. A null value means the entity
+// contributed nothing that day (no balance yet, or closed/sold), which lets a windowed slice
+// drop members with no data in its window; contributed zeros stay numeric.
 export type TrendMember = { key: string; label: string; group: Exclude<TrendGroupKey, 'net'> };
-export type TrendMemberRow = { date: Date; values: Record<string, number> };
+export type TrendMemberRow = { date: Date; values: Record<string, number | null> };
 export type TrendMemberSeries = { members: TrendMember[]; rows: TrendMemberRow[] };
-
-export function computeBoundedHistoryStart(period: PeriodKey) {
-	const now = startOfDay(new UTCDate());
-	if (period === '3m') return subMonths(now, 3);
-	if (period === '6m') return subMonths(now, 6);
-	if (period === 'ytd') return startOfYear(now);
-	if (period === '1y') return subYears(now, 1);
-	if (period === '2y') return subYears(now, 2);
-	if (period === '5y') return subYears(now, 5);
-	return null;
-}
 
 export function findEarliestBalanceDate(
 	rawAccountBalances: AccountBalancesResponse[],
@@ -64,25 +50,6 @@ export function findEarliestBalanceDate(
 		if (!earliest || d < earliest) earliest = d;
 	}
 	return earliest;
-}
-
-export function computeRangeForPeriod(
-	period: PeriodKey,
-	rawAccountBalances: AccountBalancesResponse[],
-	rawSecurityBalances: TrendSecurityBalance[],
-	rawAssetBalances: AssetBalancesResponse[]
-) {
-	const now = startOfDay(new UTCDate());
-	const boundedStart = computeBoundedHistoryStart(period);
-	if (boundedStart) return { start: boundedStart, end: now };
-
-	const earliest = findEarliestBalanceDate(
-		rawAccountBalances,
-		rawSecurityBalances,
-		rawAssetBalances
-	);
-	const start = earliest ? startOfDay(new UTCDate(earliest.getTime())) : subYears(now, 1);
-	return { start, end: now };
 }
 
 export function buildPreparedMaps(

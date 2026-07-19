@@ -18,6 +18,7 @@
 	import FilterBar from '$lib/components/filter-bar.svelte';
 	import KeyValue from '$lib/components/key-value.svelte';
 	import Page from '$lib/components/page.svelte';
+	import PeriodTabs, { slicePeriodRows, type PeriodKey } from '$lib/components/period-tabs.svelte';
 	import PositionsTable from '$lib/components/positions-table.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
@@ -116,6 +117,11 @@
 	}
 
 	const valueSeries = $derived(buildValueSeries(securityBalanceHistory));
+
+	// The full-history series is computed once; the chooser only slices it. MAX (the default)
+	// keeps the whole series, preserving the chart's original always-full-history behavior.
+	let marketValuePeriod: PeriodKey = $state('max');
+	const windowedValueSeries = $derived(slicePeriodRows(valueSeries, marketValuePeriod, null));
 
 	let accountFilter = $state<string | null>(null);
 	let search = $state('');
@@ -311,13 +317,23 @@
 
 	<div class="grid grid-cols-1 gap-8 xl:grid-cols-2">
 		<Section>
-			<SectionTitle title={m.market_value_section_title()} />
+			<SectionTitle title={m.market_value_section_title()}>
+				<PeriodTabs
+					bind:value={marketValuePeriod}
+					label={m.period_tabs_label({ section: m.market_value_section_title() })}
+				/>
+			</SectionTitle>
 			{#if securitiesContext.isLoading || accountsContext.isLoading || balanceHistoryLoading}
 				<Skeleton class="h-[30vh] min-h-96" showSpinner />
 			{:else if valueSeries.length >= 2}
-				<div class="bg-background overflow-visible rounded-sm shadow-md">
+				<div
+					class="bg-background overflow-visible rounded-sm shadow-md"
+					data-market-value-period={marketValuePeriod}
+					data-market-value-start={windowedValueSeries[0]?.date.toISOString().slice(0, 10)}
+					data-market-value-points={windowedValueSeries.length}
+				>
 					<BalanceHistoryChart
-						points={valueSeries}
+						points={windowedValueSeries}
 						seriesLabel={m.market_value_series_label()}
 						formatAxisValue={(value) => formatCurrency(Math.round(value))}
 						formatTooltipValue={(value) => formatCurrency(value, 2)}

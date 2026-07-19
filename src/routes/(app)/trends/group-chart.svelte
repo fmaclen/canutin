@@ -31,8 +31,8 @@
 		let max = Number.NEGATIVE_INFINITY;
 		for (const row of rows) {
 			for (const member of members) {
-				min = Math.min(min, row.values[member.key]);
-				max = Math.max(max, row.values[member.key]);
+				min = Math.min(min, row.values[member.key] ?? 0);
+				max = Math.max(max, row.values[member.key] ?? 0);
 			}
 		}
 		if (min > max) return null as [number, number] | null;
@@ -61,7 +61,7 @@
 			key: member.key,
 			label: member.label,
 			color: memberColor(index),
-			value: (row: TrendMemberRow) => row.values[member.key]
+			value: (row: TrendMemberRow) => row.values[member.key] ?? 0
 		}))}
 		legend={{ placement: 'top' }}
 		props={{
