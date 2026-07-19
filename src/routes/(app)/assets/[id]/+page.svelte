@@ -9,7 +9,7 @@
 	import TimeSeriesChart from '$lib/components/time-series-chart.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { m } from '$lib/paraglide/messages';
-	import type { AssetBalancesResponse } from '$lib/pocketbase.schema';
+	import { AssetsBalanceGroupOptions, type AssetBalancesResponse } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { projectSignedValue } from '$lib/sharing';
 
@@ -118,7 +118,8 @@
 				key: 'value',
 				label: m.balance_history_series_label(),
 				color: 'var(--brand)',
-				value: (point) => point.value
+				value: (point) => point.value,
+				isLiability: asset?.balanceGroup === AssetsBalanceGroupOptions.DEBT
 			}
 		]}
 		emptyMessage={m.balance_history_empty()}

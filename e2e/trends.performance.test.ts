@@ -109,6 +109,22 @@ test('trends performance table', async ({ page }) => {
 		});
 	}
 
+	// A cash member that is zero across the whole window: it contributes nothing to any group
+	// total (so every other assertion is unaffected) but gives the compare tooltip a zero
+	// baseline, whose percent is non-computable and renders as ~
+	const zeroBaseAccount = await seedAccount({
+		name: 'Zero Base',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: zeroBaseAccount.id,
+		owner: user.id,
+		asOf: beforeTwoYears.toISOString(),
+		value: 0
+	});
+
 	// The closed account and sold asset are zeroed at-or-after this instant. A
 	// deterministic mid-window past date (about a month ago, at UTC midnight) keeps
 	// them present at every historical datepoint (including the 2Y/5Y/earliest window
@@ -393,8 +409,31 @@ test('trends performance table', async ({ page }) => {
 	await expect(cashCompareTooltip.getByText('Perf Test')).toBeVisible();
 	await expect(cashCompareTooltip.getByText('+$5,400')).toBeVisible();
 	await expect(cashCompareTooltip.getByText('+207.7%')).toBeVisible();
+	// Zero Base's zero baseline makes its percent non-computable, rendered as a muted ~
+	await expect(cashCompareTooltip.getByText('+$0', { exact: true })).toBeVisible();
+	await expect(cashCompareTooltip.getByText('~')).toHaveClass(/text-muted-foreground/);
 
 	// Releasing dismisses the compare tooltip
 	await page.mouse.up();
 	await expect(page.getByText(cashCompareHeader)).not.toBeVisible();
+
+	// The Debt group chart follows the performance table's magnitude convention: over the
+	// 1Y window Perf Debt goes -2,500 -> -3,000, which is +$500 more debt (+20%) and is
+	// colored as bad (text-debt)
+	const debtChart = page.locator('[data-group-chart="debt"]');
+	// Mouse coordinates don't auto-scroll, and the debt chart sits below the fold on mobile
+	await debtChart.scrollIntoViewIfNeeded();
+	const debtChartBox = await debtChart.boundingBox();
+	if (!debtChartBox) throw new Error('Debt chart has no bounding box');
+	const debtMiddleY = debtChartBox.y + debtChartBox.height * 0.6;
+	await page.mouse.move(debtChartBox.x + 4, debtMiddleY);
+	await page.mouse.down();
+	await page.mouse.move(debtChartBox.x + debtChartBox.width - 4, debtMiddleY, { steps: 5 });
+	const debtCompareHeader = `${oneYear.toISOString().slice(0, 10)} → ${now.toISOString().slice(0, 10)}`;
+	const debtCompareTooltip = page.getByText(debtCompareHeader).locator('..');
+	await expect(debtCompareTooltip.getByText('+$500')).toBeVisible();
+	await expect(debtCompareTooltip.getByText('+20.0%')).toBeVisible();
+	await expect(debtCompareTooltip.getByText('+20.0%')).toHaveClass(/text-debt/);
+	await page.mouse.up();
+	await expect(page.getByText(debtCompareHeader)).not.toBeVisible();
 });

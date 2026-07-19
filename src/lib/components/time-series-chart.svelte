@@ -272,9 +272,14 @@
 											/>{:else}{formatTooltipValue(row.diff)}{/if}</span
 									>
 									<span
-										class="text-right font-mono text-base leading-none tabular-nums {trendClass}"
+										class="text-right font-mono text-base leading-none tabular-nums {row.percent ===
+										null
+											? 'text-muted-foreground'
+											: trendClass}"
 									>
-										{#if row.percent !== null}
+										{#if row.percent === null}
+											~
+										{:else}
 											{row.percent >= 0 ? '+' : ''}{row.percent.toFixed(1)}%
 										{/if}
 									</span>

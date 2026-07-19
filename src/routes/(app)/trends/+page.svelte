@@ -693,7 +693,8 @@
 								key: member.key,
 								label: member.label,
 								color: memberColor(group.color, index, windowedMembers.length),
-								value: (row: TrendMemberRow) => row.values[member.key] ?? 0
+								value: (row: TrendMemberRow) => row.values[member.key] ?? 0,
+								isLiability: group.key === 'debt'
 							}))}
 							emptyMessage={m.trends_empty()}
 							formatAxisValue={(value) => formatCurrency(Math.round(value))}

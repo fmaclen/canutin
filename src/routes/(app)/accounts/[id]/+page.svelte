@@ -436,7 +436,8 @@
 				key: 'value',
 				label: m.balance_history_series_label(),
 				color: 'var(--brand)',
-				value: (point) => point.value
+				value: (point) => point.value,
+				isLiability: account?.balanceGroup === AccountsBalanceGroupOptions.DEBT
 			}
 		]}
 		emptyMessage={m.balance_history_empty()}
