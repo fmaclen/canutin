@@ -77,30 +77,27 @@
 	};
 	const seriesByKey = $derived(new Map(series.map((s) => [s.key, s])));
 
-	// The chart lays out against a debounced container size instead of layerchart's live
+	// The chart lays out against a throttled container size instead of layerchart's live
 	// element binding: a window drag emits dozens of resize events, and re-laying out
-	// every chart on each one stalls the main thread for seconds. The first measurement
-	// applies immediately so mount isn't delayed; later ones settle once the drag pauses.
+	// every chart on each one stalls the main thread for seconds. Between layouts the
+	// last-rendered SVG is CSS-scaled to the live container size (see chartStretch), so
+	// the chart stays glued to the card edge while real layouts run on the throttle.
+	// The SVG renders in an absolutely-positioned wrapper so its fixed pixel size never
+	// props the container open - otherwise a shrinking ancestor (sidebar expand, grid
+	// breakpoint) could never get smaller and the observer would deadlock at the old size.
+	const LAYOUT_THROTTLE_MS = 200;
+	let liveSize = $state<{ width: number; height: number } | null>(null);
 	let chartSize = $state<{ width: number; height: number } | null>(null);
-	const chartSizeProps = {
-		[createAttachmentKey()]: (node: HTMLElement) => {
-			let timer = 0;
-			const observer = new ResizeObserver(([entry]) => {
-				const next = { width: entry.contentRect.width, height: entry.contentRect.height };
-				if (!chartSize) {
-					chartSize = next;
-					return;
-				}
-				clearTimeout(timer);
-				timer = window.setTimeout(() => (chartSize = next), 100);
-			});
-			observer.observe(node);
-			return () => {
-				clearTimeout(timer);
-				observer.disconnect();
-			};
-		}
-	};
+
+	// Identity check: the throttle assigns liveSize into chartSize, so a settled chart
+	// compares equal and renders untransformed
+	const chartStretch = $derived.by(() => {
+		if (!liveSize || !chartSize || liveSize === chartSize) return '';
+		if (!chartSize.width || !chartSize.height) return '';
+		const x = liveSize.width / chartSize.width;
+		const y = liveSize.height / chartSize.height;
+		return `transform: scale(${x}, ${y}); transform-origin: 0 0;`;
+	});
 
 	let chartContext = $state<ChartState<T>>();
 	const hovered: T | null = $derived(chartContext?.tooltip.data ?? null);
@@ -214,157 +211,190 @@
 			role={hasLegend ? undefined : 'img'}
 			aria-label={hasLegend ? undefined : series[0].label}
 			onpointerdown={(event) => chartCompare.start(event, hovered)}
-			{...chartSizeProps}
 		>
-			<LineChart
-				bind:context={chartContext}
-				width={chartSize?.width}
-				height={chartSize?.height}
-				data={windowedRows}
-				x="date"
-				xScale={scaleUtc()}
-				yDomain={yDomain ?? undefined}
-				padding={{
-					top: hasLegend ? legendHeight + 16 : 16,
-					right: 48,
-					bottom: 24,
-					left: leftPadding
-				}}
-				series={series.map((s) => ({ key: s.key, label: s.label, color: s.color, value: s.value }))}
-				legend={hasLegend ? legendProps : false}
-				props={{
-					// opacity 1 opts out of layerchart's series highlight, which dims the other
-					// series to 0.1 while a spline or highlight point is hovered.
-					// motion 'none' everywhere: layerchart's mount/update tweens re-evaluate every
-					// mark's reactive props on each animation frame, which stalls the main thread
-					// for seconds when several charts mount at once.
-					spline: { curve: curveBumpX, opacity: 1, strokeWidth: 1.25, motion: 'none' },
-					xAxis: {
-						format: (v: Date) => v.toISOString().slice(0, 10),
-						ticks: 6,
-						motion: 'none'
-					},
-					yAxis: {
-						motion: 'none',
-						format: (v: number) => formatAxisValue(v),
-						ticks: (scale) => {
-							const [min, max] = scale.domain();
-							return axisTicks(min, max);
+			<div
+				class="relative w-full"
+				{@attach (node) => {
+					let lastLayoutAt = Number.NEGATIVE_INFINITY;
+					let timer = 0;
+					const observer = new ResizeObserver(([entry]) => {
+						liveSize = { width: entry.contentRect.width, height: entry.contentRect.height };
+						const wait = lastLayoutAt + LAYOUT_THROTTLE_MS - performance.now();
+						const layout = () => {
+							lastLayoutAt = performance.now();
+							chartSize = liveSize;
+						};
+						if (wait <= 0) {
+							layout();
+							return;
 						}
-					},
-					grid: { x: true, y: true, xTicks: 6, yTicks: [0], motion: 'none' },
-					highlight: { motion: 'none', points: { r: 3, opacity: 1 } }
+						clearTimeout(timer);
+						timer = window.setTimeout(layout, wait);
+					});
+					observer.observe(node);
+					return () => {
+						clearTimeout(timer);
+						observer.disconnect();
+					};
 				}}
 			>
-				{#snippet aboveMarks({ context })}
-					{#if comparison}
-						{@const xA = context.xScale(comparison.a.date)}
-						{@const xB = context.xScale(comparison.b.date)}
-						<!-- With several series a gain/loss tint has no single sign to follow, so the
+				<div class="absolute inset-0" style={chartStretch}>
+					<LineChart
+						bind:context={chartContext}
+						width={chartSize?.width}
+						height={chartSize?.height}
+						data={windowedRows}
+						x="date"
+						xScale={scaleUtc()}
+						yDomain={yDomain ?? undefined}
+						padding={{
+							top: hasLegend ? legendHeight + 16 : 16,
+							right: 48,
+							bottom: 24,
+							left: leftPadding
+						}}
+						series={series.map((s) => ({
+							key: s.key,
+							label: s.label,
+							color: s.color,
+							value: s.value
+						}))}
+						legend={hasLegend ? legendProps : false}
+						props={{
+							// opacity 1 opts out of layerchart's series highlight, which dims the other
+							// series to 0.1 while a spline or highlight point is hovered.
+							// motion 'none' everywhere: layerchart's mount/update tweens re-evaluate every
+							// mark's reactive props on each animation frame, which stalls the main thread
+							// for seconds when several charts mount at once.
+							spline: { curve: curveBumpX, opacity: 1, strokeWidth: 1.25, motion: 'none' },
+							xAxis: {
+								format: (v: Date) => v.toISOString().slice(0, 10),
+								ticks: 6,
+								motion: 'none'
+							},
+							yAxis: {
+								motion: 'none',
+								format: (v: number) => formatAxisValue(v),
+								ticks: (scale) => {
+									const [min, max] = scale.domain();
+									return axisTicks(min, max);
+								}
+							},
+							grid: { x: true, y: true, xTicks: 6, yTicks: [0], motion: 'none' },
+							highlight: { motion: 'none', points: { r: 3, opacity: 1 } }
+						}}
+					>
+						{#snippet aboveMarks({ context })}
+							{#if comparison}
+								{@const xA = context.xScale(comparison.a.date)}
+								{@const xB = context.xScale(comparison.b.date)}
+								<!-- With several series a gain/loss tint has no single sign to follow, so the
 						band stays neutral; a lone series tints by its own change -->
-						<rect
-							x={Math.min(xA, xB)}
-							y={0}
-							width={Math.abs(xB - xA)}
-							height={context.height}
-							class={isMultiSeries
-								? 'fill-foreground/5'
-								: comparison.rows[0].diff >= 0
-									? 'fill-cash/10'
-									: 'fill-debt/10'}
-						/>
-						<line
-							x1={xA}
-							y1={0}
-							x2={xA}
-							y2={context.height}
-							stroke-dasharray="2,2"
-							class="stroke-foreground/30"
-						/>
-						{#each comparison.rows as row (row.def.key)}
-							<circle
-								cx={xA}
-								cy={context.yScale(row.def.value(comparison.a))}
-								r={3}
-								fill={row.def.color}
-							/>
-							<circle
-								cx={xB}
-								cy={context.yScale(row.def.value(comparison.b))}
-								r={3}
-								fill={row.def.color}
-							/>
-						{/each}
-					{/if}
-				{/snippet}
-				{#snippet tooltip()}
-					{#if comparison}
-						<Chart.Tooltip>
-							<div class="border-border -mx-2.5 border-b px-2.5 pb-1.5 text-sm font-medium">
-								{comparison.a.date.toISOString().slice(0, 10)} → {comparison.b.date
-									.toISOString()
-									.slice(0, 10)}
-							</div>
-							<div class="grid grid-cols-[auto_1fr_auto_auto] items-center gap-x-2 gap-y-1.5">
+								<rect
+									x={Math.min(xA, xB)}
+									y={0}
+									width={Math.abs(xB - xA)}
+									height={context.height}
+									class={isMultiSeries
+										? 'fill-foreground/5'
+										: comparison.rows[0].diff >= 0
+											? 'fill-cash/10'
+											: 'fill-debt/10'}
+								/>
+								<line
+									x1={xA}
+									y1={0}
+									x2={xA}
+									y2={context.height}
+									stroke-dasharray="2,2"
+									class="stroke-foreground/30"
+								/>
 								{#each comparison.rows as row (row.def.key)}
-									{@const trendClass = row.diff >= 0 ? 'text-cash' : 'text-debt'}
-									<div
-										style="--color-bg: {row.def.color};"
-										class="size-2.5 shrink-0 rounded-lg bg-(--color-bg)"
-									></div>
-									<span class="text-muted-foreground text-sm">{row.def.label}</span>
-									<span
-										class="text-right font-mono text-base leading-none tabular-nums {trendClass}"
-										>{row.diff >= 0 ? '+' : ''}{#if row.def.isUnconverted}<Currency
-												value={row.diff}
-												isUnconverted={row.isUnconverted}
-											/>{:else}{formatTooltipValue(row.diff)}{/if}</span
-									>
-									<span
-										class="text-right font-mono text-base leading-none tabular-nums {row.percent ===
-										null
-											? 'text-muted-foreground'
-											: trendClass}"
-									>
-										{#if row.percent === null}
-											~
-										{:else}
-											{row.percent >= 0 ? '+' : ''}{row.percent.toFixed(1)}%
-										{/if}
-									</span>
+									<circle
+										cx={xA}
+										cy={context.yScale(row.def.value(comparison.a))}
+										r={3}
+										fill={row.def.color}
+									/>
+									<circle
+										cx={xB}
+										cy={context.yScale(row.def.value(comparison.b))}
+										r={3}
+										fill={row.def.color}
+									/>
 								{/each}
-							</div>
-						</Chart.Tooltip>
-					{:else}
-						<Chart.Tooltip>
-							{#snippet formatter({ value, item })}
-								{@const def = seriesByKey.get(item.key)}
-								{#if def}
-									<div
-										style="--color-bg: {def.color};"
-										class="size-2.5 shrink-0 rounded-lg bg-(--color-bg)"
-									></div>
-									<div
-										class="flex flex-1 shrink-0 items-center justify-between gap-4 text-base leading-none"
-									>
-										<span class="text-muted-foreground text-sm">{def.label}</span>
-										{#if typeof value === 'number'}
-											{#if def.isUnconverted}
-												<Currency
-													{value}
-													isUnconverted={hovered ? def.isUnconverted(hovered) : false}
-												/>
-											{:else}
-												<span class="font-mono tabular-nums">{formatTooltipValue(value)}</span>
-											{/if}
-										{/if}
+							{/if}
+						{/snippet}
+						{#snippet tooltip()}
+							{#if comparison}
+								<Chart.Tooltip>
+									<div class="border-border -mx-2.5 border-b px-2.5 pb-1.5 text-sm font-medium">
+										{comparison.a.date.toISOString().slice(0, 10)} → {comparison.b.date
+											.toISOString()
+											.slice(0, 10)}
 									</div>
-								{/if}
-							{/snippet}
-						</Chart.Tooltip>
-					{/if}
-				{/snippet}
-			</LineChart>
+									<div class="grid grid-cols-[auto_1fr_auto_auto] items-center gap-x-2 gap-y-1.5">
+										{#each comparison.rows as row (row.def.key)}
+											{@const trendClass = row.diff >= 0 ? 'text-cash' : 'text-debt'}
+											<div
+												style="--color-bg: {row.def.color};"
+												class="size-2.5 shrink-0 rounded-lg bg-(--color-bg)"
+											></div>
+											<span class="text-muted-foreground text-sm">{row.def.label}</span>
+											<span
+												class="text-right font-mono text-base leading-none tabular-nums {trendClass}"
+												>{row.diff >= 0 ? '+' : ''}{#if row.def.isUnconverted}<Currency
+														value={row.diff}
+														isUnconverted={row.isUnconverted}
+													/>{:else}{formatTooltipValue(row.diff)}{/if}</span
+											>
+											<span
+												class="text-right font-mono text-base leading-none tabular-nums {row.percent ===
+												null
+													? 'text-muted-foreground'
+													: trendClass}"
+											>
+												{#if row.percent === null}
+													~
+												{:else}
+													{row.percent >= 0 ? '+' : ''}{row.percent.toFixed(1)}%
+												{/if}
+											</span>
+										{/each}
+									</div>
+								</Chart.Tooltip>
+							{:else}
+								<Chart.Tooltip>
+									{#snippet formatter({ value, item })}
+										{@const def = seriesByKey.get(item.key)}
+										{#if def}
+											<div
+												style="--color-bg: {def.color};"
+												class="size-2.5 shrink-0 rounded-lg bg-(--color-bg)"
+											></div>
+											<div
+												class="flex flex-1 shrink-0 items-center justify-between gap-4 text-base leading-none"
+											>
+												<span class="text-muted-foreground text-sm">{def.label}</span>
+												{#if typeof value === 'number'}
+													{#if def.isUnconverted}
+														<Currency
+															{value}
+															isUnconverted={hovered ? def.isUnconverted(hovered) : false}
+														/>
+													{:else}
+														<span class="font-mono tabular-nums">{formatTooltipValue(value)}</span>
+													{/if}
+												{/if}
+											</div>
+										{/if}
+									{/snippet}
+								</Chart.Tooltip>
+							{/if}
+						{/snippet}
+					</LineChart>
+				</div>
+			</div>
 		</Chart.Container>
 	</div>
 {/if}
