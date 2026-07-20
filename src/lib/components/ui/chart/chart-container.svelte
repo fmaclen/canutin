@@ -57,6 +57,13 @@
 		'[&_.lc-grid-y-radial-circle]:stroke-border [&_.lc-grid-y-radial-line]:stroke-border',
 
 		// Legend adjustments
+		//
+		// layerchart sizes the legend to its content, so a long member list would spill
+		// past the chart edges; span the container width instead (undoing the left-50%
+		// + translate centering, which also halves the shrink-to-fit width) and let the
+		// items wrap, keeping them centered via the flex group
+		'[&_.lc-legend-container]:inset-x-0 [&_.lc-legend-container]:transform-none',
+		'[&_.lc-legend-swatch-group]:flex-wrap [&_.lc-legend-swatch-group]:justify-center',
 		'[&_.lc-legend-swatch-button]:items-center [&_.lc-legend-swatch-button]:gap-1.5',
 		'[&_.lc-legend-swatch-group]:items-center [&_.lc-legend-swatch-group]:gap-4',
 		'[&_.lc-legend-swatch]:size-2.5 [&_.lc-legend-swatch]:rounded-xl',

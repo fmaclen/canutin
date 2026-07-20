@@ -2,6 +2,7 @@
 	import { scaleUtc } from 'd3-scale';
 	import { curveBumpX } from 'd3-shape';
 	import { LineChart, type ChartState } from 'layerchart';
+	import { createAttachmentKey } from 'svelte/attachments';
 	import type { HTMLAttributes } from 'svelte/elements';
 
 	import { ChartCompare, diffPercent } from '$lib/components/chart-compare.svelte.js';
@@ -62,6 +63,18 @@
 	const lastRow = $derived(windowedRows.at(-1) ?? null);
 	const isMultiSeries = $derived(series.length > 1);
 	const hasLegend = $derived(showLegend ?? isMultiSeries);
+
+	// The legend overlays the plot from the top and wraps within the container width, so
+	// the chart's top padding tracks its measured height to keep it clear of the marks
+	let legendHeight = $state(16);
+	const legendProps = {
+		placement: 'top' as const,
+		[createAttachmentKey()]: (node: HTMLElement) => {
+			const observer = new ResizeObserver(() => (legendHeight = node.clientHeight));
+			observer.observe(node);
+			return () => observer.disconnect();
+		}
+	};
 	const seriesByKey = $derived(new Map(series.map((s) => [s.key, s])));
 
 	let chartContext = $state<ChartState<T>>();
@@ -183,9 +196,14 @@
 				x="date"
 				xScale={scaleUtc()}
 				yDomain={yDomain ?? undefined}
-				padding={{ top: hasLegend ? 32 : 16, right: 48, bottom: 24, left: leftPadding }}
+				padding={{
+					top: hasLegend ? legendHeight + 16 : 16,
+					right: 48,
+					bottom: 24,
+					left: leftPadding
+				}}
 				series={series.map((s) => ({ key: s.key, label: s.label, color: s.color, value: s.value }))}
-				legend={hasLegend ? { placement: 'top' } : false}
+				legend={hasLegend ? legendProps : false}
 				props={{
 					// opacity 1 opts out of layerchart's series highlight, which dims the other
 					// series to 0.1 while a spline or highlight point is hovered.
