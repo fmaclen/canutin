@@ -19,8 +19,10 @@
 		label: string;
 		color: string;
 		value: (row: T) => number;
-		// Liability series compare by magnitude (more debt is a positive, bad change) and
-		// invert the gain/loss coloring, matching the performance table's convention
+		// Liability series compare with the raw signed diff for dollars (paying down debt
+		// raises the balance toward zero, a positive, good change) but keep the performance
+		// table's magnitude convention for the percent (less debt = negative %), so the two
+		// deliberately carry opposite signs when green
 		isLiability?: boolean;
 		// When present, tooltip values render through Currency with the FX unconverted indicator
 		isUnconverted?: (row: T) => boolean;
@@ -83,7 +85,10 @@
 				.map((s) => ({
 					def: s,
 					...(s.isLiability
-						? diffPercent(Math.abs(s.value(a)), Math.abs(s.value(b)))
+						? {
+								diff: s.value(b) - s.value(a),
+								percent: diffPercent(Math.abs(s.value(a)), Math.abs(s.value(b))).percent
+							}
 						: diffPercent(s.value(a), s.value(b))),
 					isUnconverted: s.isUnconverted ? s.isUnconverted(a) || s.isUnconverted(b) : false
 				}))
@@ -256,9 +261,7 @@
 							</div>
 							<div class="grid grid-cols-[auto_1fr_auto_auto] items-center gap-x-2 gap-y-1.5">
 								{#each comparison.rows as row (row.def.key)}
-									{@const trendClass = (row.def.isLiability ? row.diff <= 0 : row.diff >= 0)
-										? 'text-cash'
-										: 'text-debt'}
+									{@const trendClass = row.diff >= 0 ? 'text-cash' : 'text-debt'}
 									<div
 										style="--color-bg: {row.def.color};"
 										class="size-2.5 shrink-0 rounded-lg bg-(--color-bg)"

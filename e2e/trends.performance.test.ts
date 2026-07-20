@@ -51,6 +51,7 @@ test('trends performance table', async ({ page }) => {
 
 	const oneWeek = subDays(now, 7);
 	const oneMonth = subMonths(now, 1);
+	const threeMonths = subMonths(now, 3);
 	const sixMonths = subMonths(now, 6);
 	const oneYear = subYears(now, 1);
 	const earliest = subYears(now, 6);
@@ -331,8 +332,9 @@ test('trends performance table', async ({ page }) => {
 	// window endpoints, so the compare tooltip shows the full-history change per series.
 	// Cash went 1,000 -> 8,000 (+700%); the table's percent strings collide with the tooltip's,
 	// so assertions are scoped to the tooltip via its date-range header.
-	// Debt follows the table's magnitude convention: -1,000 -> -3,000 is +$2,000 more debt
-	// (+200%, same sign as the table's MAX cell above) and is colored as bad (text-debt).
+	// Debt dollars are the raw balance change: -1,000 -> -3,000 is -$2,000. The percent keeps
+	// the table's magnitude convention (+200%, same sign as the table's MAX cell above) and
+	// is colored as bad (text-debt) because the debt grew.
 	const maxChartBox = await maxChart.boundingBox();
 	if (!maxChartBox) throw new Error('Growth chart has no bounding box');
 	const chartMiddleY = maxChartBox.y + maxChartBox.height * 0.6;
@@ -343,7 +345,7 @@ test('trends performance table', async ({ page }) => {
 	const compareTooltip = page.getByText(compareHeader).locator('..');
 	await expect(compareTooltip.getByText('+$7,000')).toBeVisible();
 	await expect(compareTooltip.getByText('+700.0%')).toBeVisible();
-	await expect(compareTooltip.getByText('+$2,000')).toBeVisible();
+	await expect(compareTooltip.getByText('-$2,000')).toBeVisible();
 	await expect(compareTooltip.getByText('+200.0%')).toBeVisible();
 	await expect(compareTooltip.getByText('+200.0%')).toHaveClass(/text-debt/);
 	await expect(compareTooltip.getByText('-70.6%')).toBeVisible();
@@ -417,9 +419,9 @@ test('trends performance table', async ({ page }) => {
 	await page.mouse.up();
 	await expect(page.getByText(cashCompareHeader)).not.toBeVisible();
 
-	// The Debt group chart follows the performance table's magnitude convention: over the
-	// 1Y window Perf Debt goes -2,500 -> -3,000, which is +$500 more debt (+20%) and is
-	// colored as bad (text-debt)
+	// The Debt group chart shows the raw balance change in dollars but keeps the performance
+	// table's magnitude convention for the percent: over the 1Y window Perf Debt goes
+	// -2,500 -> -3,000, which is -$500 (+20% more debt), both colored as bad (text-debt)
 	const debtChart = page.locator('[data-group-chart="debt"]');
 	// Mouse coordinates don't auto-scroll, and the debt chart sits below the fold on mobile
 	await debtChart.scrollIntoViewIfNeeded();
@@ -431,9 +433,32 @@ test('trends performance table', async ({ page }) => {
 	await page.mouse.move(debtChartBox.x + debtChartBox.width - 4, debtMiddleY, { steps: 5 });
 	const debtCompareHeader = `${oneYear.toISOString().slice(0, 10)} → ${now.toISOString().slice(0, 10)}`;
 	const debtCompareTooltip = page.getByText(debtCompareHeader).locator('..');
-	await expect(debtCompareTooltip.getByText('+$500')).toBeVisible();
+	await expect(debtCompareTooltip.getByText('-$500')).toBeVisible();
+	await expect(debtCompareTooltip.getByText('-$500')).toHaveClass(/text-debt/);
 	await expect(debtCompareTooltip.getByText('+20.0%')).toBeVisible();
 	await expect(debtCompareTooltip.getByText('+20.0%')).toHaveClass(/text-debt/);
 	await page.mouse.up();
 	await expect(page.getByText(debtCompareHeader)).not.toBeVisible();
+
+	// Shrinking debt carries deliberately opposite signs, both colored as good (text-cash):
+	// the 3M window opens at the six-month balance carried forward (-3,500) and ends at
+	// today's -3,000, which is +$500 raw dollars and -14.3% by magnitude
+	await page.getByRole('tablist', { name: 'Debt period' }).getByRole('tab', { name: '3M' }).click();
+	await expect(debtChart).toHaveAttribute('data-chart-period', '3m');
+	const debtShrinkChartBox = await debtChart.boundingBox();
+	if (!debtShrinkChartBox) throw new Error('Debt chart has no bounding box');
+	const debtShrinkMiddleY = debtShrinkChartBox.y + debtShrinkChartBox.height * 0.6;
+	await page.mouse.move(debtShrinkChartBox.x + 4, debtShrinkMiddleY);
+	await page.mouse.down();
+	await page.mouse.move(debtShrinkChartBox.x + debtShrinkChartBox.width - 4, debtShrinkMiddleY, {
+		steps: 5
+	});
+	const debtShrinkCompareHeader = `${threeMonths.toISOString().slice(0, 10)} → ${now.toISOString().slice(0, 10)}`;
+	const debtShrinkCompareTooltip = page.getByText(debtShrinkCompareHeader).locator('..');
+	await expect(debtShrinkCompareTooltip.getByText('+$500')).toBeVisible();
+	await expect(debtShrinkCompareTooltip.getByText('+$500')).toHaveClass(/text-cash/);
+	await expect(debtShrinkCompareTooltip.getByText('-14.3%')).toBeVisible();
+	await expect(debtShrinkCompareTooltip.getByText('-14.3%')).toHaveClass(/text-cash/);
+	await page.mouse.up();
+	await expect(page.getByText(debtShrinkCompareHeader)).not.toBeVisible();
 });
