@@ -5,7 +5,6 @@
 	import { createAttachmentKey } from 'svelte/attachments';
 	import type { HTMLAttributes } from 'svelte/elements';
 
-	import { ChartCompare, diffPercent } from '$lib/components/chart-compare.svelte.js';
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
 	import PeriodTabs, { slicePeriodRows, type PeriodKey } from '$lib/components/period-tabs.svelte';
@@ -102,31 +101,48 @@
 	let chartContext = $state<ChartState<T>>();
 	const hovered: T | null = $derived(chartContext?.tooltip.data ?? null);
 
-	const chartCompare = new ChartCompare<T>();
-	$effect(() => chartCompare.track(hovered));
+	let dragging = $state.raw(false);
+	let comparisonAnchor = $state.raw<T | null>(null);
+	let comparisonCurrent = $state.raw<T | null>(null);
+	$effect(() => {
+		if (!dragging || !hovered) return;
+		if (!comparisonAnchor) comparisonAnchor = hovered;
+		comparisonCurrent = hovered;
+	});
+	function endComparison() {
+		dragging = false;
+		comparisonAnchor = null;
+		comparisonCurrent = null;
+	}
 
 	// Legend toggling narrows the chart's visible series; the compare tooltip and y-domain follow it
 	const visibleKeys = $derived(
 		new Set(chartContext?.series.visibleSeries.map((s) => s.key) ?? series.map((s) => s.key))
 	);
 	const comparison = $derived.by(() => {
-		if (!chartCompare.range) return null;
-		const [a, b] = chartCompare.range;
+		if (!comparisonAnchor || !comparisonCurrent || comparisonAnchor === comparisonCurrent)
+			return null;
+		const [a, b] =
+			comparisonAnchor.date <= comparisonCurrent.date
+				? [comparisonAnchor, comparisonCurrent]
+				: [comparisonCurrent, comparisonAnchor];
 		return {
 			a,
 			b,
 			rows: series
 				.filter((s) => visibleKeys.has(s.key))
-				.map((s) => ({
-					def: s,
-					...(s.isLiability
-						? {
-								diff: s.value(b) - s.value(a),
-								percent: diffPercent(Math.abs(s.value(a)), Math.abs(s.value(b))).percent
-							}
-						: diffPercent(s.value(a), s.value(b))),
-					isUnconverted: s.isUnconverted ? s.isUnconverted(a) || s.isUnconverted(b) : false
-				}))
+				.map((s) => {
+					const earlier = s.value(a);
+					const later = s.value(b);
+					const diff = later - earlier;
+					const percentDiff = s.isLiability ? Math.abs(later) - Math.abs(earlier) : diff;
+					return {
+						def: s,
+						diff,
+						percent: earlier === 0 ? null : (percentDiff / Math.abs(earlier)) * 100,
+						isUnconverted: s.isUnconverted ? s.isUnconverted(a) || s.isUnconverted(b) : false
+					};
+				})
 		};
 	});
 
@@ -179,7 +195,7 @@
 	});
 </script>
 
-<svelte:window onpointerup={() => chartCompare.end()} onpointercancel={() => chartCompare.end()} />
+<svelte:window onpointerup={endComparison} onpointercancel={endComparison} />
 
 <SectionTitle {title}>
 	<PeriodTabs bind:value={period} label={m.period_tabs_label({ section: title })} />
@@ -200,7 +216,6 @@
 		data-chart-period={period}
 		data-chart-points={windowedRows.length}
 		data-chart-start={firstRow?.date.toISOString().slice(0, 10)}
-		data-chart-end={lastRow?.date.toISOString().slice(0, 10)}
 		data-chart-start-value={firstRow ? series[0].value(firstRow) : undefined}
 		data-chart-end-value={lastRow ? series[0].value(lastRow) : undefined}
 		{...rest}
@@ -210,7 +225,12 @@
 			class="h-[30vh] min-h-96 w-full select-none"
 			role={hasLegend ? undefined : 'img'}
 			aria-label={hasLegend ? undefined : series[0].label}
-			onpointerdown={(event) => chartCompare.start(event, hovered)}
+			onpointerdown={(event) => {
+				if (event.button !== 0) return;
+				dragging = true;
+				comparisonAnchor = hovered;
+				comparisonCurrent = hovered;
+			}}
 		>
 			<div
 				class="relative w-full"

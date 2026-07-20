@@ -15,7 +15,6 @@
 
 	import {
 		type BalanceGroup,
-		type TrendFxFlags as FxFlags,
 		type TrendGroupKey as GroupKey,
 		type PreparedTrendMaps,
 		type TrendSeriesRow as Row,
@@ -39,7 +38,7 @@
 	} = $props();
 
 	type GroupSums = Record<Exclude<GroupKey, 'net'>, number>;
-	type GroupFxFlags = Record<Exclude<GroupKey, 'net'>, FxFlags>;
+	type GroupUnconverted = Record<Exclude<GroupKey, 'net'>, boolean>;
 
 	const fx = getExchangeRatesContext();
 
@@ -75,16 +74,14 @@
 
 	function accumulateGroup(
 		sums: GroupSums,
-		flags: GroupFxFlags,
+		unconverted: GroupUnconverted,
 		group: BalanceGroup,
 		value: number,
-		conversion: FxFlags
+		isUnconverted: boolean
 	) {
 		const key = groupKey(group);
-		if (!conversion.isUnconverted) sums[key] += value;
-		flags[key] = {
-			isUnconverted: flags[key].isUnconverted || conversion.isUnconverted
-		};
+		if (!isUnconverted) sums[key] += value;
+		unconverted[key] ||= isUnconverted;
 	}
 
 	function recomputeSeries() {
@@ -133,11 +130,11 @@
 		const rows: Row[] = [];
 		for (const [pointIndex, datePoint] of datePoints.entries()) {
 			const sums: GroupSums = { cash: 0, debt: 0, investment: 0, other: 0 };
-			const flags: GroupFxFlags = {
-				cash: { isUnconverted: false },
-				debt: { isUnconverted: false },
-				investment: { isUnconverted: false },
-				other: { isUnconverted: false }
+			const unconverted: GroupUnconverted = {
+				cash: false,
+				debt: false,
+				investment: false,
+				other: false
 			};
 
 			for (const [accountId, balances] of accountBalancesByAccountId) {
@@ -156,10 +153,10 @@
 				);
 				accumulateGroup(
 					sums,
-					flags,
+					unconverted,
 					meta.balanceGroup as BalanceGroup,
 					conversion.value,
-					conversion
+					conversion.isUnconverted
 				);
 				if (index >= 0 && !(meta.closed && datePoint >= new Date(meta.closed)))
 					addMemberValue(accountId, pointIndex, conversion.isUnconverted ? 0 : conversion.value);
@@ -188,10 +185,10 @@
 				);
 				accumulateGroup(
 					sums,
-					flags,
+					unconverted,
 					meta.balanceGroup as BalanceGroup,
 					conversion.value,
-					conversion
+					conversion.isUnconverted
 				);
 				// Positions roll up into their owning account's series
 				addMemberValue(accountId, pointIndex, conversion.isUnconverted ? 0 : conversion.value);
@@ -213,23 +210,18 @@
 				);
 				accumulateGroup(
 					sums,
-					flags,
+					unconverted,
 					meta.balanceGroup as BalanceGroup,
 					conversion.value,
-					conversion
+					conversion.isUnconverted
 				);
 				if (index >= 0 && !(meta.sold && datePoint >= new Date(meta.sold)))
 					addMemberValue(assetId, pointIndex, conversion.isUnconverted ? 0 : conversion.value);
 			}
 
 			const net = sums.cash + sums.debt + sums.investment + sums.other;
-			const netFlags: FxFlags = {
-				isUnconverted:
-					flags.cash.isUnconverted ||
-					flags.debt.isUnconverted ||
-					flags.investment.isUnconverted ||
-					flags.other.isUnconverted
-			};
+			const netIsUnconverted =
+				unconverted.cash || unconverted.debt || unconverted.investment || unconverted.other;
 			rows.push({
 				date: datePoint,
 				net,
@@ -237,7 +229,7 @@
 				debt: sums.debt,
 				investment: sums.investment,
 				other: sums.other,
-				fx: { net: netFlags, ...flags }
+				isUnconverted: { net: netIsUnconverted, ...unconverted }
 			});
 		}
 
@@ -276,14 +268,14 @@ color as --color-<key> per chart, so var(--color-cash) would be a circular refer
 			label: m.trends_series_net_label(),
 			color: 'var(--foreground)',
 			value: (row) => row.net,
-			isUnconverted: (row) => row.fx.net.isUnconverted
+			isUnconverted: (row) => row.isUnconverted.net
 		},
 		{
 			key: 'cash',
 			label: m.trends_series_cash_label(),
 			color: 'var(--cash)',
 			value: (row) => row.cash,
-			isUnconverted: (row) => row.fx.cash.isUnconverted
+			isUnconverted: (row) => row.isUnconverted.cash
 		},
 		{
 			key: 'debt',
@@ -291,21 +283,21 @@ color as --color-<key> per chart, so var(--color-cash) would be a circular refer
 			color: 'var(--debt)',
 			value: (row) => row.debt,
 			isLiability: true,
-			isUnconverted: (row) => row.fx.debt.isUnconverted
+			isUnconverted: (row) => row.isUnconverted.debt
 		},
 		{
 			key: 'investment',
 			label: m.trends_series_investment_label(),
 			color: 'var(--investment)',
 			value: (row) => row.investment,
-			isUnconverted: (row) => row.fx.investment.isUnconverted
+			isUnconverted: (row) => row.isUnconverted.investment
 		},
 		{
 			key: 'other',
 			label: m.trends_series_other_label(),
 			color: 'var(--other-assets)',
 			value: (row) => row.other,
-			isUnconverted: (row) => row.fx.other.isUnconverted
+			isUnconverted: (row) => row.isUnconverted.other
 		}
 	]}
 	emptyMessage={m.trends_empty()}

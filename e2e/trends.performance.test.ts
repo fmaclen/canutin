@@ -6,7 +6,7 @@ import {
 	AccountsBalanceGroupOptions,
 	AssetsBalanceGroupOptions
 } from '../src/lib/pocketbase.schema';
-import { goToPageViaSidebar, signIn } from './playwright.helpers';
+import { dragChart, goToPageViaSidebar, signIn } from './playwright.helpers';
 import {
 	seedAccount,
 	seedAccountBalance,
@@ -335,12 +335,7 @@ test('trends performance table', async ({ page }) => {
 	// Debt dollars are the raw balance change: -1,000 -> -3,000 is -$2,000. The percent keeps
 	// the table's magnitude convention (+200%, same sign as the table's MAX cell above) and
 	// is colored as bad (text-debt) because the debt grew.
-	const maxChartBox = await maxChart.boundingBox();
-	if (!maxChartBox) throw new Error('Growth chart has no bounding box');
-	const chartMiddleY = maxChartBox.y + maxChartBox.height * 0.6;
-	await page.mouse.move(maxChartBox.x + 4, chartMiddleY);
-	await page.mouse.down();
-	await page.mouse.move(maxChartBox.x + maxChartBox.width - 4, chartMiddleY, { steps: 5 });
+	await dragChart(page, maxChart, 0, 1, 0.6, 4);
 	const compareHeader = `${earliest.toISOString().slice(0, 10)} → ${now.toISOString().slice(0, 10)}`;
 	const compareTooltip = page.getByText(compareHeader).locator('..');
 	await expect(compareTooltip.getByText('+$7,000')).toBeVisible();
@@ -365,14 +360,7 @@ test('trends performance table', async ({ page }) => {
 	await expect(maxChart.getByText('$9,000', { exact: true })).toBeVisible();
 	await expect(maxChart.getByText('$45,000', { exact: true })).not.toBeVisible();
 	// Recapture the box: the legend click can scroll the chart and stale coords miss it
-	const isolatedChartBox = await maxChart.boundingBox();
-	if (!isolatedChartBox) throw new Error('Growth chart has no bounding box');
-	const isolatedMiddleY = isolatedChartBox.y + isolatedChartBox.height * 0.6;
-	await page.mouse.move(isolatedChartBox.x + 4, isolatedMiddleY);
-	await page.mouse.down();
-	await page.mouse.move(isolatedChartBox.x + isolatedChartBox.width - 4, isolatedMiddleY, {
-		steps: 5
-	});
+	await dragChart(page, maxChart, 0, 1, 0.6, 4);
 	await expect(compareTooltip.getByText('+$7,000')).toBeVisible();
 	await expect(compareTooltip.getByText('Net worth')).not.toBeVisible();
 	await page.mouse.up();
@@ -400,12 +388,7 @@ test('trends performance table', async ({ page }) => {
 
 	// Group charts share the drag-to-compare interaction: dragging edge to edge across the
 	// 2Y Cash chart compares its lone member from the window start (2,600) to today (8,000)
-	const cashChartBox = await cashChart.boundingBox();
-	if (!cashChartBox) throw new Error('Cash chart has no bounding box');
-	const cashMiddleY = cashChartBox.y + cashChartBox.height * 0.6;
-	await page.mouse.move(cashChartBox.x + 4, cashMiddleY);
-	await page.mouse.down();
-	await page.mouse.move(cashChartBox.x + cashChartBox.width - 4, cashMiddleY, { steps: 5 });
+	await dragChart(page, cashChart, 0, 1, 0.6, 4);
 	const cashCompareHeader = `${twoYearsStart.toISOString().slice(0, 10)} → ${now.toISOString().slice(0, 10)}`;
 	const cashCompareTooltip = page.getByText(cashCompareHeader).locator('..');
 	await expect(cashCompareTooltip.getByText('Perf Test')).toBeVisible();
@@ -425,12 +408,7 @@ test('trends performance table', async ({ page }) => {
 	const debtChart = page.locator('[data-group-chart="debt"]');
 	// Mouse coordinates don't auto-scroll, and the debt chart sits below the fold on mobile
 	await debtChart.scrollIntoViewIfNeeded();
-	const debtChartBox = await debtChart.boundingBox();
-	if (!debtChartBox) throw new Error('Debt chart has no bounding box');
-	const debtMiddleY = debtChartBox.y + debtChartBox.height * 0.6;
-	await page.mouse.move(debtChartBox.x + 4, debtMiddleY);
-	await page.mouse.down();
-	await page.mouse.move(debtChartBox.x + debtChartBox.width - 4, debtMiddleY, { steps: 5 });
+	await dragChart(page, debtChart, 0, 1, 0.6, 4);
 	const debtCompareHeader = `${oneYear.toISOString().slice(0, 10)} → ${now.toISOString().slice(0, 10)}`;
 	const debtCompareTooltip = page.getByText(debtCompareHeader).locator('..');
 	await expect(debtCompareTooltip.getByText('-$500')).toBeVisible();
@@ -445,14 +423,7 @@ test('trends performance table', async ({ page }) => {
 	// today's -3,000, which is +$500 raw dollars and -14.3% by magnitude
 	await page.getByRole('tablist', { name: 'Debt period' }).getByRole('tab', { name: '3M' }).click();
 	await expect(debtChart).toHaveAttribute('data-chart-period', '3m');
-	const debtShrinkChartBox = await debtChart.boundingBox();
-	if (!debtShrinkChartBox) throw new Error('Debt chart has no bounding box');
-	const debtShrinkMiddleY = debtShrinkChartBox.y + debtShrinkChartBox.height * 0.6;
-	await page.mouse.move(debtShrinkChartBox.x + 4, debtShrinkMiddleY);
-	await page.mouse.down();
-	await page.mouse.move(debtShrinkChartBox.x + debtShrinkChartBox.width - 4, debtShrinkMiddleY, {
-		steps: 5
-	});
+	await dragChart(page, debtChart, 0, 1, 0.6, 4);
 	const debtShrinkCompareHeader = `${threeMonths.toISOString().slice(0, 10)} → ${now.toISOString().slice(0, 10)}`;
 	const debtShrinkCompareTooltip = page.getByText(debtShrinkCompareHeader).locator('..');
 	await expect(debtShrinkCompareTooltip.getByText('+$500')).toBeVisible();

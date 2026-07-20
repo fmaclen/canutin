@@ -17,6 +17,23 @@ export function isoMidOfMonthMonthsAgo(monthsAgo: number) {
 	return setHours(addDays(targetMonthStart, 14), 12).toISOString();
 }
 
+export async function dragChart(
+	page: Page,
+	chart: Locator,
+	startRatio: number,
+	endRatio: number,
+	yRatio: number,
+	inset: number
+) {
+	const box = await chart.boundingBox();
+	if (!box) throw new Error('Chart has no bounding box');
+	const width = box.width - inset * 2;
+	const y = box.y + box.height * yRatio;
+	await page.mouse.move(box.x + inset + width * startRatio, y);
+	await page.mouse.down();
+	await page.mouse.move(box.x + inset + width * endRatio, y, { steps: 5 });
+}
+
 export async function signIn(page: Page, email: string) {
 	await page.getByLabel('Email').fill(email);
 	await page.getByLabel('Password', { exact: true }).fill(DEFAULT_PASSWORD);

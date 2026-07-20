@@ -10,9 +10,6 @@ import type {
 export type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
 
 export type TrendGroupKey = 'net' | 'cash' | 'debt' | 'investment' | 'other';
-// NOTE: trends hides the converted-amount indicator (page-scoped FX rule), so only the
-// unconvertible warning is tracked per group; the converted values themselves are unchanged.
-export type TrendFxFlags = { isUnconverted: boolean };
 export type TrendSeriesRow = {
 	date: Date;
 	net: number;
@@ -20,7 +17,7 @@ export type TrendSeriesRow = {
 	debt: number;
 	investment: number;
 	other: number;
-	fx: Record<TrendGroupKey, TrendFxFlags>;
+	isUnconverted: Record<TrendGroupKey, boolean>;
 };
 
 // Per-entity daily series for the group charts: each member is an account (its balance plus
@@ -37,17 +34,11 @@ export function findEarliestBalanceDate(
 	rawAssetBalances: AssetBalancesResponse[]
 ) {
 	let earliest: Date | null = null;
-	for (const b of rawAccountBalances) {
-		const d = new Date(b.asOf);
-		if (!earliest || d < earliest) earliest = d;
-	}
-	for (const b of rawSecurityBalances) {
-		const d = new Date(b.asOf);
-		if (!earliest || d < earliest) earliest = d;
-	}
-	for (const b of rawAssetBalances) {
-		const d = new Date(b.asOf);
-		if (!earliest || d < earliest) earliest = d;
+	for (const balances of [rawAccountBalances, rawSecurityBalances, rawAssetBalances]) {
+		for (const balance of balances) {
+			const date = new Date(balance.asOf);
+			if (!earliest || date < earliest) earliest = date;
+		}
 	}
 	return earliest;
 }
@@ -60,27 +51,16 @@ export function buildPreparedMaps(
 	securityBalances: TrendSecurityBalance[],
 	assetBalances: AssetBalancesResponse[]
 ) {
-	const accountBalancesByAccountId = new Map<string, AccountBalancesResponse[]>();
-	for (const balance of accountBalances) {
-		const existing = accountBalancesByAccountId.get(balance.account) || [];
-		existing.push(balance);
-		accountBalancesByAccountId.set(balance.account, existing);
-	}
-	const securityBalancesByAccountSecurity = new Map<string, TrendSecurityBalance[]>();
-	for (const balance of securityBalances) {
-		const key = `${balance.account}:${balance.security}`;
-		const existing = securityBalancesByAccountSecurity.get(key) || [];
-		existing.push(balance);
-		securityBalancesByAccountSecurity.set(key, existing);
-	}
+	const accountBalancesByAccountId = Map.groupBy(accountBalances, (balance) => balance.account);
+	const securityBalancesByAccountSecurity = Map.groupBy(
+		securityBalances,
+		(balance) => `${balance.account}:${balance.security}`
+	);
 	const assetById = new Map(assets.map((a) => [a.id, a] as const));
-	const assetBalancesByAssetId = new Map<string, AssetBalancesResponse[]>();
-	for (const balance of assetBalances) {
-		if (!assetById.has(balance.asset)) continue;
-		const existing = assetBalancesByAssetId.get(balance.asset) || [];
-		existing.push(balance);
-		assetBalancesByAssetId.set(balance.asset, existing);
-	}
+	const assetBalancesByAssetId = Map.groupBy(
+		assetBalances.filter((balance) => assetById.has(balance.asset)),
+		(balance) => balance.asset
+	);
 	return {
 		accountBalancesByAccountId,
 		securityBalancesByAccountSecurity,

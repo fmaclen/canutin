@@ -4,7 +4,13 @@ import {
 	AccountsBalanceGroupOptions,
 	SecurityTransactionsTypeOptions
 } from '../src/lib/pocketbase.schema';
-import { goToEditTab, goToPageViaSidebar, goToRecordDetail, signIn } from './playwright.helpers';
+import {
+	dragChart,
+	goToEditTab,
+	goToPageViaSidebar,
+	goToRecordDetail,
+	signIn
+} from './playwright.helpers';
 import {
 	recordExists,
 	seedAccount,
@@ -499,12 +505,7 @@ test('account overview keeps the balance history section and swaps its empty sta
 	await expect(page.getByRole('img', { name: 'Balance' })).toBeVisible();
 
 	// Drag across the chart from the first balance point to the second to compare them
-	const chartBox = await page.getByRole('img', { name: 'Balance' }).boundingBox();
-	if (!chartBox) throw new Error('Balance history chart has no bounding box');
-	const chartMiddleY = chartBox.y + chartBox.height / 2;
-	await page.mouse.move(chartBox.x + chartBox.width * 0.25, chartMiddleY);
-	await page.mouse.down();
-	await page.mouse.move(chartBox.x + chartBox.width * 0.75, chartMiddleY, { steps: 5 });
+	await dragChart(page, page.getByRole('img', { name: 'Balance' }), 0.25, 0.75, 0.5, 0);
 	await expect(page.getByText('2025-01-01 → 2025-02-01')).toBeVisible();
 	await expect(page.getByText('+$1,000.00')).toBeVisible();
 	await expect(page.getByText('+100.0%')).toBeVisible();

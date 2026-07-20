@@ -7,6 +7,7 @@ import {
 	SecurityTransactionsTypeOptions
 } from '../src/lib/pocketbase.schema';
 import {
+	dragChart,
 	formatDateForInput,
 	goToAddPage,
 	goToEditTab,
@@ -360,12 +361,7 @@ test('portfolio charts total securities value across accounts with drag-to-compa
 	// dragging with viewport-relative mouse coordinates.
 	const chart = page.getByRole('img', { name: 'Market value' });
 	await chart.scrollIntoViewIfNeeded();
-	const chartBox = await chart.boundingBox();
-	if (!chartBox) throw new Error('Market value chart has no bounding box');
-	const chartMiddleY = chartBox.y + chartBox.height / 2;
-	await page.mouse.move(chartBox.x + chartBox.width * 0.25, chartMiddleY);
-	await page.mouse.down();
-	await page.mouse.move(chartBox.x + chartBox.width * 0.75, chartMiddleY, { steps: 5 });
+	await dragChart(page, chart, 0.25, 0.75, 0.5, 0);
 	await expect(page.getByText('+$2,000.00')).toBeVisible();
 	await expect(page.getByText('+200.0%')).toBeVisible();
 
