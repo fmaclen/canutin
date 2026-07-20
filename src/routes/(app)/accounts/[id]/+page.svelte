@@ -8,7 +8,6 @@
 		type TrendSecurityBalance,
 		type TrendSecurityValueState
 	} from '$lib/balance-series';
-	import BalanceHistoryChart from '$lib/components/balance-history-chart.svelte';
 	import CashflowAverages from '$lib/components/cashflow-averages.svelte';
 	import { formatNativeCurrency } from '$lib/components/currency';
 	import Currency from '$lib/components/currency.svelte';
@@ -19,6 +18,7 @@
 	import Section from '$lib/components/section.svelte';
 	import SharedRecordReadonlyBanner from '$lib/components/shared-record-readonly-banner.svelte';
 	import TableViewAllRow from '$lib/components/table-view-all-row.svelte';
+	import TimeSeriesChart from '$lib/components/time-series-chart.svelte';
 	import { badgeVariants } from '$lib/components/ui/badge/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Table from '$lib/components/ui/table/index';
@@ -425,23 +425,26 @@
 {/if}
 
 <Section>
-	<SectionTitle title={m.balance_history_section_title()} />
-	{#if !loaded || balanceHistoryLoading || !account}
-		<Skeleton class="h-[30vh] min-h-[220px]" showSpinner />
-	{:else if balanceHistory.length >= 2}
-		<div class="bg-background overflow-visible rounded-sm shadow-md">
-			<BalanceHistoryChart
-				points={balanceHistory}
-				seriesLabel={m.balance_history_series_label()}
-				formatAxisValue={(value) => formatNativeCurrency(Math.round(value), 0, account.currency)}
-				formatTooltipValue={(value) => formatNativeCurrency(value, 2, account.currency)}
-			/>
-		</div>
-	{:else}
-		<div class="h-[30vh] min-h-[220px]">
-			<Empty class="h-full">{m.balance_history_empty()}</Empty>
-		</div>
-	{/if}
+	<!-- The USD fallback is never hit: the chart only renders once the account has loaded -->
+	<TimeSeriesChart
+		title={m.balance_history_section_title()}
+		isLoading={!loaded || balanceHistoryLoading || !account}
+		rows={balanceHistory}
+		period="max"
+		series={[
+			{
+				key: 'value',
+				label: m.balance_history_series_label(),
+				color: 'var(--brand)',
+				value: (point) => point.value,
+				isLiability: account?.balanceGroup === AccountsBalanceGroupOptions.DEBT
+			}
+		]}
+		emptyMessage={m.balance_history_empty()}
+		formatAxisValue={(value) =>
+			formatNativeCurrency(Math.round(value), 0, account?.currency ?? 'USD')}
+		formatTooltipValue={(value) => formatNativeCurrency(value, 2, account?.currency ?? 'USD')}
+	/>
 </Section>
 
 {#snippet positionsAndTrades()}

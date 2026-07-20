@@ -4,7 +4,13 @@ import {
 	AccountsBalanceGroupOptions,
 	SecurityTransactionsTypeOptions
 } from '../src/lib/pocketbase.schema';
-import { goToEditTab, goToPageViaSidebar, goToRecordDetail, signIn } from './playwright.helpers';
+import {
+	dragChart,
+	goToEditTab,
+	goToPageViaSidebar,
+	goToRecordDetail,
+	signIn
+} from './playwright.helpers';
 import {
 	recordExists,
 	seedAccount,
@@ -496,6 +502,31 @@ test('account overview keeps the balance history section and swaps its empty sta
 		value: 2000
 	});
 	await expect(page.getByText('No balance history yet')).not.toBeVisible();
+	await expect(page.getByRole('img', { name: 'Balance' })).toBeVisible();
+
+	// Drag across the chart from the first balance point to the second to compare them
+	await dragChart(page, page.getByRole('img', { name: 'Balance' }), 0.25, 0.75, 0.5, 0);
+	await expect(page.getByText('2025-01-01 → 2025-02-01')).toBeVisible();
+	await expect(page.getByText('+$1,000.00')).toBeVisible();
+	await expect(page.getByText('+100.0%')).toBeVisible();
+
+	// Releasing restores the regular single-point tooltip
+	await page.mouse.up();
+	await expect(page.getByText('2025-01-01 → 2025-02-01')).not.toBeVisible();
+	await expect(page.getByText('Balance', { exact: true })).toBeVisible();
+
+	// The chart's period tabs window the series: both balances predate the 3M window, so it
+	// swaps to the period empty state; MAX restores the full series
+	await expect(page.locator('[data-chart-period="max"]')).toBeVisible();
+	await page
+		.getByRole('tablist', { name: 'Balance history period' })
+		.getByRole('tab', { name: '3M' })
+		.click();
+	await expect(page.getByText('No data in this period')).toBeVisible();
+	await page
+		.getByRole('tablist', { name: 'Balance history period' })
+		.getByRole('tab', { name: 'MAX' })
+		.click();
 	await expect(page.getByRole('img', { name: 'Balance' })).toBeVisible();
 });
 

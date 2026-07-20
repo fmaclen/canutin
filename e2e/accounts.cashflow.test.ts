@@ -127,14 +127,16 @@ test('account trailing cashflow is filtered to a single account', async ({ page 
 	await expect(expenses).toContainText('$125');
 	await expect(surplus).toContainText('$125');
 
-	// 3M includes only M-1, averaging $400 income and $200 expenses.
-	await page.getByRole('tab', { name: '3M' }).click();
+	// 3M includes only M-1, averaging $400 income and $200 expenses. The balance history
+	// chart has its own period tabs on this page, so scope clicks to the cashflow tablist.
+	const cashflowTabs = page.getByRole('tablist', { name: 'Trailing cashflow period' });
+	await cashflowTabs.getByRole('tab', { name: '3M' }).click();
 	await expect(income).toContainText('$400');
 	await expect(expenses).toContainText('$200');
 	await expect(surplus).toContainText('$200');
 
 	// 1Y includes all three seed windows, averaging $175 income and $88 expenses.
-	await page.getByRole('tab', { name: '1Y' }).click();
+	await cashflowTabs.getByRole('tab', { name: '1Y' }).click();
 	await expect(income).toContainText('$175');
 	await expect(expenses).toContainText('$88');
 	await expect(surplus).toContainText('$88');

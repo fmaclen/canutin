@@ -1,4 +1,13 @@
+import { existsSync } from 'node:fs';
 import { defineConfig, devices } from '@playwright/test';
+
+// Worktrees pin their ports in a repo-local .env; load it here so an unsourced
+// shell still targets this checkout's servers instead of the defaults below
+// (which can attach to another checkout's PocketBase via reuseExistingServer).
+// loadEnvFile never overrides variables already in the environment, so explicit
+// exports still win.
+const envFile = new URL('.env', import.meta.url);
+if (existsSync(envFile)) process.loadEnvFile(envFile);
 
 const isCI = process.env.CI === 'true';
 

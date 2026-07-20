@@ -1,95 +1,46 @@
 <script lang="ts">
-	import { getTooltipContext, Tooltip as TooltipPrimitive } from 'layerchart';
+	import { getChartContext, Tooltip as TooltipPrimitive, type Tooltip } from 'layerchart';
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 
-	import Currency from '$lib/components/currency.svelte';
-	import { cn, type WithElementRef, type WithoutChildren } from '$lib/utils.js';
-
-	import { getPayloadConfigFromPayload, useChart, type TooltipPayload } from './chart-utils.js';
-
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
-	function defaultFormatter(value: any, _payload: TooltipPayload[]) {
-		if (value instanceof Date) return value.toISOString().slice(0, 10);
-		return value;
-	}
+	import { cn, type WithElementRef } from '$lib/utils.js';
 
 	let {
 		ref = $bindable(null),
 		class: className,
-		hideLabel = false,
-		indicator = 'dot',
-		hideIndicator = false,
-		labelKey,
-		label,
-		labelFormatter = defaultFormatter,
-		labelClassName,
 		formatter,
-		nameKey,
-		color,
+		children,
 		...restProps
-	}: WithoutChildren<WithElementRef<HTMLAttributes<HTMLDivElement>>> & {
-		hideLabel?: boolean;
-		label?: string;
-		indicator?: 'line' | 'dot' | 'dashed';
-		nameKey?: string;
-		labelKey?: string;
-		hideIndicator?: boolean;
-		labelClassName?: string;
-		labelFormatter?: // eslint-disable-next-line @typescript-eslint/no-explicit-any
-		((value: any, payload: TooltipPayload[]) => string | number | Snippet) | null;
+	}: WithElementRef<HTMLAttributes<HTMLDivElement>> & {
 		formatter?: Snippet<
 			[
 				{
 					value: unknown;
-					name: string;
-					item: TooltipPayload;
-					index: number;
-					payload: TooltipPayload[];
+					item: Tooltip.TooltipSeries;
 				}
 			]
 		>;
 	} = $props();
 
-	const chart = useChart();
-	const tooltipCtx = getTooltipContext();
+	const chart = getChartContext<unknown>();
 
-	const formattedLabel = $derived.by(() => {
-		if (hideLabel || !tooltipCtx.payload?.length) return null;
+	// Only series with a value for the hovered point (item-based charts like Pie/Arc
+	// populate a value on the hovered series alone)
+	const visibleSeries = $derived(
+		chart.tooltip.series.filter((series) => series.visible && series.value !== undefined)
+	);
 
-		const [item] = tooltipCtx.payload;
-		const key = labelKey ?? item?.label ?? item?.name ?? 'value';
-
-		const itemConfig = getPayloadConfigFromPayload(chart.config, item, key);
-
-		const value =
-			!labelKey && typeof label === 'string'
-				? (chart.config[label as keyof typeof chart.config]?.label ?? label)
-				: (itemConfig?.label ?? item.label);
-
-		if (value === undefined) return null;
-		if (!labelFormatter) return value;
-		return labelFormatter(value, tooltipCtx.payload);
+	const label = $derived.by(() => {
+		if (chart.tooltip.data == null) return null;
+		const value = chart.x(chart.tooltip.data);
+		return value instanceof Date ? value.toISOString().slice(0, 10) : value;
 	});
-
-	const nestLabel = $derived(tooltipCtx.payload.length === 1 && indicator !== 'dot');
 </script>
 
-{#snippet TooltipLabel()}
-	{#if formattedLabel}
-		<div
-			class={cn('border-border -mx-2.5 border-b px-2.5 pb-1.5 text-sm font-medium', labelClassName)}
-		>
-			{#if typeof formattedLabel === 'function'}
-				{@render formattedLabel()}
-			{:else}
-				{formattedLabel}
-			{/if}
-		</div>
-	{/if}
-{/snippet}
-
-<TooltipPrimitive.Root variant="none">
+<!-- Pinned to the top of the plot area (fixed y, below any top legend) with snap positioning
+(motion "none") so the tooltip never chases or eases after the cursor; x still anchors to the
+highlighted point's crosshair and the default `contained="container"` flips it at chart edges -->
+<TooltipPrimitive.Root variant="none" motion="none" x="data" xOffset={12} y={chart.padding.top}>
 	<div
 		class={cn(
 			'bg-background grid min-w-[9rem] items-start gap-1.5 rounded-lg px-2.5 py-1.5 shadow-xl',
@@ -97,63 +48,21 @@
 		)}
 		{...restProps}
 	>
-		{#if !nestLabel}
-			{@render TooltipLabel()}
-		{/if}
-		<div class="grid gap-1.5">
-			{#each tooltipCtx.payload as item, i (item.key + i)}
-				{@const key = `${nameKey || item.key || item.name || 'value'}`}
-				{@const itemConfig = getPayloadConfigFromPayload(chart.config, item, key)}
-				{@const indicatorColor = color || item.payload?.color || item.color}
-				<div
-					class={cn(
-						'[&>svg]:text-muted-foreground flex w-full flex-wrap items-stretch gap-2 [&>svg]:size-2.5',
-						indicator === 'dot' && 'items-center'
-					)}
-				>
-					{#if formatter && item.value !== undefined && item.name}
-						{@render formatter({
-							value: item.value,
-							name: item.name,
-							item,
-							index: i,
-							payload: tooltipCtx.payload
-						})}
-					{:else}
-						{#if itemConfig?.icon}
-							<itemConfig.icon />
-						{:else if !hideIndicator}
-							<div
-								style="--color-bg: {indicatorColor}; --color-border: {indicatorColor};"
-								class={cn('shrink-0 rounded-lg border-(--color-border) bg-(--color-bg)', {
-									'size-2.5': indicator === 'dot',
-									'h-full w-1': indicator === 'line',
-									'w-0 border-[1.5px] border-dashed bg-transparent': indicator === 'dashed',
-									'my-0.5': nestLabel && indicator === 'dashed'
-								})}
-							></div>
-						{/if}
-						<div
-							class={cn(
-								'flex flex-1 shrink-0 justify-between gap-4 text-base leading-none',
-								nestLabel ? 'items-end' : 'items-center'
-							)}
-						>
-							<div class="grid gap-1.5">
-								{#if nestLabel}
-									{@render TooltipLabel()}
-								{/if}
-								<span class="text-muted-foreground text-sm">
-									{itemConfig?.label || item.name}
-								</span>
-							</div>
-							{#if item.value !== undefined}
-								<Currency value={item.value} />
-							{/if}
-						</div>
-					{/if}
+		{#if children}
+			{@render children()}
+		{:else if formatter}
+			{#if label}
+				<div class="border-border -mx-2.5 border-b px-2.5 pb-1.5 text-sm font-medium">
+					{label}
 				</div>
-			{/each}
-		</div>
+			{/if}
+			<div class="grid gap-1.5">
+				{#each visibleSeries as item, index (item.key + index)}
+					<div class="flex w-full flex-wrap items-center gap-2">
+						{@render formatter({ value: item.value, item })}
+					</div>
+				{/each}
+			</div>
+		{/if}
 	</div>
 </TooltipPrimitive.Root>

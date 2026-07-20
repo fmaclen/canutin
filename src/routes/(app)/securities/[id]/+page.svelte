@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import BalanceHistoryChart from '$lib/components/balance-history-chart.svelte';
 	import { formatNativeCurrency } from '$lib/components/currency';
 	import Empty from '$lib/components/empty.svelte';
 	import KeyValue from '$lib/components/key-value.svelte';
 	import PositionsTable from '$lib/components/positions-table.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
+	import TimeSeriesChart from '$lib/components/time-series-chart.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { getExchangeRatesContext } from '$lib/exchange-rates.svelte';
 	import { m } from '$lib/paraglide/messages';
@@ -115,23 +115,23 @@
 </script>
 
 <Section>
-	<SectionTitle title={m.securities_section_price_history()} />
-	{#if !loaded || priceHistoryLoading}
-		<Skeleton class="h-[30vh] min-h-[220px]" showSpinner />
-	{:else if priceHistory.length >= 2}
-		<div class="bg-background overflow-visible rounded-sm shadow-md">
-			<BalanceHistoryChart
-				points={priceHistory}
-				seriesLabel={m.securities_price_history_series_label()}
-				formatAxisValue={(value) => formatNativeCurrency(Math.round(value), 0, securityCurrency)}
-				formatTooltipValue={(value) => formatNativeCurrency(value, 2, securityCurrency)}
-			/>
-		</div>
-	{:else}
-		<div class="h-[30vh] min-h-[220px]">
-			<Empty class="h-full">{m.securities_price_history_empty()}</Empty>
-		</div>
-	{/if}
+	<TimeSeriesChart
+		title={m.securities_section_price_history()}
+		isLoading={!loaded || priceHistoryLoading}
+		rows={priceHistory}
+		period="max"
+		series={[
+			{
+				key: 'value',
+				label: m.securities_price_history_series_label(),
+				color: 'var(--brand)',
+				value: (point) => point.value
+			}
+		]}
+		emptyMessage={m.securities_price_history_empty()}
+		formatAxisValue={(value) => formatNativeCurrency(Math.round(value), 0, securityCurrency)}
+		formatTooltipValue={(value) => formatNativeCurrency(value, 2, securityCurrency)}
+	/>
 </Section>
 
 <Section>

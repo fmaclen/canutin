@@ -45,14 +45,14 @@
 			icon: LayoutListIcon
 		},
 		{
-			name: m.portfolio_page_title(),
-			url: '/portfolio',
-			icon: ChartCandlestickIcon
-		},
-		{
 			name: m.sidebar_trends(),
 			url: '/trends',
 			icon: ChartLineIcon
+		},
+		{
+			name: m.portfolio_page_title(),
+			url: '/portfolio',
+			icon: ChartCandlestickIcon
 		}
 	] as const);
 

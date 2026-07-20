@@ -24,7 +24,7 @@
 	<nav class="flex items-center justify-between space-x-2">
 		<SectionTitle {title} />
 
-		<Tabs.List>
+		<Tabs.List aria-label={m.period_tabs_label({ section: title })}>
 			<Tabs.Trigger value="three-months">{m.period_3m_label()}</Tabs.Trigger>
 			<Tabs.Trigger value="six-months">{m.period_6m_label()}</Tabs.Trigger>
 			<Tabs.Trigger value="year-to-date">{m.period_ytd_label()}</Tabs.Trigger>

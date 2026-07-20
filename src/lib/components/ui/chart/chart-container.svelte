@@ -4,7 +4,7 @@
 	import { cn, type WithElementRef } from '$lib/utils.js';
 
 	import ChartStyle from './chart-style.svelte';
-	import { setChartContext, type ChartConfig } from './chart-utils.js';
+	import type { ChartConfig } from './chart-utils.js';
 
 	const uid = $props.id();
 
@@ -20,12 +20,6 @@
 	} = $props();
 
 	const chartId = `chart-${id || uid.replace(/:/g, '')}`;
-
-	setChartContext({
-		get config() {
-			return config;
-		}
-	});
 </script>
 
 <div
@@ -36,17 +30,13 @@
 		'flex aspect-video justify-center overflow-visible text-xs',
 		// Overrides
 		//
-		// Stroke around dots/marks when hovering
-		'[&_.stroke-white]:stroke-transparent',
-		// override the default stroke color of lines
-		'[&_.lc-line]:stroke-border/50',
-
-		// by default, layerchart shows a line intersecting the point when hovering, this hides that
-		'[&_.lc-highlight-line]:stroke-0',
+		// override the default stroke color of lines, except the dashed highlight crosshair
+		// which keeps layerchart's default stroke
+		'[&_.lc-line:not(.lc-highlight-line)]:stroke-border/50',
 
 		// by default, when you hover a point on a stacked series chart, it will drop the opacity
 		// of the other series, this overrides that
-		'[&_.lc-area-path]:opacity-100 [&_.lc-highlight-line]:opacity-100 [&_.lc-highlight-point]:opacity-100 [&_.lc-spline-path]:opacity-100 [&_.lc-text]:text-xs [&_.lc-text-svg]:overflow-visible',
+		'[&_.lc-area-path]:opacity-100 [&_.lc-highlight-line]:opacity-100 [&_.lc-highlight-point]:opacity-100 [&_.lc-text]:text-xs [&_.lc-text-svg]:overflow-visible',
 
 		// We don't want the little tick lines between the axis labels and the chart, so we remove
 		// the stroke. The alternative is to manually disable `tickMarks` on the x/y axis of every
@@ -57,12 +47,19 @@
 		// a grid line there and rule ends up overlapping the marks because it is rendered after
 		// the marks
 		'[&_.lc-rule-x-line:not(.lc-grid-x-rule)]:stroke-0 [&_.lc-rule-y-line:not(.lc-grid-y-rule)]:stroke-0',
-		'[&_.lc-grid-x-radial-circle]:stroke-border [&_.lc-grid-x-radial-line]:stroke-border',
+		'[&_.lc-grid-x-radial-line]:stroke-border',
 		'[&_.lc-grid-y-radial-circle]:stroke-border [&_.lc-grid-y-radial-line]:stroke-border',
 
 		// Legend adjustments
+		//
+		// layerchart sizes the legend to its content, so a long member list would spill
+		// past the chart edges; span the container width instead (undoing the left-50%
+		// + translate centering, which also halves the shrink-to-fit width) and let the
+		// items wrap, keeping them centered via the flex group
+		'[&_.lc-legend-container]:inset-x-0 [&_.lc-legend-container]:transform-none',
+		'[&_.lc-legend-swatch-group]:flex-wrap [&_.lc-legend-swatch-group]:justify-center',
 		'[&_.lc-legend-swatch-button]:items-center [&_.lc-legend-swatch-button]:gap-1.5',
-		'[&_.lc-legend-swatch-group]:items-center [&_.lc-legend-swatch-group]:gap-4',
+		'[&_.lc-legend-swatch-group]:items-center [&_.lc-legend-swatch-group]:gap-x-4 [&_.lc-legend-swatch-group]:gap-y-1',
 		'[&_.lc-legend-swatch]:size-2.5 [&_.lc-legend-swatch]:rounded-xl',
 
 		// Labels
@@ -71,6 +68,14 @@
 		// Tick labels on th x/y axes
 		'[&_.lc-axis-tick-label]:fill-muted-foreground [&_.lc-axis-tick-label]:font-normal',
 		'[&_.lc-tooltip-rects-g]:fill-transparent',
+
+		// The tooltip hit surface is inset by the chart padding, leaving the horizontal
+		// gutters dead and the first/last points hard to hover. Stretch it across the full
+		// width; the inner container's negative offset compensates for the outer inset, so
+		// both need overriding to keep the chart content in place. Coupled to layerchart 2.0.1's
+		// inset-compensation scheme; if an upgrade changes it, the symptom is visible layout shift.
+		'[&_.lc-tooltip-context]:left-0! [&_.lc-tooltip-context]:w-full!',
+		'[&_.lc-tooltip-context-container]:left-0!',
 		'[&_.lc-layout-svg-g]:fill-transparent',
 		'[&_.lc-root-container]:w-full',
 		'py-4',

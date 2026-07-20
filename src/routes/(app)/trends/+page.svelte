@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { UTCDate } from '@date-fns/utc';
+	import { startOfDay } from 'date-fns';
 	import type { RecordSubscription } from 'pocketbase';
 	import { untrack } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
@@ -6,10 +8,16 @@
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAssetsContext } from '$lib/assets.svelte';
 	import { type TrendSecurityBalance } from '$lib/balance-series';
+	import { formatCurrency } from '$lib/components/currency';
 	import Page from '$lib/components/page.svelte';
+	import {
+		computeBoundedHistoryStart,
+		slicePeriodRows,
+		type PeriodKey
+	} from '$lib/components/period-tabs.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
-	import * as Tabs from '$lib/components/ui/tabs/index';
+	import TimeSeriesChart from '$lib/components/time-series-chart.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import type {
 		AccountBalancesResponse,
@@ -25,7 +33,12 @@
 
 	import ChartNetWorth from './growth.svelte';
 	import Performance from './performance.svelte';
-	import { buildPreparedMaps, computeBoundedHistoryStart, type PeriodKey } from './trends';
+	import {
+		buildPreparedMaps,
+		findEarliestBalanceDate,
+		type TrendMemberRow,
+		type TrendMemberSeries
+	} from './trends';
 
 	const pb = getPocketBaseContext();
 	const accountsCtx = getAccountsContext();
@@ -35,15 +48,18 @@
 	let bootstrapped = $state(false);
 	const isLoading = $derived(!bootstrapped);
 
-	let period: PeriodKey = $state('1y');
-	let rawAccounts: AccountsResponse[] = $state([]);
-	let rawAssets: AssetsResponse[] = $state([]);
-	let rawAccountBalances: AccountBalancesResponse[] = $state([]);
-	let rawSecurityBalances: TrendSecurityBalance[] = $state([]);
-	let rawAssetBalances: AssetBalancesResponse[] = $state([]);
-	let rawFullHistoryAccountBalances: AccountBalancesResponse[] = $state([]);
-	let rawFullHistorySecurityBalances: TrendSecurityBalance[] = $state([]);
-	let rawFullHistoryAssetBalances: AssetBalancesResponse[] = $state([]);
+	// Raw state: the balance collections and derived series are large (thousands of rows),
+	// always replaced wholesale, and never mutated in place - deep proxies would only add
+	// per-property traps to the recompute loops and charts that read them.
+	let memberSeries: TrendMemberSeries = $state.raw({ members: [], rows: [] });
+	let rawAccounts: AccountsResponse[] = $state.raw([]);
+	let rawAssets: AssetsResponse[] = $state.raw([]);
+	let rawAccountBalances: AccountBalancesResponse[] = $state.raw([]);
+	let rawSecurityBalances: TrendSecurityBalance[] = $state.raw([]);
+	let rawAssetBalances: AssetBalancesResponse[] = $state.raw([]);
+	let rawFullHistoryAccountBalances: AccountBalancesResponse[] = $state.raw([]);
+	let rawFullHistorySecurityBalances: TrendSecurityBalance[] = $state.raw([]);
+	let rawFullHistoryAssetBalances: AssetBalancesResponse[] = $state.raw([]);
 	let historyStart: Date | null = $state(null);
 
 	const includedAccounts = $derived.by(
@@ -246,6 +262,9 @@
 			const sequence = ++refreshSequence;
 			const start = computeBoundedHistoryStart('5y');
 			if (!start) return;
+			// Snapshot the signature this refresh reflects; the signature effect treats any later
+			// divergence - including one committed while this refresh is in flight - as a change.
+			lastIncludedSignature = includedSignature;
 			const accountIds = Array.from(includedAccounts.keys());
 			const assetIds = Array.from(includedAssets.keys());
 			const accountFilter = filterByIds('account', accountIds);
@@ -421,7 +440,7 @@
 	>(event: RecordSubscription<TRecord>, config: BalanceRealtimeConfig<TRecord, TBalance>) {
 		if (!event.action) return;
 		if (!bootstrapped) {
-			pendingRefresh = true;
+			if (refreshInFlight) pendingRefresh = true;
 			return;
 		}
 		const records = config.records();
@@ -481,7 +500,6 @@
 	}
 
 	function scheduleRefresh() {
-		if (!bootstrapped) return;
 		if (refreshTimer) clearTimeout(refreshTimer);
 		refreshTimer = window.setTimeout(() => {
 			refreshTimer = null;
@@ -560,7 +578,12 @@
 		};
 	});
 
+	// Defer the bootstrap refresh until the accounts and assets contexts have finished their
+	// initial load - refreshing earlier would query with empty inclusion maps and resolve to a
+	// false empty state before the contexts ever land.
 	$effect(() => {
+		if (bootstrapped) return;
+		if (accountsCtx?.isLoading || assetsCtx?.isLoading) return;
 		untrack(() => {
 			void doRefresh().then(() => {
 				bootstrapped = true;
@@ -570,45 +593,64 @@
 
 	$effect(() => {
 		const signature = includedSignature;
-		if (!bootstrapped) {
-			lastIncludedSignature = signature;
-			return;
-		}
 		if (signature === lastIncludedSignature) return;
 		lastIncludedSignature = signature;
+		if (refreshInFlight) {
+			pendingRefresh = true;
+			return;
+		}
+		if (!bootstrapped) return;
 		scheduleRefresh();
+	});
+
+	const isEmpty = $derived(!rawAccounts.length && !rawAssets.length);
+	// NOTE: reference the raw tokens (--cash, not --color-cash): ChartStyle re-emits each config
+	// color as --color-<key> per chart, so var(--color-cash) would be a circular reference.
+	const groupCharts = [
+		{ key: 'cash', label: m.trends_series_cash_label(), color: 'var(--cash)' },
+		{ key: 'debt', label: m.trends_series_debt_label(), color: 'var(--debt)' },
+		{ key: 'investment', label: m.trends_series_investment_label(), color: 'var(--investment)' },
+		{ key: 'other', label: m.trends_series_other_label(), color: 'var(--other-assets)' }
+	] as const;
+	const membersByGroup = $derived(
+		Map.groupBy(
+			memberSeries.members.toSorted((a, b) => a.label.localeCompare(b.label)),
+			(member) => member.group
+		)
+	);
+	// Shades of the group color, stepping toward the background so the chart reads as its group
+	function memberColor(color: string, index: number, count: number) {
+		return `color-mix(in oklab, ${color}, var(--background) ${Math.round((index * 60) / count)}%)`;
+	}
+	const groupPeriods = $state<Record<(typeof groupCharts)[number]['key'], PeriodKey>>({
+		cash: '1y',
+		debt: '1y',
+		investment: '1y',
+		other: '1y'
+	});
+	// Anchors every chart's MAX window at the earliest balance instead of the base range start,
+	// so MAX never pads a zero lead-in when history is shorter than five years
+	const maxStart = $derived.by(() => {
+		const earliest = findEarliestBalanceDate(
+			rawFullHistoryAccountBalances,
+			rawFullHistorySecurityBalances,
+			rawFullHistoryAssetBalances
+		);
+		return earliest ? startOfDay(new UTCDate(earliest.getTime())) : null;
 	});
 </script>
 
 <Page pageTitle={m.trends_page_title()}>
-	<Tabs.Root bind:value={period}>
-		<Section>
-			<SectionTitle title={m.trends_growth_section_title()}>
-				<Tabs.List>
-					<Tabs.Trigger value="3m">{m.period_3m_label()}</Tabs.Trigger>
-					<Tabs.Trigger value="6m">{m.period_6m_label()}</Tabs.Trigger>
-					<Tabs.Trigger value="ytd">{m.period_ytd_label()}</Tabs.Trigger>
-					<Tabs.Trigger value="1y">{m.period_1y_label()}</Tabs.Trigger>
-					<Tabs.Trigger value="2y">{m.period_2y_label()}</Tabs.Trigger>
-					<Tabs.Trigger value="5y">{m.period_5y_label()}</Tabs.Trigger>
-					<Tabs.Trigger value="max">{m.period_max_label()}</Tabs.Trigger>
-				</Tabs.List>
-			</SectionTitle>
-
-			<ChartNetWorth
-				bind:period
-				{isLoading}
-				prepared={period === 'max' ? fullHistoryPrepared : prepared}
-				{rawAccounts}
-				{rawAssets}
-				rawAccountBalances={period === 'max' ? rawFullHistoryAccountBalances : rawAccountBalances}
-				rawSecurityBalances={period === 'max'
-					? rawFullHistorySecurityBalances
-					: rawSecurityBalances}
-				rawAssetBalances={period === 'max' ? rawFullHistoryAssetBalances : rawAssetBalances}
-			/>
-		</Section>
-	</Tabs.Root>
+	<Section>
+		<ChartNetWorth
+			{maxStart}
+			bind:memberSeries
+			{isLoading}
+			prepared={fullHistoryPrepared}
+			{rawAccounts}
+			{rawAssets}
+		/>
+	</Section>
 
 	<Section>
 		<SectionTitle title={m.trends_performance_section_title()} />
@@ -623,4 +665,46 @@
 			{rawFullHistoryAssetBalances}
 		/>
 	</Section>
+
+	{#if isLoading || !isEmpty}
+		<div class="grid grid-cols-1 gap-8 xl:grid-cols-2">
+			{#each groupCharts as group (group.key)}
+				{@const members = membersByGroup.get(group.key) ?? []}
+				{#if isLoading || members.length}
+					<Section>
+						<!-- The window is sliced here as well as inside the chart so members with no
+						data in the chosen period drop out of the series entirely (null means "no
+						data in this window", not a contributed zero) -->
+						{@const windowedRows = slicePeriodRows(
+							memberSeries.rows,
+							groupPeriods[group.key],
+							maxStart
+						)}
+						{@const windowedMembers = members.filter((member) =>
+							windowedRows.some((row) => row.values[member.key] !== null)
+						)}
+						<TimeSeriesChart
+							title={group.label}
+							{isLoading}
+							rows={memberSeries.rows}
+							bind:period={groupPeriods[group.key]}
+							{maxStart}
+							series={windowedMembers.map((member, index) => ({
+								key: member.key,
+								label: member.label,
+								color: memberColor(group.color, index, windowedMembers.length),
+								value: (row: TrendMemberRow) => row.values[member.key] ?? 0,
+								isLiability: group.key === 'debt'
+							}))}
+							emptyMessage={m.trends_empty()}
+							formatAxisValue={(value) => formatCurrency(Math.round(value))}
+							formatTooltipValue={(value) => formatCurrency(value)}
+							showLegend
+							data-group-chart={group.key}
+						/>
+					</Section>
+				{/if}
+			{/each}
+		</div>
+	{/if}
 </Page>

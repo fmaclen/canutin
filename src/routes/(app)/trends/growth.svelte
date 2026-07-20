@@ -1,128 +1,51 @@
 <script lang="ts">
 	import { UTCDate } from '@date-fns/utc';
-	import { scaleUtc } from 'd3-scale';
-	import { curveBumpX } from 'd3-shape';
-	import { eachDayOfInterval } from 'date-fns';
-	import { LineChart } from 'layerchart';
-	import { SvelteMap } from 'svelte/reactivity';
+	import { eachDayOfInterval, startOfDay, subYears } from 'date-fns';
 
 	import {
 		advanceTrendSecurityValue,
 		latestIndexBeforeOrEqual,
-		type TrendSecurityBalance,
 		type TrendSecurityValueState
 	} from '$lib/balance-series';
 	import { formatCurrency } from '$lib/components/currency';
-	import Currency from '$lib/components/currency.svelte';
-	import Empty from '$lib/components/empty.svelte';
-	import { axisTicks } from '$lib/components/ui/chart/chart-utils.js';
-	import * as Chart from '$lib/components/ui/chart/index.js';
-	import Skeleton from '$lib/components/ui/skeleton/skeleton.svelte';
+	import TimeSeriesChart from '$lib/components/time-series-chart.svelte';
 	import { getExchangeRatesContext } from '$lib/exchange-rates.svelte';
 	import { m } from '$lib/paraglide/messages';
-	import type {
-		AccountBalancesResponse,
-		AccountsResponse,
-		AssetBalancesResponse,
-		AssetsResponse
-	} from '$lib/pocketbase.schema';
+	import type { AccountsResponse, AssetsResponse } from '$lib/pocketbase.schema';
 
 	import {
-		computeRangeForPeriod,
 		type BalanceGroup,
-		type PeriodKey,
-		type PreparedTrendMaps
+		type TrendGroupKey as GroupKey,
+		type PreparedTrendMaps,
+		type TrendSeriesRow as Row,
+		type TrendMemberSeries
 	} from './trends';
 
 	let {
-		period = $bindable(),
+		maxStart,
+		memberSeries = $bindable(),
 		isLoading,
 		prepared,
 		rawAccounts,
-		rawAssets,
-		rawAccountBalances,
-		rawSecurityBalances,
-		rawAssetBalances
+		rawAssets
 	}: {
-		period: PeriodKey;
+		maxStart: Date | null;
+		memberSeries: TrendMemberSeries;
 		isLoading: boolean;
 		prepared: PreparedTrendMaps;
 		rawAccounts: AccountsResponse[];
 		rawAssets: AssetsResponse[];
-		rawAccountBalances: AccountBalancesResponse[];
-		rawSecurityBalances: TrendSecurityBalance[];
-		rawAssetBalances: AssetBalancesResponse[];
 	} = $props();
 
-	type GroupKey = 'net' | 'cash' | 'debt' | 'investment' | 'other';
-	// NOTE: trends hides the converted-amount indicator (page-scoped FX rule), so only the
-	// unconvertible warning is tracked per group; the converted values themselves are unchanged.
-	type FxFlags = { isUnconverted: boolean };
 	type GroupSums = Record<Exclude<GroupKey, 'net'>, number>;
-	type GroupFxFlags = Record<Exclude<GroupKey, 'net'>, FxFlags>;
-
-	type Row = {
-		date: Date;
-		net: number;
-		cash: number;
-		debt: number;
-		investment: number;
-		other: number;
-		fx: Record<GroupKey, FxFlags>;
-	};
+	type GroupUnconverted = Record<Exclude<GroupKey, 'net'>, boolean>;
 
 	const fx = getExchangeRatesContext();
-	const isEmpty = $derived(!rawAccounts.length && !rawAssets.length);
 
-	let series: Row[] = $state([]);
-	const firstSeriesRow = $derived(series[0] ?? null);
-	const lastSeriesRow = $derived(series.at(-1) ?? null);
-	const hasUnconverted = $derived(
-		series.some((row) => Object.values(row.fx).some((f) => f.isUnconverted))
-	);
-
-	const chartConfig = {
-		net: { label: m.trends_series_net_label(), color: '#45403C' },
-		cash: { label: m.trends_series_cash_label(), color: '#00a36f' },
-		debt: { label: m.trends_series_debt_label(), color: '#e75258' },
-		investment: { label: m.trends_series_investment_label(), color: '#b19b70' },
-		other: { label: m.trends_series_other_label(), color: '#5255ac' }
-	} satisfies Chart.ChartConfig;
-
-	const yDomain = $derived.by(() => {
-		if (!series.length) return null as [number, number] | null;
-		let min = Number.POSITIVE_INFINITY;
-		let max = Number.NEGATIVE_INFINITY;
-		for (const r of series) {
-			min = Math.min(min, r.net, r.cash, r.debt, r.investment, r.other);
-			max = Math.max(max, r.net, r.cash, r.debt, r.investment, r.other);
-		}
-		const pad = Math.max(1, (max - min) * 0.05);
-		return [min - pad, max + pad] as [number, number];
-	});
-
-	function formatY(v: number) {
-		return formatCurrency(v);
-	}
-
-	let _measureCanvas: HTMLCanvasElement | null = null;
-	function textWidthMono(text: string) {
-		if (typeof document === 'undefined') return text.length * 8;
-		if (!_measureCanvas) _measureCanvas = document.createElement('canvas');
-		const ctx = _measureCanvas.getContext('2d');
-		if (!ctx) return text.length * 8;
-		ctx.font =
-			'12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
-		return ctx.measureText(text).width;
-	}
-
-	const yTickValues = $derived(yDomain ? axisTicks(yDomain[0], yDomain[1]) : ([] as number[]));
-
-	const leftPadding = $derived.by(() => {
-		const labels = yTickValues.map((v) => formatY(Math.round(v)));
-		const maxW = labels.reduce((m, s) => Math.max(m, textWidthMono(s)), 0);
-		return Math.max(48, Math.ceil(maxW) + 16);
-	});
+	// Full-range rows computed once per data change; the chart's period chooser only reslices
+	// them. Raw state: the rows are replaced wholesale and never mutated, so the charts skip
+	// per-property proxy traps over the ~1,800-row series.
+	let seriesRows: Row[] = $state.raw([]);
 
 	function convertSnapshot<T extends { asOf: string }>(
 		balances: T[],
@@ -139,40 +62,42 @@
 		return fx.convert(rawValue(balance), currency, balance.asOf);
 	}
 
+	function groupKey(group: BalanceGroup) {
+		return group === 'CASH'
+			? 'cash'
+			: group === 'DEBT'
+				? 'debt'
+				: group === 'INVESTMENT'
+					? 'investment'
+					: 'other';
+	}
+
 	function accumulateGroup(
 		sums: GroupSums,
-		flags: GroupFxFlags,
+		unconverted: GroupUnconverted,
 		group: BalanceGroup,
 		value: number,
-		conversion: FxFlags
+		isUnconverted: boolean
 	) {
-		const key =
-			group === 'CASH'
-				? 'cash'
-				: group === 'DEBT'
-					? 'debt'
-					: group === 'INVESTMENT'
-						? 'investment'
-						: 'other';
-		if (!conversion.isUnconverted) sums[key] += value;
-		flags[key] = {
-			isUnconverted: flags[key].isUnconverted || conversion.isUnconverted
-		};
+		const key = groupKey(group);
+		if (!isUnconverted) sums[key] += value;
+		unconverted[key] ||= isUnconverted;
 	}
 
 	function recomputeSeries() {
 		if (!rawAccounts.length && !rawAssets.length) {
-			series = [];
+			seriesRows = [];
+			memberSeries = { members: [], rows: [] };
 			return;
 		}
-		const { start, end } = computeRangeForPeriod(
-			period,
-			rawAccountBalances,
-			rawSecurityBalances,
-			rawAssetBalances
-		);
+		// The rows always span the widest choosable window - five years, or the earliest balance
+		// when it is older - so every period (including MAX) is a slice of the same computation.
+		// Days before the first balance sum to zero, matching the bounded windows' zero lead-in.
+		const now = startOfDay(new UTCDate());
+		const fiveYearsAgo = subYears(now, 5);
+		const start = maxStart && maxStart < fiveYearsAgo ? maxStart : fiveYearsAgo;
 
-		const datePoints = eachDayOfInterval({ start: new UTCDate(start), end: new UTCDate(end) });
+		const datePoints = eachDayOfInterval({ start: new UTCDate(start), end: new UTCDate(now) });
 
 		const {
 			accountBalancesByAccountId,
@@ -183,30 +108,41 @@
 			securityCurrencyById
 		} = prepared;
 
-		const accountIndexPointer = new SvelteMap<string, number>();
+		// Plain records for the scratch state: it is written tens of thousands of times per
+		// recompute and needs no reactivity of its own.
+		const accountIndexPointer: Record<string, number> = {};
 		for (const [accountId, balances] of accountBalancesByAccountId)
-			accountIndexPointer.set(accountId, latestIndexBeforeOrEqual(balances, datePoints[0], -1));
-		const securityValueState = new SvelteMap<string, TrendSecurityValueState>();
-		const assetIndexPointer = new SvelteMap<string, number>();
+			accountIndexPointer[accountId] = latestIndexBeforeOrEqual(balances, datePoints[0], -1);
+		const securityValueState: Record<string, TrendSecurityValueState> = {};
+		const assetIndexPointer: Record<string, number> = {};
 		for (const [assetId, balances] of assetBalancesByAssetId)
-			assetIndexPointer.set(assetId, latestIndexBeforeOrEqual(balances, datePoints[0], -1));
+			assetIndexPointer[assetId] = latestIndexBeforeOrEqual(balances, datePoints[0], -1);
+
+		// Per-entity daily values for the group charts, keyed by account/asset id. Days without a
+		// contribution stay null so a windowed slice can tell "no data in this window" (member
+		// dropped) apart from a contributed zero.
+		const memberValues: Record<string, Array<number | null>> = {};
+		function addMemberValue(id: string, pointIndex: number, value: number) {
+			const values = (memberValues[id] ??= new Array<number | null>(datePoints.length).fill(null));
+			values[pointIndex] = (values[pointIndex] ?? 0) + value;
+		}
 
 		const rows: Row[] = [];
-		for (const datePoint of datePoints) {
+		for (const [pointIndex, datePoint] of datePoints.entries()) {
 			const sums: GroupSums = { cash: 0, debt: 0, investment: 0, other: 0 };
-			const flags: GroupFxFlags = {
-				cash: { isUnconverted: false },
-				debt: { isUnconverted: false },
-				investment: { isUnconverted: false },
-				other: { isUnconverted: false }
+			const unconverted: GroupUnconverted = {
+				cash: false,
+				debt: false,
+				investment: false,
+				other: false
 			};
 
 			for (const [accountId, balances] of accountBalancesByAccountId) {
 				const meta = accountById.get(accountId);
 				if (!meta) continue;
-				const previousIndex = accountIndexPointer.get(accountId) ?? -1;
+				const previousIndex = accountIndexPointer[accountId] ?? -1;
 				const index = latestIndexBeforeOrEqual(balances, datePoint, previousIndex);
-				accountIndexPointer.set(accountId, index);
+				accountIndexPointer[accountId] = index;
 				const conversion = convertSnapshot(
 					balances,
 					index,
@@ -217,24 +153,26 @@
 				);
 				accumulateGroup(
 					sums,
-					flags,
+					unconverted,
 					meta.balanceGroup as BalanceGroup,
 					conversion.value,
-					conversion
+					conversion.isUnconverted
 				);
+				if (index >= 0 && !(meta.closed && datePoint >= new Date(meta.closed)))
+					addMemberValue(accountId, pointIndex, conversion.isUnconverted ? 0 : conversion.value);
 			}
 
 			for (const [key, balances] of securityBalancesByAccountSecurity) {
 				const accountId = balances[0]?.account;
-				const meta = accountId ? accountById.get(accountId) : null;
+				if (!accountId) continue;
+				const meta = accountById.get(accountId);
 				if (!meta) continue;
 				if (meta.closed && datePoint >= new Date(meta.closed)) continue;
-				const state = securityValueState.get(key) ?? {
+				const state = (securityValueState[key] ??= {
 					index: -1,
 					lastKnownValue: null,
 					soldOut: false
-				};
-				securityValueState.set(key, state);
+				});
 				const rawValue = advanceTrendSecurityValue(balances, datePoint, state);
 				if (rawValue === null) continue;
 				// NOTE: securities load from a different context than these balances, so their currency
@@ -247,19 +185,21 @@
 				);
 				accumulateGroup(
 					sums,
-					flags,
+					unconverted,
 					meta.balanceGroup as BalanceGroup,
 					conversion.value,
-					conversion
+					conversion.isUnconverted
 				);
+				// Positions roll up into their owning account's series
+				addMemberValue(accountId, pointIndex, conversion.isUnconverted ? 0 : conversion.value);
 			}
 
 			for (const [assetId, balances] of assetBalancesByAssetId) {
 				const meta = assetById.get(assetId);
 				if (!meta) continue;
-				const previousIndex = assetIndexPointer.get(assetId) ?? -1;
+				const previousIndex = assetIndexPointer[assetId] ?? -1;
 				const index = latestIndexBeforeOrEqual(balances, datePoint, previousIndex);
-				assetIndexPointer.set(assetId, index);
+				assetIndexPointer[assetId] = index;
 				const conversion = convertSnapshot(
 					balances,
 					index,
@@ -270,21 +210,18 @@
 				);
 				accumulateGroup(
 					sums,
-					flags,
+					unconverted,
 					meta.balanceGroup as BalanceGroup,
 					conversion.value,
-					conversion
+					conversion.isUnconverted
 				);
+				if (index >= 0 && !(meta.sold && datePoint >= new Date(meta.sold)))
+					addMemberValue(assetId, pointIndex, conversion.isUnconverted ? 0 : conversion.value);
 			}
 
 			const net = sums.cash + sums.debt + sums.investment + sums.other;
-			const netFlags: FxFlags = {
-				isUnconverted:
-					flags.cash.isUnconverted ||
-					flags.debt.isUnconverted ||
-					flags.investment.isUnconverted ||
-					flags.other.isUnconverted
-			};
+			const netIsUnconverted =
+				unconverted.cash || unconverted.debt || unconverted.investment || unconverted.other;
 			rows.push({
 				date: datePoint,
 				net,
@@ -292,93 +229,79 @@
 				debt: sums.debt,
 				investment: sums.investment,
 				other: sums.other,
-				fx: { net: netFlags, ...flags }
+				isUnconverted: { net: netIsUnconverted, ...unconverted }
 			});
 		}
 
-		series = rows;
+		seriesRows = rows;
+		memberSeries = {
+			members: [...rawAccounts, ...rawAssets]
+				.filter((entity) => entity.id in memberValues)
+				.map((entity) => ({
+					key: entity.id,
+					label: entity.name,
+					group: groupKey(entity.balanceGroup as BalanceGroup)
+				})),
+			rows: datePoints.map((date, index) => ({
+				date,
+				values: Object.fromEntries(
+					Object.entries(memberValues).map(([id, values]) => [id, values[index]] as const)
+				)
+			}))
+		};
 	}
 
 	$effect(() => recomputeSeries());
 </script>
 
-{#if isLoading}
-	<Skeleton class="h-[30vh] min-h-[220px]" showSpinner />
-{:else if isEmpty}
-	<Empty>{m.trends_empty()}</Empty>
-{:else}
-	<div
-		class="bg-background overflow-visible rounded-sm shadow-md"
-		data-growth-period={period}
-		data-growth-points={series.length}
-		data-growth-start={firstSeriesRow?.date.toISOString().slice(0, 10)}
-		data-growth-end={lastSeriesRow?.date.toISOString().slice(0, 10)}
-		data-growth-start-net={firstSeriesRow?.net}
-		data-growth-end-net={lastSeriesRow?.net}
-	>
-		<Chart.Container config={chartConfig} class="h-[30vh] min-h-[220px] w-full">
-			<LineChart
-				data={series}
-				x="date"
-				xScale={scaleUtc()}
-				yDomain={yDomain ?? undefined}
-				padding={{ top: 32, right: 48, bottom: 24, left: leftPadding }}
-				series={[
-					{ key: 'net', label: chartConfig.net.label, color: chartConfig.net.color },
-					{ key: 'cash', label: chartConfig.cash.label, color: chartConfig.cash.color },
-					{ key: 'debt', label: chartConfig.debt.label, color: chartConfig.debt.color },
-					{
-						key: 'investment',
-						label: chartConfig.investment.label,
-						color: chartConfig.investment.color
-					},
-					{ key: 'other', label: chartConfig.other.label, color: chartConfig.other.color }
-				]}
-				legend={{ placement: 'top' }}
-				props={{
-					spline: { curve: curveBumpX, motion: 'tween', strokeWidth: 1.25 },
-					xAxis: {
-						format: (v: Date) => v.toISOString().slice(0, 10),
-						ticks: 6
-					},
-					yAxis: {
-						format: (v: number) => formatY(Math.round(v)),
-						ticks: (scale) => {
-							const [min, max] = scale.domain();
-							return axisTicks(min, max);
-						}
-					},
-					grid: { x: true, y: true, xTicks: 6, yTicks: [0] },
-					highlight: { points: { r: 3 } }
-				}}
-			>
-				{#snippet tooltip()}
-					{#if hasUnconverted}
-						<Chart.Tooltip>
-							{#snippet formatter({ value, item })}
-								{@const key = item.key as GroupKey}
-								{@const seriesConfig = chartConfig[key]}
-								{@const row = item.payload as Row}
-								{@const conversion = row.fx[key]}
-								<div
-									style="--color-bg: {seriesConfig.color}; --color-border: {seriesConfig.color};"
-									class="size-2.5 shrink-0 rounded-lg border-(--color-border) bg-(--color-bg)"
-								></div>
-								<div
-									class="flex flex-1 shrink-0 items-center justify-between gap-4 text-base leading-none"
-								>
-									<span class="text-muted-foreground text-sm">{seriesConfig.label}</span>
-									{#if typeof value === 'number'}
-										<Currency {value} isUnconverted={conversion.isUnconverted} />
-									{/if}
-								</div>
-							{/snippet}
-						</Chart.Tooltip>
-					{:else}
-						<Chart.Tooltip />
-					{/if}
-				{/snippet}
-			</LineChart>
-		</Chart.Container>
-	</div>
-{/if}
+<!-- NOTE: reference the raw tokens (--cash, not --color-cash): ChartStyle re-emits each config
+color as --color-<key> per chart, so var(--color-cash) would be a circular reference. -->
+<TimeSeriesChart
+	title={m.trends_growth_section_title()}
+	{isLoading}
+	rows={seriesRows}
+	period="1y"
+	{maxStart}
+	series={[
+		{
+			key: 'net',
+			label: m.trends_series_net_label(),
+			color: 'var(--foreground)',
+			value: (row) => row.net,
+			isUnconverted: (row) => row.isUnconverted.net
+		},
+		{
+			key: 'cash',
+			label: m.trends_series_cash_label(),
+			color: 'var(--cash)',
+			value: (row) => row.cash,
+			isUnconverted: (row) => row.isUnconverted.cash
+		},
+		{
+			key: 'debt',
+			label: m.trends_series_debt_label(),
+			color: 'var(--debt)',
+			value: (row) => row.debt,
+			isLiability: true,
+			isUnconverted: (row) => row.isUnconverted.debt
+		},
+		{
+			key: 'investment',
+			label: m.trends_series_investment_label(),
+			color: 'var(--investment)',
+			value: (row) => row.investment,
+			isUnconverted: (row) => row.isUnconverted.investment
+		},
+		{
+			key: 'other',
+			label: m.trends_series_other_label(),
+			color: 'var(--other-assets)',
+			value: (row) => row.other,
+			isUnconverted: (row) => row.isUnconverted.other
+		}
+	]}
+	emptyMessage={m.trends_empty()}
+	formatAxisValue={(value) => formatCurrency(Math.round(value))}
+	formatTooltipValue={(value) => formatCurrency(value)}
+	data-growth-chart=""
+/>

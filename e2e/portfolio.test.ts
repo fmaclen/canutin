@@ -1,11 +1,13 @@
 import { UTCDate } from '@date-fns/utc';
 import { expect, test } from '@playwright/test';
+import { startOfDay, subDays, subMonths } from 'date-fns';
 
 import {
 	AccountsBalanceGroupOptions,
 	SecurityTransactionsTypeOptions
 } from '../src/lib/pocketbase.schema';
 import {
+	dragChart,
 	formatDateForInput,
 	goToAddPage,
 	goToEditTab,
@@ -57,6 +59,12 @@ test('portfolio and trades flow covers security creation, balances, filters, and
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Portfolio');
 	await expect(page.getByText('No positions yet')).toBeVisible();
+	await expect(page.getByText('No market value history yet')).toBeVisible();
+	await expect(page.getByText('No allocation yet')).toBeVisible();
+	// Positions first, then the market value chart and allocation treemap side by side
+	await expect(
+		page.getByRole('heading', { name: /^(Positions|Market value|Allocation)$/ })
+	).toHaveText(['Positions', 'Market value', 'Allocation']);
 
 	await goToAddPage(page, 'Securities');
 	await expect(page).toHaveURL('/securities/add');
@@ -86,12 +94,19 @@ test('portfolio and trades flow covers security creation, balances, filters, and
 	await goToPageViaSidebar(page, 'Portfolio');
 	const portfolioRow = page.getByRole('row', { name: /Vanguard Total Stock Market ETF/ });
 	await expect(portfolioRow).toBeVisible();
+	// A single balance date yields one series point, which is not enough to draw a line,
+	// so the market value chart stays empty
+	await expect(page.getByText('No market value history yet')).toBeVisible();
+	await expect(page.getByRole('img', { name: 'Market value' })).not.toBeVisible();
 	await expect(portfolioRow).toContainText('VTI');
 	await expect(portfolioRow).toContainText('Core Brokerage');
 	await expect(portfolioRow).toContainText('10');
 	await expect(portfolioRow).toContainText('$2,000.00');
 	await expect(portfolioRow).toContainText('$1,500.00');
 	await expect(portfolioRow).toContainText('$500.00');
+	await expect(
+		page.getByRole('link', { name: 'Vanguard Total Stock Market ETF: $2,000.00' })
+	).toBeVisible();
 
 	await portfolioRow.getByRole('link', { name: 'Vanguard Total Stock Market ETF' }).click();
 	await expect(page).toHaveURL(/\/securities\//);
@@ -272,6 +287,108 @@ test('portfolio search and account filters update and restore the URL, rows, and
 	await expect(page.getByRole('region', { name: 'Net market value' })).toContainText('$3,000.00');
 });
 
+test('portfolio charts total securities value across accounts with drag-to-compare', async ({
+	page
+}) => {
+	const user = await seedUser('margot');
+	const brokerage = await seedAccount({
+		name: 'Chart Brokerage',
+		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+		owner: user.id,
+		balanceType: 'Brokerage'
+	});
+	const ira = await seedAccount({
+		name: 'Chart IRA',
+		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+		owner: user.id,
+		balanceType: 'Retirement'
+	});
+	const alphaSecurity = await seedSecurity({
+		name: 'Chart Alpha Fund',
+		symbol: 'CAF',
+		owner: user.id
+	});
+	const betaSecurity = await seedSecurity({
+		name: 'Chart Beta Fund',
+		symbol: 'CBT',
+		owner: user.id
+	});
+	// Two accounts start at $600 + $400 = $1,000 six months back; the brokerage position jumps to
+	// $2,600 three months back, so the series forward-fills $1,000 then $3,000 up to today
+	const start = subDays(new UTCDate(), 180).toISOString();
+	const midpoint = subDays(new UTCDate(), 90).toISOString();
+	await seedSecurityBalance({
+		account: brokerage.id,
+		owner: user.id,
+		security: alphaSecurity.id,
+		asOf: start,
+		quantity: 10,
+		price: 60,
+		value: 600,
+		costBasis: 500
+	});
+	await seedSecurityBalance({
+		account: ira.id,
+		owner: user.id,
+		security: betaSecurity.id,
+		asOf: start,
+		quantity: 5,
+		price: 80,
+		value: 400,
+		costBasis: 350
+	});
+	await seedSecurityBalance({
+		account: brokerage.id,
+		owner: user.id,
+		security: alphaSecurity.id,
+		asOf: midpoint,
+		quantity: 10,
+		price: 260,
+		value: 2600,
+		costBasis: 500
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Portfolio');
+	await expect(page.getByRole('heading', { name: 'Market value' })).toBeVisible();
+	await expect(page.getByRole('img', { name: 'Market value' })).toBeVisible();
+	await expect(page.getByRole('region', { name: 'Net market value' })).toContainText('$3,000.00');
+
+	// Drag across the chart: a quarter in lands in the $1,000 stretch, three quarters in lands in
+	// the $3,000 stretch, so the compare tooltip reports the account-spanning total's change.
+	// The chart sits below the positions section, so bring it into the viewport before
+	// dragging with viewport-relative mouse coordinates.
+	const chart = page.getByRole('img', { name: 'Market value' });
+	await chart.scrollIntoViewIfNeeded();
+	await dragChart(page, chart, 0.25, 0.75, 0.5, 0);
+	await expect(page.getByText('+$2,000.00')).toBeVisible();
+	await expect(page.getByText('+200.0%')).toBeVisible();
+
+	// Releasing restores the regular single-point tooltip; its "Market value" series label also
+	// renders in the section heading and table header, so scope the check to the tooltip portal
+	await page.mouse.up();
+	await expect(page.getByText('+$2,000.00')).not.toBeVisible();
+	await expect(
+		page.locator('.lc-tooltip-content').getByText('Market value', { exact: true })
+	).toBeVisible();
+
+	// The chart's period chooser reslices the x-axis span: the MAX default spans from the first
+	// balance six months back, 3M clips the same series to the last three months.
+	await expect(page.locator('[data-chart-period="max"]')).toHaveAttribute(
+		'data-chart-start',
+		start.slice(0, 10)
+	);
+	await page
+		.getByRole('tablist', { name: 'Market value period' })
+		.getByRole('tab', { name: '3M' })
+		.click();
+	await expect(page.locator('[data-chart-period="3m"]')).toHaveAttribute(
+		'data-chart-start',
+		subMonths(startOfDay(new UTCDate()), 3).toISOString().slice(0, 10)
+	);
+});
+
 test('portfolio unknown values render as unknown and do not inflate account totals', async ({
 	page
 }) => {
@@ -325,6 +442,8 @@ test('portfolio unknown values render as unknown and do not inflate account tota
 	const knownZeroRow = page.getByRole('row', { name: /Worthless Fund/ });
 	await expect(knownZeroRow).toContainText('WRTH');
 	await expect(knownZeroRow.locator('td').last()).toHaveText('$0.00');
+	// Unknown and zero market values can't size a treemap rect, so the allocation stays empty
+	await expect(page.getByText('No allocation yet')).toBeVisible();
 
 	const partialTotalLabel =
 		'Some items are missing values or conversion rates and are excluded from this total';
@@ -459,6 +578,36 @@ test('portfolio tables sort positions by market value descending with unknown va
 	await expect(portfolioRows.nth(3)).toContainText('Bravo Holdings');
 	await expect(portfolioRows.nth(4)).toContainText('Delta Holdings');
 	await expect(portfolioRows.nth(4).locator('td').last()).toHaveText('~');
+
+	// The allocation treemap renders one rect per known positive position; Delta's unknown
+	// market value can't size a rect
+	await expect(page.getByRole('link', { name: 'Alpha Holdings: $4,500.00' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Charlie Holdings: $4,000.00' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Bravo Holdings: $3,500.00' })).toBeVisible();
+	await expect(page.getByRole('link', { name: /Delta Holdings:/ })).toHaveCount(0);
+
+	// Fills always follow gain sentiment; the mode tabs only swap the rect headline between
+	// the position's value and its gain % ($800 gain on $3,700 basis)
+	const alphaRect = page.getByRole('link', { name: 'Alpha Holdings: $4,500.00' });
+	await expect(alphaRect.getByText('$4,500.00')).toBeVisible();
+	await expect(alphaRect).toHaveAttribute('style', /var\(--cash\)/);
+	await page.getByRole('tab', { name: 'Gain', exact: true }).click();
+	await expect(alphaRect.getByText('$4,500.00')).not.toBeVisible();
+	await expect(alphaRect.getByText('+21.6%')).toBeVisible();
+	await expect(alphaRect).toHaveAttribute('style', /var\(--cash\)/);
+	await page.getByRole('tab', { name: 'Market value', exact: true }).click();
+	await expect(alphaRect.getByText('$4,500.00')).toBeVisible();
+
+	// Hover tooltips are unavailable in mobile projects.
+	if (!test.info().project.name?.toLowerCase().includes('mobile')) {
+		// HACK: a pointer that lands on a freshly rendered trigger before bits-ui binds its
+		// listeners never opens the tooltip; leave and re-enter so the second hover is seen
+		await page.getByRole('link', { name: 'Alpha Holdings: $4,500.00' }).hover();
+		await page.mouse.move(0, 0);
+		// Alpha holds $4,500 of the $12,000 charted total
+		await page.getByRole('link', { name: 'Alpha Holdings: $4,500.00' }).hover();
+		await expect(page.getByText('37.5%')).toBeVisible();
+	}
 
 	await portfolioRows.nth(1).getByRole('link', { name: 'Main Brokerage' }).click();
 	const accountPositionRows = page.getByRole('table').getByRole('row');
