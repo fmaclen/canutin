@@ -77,6 +77,31 @@
 	};
 	const seriesByKey = $derived(new Map(series.map((s) => [s.key, s])));
 
+	// The chart lays out against a debounced container size instead of layerchart's live
+	// element binding: a window drag emits dozens of resize events, and re-laying out
+	// every chart on each one stalls the main thread for seconds. The first measurement
+	// applies immediately so mount isn't delayed; later ones settle once the drag pauses.
+	let chartSize = $state<{ width: number; height: number } | null>(null);
+	const chartSizeProps = {
+		[createAttachmentKey()]: (node: HTMLElement) => {
+			let timer = 0;
+			const observer = new ResizeObserver(([entry]) => {
+				const next = { width: entry.contentRect.width, height: entry.contentRect.height };
+				if (!chartSize) {
+					chartSize = next;
+					return;
+				}
+				clearTimeout(timer);
+				timer = window.setTimeout(() => (chartSize = next), 100);
+			});
+			observer.observe(node);
+			return () => {
+				clearTimeout(timer);
+				observer.disconnect();
+			};
+		}
+	};
+
 	let chartContext = $state<ChartState<T>>();
 	const hovered: T | null = $derived(chartContext?.tooltip.data ?? null);
 
@@ -189,9 +214,12 @@
 			role={hasLegend ? undefined : 'img'}
 			aria-label={hasLegend ? undefined : series[0].label}
 			onpointerdown={(event) => chartCompare.start(event, hovered)}
+			{...chartSizeProps}
 		>
 			<LineChart
 				bind:context={chartContext}
+				width={chartSize?.width}
+				height={chartSize?.height}
 				data={windowedRows}
 				x="date"
 				xScale={scaleUtc()}
