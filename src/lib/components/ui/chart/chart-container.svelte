@@ -65,7 +65,7 @@
 		'[&_.lc-legend-container]:inset-x-0 [&_.lc-legend-container]:transform-none',
 		'[&_.lc-legend-swatch-group]:flex-wrap [&_.lc-legend-swatch-group]:justify-center',
 		'[&_.lc-legend-swatch-button]:items-center [&_.lc-legend-swatch-button]:gap-1.5',
-		'[&_.lc-legend-swatch-group]:items-center [&_.lc-legend-swatch-group]:gap-4',
+		'[&_.lc-legend-swatch-group]:items-center [&_.lc-legend-swatch-group]:gap-x-4 [&_.lc-legend-swatch-group]:gap-y-1',
 		'[&_.lc-legend-swatch]:size-2.5 [&_.lc-legend-swatch]:rounded-xl',
 
 		// Labels
