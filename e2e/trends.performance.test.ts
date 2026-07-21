@@ -512,8 +512,8 @@ test('trends performance table', async ({ page }) => {
 	await historyHeld;
 
 	await seedTodayCashBalance(10000);
-	await expect(maxChart).toHaveAttribute('data-chart-end-value', '7000');
 	await expect(cashCells.nth(8).getByRole('button', { name: '+900%' })).toBeVisible();
+	await expect(maxChart).toHaveAttribute('data-chart-end-value', '7000');
 
 	// Releasing the stale 9,000 response cannot overwrite the replacement's 10,000 snapshot.
 	releaseHistory();
