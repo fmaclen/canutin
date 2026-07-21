@@ -18,6 +18,17 @@ import {
 test('trends performance table', async ({ page }) => {
 	const user = await seedUser('steve');
 
+	await page.addInitScript(() => {
+		const NativeEventSource = window.EventSource;
+		const sources: EventSource[] = [];
+		Object.assign(window, { __realtimeSources: sources });
+		window.EventSource = class extends NativeEventSource {
+			constructor(url: string | URL, init?: EventSourceInit) {
+				super(url, init);
+				sources.push(this);
+			}
+		};
+	});
 	await page.goto('/');
 	await signIn(page, user.email);
 
@@ -432,4 +443,112 @@ test('trends performance table', async ({ page }) => {
 	await expect(debtShrinkCompareTooltip.getByText('-14.3%')).toHaveClass(/text-cash/);
 	await page.mouse.up();
 	await expect(page.getByText(debtShrinkCompareHeader)).not.toBeVisible();
+
+	const observation = await page.evaluateHandle(() => {
+		const state = { mutations: 0 };
+		const observer = new MutationObserver((records) => (state.mutations += records.length));
+		for (const chart of document.querySelectorAll('[data-growth-chart], [data-group-chart]'))
+			observer.observe(chart, {
+				attributes: true,
+				characterData: true,
+				childList: true,
+				subtree: true
+			});
+		return { observer, state };
+	});
+	await expect(page.locator('[data-growth-chart], [data-group-chart]')).toHaveCount(5);
+
+	let trendHistoryRequests = 0;
+	page.on('requestfinished', (request) => {
+		const url = new URL(request.url());
+		if (request.method() !== 'GET') return;
+		if (
+			(url.pathname.endsWith('/api/collections/accountBalances/records') &&
+				url.searchParams.get('fields') === 'id,account,value,asOf,created') ||
+			(url.pathname.endsWith('/api/collections/securityBalances/records') &&
+				url.searchParams.get('fields') === 'id,account,security,value,quantity,asOf,created') ||
+			(url.pathname.endsWith('/api/collections/assetBalances/records') &&
+				url.searchParams.get('fields') === 'id,asset,marketValue,asOf,created')
+		)
+			trendHistoryRequests++;
+	});
+	await page.evaluate(() => window.dispatchEvent(new Event('online')));
+	await expect.poll(() => trendHistoryRequests).toBe(12);
+	const recoveryMutations = await observation.evaluate(async ({ observer, state }) => {
+		await new Promise<void>((resolve) =>
+			requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+		);
+		const mutations = state.mutations + observer.takeRecords().length;
+		state.mutations = 0;
+		return mutations;
+	});
+	expect(recoveryMutations).toBe(0);
+
+	// Hold the first full-history response after it captures 9,000. A second balance event must
+	// invalidate that request immediately and let its debounced replacement commit 10,000.
+	const { promise: historyGate, resolve: releaseHistory } = Promise.withResolvers<void>();
+	const { promise: historyHeld, resolve: resolveHistoryHeld } = Promise.withResolvers<void>();
+	const seedTodayCashBalance = (value: number) =>
+		seedAccountBalance({
+			account: cashAccount.id,
+			owner: user.id,
+			asOf: todayStart.toISOString(),
+			value
+		});
+	await page.route(
+		(url) =>
+			url.pathname.endsWith('/api/collections/accountBalances/records') &&
+			url.searchParams.get('fields') === 'id,account,value,asOf,created' &&
+			!url.searchParams.get('filter')?.includes('asOf'),
+		async (route) => {
+			const response = await route.fetch();
+			resolveHistoryHeld();
+			await historyGate;
+			return route.fulfill({ response });
+		},
+		{ times: 1 }
+	);
+	await seedTodayCashBalance(9000);
+	await historyHeld;
+
+	await seedTodayCashBalance(10000);
+	await expect(maxChart).toHaveAttribute('data-chart-end-value', '7000');
+	await expect(cashCells.nth(8).getByRole('button', { name: '+900%' })).toBeVisible();
+
+	// Releasing the stale 9,000 response cannot overwrite the replacement's 10,000 snapshot.
+	releaseHistory();
+	await expect.poll(() => trendHistoryRequests).toBe(36);
+	await page.evaluate(
+		() =>
+			new Promise<void>((resolve) =>
+				requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+			)
+	);
+	await expect(maxChart).toHaveAttribute('data-chart-end-value', '7000');
+	await expect(cashCells.nth(8).getByRole('button', { name: '+900%' })).toBeVisible();
+	await observation.evaluate(({ observer, state }) => {
+		observer.takeRecords();
+		state.mutations = 0;
+	});
+
+	const { promise: realtimeGate, resolve: releaseRealtime } = Promise.withResolvers<void>();
+	await page.route('**/api/realtime', (route) => realtimeGate.then(() => route.continue()));
+	await page.evaluate(() => {
+		const sources = (window as unknown as { __realtimeSources: EventSource[] }).__realtimeSources;
+		for (const source of sources) source.dispatchEvent(new Event('error'));
+	});
+	await seedTodayCashBalance(11000);
+	await expect(maxChart).toHaveAttribute('data-chart-end-value', '7000');
+	await expect(cashCells.nth(8).getByRole('button', { name: '+900%' })).toBeVisible();
+
+	releaseRealtime();
+	await expect(maxChart).toHaveAttribute('data-chart-end-value', '8000');
+	await expect(cashCells.nth(8).getByRole('button', { name: '+1,000%' })).toBeVisible();
+	const changedRecoveryMutations = await observation.evaluate(({ observer, state }) => {
+		const mutations = state.mutations + observer.takeRecords().length;
+		observer.disconnect();
+		return mutations;
+	});
+	expect(changedRecoveryMutations).toBeGreaterThan(0);
+	expect(trendHistoryRequests).toBe(48);
 });
