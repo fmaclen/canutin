@@ -15,6 +15,8 @@ import {
 	seedUser
 } from './pocketbase.helpers';
 
+test.skip(({ isMobile }) => isMobile, 'Trends performance table is desktop-only');
+
 test('trends performance table', async ({ page }) => {
 	const user = await seedUser('steve');
 
@@ -491,7 +493,7 @@ test('trends performance table', async ({ page }) => {
 		for (const source of sources) source.dispatchEvent(new Event('error'));
 	});
 	await realtimeHeld;
-	await seedAccountBalance({
+	const missedBalance = await seedAccountBalance({
 		account: cashAccount.id,
 		owner: user.id,
 		asOf: todayStart.toISOString(),
@@ -504,7 +506,34 @@ test('trends performance table', async ({ page }) => {
 		state.mutations = 0;
 	});
 
+	const recoveredBalanceHistory = page.waitForResponse(async (response) => {
+		const url = new URL(response.url());
+		if (
+			response.request().method() !== 'GET' ||
+			!url.pathname.endsWith('/api/collections/accountBalances/records') ||
+			url.searchParams.get('fields') !== 'id,account,value,asOf,created'
+		)
+			return false;
+
+		const body: unknown = await response.json();
+		return (
+			typeof body === 'object' &&
+			body !== null &&
+			'items' in body &&
+			Array.isArray(body.items) &&
+			body.items.some(
+				(item: unknown) =>
+					typeof item === 'object' &&
+					item !== null &&
+					'id' in item &&
+					item.id === missedBalance.id &&
+					'value' in item &&
+					item.value === missedBalance.value
+			)
+		);
+	});
 	releaseRealtime();
+	await recoveredBalanceHistory;
 	await expect(maxChart).toHaveAttribute('data-chart-end-value', '8000');
 	await expect(cashCells.nth(8).getByRole('button', { name: '+1,000%' })).toBeVisible();
 	const changedRecoveryMutations = await observation.evaluate(({ observer, state }) => {
