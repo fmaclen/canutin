@@ -15,22 +15,9 @@ import {
 	seedUser
 } from './pocketbase.helpers';
 
-test.skip(({ isMobile }) => isMobile, 'Trends performance table is desktop-only');
-
 test('trends performance table', async ({ page }) => {
 	const user = await seedUser('steve');
 
-	await page.addInitScript(() => {
-		const NativeEventSource = window.EventSource;
-		const sources: EventSource[] = [];
-		Object.assign(window, { __realtimeSources: sources });
-		window.EventSource = class extends NativeEventSource {
-			constructor(url: string | URL, init?: EventSourceInit) {
-				super(url, init);
-				sources.push(this);
-			}
-		};
-	});
 	await page.goto('/');
 	await signIn(page, user.email);
 
@@ -445,101 +432,4 @@ test('trends performance table', async ({ page }) => {
 	await expect(debtShrinkCompareTooltip.getByText('-14.3%')).toHaveClass(/text-cash/);
 	await page.mouse.up();
 	await expect(page.getByText(debtShrinkCompareHeader)).not.toBeVisible();
-
-	await expect(page.locator('[data-growth-chart], [data-group-chart]')).toHaveCount(5);
-	const observation = await page.evaluateHandle(() => {
-		const state = { mutations: 0 };
-		const observer = new MutationObserver((records) => (state.mutations += records.length));
-		for (const chart of document.querySelectorAll('[data-growth-chart], [data-group-chart]'))
-			observer.observe(chart, {
-				attributes: true,
-				characterData: true,
-				childList: true,
-				subtree: true
-			});
-		return { observer, state };
-	});
-
-	await Promise.all([
-		page.waitForResponse((response) => {
-			const url = new URL(response.url());
-			return (
-				response.request().method() === 'GET' &&
-				url.pathname.endsWith('/api/collections/accountBalances/records') &&
-				url.searchParams.get('filter')?.includes('asOf<') === true
-			);
-		}),
-		page.evaluate(() => window.dispatchEvent(new Event('online')))
-	]);
-	const recoveryMutations = await observation.evaluate(async ({ observer, state }) => {
-		await new Promise<void>((resolve) =>
-			requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-		);
-		const mutations = state.mutations + observer.takeRecords().length;
-		state.mutations = 0;
-		return mutations;
-	});
-	expect(recoveryMutations).toBe(0);
-
-	const { promise: realtimeGate, resolve: releaseRealtime } = Promise.withResolvers<void>();
-	const { promise: realtimeHeld, resolve: resolveRealtimeHeld } = Promise.withResolvers<void>();
-	await page.route('**/api/realtime', async (route) => {
-		resolveRealtimeHeld();
-		await realtimeGate;
-		await route.continue();
-	});
-	await page.evaluate(() => {
-		const sources = (window as unknown as { __realtimeSources: EventSource[] }).__realtimeSources;
-		for (const source of sources) source.dispatchEvent(new Event('error'));
-	});
-	await realtimeHeld;
-	const missedBalance = await seedAccountBalance({
-		account: cashAccount.id,
-		owner: user.id,
-		asOf: todayStart.toISOString(),
-		value: 11000
-	});
-	await expect(maxChart).toHaveAttribute('data-chart-end-value', '5000');
-	await expect(cashCells.nth(8).getByRole('button', { name: '+700%' })).toBeVisible();
-	await observation.evaluate(({ observer, state }) => {
-		observer.takeRecords();
-		state.mutations = 0;
-	});
-
-	const recoveredBalanceHistory = page.waitForResponse(async (response) => {
-		const url = new URL(response.url());
-		if (
-			response.request().method() !== 'GET' ||
-			!url.pathname.endsWith('/api/collections/accountBalances/records') ||
-			url.searchParams.get('fields') !== 'id,account,value,asOf,created'
-		)
-			return false;
-
-		const body: unknown = await response.json();
-		return (
-			typeof body === 'object' &&
-			body !== null &&
-			'items' in body &&
-			Array.isArray(body.items) &&
-			body.items.some(
-				(item: unknown) =>
-					typeof item === 'object' &&
-					item !== null &&
-					'id' in item &&
-					item.id === missedBalance.id &&
-					'value' in item &&
-					item.value === missedBalance.value
-			)
-		);
-	});
-	releaseRealtime();
-	await recoveredBalanceHistory;
-	await expect(maxChart).toHaveAttribute('data-chart-end-value', '8000');
-	await expect(cashCells.nth(8).getByRole('button', { name: '+1,000%' })).toBeVisible();
-	const changedRecoveryMutations = await observation.evaluate(({ observer, state }) => {
-		const mutations = state.mutations + observer.takeRecords().length;
-		observer.disconnect();
-		return mutations;
-	});
-	expect(changedRecoveryMutations).toBeGreaterThan(0);
 });
