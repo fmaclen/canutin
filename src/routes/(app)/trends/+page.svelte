@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { UTCDate } from '@date-fns/utc';
 	import { startOfDay } from 'date-fns';
-	import type { RecordSubscription } from 'pocketbase';
 	import { untrack } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 
@@ -18,6 +17,7 @@
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import TimeSeriesChart from '$lib/components/time-series-chart.svelte';
+	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import type {
 		AccountBalancesResponse,
@@ -27,6 +27,7 @@
 		SecurityBalancesResponse
 	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+	import { Debouncer, RequestSequence } from '$lib/realtime-sync';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
 	import { projectSignedValue } from '$lib/sharing';
 	import { toNumber } from '$lib/utils';
@@ -60,7 +61,6 @@
 	let rawFullHistoryAccountBalances: AccountBalancesResponse[] = $state.raw([]);
 	let rawFullHistorySecurityBalances: TrendSecurityBalance[] = $state.raw([]);
 	let rawFullHistoryAssetBalances: AssetBalancesResponse[] = $state.raw([]);
-	let historyStart: Date | null = $state(null);
 
 	const includedAccounts = $derived.by(
 		() =>
@@ -85,14 +85,18 @@
 				account.participantExcluded,
 				account.perspective,
 				account.closed,
-				account.balanceGroup
+				account.balanceGroup,
+				account.name,
+				account.currency
 			]),
 			assets: (assetsCtx?.assets ?? []).map((asset) => [
 				asset.id,
 				asset.participantExcluded,
 				asset.perspective,
 				asset.sold,
-				asset.balanceGroup
+				asset.balanceGroup,
+				asset.name,
+				asset.currency
 			])
 		})
 	);
@@ -134,28 +138,13 @@
 		return `(${idsFilter}) && asOf>='${start.toISOString()}'`;
 	}
 
-	type TrendBalanceRecord = { asOf: string; created: string; id: string };
-
-	type BalanceRealtimeConfig<
-		TRecord extends TrendBalanceRecord,
-		TBalance extends TrendBalanceRecord
-	> = {
-		records: () => TBalance[];
-		fullHistoryRecords: () => TBalance[];
-		setRecords: (records: TBalance[]) => void;
-		setFullHistoryRecords: (records: TBalance[]) => void;
-		project: (record: TRecord) => TBalance | null;
-		carryKey: (record: TBalance) => string;
-		identityChanged: (existing: TBalance, balance: TBalance) => boolean;
-	};
-
 	function compareBalances<T extends { asOf: string; created: string; id: string }>(a: T, b: T) {
 		if (a.asOf !== b.asOf) return a.asOf.localeCompare(b.asOf);
 		if (a.created !== b.created) return a.created.localeCompare(b.created);
 		return a.id.localeCompare(b.id);
 	}
 
-	function trimBalances<T extends TrendBalanceRecord>(
+	function trimBalances<T extends { asOf: string; created: string; id: string }>(
 		records: T[],
 		start: Date | null,
 		carryKey: (record: T) => string
@@ -254,12 +243,15 @@
 		});
 	}
 
-	let refreshSequence = 0;
+	const sequence = new RequestSequence();
+	const debouncer = new Debouncer(200);
+	let disposed = false;
+	let lastIncludedSignature = '';
 
-	async function doRefresh() {
-		refreshInFlight = true;
+	async function refresh() {
+		if (disposed) return;
+		const token = sequence.next();
 		try {
-			const sequence = ++refreshSequence;
 			const start = computeBoundedHistoryStart('5y');
 			if (!start) return;
 			// Snapshot the signature this refresh reflects; the signature effect treats any later
@@ -370,7 +362,7 @@
 						)
 					]);
 
-				if (sequence !== refreshSequence) return;
+				if (disposed || !sequence.isCurrent(token)) return;
 
 				const accountBalances = trimBalances(
 					[...accountBalancesPrevious, ...accountBalancesRange]
@@ -416,104 +408,24 @@
 					null,
 					(balance) => balance.asset
 				);
-				historyStart = start;
 			} catch (error) {
-				pb.handleConnectionError(error, 'trends', 'refresh_balances');
+				if (!disposed && sequence.isCurrent(token))
+					pb.handleConnectionError(error, 'trends', 'refresh_balances');
 			}
 		} finally {
-			refreshInFlight = false;
-			if (pendingRefresh) {
-				pendingRefresh = false;
-				void doRefresh();
-			}
+			if (!disposed && sequence.isCurrent(token)) bootstrapped = true;
 		}
 	}
 
-	let refreshTimer: number | null = null;
-	let refreshInFlight = false;
-	let pendingRefresh = false;
-	let lastIncludedSignature = '';
-
-	function handleBalanceEvent<
-		TRecord extends TrendBalanceRecord,
-		TBalance extends TrendBalanceRecord
-	>(event: RecordSubscription<TRecord>, config: BalanceRealtimeConfig<TRecord, TBalance>) {
-		if (!event.action) return;
-		if (!bootstrapped) {
-			if (refreshInFlight) pendingRefresh = true;
-			return;
-		}
-		const records = config.records();
-		const fullHistoryRecords = config.fullHistoryRecords();
-		const existing = records.find((balance) => balance.id === event.record.id);
-		const fullHistoryExisting = fullHistoryRecords.find(
-			(balance) => balance.id === event.record.id
-		);
-		if (event.action === 'delete') {
-			if (existing) {
-				config.setRecords(records.filter((balance) => balance.id !== event.record.id));
-				if (historyStart && new Date(existing.asOf) < historyStart) scheduleRefresh();
-			}
-			if (fullHistoryExisting) {
-				config.setFullHistoryRecords(
-					fullHistoryRecords.filter((balance) => balance.id !== event.record.id)
-				);
-			}
-			return;
-		}
-		const balance = config.project(event.record);
-		if (!balance) {
-			if (existing) {
-				config.setRecords(records.filter((record) => record.id !== event.record.id));
-				if (historyStart && new Date(existing.asOf) < historyStart) scheduleRefresh();
-			}
-			if (fullHistoryExisting) {
-				config.setFullHistoryRecords(
-					fullHistoryRecords.filter((record) => record.id !== event.record.id)
-				);
-			}
-			return;
-		}
-		config.setFullHistoryRecords(
-			trimBalances(
-				[...fullHistoryRecords.filter((record) => record.id !== balance.id), balance],
-				null,
-				config.carryKey
-			)
-		);
-		if (
-			historyStart &&
-			((existing && new Date(existing.asOf) < historyStart) ||
-				new Date(balance.asOf) < historyStart)
-		) {
-			scheduleRefresh();
-			return;
-		}
-		config.setRecords(
-			trimBalances(
-				[...records.filter((record) => record.id !== balance.id), balance],
-				historyStart,
-				config.carryKey
-			)
-		);
-		if (existing && config.identityChanged(existing, balance)) scheduleRefresh();
-	}
-
-	function scheduleRefresh() {
-		if (refreshTimer) clearTimeout(refreshTimer);
-		refreshTimer = window.setTimeout(() => {
-			refreshTimer = null;
-			if (refreshInFlight) {
-				pendingRefresh = true;
-				return;
-			}
-			void doRefresh();
-		}, 180);
+	function invalidate() {
+		if (disposed) return;
+		sequence.bump();
+		debouncer.schedule(() => void refresh());
 	}
 
 	$effect(() => {
-		let disposed = false;
 		const unsubscribes: Array<() => void> = [];
+		pb.registerRealtimeReconnect(invalidate);
 		function addSubscription(subscription: Promise<() => void>) {
 			subscription
 				.then((unsubscribe) => {
@@ -523,57 +435,21 @@
 					}
 					unsubscribes.push(unsubscribe);
 				})
-				.catch((error) => pb.handleSubscriptionError(error, 'trends', 'subscribe_balances'));
+				.catch((error) => {
+					if (disposed) logError('trends', 'stale_subscription', error);
+					else pb.handleSubscriptionError(error, 'trends', 'subscribe_balances');
+				});
 		}
 
-		addSubscription(
-			pb.authedClient
-				.collection('accountBalances')
-				.subscribe<AccountBalancesResponse>('*', (event) =>
-					handleBalanceEvent(event, {
-						records: () => rawAccountBalances,
-						fullHistoryRecords: () => rawFullHistoryAccountBalances,
-						setRecords: (records) => (rawAccountBalances = records),
-						setFullHistoryRecords: (records) => (rawFullHistoryAccountBalances = records),
-						project: projectAccountBalance,
-						carryKey: (balance) => balance.account,
-						identityChanged: (existing, balance) => existing.account !== balance.account
-					})
-				)
-		);
-		addSubscription(
-			pb.authedClient
-				.collection('securityBalances')
-				.subscribe<SecurityBalancesResponse<number, number, number, number>>('*', (event) =>
-					handleBalanceEvent(event, {
-						records: () => rawSecurityBalances,
-						fullHistoryRecords: () => rawFullHistorySecurityBalances,
-						setRecords: (records) => (rawSecurityBalances = records),
-						setFullHistoryRecords: (records) => (rawFullHistorySecurityBalances = records),
-						project: projectSecurityBalance,
-						carryKey: (balance) => `${balance.account}:${balance.security}`,
-						identityChanged: (existing, balance) =>
-							existing.account !== balance.account || existing.security !== balance.security
-					})
-				)
-		);
-		addSubscription(
-			pb.authedClient.collection('assetBalances').subscribe<AssetBalancesResponse>('*', (event) =>
-				handleBalanceEvent(event, {
-					records: () => rawAssetBalances,
-					fullHistoryRecords: () => rawFullHistoryAssetBalances,
-					setRecords: (records) => (rawAssetBalances = records),
-					setFullHistoryRecords: (records) => (rawFullHistoryAssetBalances = records),
-					project: projectAssetBalance,
-					carryKey: (balance) => balance.asset,
-					identityChanged: (existing, balance) => existing.asset !== balance.asset
-				})
-			)
-		);
+		addSubscription(pb.authedClient.collection('accountBalances').subscribe('*', invalidate));
+		addSubscription(pb.authedClient.collection('securityBalances').subscribe('*', invalidate));
+		addSubscription(pb.authedClient.collection('assetBalances').subscribe('*', invalidate));
 
 		return () => {
 			disposed = true;
-			if (refreshTimer) clearTimeout(refreshTimer);
+			sequence.bump();
+			debouncer.cancel();
+			pb.unregisterRealtimeReconnect(invalidate);
 			for (const unsubscribe of unsubscribes) unsubscribe();
 		};
 	});
@@ -585,22 +461,17 @@
 		if (bootstrapped) return;
 		if (accountsCtx?.isLoading || assetsCtx?.isLoading) return;
 		untrack(() => {
-			void doRefresh().then(() => {
-				bootstrapped = true;
-			});
+			void refresh();
 		});
 	});
 
 	$effect(() => {
 		const signature = includedSignature;
 		if (signature === lastIncludedSignature) return;
+		const refreshStarted = sequence.current > 0;
 		lastIncludedSignature = signature;
-		if (refreshInFlight) {
-			pendingRefresh = true;
-			return;
-		}
-		if (!bootstrapped) return;
-		scheduleRefresh();
+		if (!bootstrapped && !refreshStarted) return;
+		invalidate();
 	});
 
 	const isEmpty = $derived(!rawAccounts.length && !rawAssets.length);
@@ -630,14 +501,15 @@
 	});
 	// Anchors every chart's MAX window at the earliest balance instead of the base range start,
 	// so MAX never pads a zero lead-in when history is shorter than five years
-	const maxStart = $derived.by(() => {
+	const maxStartTime = $derived.by(() => {
 		const earliest = findEarliestBalanceDate(
 			rawFullHistoryAccountBalances,
 			rawFullHistorySecurityBalances,
 			rawFullHistoryAssetBalances
 		);
-		return earliest ? startOfDay(new UTCDate(earliest.getTime())) : null;
+		return earliest ? startOfDay(new UTCDate(earliest.getTime())).getTime() : null;
 	});
+	const maxStart = $derived(maxStartTime === null ? null : new UTCDate(maxStartTime));
 </script>
 
 <Page pageTitle={m.trends_page_title()}>

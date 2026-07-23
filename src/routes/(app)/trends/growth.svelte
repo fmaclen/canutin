@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { UTCDate } from '@date-fns/utc';
 	import { eachDayOfInterval, startOfDay, subYears } from 'date-fns';
+	import { untrack } from 'svelte';
 
 	import {
 		advanceTrendSecurityValue,
@@ -85,9 +86,10 @@
 	}
 
 	function recomputeSeries() {
+		const [previousSeriesRows, previousMemberSeries] = untrack(() => [seriesRows, memberSeries]);
 		if (!rawAccounts.length && !rawAssets.length) {
-			seriesRows = [];
-			memberSeries = { members: [], rows: [] };
+			if (previousSeriesRows.length) seriesRows = [];
+			if (previousMemberSeries.rows.length) memberSeries = { members: [], rows: [] };
 			return;
 		}
 		// The rows always span the widest choosable window - five years, or the earliest balance
@@ -233,8 +235,28 @@
 			});
 		}
 
-		seriesRows = rows;
-		memberSeries = {
+		if (
+			previousSeriesRows.length !== rows.length ||
+			rows.some((row, index) => {
+				const previous = previousSeriesRows[index];
+				return (
+					row.date.getTime() !== previous.date.getTime() ||
+					row.net !== previous.net ||
+					row.cash !== previous.cash ||
+					row.debt !== previous.debt ||
+					row.investment !== previous.investment ||
+					row.other !== previous.other ||
+					row.isUnconverted.net !== previous.isUnconverted.net ||
+					row.isUnconverted.cash !== previous.isUnconverted.cash ||
+					row.isUnconverted.debt !== previous.isUnconverted.debt ||
+					row.isUnconverted.investment !== previous.isUnconverted.investment ||
+					row.isUnconverted.other !== previous.isUnconverted.other
+				);
+			})
+		)
+			seriesRows = rows;
+
+		const nextMemberSeries: TrendMemberSeries = {
 			members: [...rawAccounts, ...rawAssets]
 				.filter((entity) => entity.id in memberValues)
 				.map((entity) => ({
@@ -249,6 +271,26 @@
 				)
 			}))
 		};
+		if (
+			previousMemberSeries.members.length !== nextMemberSeries.members.length ||
+			previousMemberSeries.rows.length !== nextMemberSeries.rows.length ||
+			nextMemberSeries.members.some((member, index) => {
+				const previous = previousMemberSeries.members[index];
+				return (
+					member.key !== previous.key ||
+					member.label !== previous.label ||
+					member.group !== previous.group
+				);
+			}) ||
+			nextMemberSeries.rows.some((row, index) => {
+				const previous = previousMemberSeries.rows[index];
+				return (
+					row.date.getTime() !== previous.date.getTime() ||
+					Object.keys(row.values).some((key) => !Object.is(row.values[key], previous.values[key]))
+				);
+			})
+		)
+			memberSeries = nextMemberSeries;
 	}
 
 	$effect(() => recomputeSeries());
