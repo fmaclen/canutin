@@ -1344,7 +1344,22 @@ func handleRevert(app core.App, re *core.RequestEvent) error {
 		session.Set("recordsCreated", 0)
 		session.Set("recordsSkipped", 0)
 		session.Set("recordsFailed", 0)
-		return txApp.Save(session)
+		if err := txApp.Save(session); err != nil {
+			return err
+		}
+		if connectionID := session.GetString("connection"); connectionID != "" {
+			connection, err := txApp.FindRecordById("plaidConnections", connectionID)
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			connection.Set("cursor", "")
+			connection.Set("lastSyncedAt", "")
+			return txApp.Save(connection)
+		}
+		return nil
 	})
 
 	if err != nil {

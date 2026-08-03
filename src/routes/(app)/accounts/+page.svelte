@@ -212,6 +212,7 @@
 
 <Page pageTitle={m.accounts_title()}>
 	{#snippet actions()}
+		<Link href={resolve('/accounts/link')} class="text-sm">{m.accounts_link_page_title()}</Link>
 		<Link href={resolve('/accounts/add')} class="text-sm">{m.accounts_add_page_title()}</Link>
 	{/snippet}
 	<Section>

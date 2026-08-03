@@ -118,7 +118,42 @@ const skillCustomEndpointsSection = "## Custom endpoints\n\n" +
 	"- `POST /api/canutin/import/revert` — requires an authenticated token. Body is " +
 	"`{ sessionId }`. Returns `{ sessionId, deleted }`. Revert deletes import-session-tagged " +
 	"financial rows, but does not remove import-created `currencies` rows or their manual " +
-	"`exchangeRates` quotes because those rows do not carry an `importSession` tag.\n" +
+	"`exchangeRates` quotes because those rows do not carry an `importSession` tag. Reverting a " +
+	"Plaid sync session also clears its connection cursor and last sync time so the next sync refetches history.\n" +
+	"- `POST /api/canutin/plaid/link-token` — requires a `users` token and no body. Creates a Plaid " +
+	"Link token for Transactions with Investments as an optional product, and returns `{ linkToken }`. " +
+	"Returns `{ error: \"plaid_not_configured\" }` with status 503 when Plaid credentials are unavailable, " +
+	"or `{ error: \"plaid_request_failed\", message: \"Plaid is temporarily unavailable\" }` with status 502 " +
+	"when Plaid rejects or cannot complete the request.\n" +
+	"- `POST /api/canutin/plaid/exchange` — requires a `users` token. Body is " +
+	"`{ publicToken, institutionName }`. Exchanges the public token, stores the resulting connection, " +
+	"and returns `{ connectionId, accounts: [{ plaidAccountId, name, mask, type, subtype, currency, balance }] }`; " +
+	"`balance` is nullable when Plaid does not report a current balance. Access tokens are never returned. " +
+	"Returns `{ error: \"plaid_not_configured\" }` with status 503 when Plaid credentials are unavailable, " +
+	"or `{ error: \"plaid_request_failed\", message: \"Plaid is temporarily unavailable\" }` with status 502 " +
+	"when Plaid rejects or cannot complete either upstream request.\n" +
+	"- `POST /api/canutin/plaid/connections/{id}/sync` — requires a `users` token and an owned Plaid " +
+	"connection. Synchronizes posted cash transactions from the connection's saved cursor, applies Plaid " +
+	"adds, modifications, and removals to matched accounts, and imports current balance snapshots only for " +
+	"non-investment accounts that are not auto-calculated. For matched investment accounts it imports current holdings " +
+	"snapshots and investment transactions from 30 days before the previous sync (or from 1990-01-01 on the " +
+	"first sync). The cursor advances after every page and all added, modified, and removed cash transactions " +
+	"apply successfully; balance, currency, holding, and investment-transaction failures are reported without " +
+	"holding it back. The investment sync time advances only after investments are fetched and applied without " +
+	"failures, or when there are no investment accounts; unavailable investment data preserves the previous window. " +
+	"Returns `{ sessionId, created, skipped, failed, status }`; concurrent syncs of the " +
+	"same connection return `{ error: \"plaid_sync_in_progress\" }` with status 409, " +
+	"and a connection requiring renewed Plaid login completes with status `failed` and is marked " +
+	"`reauth_required`. A missing or foreign connection returns status 404. Returns " +
+	"`{ error: \"plaid_not_configured\" }` with status 503 when Plaid credentials are unavailable, or " +
+	"`{ error: \"plaid_request_failed\", message: \"Plaid is temporarily unavailable\" }` with status 502 " +
+	"when Plaid rejects or cannot complete an upstream request.\n" +
+	"- `DELETE /api/canutin/plaid/connections/{id}` — requires a `users` token and an owned Plaid " +
+	"connection. Best-effort removes the item from Plaid, then always unlinks it locally; linked accounts " +
+	"and their imported data remain, with `connection` cleared and `externalId` preserved. Returns " +
+	"`{ accounts }`, where `accounts` is the number of linked accounts. A concurrent sync " +
+	"returns `{ error: \"plaid_sync_in_progress\" }` with status 409, and a missing or foreign connection " +
+	"returns status 404.\n" +
 	"- `POST /api/canutin/securities/with-initial-transaction` — requires a `users` token. Body is " +
 	"`{ security: { name, symbol, owner, currency }, transaction: { account, owner, date, type, subtype, description, quantity, price, amount, fees, notes } }`. " +
 	"`security.currency` is optional (free-form uppercase code matching `^[A-Z0-9]{2,10}$`, defaults to `USD`). " +
@@ -183,7 +218,9 @@ Backend hooks enforce invariants that are not visible in the access rules:
 - Automatic exchange-rate fetching is controlled per currency by ` + "`currencies.autoUpdate`" + `. The
   engine fetches distinct non-USD codes that at least one user has enabled, writes only global
   fetched rows, and never updates owner-scoped manual rows. ` + "`FX_FETCH_DISABLED=true`" + ` is the only
-  runtime kill-switch.
+  runtime kill-switch. The scheduled refresh runs daily at 05:00 UTC.
+- Plaid connections sync sequentially every night at 06:00 UTC. Connections marked
+  ` + "`reauth_required`" + ` are skipped, as is the whole job when Plaid is not configured.
 `
 
 // canutinSkillHandler serves a live, SKILL.md-formatted reference of the Canutin API,

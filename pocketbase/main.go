@@ -89,6 +89,7 @@ func main() {
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		registerDemo(e.App)
 		registerRates(e.App)
+		registerPlaid(e.App)
 
 		e.Router.GET("/api/setup-status", func(re *core.RequestEvent) error {
 			superusers, err := e.App.FindAllRecords("_superusers")
@@ -105,6 +106,18 @@ func main() {
 		})
 
 		e.Router.GET("/api/canutin/skill", canutinSkillHandler(e.App))
+		e.Router.POST("/api/canutin/plaid/link-token", plaidLinkTokenHandler(e.App)).Bind(
+			apis.RequireAuth("users"),
+		)
+		e.Router.POST("/api/canutin/plaid/exchange", plaidExchangeHandler(e.App)).Bind(
+			apis.RequireAuth("users"),
+		)
+		e.Router.POST("/api/canutin/plaid/connections/{id}/sync", plaidSyncHandler(e.App)).Bind(
+			apis.RequireAuth("users"),
+		)
+		e.Router.DELETE("/api/canutin/plaid/connections/{id}", plaidUnlinkHandler(e.App)).Bind(
+			apis.RequireAuth("users"),
+		)
 
 		e.Router.POST("/api/canutin/import", func(re *core.RequestEvent) error {
 			return handleImport(e.App, re)
