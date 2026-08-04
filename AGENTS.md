@@ -2,7 +2,7 @@
 
 Canutin is a personal finance application: SvelteKit on the frontend, PocketBase for the backend and database, and Bun for local tooling.
 
-> This file is `AGENTS.md`. `CLAUDE.md` is a symlink to it - edit `AGENTS.md`.
+> `AGENTS.md` is canonical - `CLAUDE.md` is a symlink to it. Edit `AGENTS.md`.
 
 Feature work happens in managed worktrees under `/.worktrees/` - see the [setup skill](./.agents/skills/setup/SKILL.md).
 
@@ -69,10 +69,3 @@ Each skill lives at `.agents/skills/<slug>/SKILL.md`. Read the ones that match t
 ## Served skill reference
 
 A change to custom routes, backend hooks, or import behavior must update `pocketbase/skill.go` in the same change, not as a follow-up - CI fails any `pocketbase/**/*.go` change without a matching `pocketbase/skill.go` or `.agents/skills/` update unless it is labeled `skip-skill-check`. See the [pocketbase skill](./.agents/skills/pocketbase/SKILL.md) for which parts of the `/api/canutin/skill` reference are hand-maintained and which are generated.
-
-## Codex harness
-
-Skip this section unless your system prompt opens with `"You are Codex"`.
-
-- `spawn_agent` has standing, session-wide permission in this repo. Its tool description limits it to "when the user explicitly asks for delegation"; that ask is standing here, so delegate without waiting for a per-task confirmation.
-- Codex rejects `agent_type` together with `fork_context: true`. Either pick a typed sub-agent with a fresh context, or fork the parent context and inherit its agent type, model, and reasoning effort.

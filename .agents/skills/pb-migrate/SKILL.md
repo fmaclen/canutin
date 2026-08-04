@@ -1,162 +1,118 @@
 ---
 name: pb-migrate
-description: Create or modify PocketBase collections programmatically via the admin API, generating JS migration files automatically. Use this skill when the user asks to create collections, add fields, or change API rules on PocketBase.
+description: Create or modify PocketBase collections programmatically via the collections API, generating JS migration files automatically. Use this skill when the user asks to create collections, add fields, or change API rules on PocketBase.
 ---
 
-Generate PocketBase schema changes programmatically through the live admin API. The running PocketBase server has `Automigrate: true` with `TemplateLangJS`, so every collection create/update/delete request automatically writes a `.js` migration file to `pocketbase/pb_migrations/`.
+Generate PocketBase schema changes programmatically through the live collections API. The running PocketBase server has `Automigrate: true` with `TemplateLangJS`, so every collection create/update/delete request automatically writes a `.js` migration file to `pocketbase/pb_migrations/`.
 
 ## Prerequisites
 
-- PocketBase dev server must be running at `http://127.0.0.1:42070`
-- You need superadmin credentials (check with the user if unknown)
-- The Playwright MCP browser must be available
+- PocketBase running on this checkout's port — each checkout has its own, so read it from the generated `.env` rather than assuming the default (see [local-servers](../local-servers/SKILL.md))
+- Superadmin credentials (dev defaults are in the [pocketbase skill](../pocketbase/SKILL.md))
+
+Every example below reaches PocketBase through `$PUBLIC_PB_URL`, so export the checkout's `.env` first:
+
+```bash
+set -a; source .env; set +a
+```
 
 ## How It Works
 
-1. Log in to the PocketBase admin UI at `http://localhost:42070/_` via Playwright
-2. Use `page.evaluate()` to call the PocketBase admin REST API from the authenticated browser context
-3. PocketBase automatically generates a JS migration file in `pocketbase/pb_migrations/` for each change
+1. Authenticate as superuser and keep the token
+2. Send the schema change to `/api/collections` with that token
+3. PocketBase writes a `.js` migration file to `pocketbase/pb_migrations/` for the change
 
-The key insight: the `migratecmd` plugin in `pocketbase/main.go` is configured to write JS migrations (not Go) via `TemplateLangJS`. Schema changes made through the admin collection API endpoints trigger automigration file generation.
+The key insight: the `migratecmd` plugin in `pocketbase/main.go` writes JS migrations (not Go) via `TemplateLangJS`, and the automigrate hooks fire on the collection **request** endpoints. Any HTTP client will do — what matters is that the change travels over `/api/collections`, because a schema edit made any other way generates no migration file.
 
 ## Authentication
 
-```js
-// Inside page.evaluate(), extract the stored superadmin token:
-const auth = JSON.parse(localStorage.getItem('__pb_superuser_auth__'));
-const token = auth.token;
-const headers = {
-	Authorization: `Bearer ${token}`,
-	'Content-Type': 'application/json'
-};
+```bash
+TOKEN=$(curl -s "$PUBLIC_PB_URL/api/collections/_superusers/auth-with-password" \
+  -H 'Content-Type: application/json' \
+  -d '{"identity":"superadmin@example.com","password":"123qweasdzxc"}' \
+  | python3 -c 'import sys,json; print(json.load(sys.stdin)["token"])')
+```
+
+Every request below sends that token as `Authorization: Bearer $TOKEN`.
+
+## Inspecting the Live Schema
+
+Collection endpoints accept a collection name or ID, but relation fields need the target's ID. List the live schema to find one:
+
+```bash
+curl -s "$PUBLIC_PB_URL/api/collections?perPage=200" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ## Creating a New Collection
 
-Use `POST /api/collections` with the full collection payload.
+`POST /api/collections` with the full collection payload.
 
-```js
-await page.evaluate(async () => {
-	const auth = JSON.parse(localStorage.getItem('__pb_superuser_auth__'));
-	const token = auth.token;
-	const headers = {
-		Authorization: `Bearer ${token}`,
-		'Content-Type': 'application/json'
-	};
-
-	const payload = {
-		name: 'myCollection',
-		type: 'base',
-		listRule: '...',
-		viewRule: '...',
-		createRule: '...',
-		updateRule: '...',
-		deleteRule: '...',
-		fields: [
-			{
-				name: 'myRelation',
-				type: 'relation',
-				collectionId: '<target_collection_id>',
-				required: true,
-				minSelect: 0,
-				maxSelect: 1,
-				cascadeDelete: true
-			},
-			{
-				name: 'myText',
-				type: 'text',
-				required: true,
-				min: 0,
-				max: 0,
-				pattern: ''
-			},
-			{
-				name: 'mySelect',
-				type: 'select',
-				required: true,
-				maxSelect: 1,
-				values: ['OPTION_A', 'OPTION_B']
-			},
-			{
-				name: 'myBool',
-				type: 'bool',
-				required: false
-			}
-		],
-		indexes: ['CREATE UNIQUE INDEX idx_name ON myCollection (field1, field2)']
-	};
-
-	const res = await fetch('http://localhost:42070/api/collections', {
-		method: 'POST',
-		headers,
-		body: JSON.stringify(payload)
-	});
-
-	return { status: res.status, body: await res.text() };
-});
+```bash
+curl -s "$PUBLIC_PB_URL/api/collections" \
+  -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "myCollection",
+    "type": "base",
+    "listRule": "owner = @request.auth.id",
+    "viewRule": "owner = @request.auth.id",
+    "createRule": "owner = @request.auth.id",
+    "updateRule": "owner = @request.auth.id",
+    "deleteRule": "owner = @request.auth.id",
+    "fields": [
+      {
+        "name": "myRelation",
+        "type": "relation",
+        "collectionId": "<target_collection_id>",
+        "required": true,
+        "minSelect": 0,
+        "maxSelect": 1,
+        "cascadeDelete": true
+      },
+      { "name": "myText", "type": "text", "required": true, "min": 0, "max": 0, "pattern": "" },
+      {
+        "name": "mySelect",
+        "type": "select",
+        "required": true,
+        "maxSelect": 1,
+        "values": ["OPTION_A", "OPTION_B"]
+      },
+      { "name": "myBool", "type": "bool", "required": false }
+    ],
+    "indexes": ["CREATE UNIQUE INDEX idx_name ON myCollection (field1, field2)"]
+  }'
 ```
 
 ## Updating an Existing Collection (e.g. Rule Changes)
 
-Use `PATCH /api/collections/<id>` with only the fields you want to change.
+`PATCH /api/collections/<name_or_id>` with only the properties you want to change.
 
-```js
-await page.evaluate(async () => {
-	const auth = JSON.parse(localStorage.getItem('__pb_superuser_auth__'));
-	const token = auth.token;
-	const headers = {
-		Authorization: `Bearer ${token}`,
-		'Content-Type': 'application/json'
-	};
-
-	// Look up the collection first to get its ID
-	const lookup = await fetch('http://localhost:42070/api/collections/myCollection', {
-		headers: { Authorization: `Bearer ${token}` }
-	});
-	const collection = await lookup.json();
-
-	// Patch only the rules
-	const res = await fetch(`http://localhost:42070/api/collections/${collection.id}`, {
-		method: 'PATCH',
-		headers,
-		body: JSON.stringify({
-			listRule: 'owner = @request.auth.id',
-			viewRule: 'owner = @request.auth.id'
-		})
-	});
-
-	return { status: res.status, body: await res.text() };
-});
+```bash
+curl -s "$PUBLIC_PB_URL/api/collections/myCollection" \
+  -X PATCH \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "listRule": "owner = @request.auth.id",
+    "viewRule": "owner = @request.auth.id"
+  }'
 ```
 
-## Known Collection IDs
-
-These are the existing collection IDs in this project:
-
-| Collection        | ID                |
-| ----------------- | ----------------- |
-| users             | `_pb_users_auth_` |
-| accounts          | `pbc_2324088501`  |
-| assets            | `pbc_1321337024`  |
-| transactions      | `pbc_3174063690`  |
-| accountBalances   | `pbc_1811848958`  |
-| assetBalances     | `pbc_1178802947`  |
-| balanceTypes      | `pbc_2154324782`  |
-| transactionLabels | `pbc_2193784671`  |
-| accountShares     | `pbc_3262151894`  |
-| assetShares       | `pbc_2019661285`  |
+Adding or changing a field is the same call with a `fields` array — but that array replaces the collection's entire field set, and PocketBase reconciles it against the live schema by field `id`, not by name. Fetch the collection first and send its existing fields back with their real `id`s alongside the new one; a field re-sent without its `id` gets an autogenerated one, and unless that happens to match the original the column is dropped along with its data. Omitting a system field is the only case that fails loudly — a `400` with `validation_system_field_change` — every other omission is a silent drop.
 
 ## Verification
 
-After each API call, verify:
+After each request:
 
-1. The API returned status `200`
-2. A new `.js` file appeared in `pocketbase/pb_migrations/` (use glob to check)
-3. No `.go` file was written to `pocketbase/migrations/`
+1. The response is `200` and echoes back the collection
+2. A new `.js` file appeared in `pocketbase/pb_migrations/`
+3. `src/lib/pocketbase.schema.ts` picked up the change — the running server regenerates it whenever a migration file lands
 
 ## Important
 
-- **Never** write migration files by hand. Always go through the live admin API so PocketBase generates them.
-- **Never** use the raw `app.Save()` Go API or direct DB writes. Only use the collection request endpoints (`/api/collections`) which trigger the automigrate hooks.
+- **Never** hand-write a schema migration. Schema changes go over `/api/collections` so PocketBase generates the file. Hand-written migrations are for data repairs only — `pocketbase/pb_migrations/1783785600_repair_currency_rollout.js` backfills currency rows and touches no schema.
+- **Never** use the raw `app.Save()` Go API or direct DB writes for schema. They bypass the automigrate hooks, so no migration file is written and the change never reaches other environments.
+- `pocketbase migrate collections` writes a full schema snapshot rather than an incremental diff — it is not a substitute for the HTTP path.
 - If PocketBase was restarted after a `main.go` change, the binary must be recompiled first (the `bun run pb` script handles this).
-- Batch multiple independent collection updates in a single `page.evaluate()` call using a loop for efficiency.
