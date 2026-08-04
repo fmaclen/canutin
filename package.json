@@ -53,7 +53,7 @@
 	},
 	"private": true,
 	"scripts": {
-		"dev": "bun run vite dev",
+		"dev": "PUBLIC_DEMO_ENABLED=true bun run vite dev",
 		"build": "bun run vite build",
 		"preview": "bun run vite preview",
 		"prepare": "svelte-kit sync || echo ''",
