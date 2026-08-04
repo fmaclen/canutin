@@ -15,7 +15,7 @@ Before running `git add`, `git commit`, `git push`, `git reset`, `git revert`, `
 2. Quote that instruction back in your reply before running the command, so the user can see what you are treating as approval.
 3. If you cannot find an instruction that authorizes this exact action, stop and ask. Do not run the command.
 
-A clean executor return, a passing test run, a green CI run, or a prior approval for an earlier change set is never approval for the next one.
+Finishing the work, a passing test run, a green CI run, or a prior approval for an earlier change set is never approval for the next one.
 
 Commit approval is scoped to one coherent change set. Push approval is separate from commit approval. Destructive operations require their own explicit ask, with the target named - if the target is ambiguous or could remove work the user may expect to keep, stop and ask one clarifying question stating what would be removed and what would remain.
 

@@ -5,18 +5,18 @@ description: 'How to review code before declaring a milestone done'
 
 # Code Review
 
-Review code before the orchestrator calls a milestone done. Findings are the product. Be specific, local, and willing to flag small violations.
+Review code before a milestone is called done. Findings are the product. Be specific, local, and willing to flag small violations.
 
 ## Output
 
 Structured return, in this order:
 
-1. **Skills loaded.** List every convention skill you opened for this review (see the Conventions section for the path-driven rules). The orchestrator gates on this - a review that skipped a relevant skill is a failed review.
+1. **Skills loaded.** List every convention skill you opened for this review (see the Conventions section for the path-driven rules). A review that skipped a relevant skill is a failed review.
 2. **Per-skill status.** For each loaded skill, one line: `<skill>: clean` if nothing to report, or `<skill>: <N> findings` and the findings listed below. A skill with zero findings must still appear - silence is not the same as clean.
 3. **Findings**, ordered by severity. Each finding includes `path:line`, the violated rule (named to the skill it came from), and the concrete fix direction.
 4. **Residual risks and testing gaps.** Things the review could not verify, areas not covered by the diff that adjacent behavior would benefit from, and strategic opportunities (see below).
 
-Do not rewrite the diff unless the orchestrator explicitly assigns implementation.
+Do not rewrite the diff unless implementation was explicitly requested.
 
 ## Correctness
 
@@ -32,7 +32,7 @@ Do not rewrite the diff unless the orchestrator explicitly assigns implementatio
 Review against every convention skill that applies to the diff. Combine every rule that matches:
 
 - Always read `code-quality` - types, comments, structure, UI text, dependencies.
-- Read `testing` whenever the diff touches any path under `tests/` or `e2e/` - correct test tier, stable assertions, no explicit timeouts, no over-specific implementation checks.
+- Read `testing` whenever the diff touches any path under `e2e/` - correct test tier, stable assertions, no explicit timeouts, no over-specific implementation checks.
 - Read `svelte5` whenever the diff touches any `.svelte` or `.svelte.ts` file - Svelte 5 syntax and component patterns.
 - Read `pocketbase` whenever the diff touches PocketBase collections, generated schema, hooks, migrations, imports, or `pocketbase/`.
 - Read `failures-and-logs` whenever the diff touches error surfaces - logging level, tags, user-safe messages.

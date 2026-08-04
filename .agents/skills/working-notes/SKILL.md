@@ -14,7 +14,7 @@ Put notes under `.agents/notes/` when they need to survive the current terminal 
 Use a descriptive filename with the date and topic:
 
 ```text
-.agents/notes/2026-06-06-orchestrator-migration.md
+.agents/notes/2026-06-06-account-balance-research.md
 ```
 
 ## What belongs here
@@ -22,7 +22,7 @@ Use a descriptive filename with the date and topic:
 - Investigation notes that are too long for the final user recap.
 - Multi-step plans that may need to be resumed.
 - Scratch analysis for complex migrations, refactors, or reviews.
-- Handoff notes between orchestrator and executor sessions when the task spans multiple concerns.
+- Handoff notes between sessions or sub-agents when the task spans multiple concerns.
 
 ## What does not belong here
 
