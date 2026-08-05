@@ -13,11 +13,17 @@ Managed-worktree removal has its own listener-ownership safeguards - see the [se
 
 ## Ports
 
-- Vite dev — default `:5173`, overridable via `VITE_PORT`
-- Vite preview — default `:42069`, overridable via `VITE_PREVIEW_PORT` (falls back to `VITE_PORT`)
-- PocketBase — default `:42070`, overridable via `PB_PORT` (`PUBLIC_PB_URL` points the client at the same host)
+Every checkout runs on its own ports. A managed worktree generates an `.env` that sets them to its slot's deterministic pair (see [setup](../setup/SKILL.md)); without one, these defaults apply:
 
-In a managed worktree, read the actual ports from the worktree's `.env` (or `.worktree.json` if the worktree scripts created it) before curling or opening a browser.
+- Vite dev — `:5173`, set by `VITE_PORT`
+- Playwright's preview server — `:42069`, set by `VITE_PREVIEW_PORT` (falls back to `VITE_PORT`); `bun run test` starts and stops it, no agent ever does
+- PocketBase — `:42070`, set by `PB_PORT` (`PUBLIC_PB_URL` points the client at the same host)
+
+Read the actual ports from the checkout's `.env` (or `.worktree.json` if the worktree scripts created it) before curling or opening a browser:
+
+```bash
+set -a; source .env; set +a
+```
 
 ## Commands
 
