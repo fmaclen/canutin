@@ -1,5 +1,24 @@
 <script lang="ts">
 	const id = $props.id();
+
+	// The marks sit on a square lattice aligned to the 45 degree diagonals, so the whole grid is
+	// drawn in a rotated space where each diagonal line is simply a row. STEP is that lattice's
+	// spacing - 96√2, the diagonal of the 96px half-tile the untilted grid used - and it is both the
+	// gap between marks along a line and the gap between neighbouring lines.
+	const STEP = 135.7645;
+
+	// Rotation is about the SVG's top-left origin, so the tilted grid has to reach well past the
+	// viewport in every direction to still cover the far corner.
+	const REACH = 5000;
+
+	// Every line travels along itself at its own speed. Lines are grouped so this stays four
+	// animated layers rather than one per line; each group owns every fourth line.
+	const groups = [
+		{ duration: '9.6s' },
+		{ duration: '16.8s' },
+		{ duration: '30.4s' },
+		{ duration: '54.4s' }
+	];
 </script>
 
 <!-- The surface colour lives here rather than on each caller: the guest routes render inside the
@@ -27,21 +46,40 @@
 		     lighter than the page in dark mode and the shadow is darker than it in light mode. -->
 		<g id="mark-{id}">
 			<use href="#iso-{id}" y="1" class="stroke-white dark:stroke-neutral-600/60" />
-			<use href="#iso-{id}" class="stroke-neutral-300/60 dark:stroke-neutral-900" />
+			<use href="#iso-{id}" class="stroke-neutral-300/70 dark:stroke-neutral-900" />
 		</g>
 
-		<!-- Two marks a half-tile apart on both axes tile into a staggered grid:
-		     columns every 192px, rows every 96px, alternate rows offset by half a column. -->
-		<pattern id="pattern-{id}" width="192" height="192" patternUnits="userSpaceOnUse">
-			<use href="#mark-{id}" x="39" y="39" />
-			<use href="#mark-{id}" x="135" y="135" />
-		</pattern>
+		<!-- Centred on its own origin and counter-rotated, so it keeps its upright screen orientation
+		     once the grid around it is tilted. -->
+		<g id="tilted-mark-{id}" transform="rotate(45)">
+			<use href="#mark-{id}" x="-12" y="-12" />
+		</g>
 	</defs>
 
-	<!-- The mask stays put while the pattern drifts inside it. The rect is oversized so the
-	     translation never exposes an edge, and the drift runs along the mark's own axis by one
-	     diagonal tile repeat, which the staggered grid is invariant under, so the loop is seamless. -->
-	<rect class="drift" x="-50%" y="-50%" width="200%" height="200%" fill="url(#pattern-{id})" />
+	<!-- Tilting the grid rather than the marks: inside here the x axis runs up and to the right, so
+	     a layer travelling along it slides each line along its own diagonal. One STEP is a whole
+	     lattice period, so every layer loops seamlessly no matter how fast it moves. -->
+	<g transform="rotate(-45)">
+		{#each groups as group, index (index)}
+			<pattern
+				id="pattern-{index}-{id}"
+				width={STEP}
+				height={STEP * groups.length}
+				patternUnits="userSpaceOnUse"
+			>
+				<use href="#tilted-mark-{id}" x={STEP / 2} y={index * STEP + STEP / 2} />
+			</pattern>
+			<rect
+				class="drift"
+				style="--step: {STEP}px; animation-duration: {group.duration}"
+				x={-REACH}
+				y={-REACH}
+				width={REACH * 2}
+				height={REACH * 2}
+				fill="url(#pattern-{index}-{id})"
+			/>
+		{/each}
+	</g>
 </svg>
 
 <style>
@@ -58,12 +96,12 @@
 	}
 
 	.drift {
-		animation: drift 19s linear infinite;
+		animation: drift linear infinite;
 	}
 
 	@keyframes drift {
 		to {
-			transform: translate(96px, -96px);
+			transform: translateX(var(--step));
 		}
 	}
 
