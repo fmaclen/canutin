@@ -37,7 +37,7 @@ export async function dragChart(
 export async function signIn(page: Page, email: string) {
 	await page.getByLabel('Email').fill(email);
 	await page.getByLabel('Password', { exact: true }).fill(DEFAULT_PASSWORD);
-	await page.getByRole('button', { name: 'Login' }).click();
+	await page.getByRole('button', { name: 'Log in' }).click();
 	await expect(page.getByRole('button', { name: 'Toggle Sidebar' })).toBeVisible();
 }
 

@@ -5,11 +5,11 @@ import { DEMO_EMAIL, getUserPB, seedDemoAccount } from './pocketbase.helpers';
 
 test('/demo auto-logs into the seeded demo account and displays net worth', async ({ page }) => {
 	await page.goto('/');
-	await expect(page.getByRole('link', { name: 'Try as guest' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Try the demo' })).toBeVisible();
 
-	await page.getByRole('link', { name: 'Try as guest' }).click();
+	await page.getByRole('link', { name: 'Try the demo' }).click();
 	await expect(page.getByRole('button', { name: 'Toggle Sidebar' })).toBeVisible();
-	await expect(page.getByRole('link', { name: 'Try as guest' })).not.toBeVisible();
+	await expect(page.getByRole('link', { name: 'Try the demo' })).not.toBeVisible();
 
 	await expect(page.getByRole('region', { name: 'Net worth' })).toContainText('$185,787');
 	await expect(page.getByRole('region', { name: 'Cash' })).toBeVisible();
