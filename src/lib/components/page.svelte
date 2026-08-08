@@ -50,10 +50,10 @@
 		</Breadcrumb.Root>
 	</div>
 
-	<div class="flex items-end justify-between gap-4 px-6 pt-16 pb-6 sm:px-8">
+	<div class="flex flex-wrap items-end justify-between gap-4 px-6 pt-16 pb-6 sm:px-8">
 		<h1 class="text-foreground text-2xl font-bold tracking-tight">{pageTitle}</h1>
 		{#if actions && !subNav}
-			<nav class="flex items-center gap-4">
+			<nav class="flex w-full items-center justify-start gap-4 sm:w-auto sm:justify-end">
 				{@render actions()}
 			</nav>
 		{/if}

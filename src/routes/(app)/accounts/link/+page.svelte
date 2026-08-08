@@ -2,12 +2,12 @@
 	import { ClientResponseError } from 'pocketbase';
 	import { toast } from 'svelte-sonner';
 
-	import { goto } from '$app/navigation';
+	import { beforeNavigate, goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAuthContext } from '$lib/auth.svelte';
 	import { getBalanceTypesContext } from '$lib/balance-types.svelte';
-	import { formatCurrency } from '$lib/components/currency';
+	import CurrencyField from '$lib/components/currency-field.svelte';
 	import Empty from '$lib/components/empty.svelte';
 	import Fieldset from '$lib/components/fieldset.svelte';
 	import FormFieldRow from '$lib/components/form-field-row.svelte';
@@ -15,7 +15,9 @@
 	import Page from '$lib/components/page.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
-	import { Button } from '$lib/components/ui/button/index.js';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
+	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
@@ -58,10 +60,9 @@
 		);
 	}
 
-	type Match = {
-		mode: 'create' | 'existing';
-		accountId: string;
-	};
+	// Sentinel for the "Create new account" option; PocketBase ids are 15 characters so it can
+	// never collide with a real account id.
+	const CREATE_NEW = 'create';
 
 	function titleCaseSubtype(account: PlaidAccount) {
 		return (account.subtype || account.type).replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -74,7 +75,7 @@
 
 	const ownerId = $derived(auth.currentUser?.record?.id);
 	let plaidAccounts: PlaidAccount[] = $state([]);
-	let matches: Record<string, Match> = $state({});
+	let matches: Record<string, string> = $state({});
 	let connectionId = $state('');
 	let institutionName = $state('');
 	let notConfigured = $state(false);
@@ -84,6 +85,9 @@
 	let connectionAccountsLoaded = $state(false);
 	let completedPlaidAccountIds: string[] = $state([]);
 	let formError = $state('');
+	let discardConfirmOpen = $state(false);
+	let connectionDiscarded = $state(false);
+	let pendingNavigationUrl: URL | null = $state(null);
 
 	$effect(() => {
 		let cancelled = false;
@@ -139,10 +143,7 @@
 								connectionId = response.connectionId;
 								plaidAccounts = response.accounts;
 								matches = Object.fromEntries(
-									response.accounts.map((account) => [
-										account.plaidAccountId,
-										{ mode: 'create', accountId: '' } satisfies Match
-									])
+									response.accounts.map((account) => [account.plaidAccountId, CREATE_NEW])
 								);
 								exchangeLoaded = true;
 							} catch (error) {
@@ -178,7 +179,8 @@
 		return () => {
 			cancelled = true;
 			handler?.destroy();
-			if (connectionId && !submissionSucceeded && !isSaving) {
+			// Safety net for teardowns that bypass the discard dialog (tab close, hard reload).
+			if (connectionId && !submissionSucceeded && !isSaving && !connectionDiscarded) {
 				void pb.authedClient
 					.send(`/api/canutin/plaid/connections/${connectionId}`, { method: 'DELETE' })
 					.catch(() => {});
@@ -186,23 +188,40 @@
 		};
 	});
 
+	// An exchanged connection with no accounts yet is server-side garbage if the user walks away, so
+	// every in-app route change is turned into an explicit discard decision.
+	beforeNavigate((navigation) => {
+		if (navigation.type === 'leave') return;
+		if (!navigation.to) return;
+		if (!connectionId || submissionSucceeded || isSaving || connectionDiscarded) return;
+		navigation.cancel();
+		pendingNavigationUrl = navigation.to.url;
+		discardConfirmOpen = true;
+	});
+
+	async function handleDiscard() {
+		const destination = pendingNavigationUrl;
+		connectionDiscarded = true;
+		if (connectionId) {
+			await pb.authedClient
+				.send(`/api/canutin/plaid/connections/${connectionId}`, { method: 'DELETE' })
+				.catch(() => {});
+		}
+		if (destination) {
+			// eslint-disable-next-line svelte/no-navigation-without-resolve -- URL captured from the navigation we intercepted
+			await goto(destination);
+			return;
+		}
+		await goto(resolve('/accounts'));
+	}
+
 	async function handleSubmit() {
 		const currentOwnerId = ownerId;
 		if (!currentOwnerId) return;
 		formError = '';
-		if (
-			plaidAccounts.some(
-				(account) =>
-					matches[account.plaidAccountId].mode === 'existing' &&
-					!matches[account.plaidAccountId].accountId
-			)
-		) {
-			toast.error(m.accounts_link_existing_required());
-			return;
-		}
 		const existingAccountIds = plaidAccounts
-			.filter((account) => matches[account.plaidAccountId].mode === 'existing')
-			.map((account) => matches[account.plaidAccountId].accountId);
+			.map((account) => matches[account.plaidAccountId])
+			.filter((accountId) => accountId !== CREATE_NEW);
 		if (new Set(existingAccountIds).size !== existingAccountIds.length) {
 			formError = m.accounts_link_existing_duplicate();
 			return;
@@ -229,9 +248,9 @@
 
 			for (const account of plaidAccounts) {
 				if (completedPlaidAccountIds.includes(account.plaidAccountId)) continue;
-				const match = matches[account.plaidAccountId];
-				if (match.mode === 'existing') {
-					await pb.authedClient.collection('accounts').update(match.accountId, {
+				const matchedAccountId = matches[account.plaidAccountId];
+				if (matchedAccountId !== CREATE_NEW) {
+					await pb.authedClient.collection('accounts').update(matchedAccountId, {
 						externalId: account.plaidAccountId,
 						connection: connectionId
 					});
@@ -336,105 +355,111 @@
 					class="space-y-0"
 				>
 					<Fieldset isFirst={true}>
-						{#each plaidAccounts as account (account.plaidAccountId)}
-							{@const currency = account.currency || interfacePreferences.displayCurrency}
-							{@const chosenElsewhere = new Set(
-								plaidAccounts
-									.filter((other) => other.plaidAccountId !== account.plaidAccountId)
-									.map((other) => matches[other.plaidAccountId].accountId)
-							)}
-							{@const eligibleAccounts = accountsContext.accounts.filter(
-								(existing) =>
-									existing.isOwner &&
-									!existing.connection &&
-									!existing.closed &&
-									existing.currency === currency &&
-									!chosenElsewhere.has(existing.id)
-							)}
-							<FormFieldRow itemsAlignment="items-start">
+						<FormFieldRow>
+							<Label for="institution" class="justify-start pr-0 md:justify-end"
+								>{m.accounts_label_institution()}</Label
+							>
+							<Input id="institution" value={institutionName} disabled />
+						</FormFieldRow>
+					</Fieldset>
+
+					{#each plaidAccounts as account (account.plaidAccountId)}
+						{@const currency = account.currency || interfacePreferences.displayCurrency}
+						{@const chosenElsewhere = new Set(
+							plaidAccounts
+								.filter((other) => other.plaidAccountId !== account.plaidAccountId)
+								.map((other) => matches[other.plaidAccountId])
+						)}
+						{@const eligibleAccounts = accountsContext.accounts.filter(
+							(existing) =>
+								existing.isOwner &&
+								!existing.connection &&
+								!existing.closed &&
+								existing.currency === currency &&
+								!chosenElsewhere.has(existing.id)
+						)}
+						<Fieldset>
+							<FormFieldRow>
+								<Label
+									for={`name-${account.plaidAccountId}`}
+									class="justify-start pr-0 md:justify-end">{m.accounts_link_label_account()}</Label
+								>
+								<Input id={`name-${account.plaidAccountId}`} value={account.name} disabled />
+							</FormFieldRow>
+
+							<FormFieldRow>
+								<Label
+									for={`type-${account.plaidAccountId}`}
+									class="justify-start pr-0 md:justify-end">{m.accounts_link_label_type()}</Label
+								>
+								<Input
+									id={`type-${account.plaidAccountId}`}
+									value={titleCaseSubtype(account)}
+									disabled
+								/>
+							</FormFieldRow>
+
+							<FormFieldRow>
+								<Label
+									for={`mask-${account.plaidAccountId}`}
+									class="justify-start pr-0 md:justify-end"
+									>{m.accounts_link_label_account_number()}</Label
+								>
+								<Input
+									id={`mask-${account.plaidAccountId}`}
+									value={account.mask || m.accounts_link_no_mask()}
+									disabled
+								/>
+							</FormFieldRow>
+
+							<FormFieldRow>
+								<Label
+									for={`balance-${account.plaidAccountId}`}
+									class="justify-start pr-0 md:justify-end">{m.accounts_label_balance()}</Label
+								>
+								<CurrencyField
+									id={`balance-${account.plaidAccountId}`}
+									value={String(account.balance)}
+									{currency}
+									disabled
+								/>
+							</FormFieldRow>
+
+							<FormFieldRow>
 								<Label
 									for={`match-${account.plaidAccountId}`}
-									class="flex flex-col items-start justify-start gap-1 pr-0 md:items-end md:pt-2 md:text-right"
+									class="justify-start pr-0 md:justify-end">{m.accounts_link_label_link_to()}</Label
 								>
-									<span>{account.name}</span>
-									<span class="text-muted-foreground font-normal">
-										{m.accounts_link_account_details({
-											type: titleCaseSubtype(account),
-											mask: account.mask || m.accounts_link_no_mask()
-										})}
-									</span>
-									<span class="text-muted-foreground font-normal">
-										{formatCurrency(account.balance, 2, currency)}
-									</span>
-								</Label>
-								<div class="space-y-2">
-									<Select.Root
-										type="single"
-										value={matches[account.plaidAccountId].mode}
-										onValueChange={(value) => {
-											if (value === 'create' || value === 'existing') {
-												matches[account.plaidAccountId].mode = value;
-												formError = '';
-											}
-										}}
-										disabled={isSaving}
+								<Select.Root
+									type="single"
+									value={matches[account.plaidAccountId]}
+									onValueChange={(value) => {
+										matches[account.plaidAccountId] = value;
+										formError = '';
+									}}
+									disabled={isSaving}
+								>
+									<Select.Trigger
+										id={`match-${account.plaidAccountId}`}
+										class="bg-background w-full"
 									>
-										<Select.Trigger
-											id={`match-${account.plaidAccountId}`}
-											class="bg-background w-full"
-										>
-											{matches[account.plaidAccountId].mode === 'create'
-												? m.accounts_link_create_new()
-												: m.accounts_link_existing()}
-										</Select.Trigger>
-										<Select.Content>
-											<Select.Item value="create">
-												{m.accounts_link_create_new()}
-											</Select.Item>
-											<Select.Item value="existing" disabled={eligibleAccounts.length === 0}>
-												{m.accounts_link_existing()}
-											</Select.Item>
-										</Select.Content>
-									</Select.Root>
-
-									{#if matches[account.plaidAccountId].mode === 'existing'}
-										<Select.Root
-											type="single"
-											value={matches[account.plaidAccountId].accountId}
-											onValueChange={(value) => {
-												matches[account.plaidAccountId].accountId = value;
-												formError = '';
-											}}
-											disabled={isSaving}
-										>
-											<Select.Trigger class="bg-background w-full">
-												{#if matches[account.plaidAccountId].accountId}
-													{eligibleAccounts.find(
-														(existing) => existing.id === matches[account.plaidAccountId].accountId
-													)?.name}
-												{:else}
-													<span class="text-muted-foreground">
-														{m.accounts_link_existing_placeholder()}
-													</span>
-												{/if}
-											</Select.Trigger>
-											<Select.Content>
-												{#if eligibleAccounts.length === 0}
-													<Select.Item value="__no-accounts" disabled>
-														{m.accounts_link_existing_empty()}
-													</Select.Item>
-												{:else}
-													{#each eligibleAccounts as existing (existing.id)}
-														<Select.Item value={existing.id}>{existing.name}</Select.Item>
-													{/each}
-												{/if}
-											</Select.Content>
-										</Select.Root>
-									{/if}
-								</div>
+										{matches[account.plaidAccountId] === CREATE_NEW
+											? m.accounts_link_create_new()
+											: eligibleAccounts.find(
+													(existing) => existing.id === matches[account.plaidAccountId]
+												)?.name}
+									</Select.Trigger>
+									<Select.Content>
+										<Select.Item value={CREATE_NEW}>{m.accounts_link_create_new()}</Select.Item>
+										{#each eligibleAccounts as existing (existing.id)}
+											<Select.Item value={existing.id}>{existing.name}</Select.Item>
+										{/each}
+									</Select.Content>
+								</Select.Root>
 							</FormFieldRow>
-						{/each}
-					</Fieldset>
+						</Fieldset>
+					{/each}
+
 					{#if formError}
 						<div class="border-border border-t p-2">
 							<p
@@ -446,15 +471,46 @@
 						</div>
 					{/if}
 
-					<footer class="border-border bg-border border-t p-2">
-						<div class="flex justify-end">
-							<Button type="submit" disabled={isSaving}>
-								{isSaving ? m.accounts_link_confirming() : m.accounts_link_confirm()}
-							</Button>
-						</div>
+					<footer class="border-border bg-border flex items-center justify-end gap-2 border-t p-2">
+						<Button
+							variant="secondary"
+							type="button"
+							disabled={isSaving}
+							onclick={() => {
+								pendingNavigationUrl = null;
+								discardConfirmOpen = true;
+							}}
+						>
+							{m.accounts_link_cancel()}
+						</Button>
+						<Button type="submit" disabled={isSaving}>
+							{isSaving ? m.accounts_link_confirming() : m.accounts_link_confirm()}
+						</Button>
 					</footer>
 				</form>
 			</div>
 		</Section>
 	{/if}
 </Page>
+
+<AlertDialog.Root bind:open={discardConfirmOpen}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>{m.accounts_link_discard_confirm_title()}</AlertDialog.Title>
+			<AlertDialog.Description>
+				{m.accounts_link_discard_confirm_description()}
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel onclick={() => (pendingNavigationUrl = null)}>
+				{m.accounts_link_discard_confirm_cancel()}
+			</AlertDialog.Cancel>
+			<AlertDialog.Action
+				class={buttonVariants({ variant: 'destructive' })}
+				onclick={handleDiscard}
+			>
+				{m.accounts_link_discard_confirm_continue()}
+			</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

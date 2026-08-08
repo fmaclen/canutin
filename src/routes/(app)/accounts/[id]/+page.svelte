@@ -45,8 +45,6 @@
 	import { TableSort } from '$lib/sorting.svelte';
 	import { createSortComparator, toNumber, type SortState } from '$lib/utils';
 
-	import ConnectionSection from './connection-section.svelte';
-
 	const accountsContext = getAccountsContext();
 	const securitiesContext = getSecuritiesContext();
 	const accountCashflow = getAccountCashflowContext();
@@ -699,8 +697,4 @@
 {:else}
 	{@render cashflowAndTransactions()}
 	{@render positionsAndTrades()}
-{/if}
-
-{#if account?.isOwner && account.connection}
-	<ConnectionSection connectionId={account.connection} />
 {/if}

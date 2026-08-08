@@ -7,11 +7,14 @@
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAuthContext } from '$lib/auth.svelte';
 	import { getBalanceTypesContext } from '$lib/balance-types.svelte';
+	import Empty from '$lib/components/empty.svelte';
+	import ImportSessionsTable from '$lib/components/import-sessions-table.svelte';
 	import RecordDangerZone from '$lib/components/record-danger-zone.svelte';
 	import RecordSharingSection from '$lib/components/record-sharing-section.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+	import { getImportSessionsContext } from '$lib/import-sessions.svelte';
 	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import {
@@ -25,13 +28,17 @@
 	import { sanitizeFromParam } from '$lib/utils';
 
 	import BalanceForm from '../balance-form.svelte';
+	import ConnectionSection from '../connection-section.svelte';
 	import DetailsForm from '../details-form.svelte';
+
+	const RECENT_IMPORTS_LIMIT = 5;
 
 	const pb = getPocketBaseContext();
 	const auth = getAuthContext();
 	const accountsContext = getAccountsContext();
 	const balanceTypesContext = getBalanceTypesContext();
 	const securitiesContext = getSecuritiesContext();
+	const importSessionsContext = getImportSessionsContext();
 
 	const accountId = $derived(page.params.id);
 	const ownerId = $derived(auth.currentUser?.record?.id);
@@ -39,6 +46,16 @@
 	const account = $derived(accountId ? accountsContext.getAccount(accountId) : null);
 	const isLoading = $derived(accountsContext.isLoading);
 	const canWrite = $derived(Boolean(account?.canWrite));
+	// Only the owner of a linked account can see or manage its bank connection; recipients of a share
+	// get the plain account.
+	const connectionId = $derived(account?.isOwner ? account.connection : '');
+	const recentConnectionImports = $derived(
+		connectionId
+			? importSessionsContext.sessions
+					.filter((session) => session.connection === connectionId)
+					.slice(0, RECENT_IMPORTS_LIMIT)
+			: []
+	);
 	const incomingShare = $derived(account ? accountsContext.getIncomingShare(account.id) : null);
 	const grantedShares = $derived(account ? accountsContext.getGrantedShares(account.id) : []);
 	const hasPositions = $derived(
@@ -244,7 +261,36 @@
 			toast.error(m.accounts_share_leave_failed());
 		}
 	}
+
+	const dangerZoneAction = $derived.by(() => {
+		if (!canWrite)
+			return {
+				description: m.accounts_share_leave_description(),
+				subtext: m.accounts_share_leave_subtext(),
+				buttonLabel: m.accounts_share_leave_button(),
+				confirmTitle: m.accounts_share_leave_confirm_title(),
+				confirmDescription: m.accounts_share_leave_confirm_description(),
+				confirmCancelLabel: m.accounts_share_leave_confirm_cancel(),
+				confirmContinueLabel: m.accounts_share_leave_confirm_continue(),
+				onConfirm: handleLeaveShare
+			};
+
+		return {
+			description: m.accounts_delete_description(),
+			subtext: m.accounts_delete_subtext(),
+			buttonLabel: m.accounts_delete_button(),
+			confirmTitle: m.accounts_delete_confirm_title(),
+			confirmDescription: m.accounts_delete_confirm_description(),
+			confirmCancelLabel: m.accounts_delete_confirm_cancel(),
+			confirmContinueLabel: m.accounts_delete_confirm_continue(),
+			onConfirm: handleDelete
+		};
+	});
 </script>
+
+{#if connectionId}
+	<ConnectionSection {connectionId} />
+{/if}
 
 <Section>
 	<SectionTitle title={m.accounts_section_balance()} />
@@ -291,27 +337,27 @@
 	onRevokeShare={handleRevokeShare}
 />
 
-<RecordDangerZone
-	isLoading={isLoading || !account}
-	action={canWrite
-		? {
-				description: m.accounts_delete_description(),
-				subtext: m.accounts_delete_subtext(),
-				buttonLabel: m.accounts_delete_button(),
-				confirmTitle: m.accounts_delete_confirm_title(),
-				confirmDescription: m.accounts_delete_confirm_description(),
-				confirmCancelLabel: m.accounts_delete_confirm_cancel(),
-				confirmContinueLabel: m.accounts_delete_confirm_continue(),
-				onConfirm: handleDelete
-			}
-		: {
-				description: m.accounts_share_leave_description(),
-				subtext: m.accounts_share_leave_subtext(),
-				buttonLabel: m.accounts_share_leave_button(),
-				confirmTitle: m.accounts_share_leave_confirm_title(),
-				confirmDescription: m.accounts_share_leave_confirm_description(),
-				confirmCancelLabel: m.accounts_share_leave_confirm_cancel(),
-				confirmContinueLabel: m.accounts_share_leave_confirm_continue(),
-				onConfirm: handleLeaveShare
-			}}
-/>
+{#if connectionId}
+	<Section>
+		<SectionTitle title={m.accounts_connection_imports_section_title()} />
+		{#if importSessionsContext.isLoading}
+			<Skeleton class="h-64" showSpinner />
+		{:else if recentConnectionImports.length === 0}
+			<Empty>{m.settings_imports_empty()}</Empty>
+		{:else}
+			<ImportSessionsTable
+				rows={recentConnectionImports}
+				viewAll={{
+					href: resolve('/settings/imports'),
+					label: m.accounts_connection_imports_view_all()
+				}}
+			/>
+		{/if}
+	</Section>
+{/if}
+
+{#if !connectionId}
+	<!-- A linked account can't be deleted or left from here: its connection covers every account it
+	was linked with, so it is unlinked from Settings > Connections instead. -->
+	<RecordDangerZone isLoading={isLoading || !account} action={dangerZoneAction} />
+{/if}
