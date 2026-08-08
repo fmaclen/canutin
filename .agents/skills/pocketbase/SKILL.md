@@ -11,7 +11,7 @@ Backend runtime and database for canutin. Custom Go hooks extend PocketBase with
 
 ## Dev Environment
 
-- Base URL: `http://127.0.0.1:42070` (default; override with `PB_PORT` env var)
+- Base URL: `$PUBLIC_PB_URL` — each checkout has its own port, so read it from the generated `.env` rather than assuming the default
 - Server ownership, ports, and start/reset commands: see [local-servers](../local-servers/SKILL.md)
 - Types auto-generated in `src/lib/pocketbase.schema.ts` on schema changes
 

@@ -2,24 +2,19 @@
 
 Canutin is a personal finance application: SvelteKit on the frontend, PocketBase for the backend and database, and Bun for local tooling.
 
-> This file is `AGENTS.md`. `CLAUDE.md` is a symlink to it - edit `AGENTS.md`.
+> `AGENTS.md` is canonical - `CLAUDE.md` is a symlink to it. Edit `AGENTS.md`.
 
 Feature work happens in managed worktrees under `/.worktrees/` - see the [setup skill](./.agents/skills/setup/SKILL.md).
 
-## Your role
-
-Before you call any other tool, read any other file, or respond to the user, open your role skill. The skill body is not auto-injected - opening it is your first action.
-
-1. If your prompt explicitly assigns you the **Executor** role, read [.agents/skills/executor/SKILL.md](./.agents/skills/executor/SKILL.md).
-2. Otherwise you are the **Orchestrator**. Read [.agents/skills/orchestrator/SKILL.md](./.agents/skills/orchestrator/SKILL.md).
-3. If your system prompt opens with `"You are Codex"`, also read [.agents/skills/codex/SKILL.md](./.agents/skills/codex/SKILL.md).
-4. If your system prompt opens with `"You are OpenCode"`, also read [.agents/skills/opencode/SKILL.md](./.agents/skills/opencode/SKILL.md).
-
-A common failure is treating a task-specific request like "review this PR" or "write a test" as license to load only the matching skill and skip the role. Load the role first, every session, before any task-specific skill.
-
 ## Skills
 
-Each skill lives at `.agents/skills/<slug>/SKILL.md`.
+Each skill lives at `.agents/skills/<slug>/SKILL.md`. Read the ones that match the files you are about to touch, before you touch them:
+
+- `code-quality` on every change.
+- `svelte5` for any `.svelte` or `.svelte.ts` file.
+- `testing` for anything under `e2e/`, and for any work that adds or changes tests.
+- `pocketbase` for PocketBase collections, hooks, migrations, the generated schema, and anything under `pocketbase/`.
+- `failures-and-logs` for error surfaces: try/catch boundaries, user-visible failure messages, server logging.
 
 ### Context
 
@@ -67,11 +62,10 @@ Each skill lives at `.agents/skills/<slug>/SKILL.md`.
 | How to write GitHub issues that describe the problem, not the solution         | issue-writing |
 | Where to put working notes, plans, and research so they don't pollute the repo | working-notes |
 
-### Harness
+## Checks
 
-Load when your tool list matches the harness. The agent must check tool availability and load proactively - this is not auto-injected.
+`bun run quality` already runs Prettier, ESLint, and svelte-check. Run it once at the end of a chunk of work - never the pieces separately.
 
-| Synopsis                                                                                 | Slug     |
-| ---------------------------------------------------------------------------------------- | -------- |
-| Harness-specific quirks for Codex sessions - spawn_agent rules and validation gotchas    | codex    |
-| Harness-specific quirks for opencode sessions - plan mode rules and delegation reminders | opencode |
+## Served skill reference
+
+A change to custom routes, backend hooks, or import behavior must update `pocketbase/skill.go` in the same change, not as a follow-up - CI fails any `pocketbase/**/*.go` change without a matching `pocketbase/skill.go` or `.agents/skills/` update unless it is labeled `skip-skill-check`. See the [pocketbase skill](./.agents/skills/pocketbase/SKILL.md) for which parts of the `/api/canutin/skill` reference are hand-maintained and which are generated.

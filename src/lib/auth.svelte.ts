@@ -128,7 +128,12 @@ export class AuthContext {
 			this.subscribeToCurrentUser();
 			return { success: true } as const;
 		} catch (e: unknown) {
-			this.error = this.getErrorMessage(e, m.auth_login_failed());
+			// PocketBase answers rejected credentials with a 400 here. Any other status keeps its
+			// own message so an outage isn't mislabelled as a bad password.
+			this.error =
+				e instanceof ClientResponseError && e.status === 400
+					? m.auth_login_invalid_credentials()
+					: this.getErrorMessage(e, m.auth_login_failed());
 			return { success: false, error: this.error } as const;
 		} finally {
 			this.isSubmitting = false;
@@ -144,7 +149,12 @@ export class AuthContext {
 			this.currentUserId = this._pb.authStore.record?.id ?? '';
 			return { success: true } as const;
 		} catch (e: unknown) {
-			this.error = this.getErrorMessage(e, m.auth_signup_failed());
+			// Sign-ups closed means no create rule on `users`, which PocketBase forbids with a 403.
+			// A rejected payload comes back as a 400 and keeps its own field-level message.
+			this.error =
+				e instanceof ClientResponseError && e.status === 403
+					? m.auth_signup_closed()
+					: this.getErrorMessage(e, m.auth_signup_failed());
 			return { success: false, error: this.error } as const;
 		} finally {
 			this.isSubmitting = false;

@@ -11,7 +11,7 @@
 	import WalletCardsIcon from '@lucide/svelte/icons/wallet-cards';
 	import type { ComponentProps } from 'svelte';
 
-	import { afterNavigate } from '$app/navigation';
+	import { beforeNavigate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import CanutinIcon from '$lib/components/canutin-icon.svelte';
@@ -26,12 +26,8 @@
 
 	const sidebar = Sidebar.useSidebar();
 
-	// The mobile sidebar is a Sheet that only closes explicitly - navigating to a
-	// new route doesn't close it on its own. Close it after every navigation so
-	// tapping a link on mobile both navigates and dismisses the drawer.
-	afterNavigate(() => {
-		if (sidebar.isMobile) sidebar.setOpenMobile(false);
-	});
+	// Begin dismissing the mobile Sheet before the destination loads.
+	beforeNavigate(() => sidebar.setOpenMobile(false));
 
 	const insights = $derived([
 		{

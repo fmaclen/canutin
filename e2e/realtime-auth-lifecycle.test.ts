@@ -37,7 +37,7 @@ test('logging out from a realtime route emits no realtime authorization 403', as
 
 	await logOut(page);
 	await expect(page).toHaveURL('/auth');
-	await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible();
 	await expect(page.getByText('Your session has expired')).not.toBeVisible();
 	expect(forbidden).toEqual([]);
 });

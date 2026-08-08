@@ -6,6 +6,13 @@
 			name="viewport"
 			content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
 		/>
+		<!-- Safari 26 ignores `theme-color` and samples the background of a fixed or sticky element
+		     near the viewport edge instead - the sticky bar in page.svelte is what tints it there.
+		     These stay for the browsers that do honour the tag; they track the system preference
+		     rather than the in-app toggle because Safari only reads them while parsing. Keep them
+		     in sync with light and dark `--muted` in app.css. -->
+		<meta name="theme-color" content="#f8f8f8" media="(prefers-color-scheme: light)" />
+		<meta name="theme-color" content="#282828" media="(prefers-color-scheme: dark)" />
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link
