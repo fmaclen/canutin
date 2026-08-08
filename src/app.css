@@ -181,6 +181,14 @@
 		@apply bg-background text-foreground;
 		text-wrap: pretty;
 	}
+	/* Keeps scroll targets clear of the toolbar in page.svelte, which is sticky below `md`;
+	   without this, anchoring an element to the top of the viewport hides it behind the bar.
+	   Half a step taller than the bar's `h-12` so the target doesn't sit flush against it. */
+	@media (width < 48rem) {
+		html {
+			scroll-padding-top: --spacing(14);
+		}
+	}
 }
 
 @layer utilities {
