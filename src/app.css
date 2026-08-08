@@ -65,6 +65,9 @@
 	--primary-foreground: oklch(0.985 0 0);
 	--secondary: oklch(0.97 0 0);
 	--secondary-foreground: oklch(0.205 0 0);
+	/* --muted paints the page header, whose sticky bar is what iOS Safari samples to tint the
+	   strip behind the status bar; it is also mirrored as hex into the `theme-color` metas in
+	   app.html for other browsers. Keep those values in sync when this token changes. */
 	--muted: oklch(0.98 0 0);
 	--muted-foreground: oklch(0.66 0 0);
 	--accent: oklch(0.97 0 0);
