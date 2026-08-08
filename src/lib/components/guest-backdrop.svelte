@@ -1,18 +1,16 @@
 <script lang="ts">
 	const id = $props.id();
 
-	// The marks sit on a square lattice aligned to the 45 degree diagonals, so the whole grid is
-	// drawn in a rotated space where each diagonal line is simply a row. STEP is that lattice's
-	// spacing - 96√2, the diagonal of the 96px half-tile the untilted grid used - and it is both the
-	// gap between marks along a line and the gap between neighbouring lines.
+	// The grid is drawn rotated so each 45 degree line of marks is simply a row. STEP is the lattice
+	// spacing both along a line and between lines, and also the drift distance - a layer has to
+	// travel exactly one period to loop seamlessly.
 	const STEP = 135.7645;
 
-	// Rotation is about the SVG's top-left origin, so the tilted grid has to reach well past the
-	// viewport in every direction to still cover the far corner.
+	// Rotation is about the top-left origin, so the grid has to overshoot the viewport.
 	const REACH = 5000;
 
-	// Every line travels along itself at its own speed. Lines are grouped so this stays four
-	// animated layers rather than one per line; each group owns every fourth line.
+	// Each group owns every fourth line, so varying the speeds costs four layers rather than one
+	// per line.
 	const groups = [
 		{ duration: '9.6s' },
 		{ duration: '16.8s' },
@@ -21,9 +19,8 @@
 	];
 </script>
 
-<!-- The surface colour lives here rather than on each caller: the guest routes render inside the
-     app's own background wrapper and the setup splash renders outside it, so owning both layers
-     keeps the two entry points on the same surface. -->
+<!-- The surface colour is owned here so the guest routes and the setup splash share it; the splash
+     renders outside the app's own background wrapper. -->
 <div aria-hidden="true" class="bg-secondary pointer-events-none fixed inset-0"></div>
 
 <svg
@@ -32,8 +29,8 @@
 	xmlns="http://www.w3.org/2000/svg"
 >
 	<defs>
-		<!-- The iso is split into its pill and its hole so the hole can be drawn smaller than the
-		     logo's, leaving more breathing room between the two contours at pattern scale. -->
+		<!-- The hole is a separate circle, deliberately smaller than the logo's, to keep the two
+		     contours legible at pattern scale. -->
 		<g id="iso-{id}" transform="scale(0.6)" fill="none" stroke-width="2">
 			<path
 				d="M3.4021 20.171C-1.13403 24.7071 -1.13403 32.0616 3.4021 36.5978C7.93823 41.1339 15.2928 41.1339 19.8289 36.5978L36.5979 19.8288C41.134 15.2926 41.134 7.93811 36.5979 3.40198C32.0618 -1.13415 24.7073 -1.13416 20.1711 3.40197L3.4021 20.171Z"
@@ -41,28 +38,22 @@
 			<circle cx="28.2369" cy="11.7814" r="4.9" />
 		</g>
 
-		<!-- Carved, not raised: the shadow sits on the outline and the highlight 1px below it, as if
-		     lit from above. Which colour plays each part flips with the theme, since a highlight is
-		     lighter than the page in dark mode and the shadow is darker than it in light mode.
-		     The colours come in as custom properties because these marks are painted through a
-		     three-deep <use> chain inside a <pattern>, and a `dark:` utility's selector does not
-		     match those clones - it silently fell back to the light stroke. Inheritance does reach
-		     them, so the variables are set on the svg and inherited down. -->
+		<!-- Carved, not raised: shadow on the outline, highlight 1px below it. Custom properties
+		     rather than `dark:` classes - utility selectors don't match cloned content inside a
+		     <use>, so a class-based theme silently never applies here. -->
 		<g id="mark-{id}">
 			<use href="#iso-{id}" y="1" style="stroke: var(--mark-highlight)" />
 			<use href="#iso-{id}" style="stroke: var(--mark-shadow)" />
 		</g>
 
-		<!-- Centred on its own origin and counter-rotated, so it keeps its upright screen orientation
-		     once the grid around it is tilted. -->
+		<!-- Counter-rotated so the mark stays upright inside the tilted grid. -->
 		<g id="tilted-mark-{id}" transform="rotate(45)">
 			<use href="#mark-{id}" x="-12" y="-12" />
 		</g>
 	</defs>
 
-	<!-- Tilting the grid rather than the marks: inside here the x axis runs up and to the right, so
-	     a layer travelling along it slides each line along its own diagonal. One STEP is a whole
-	     lattice period, so every layer loops seamlessly no matter how fast it moves. -->
+	<!-- Inside here the x axis runs up and to the right, so a layer drifting along it slides each
+	     line along its own diagonal. -->
 	<g transform="rotate(-45)">
 		{#each groups as group, index (index)}
 			<pattern
@@ -87,9 +78,8 @@
 </svg>
 
 <style>
-	/* Deliberately a true circle sized off the larger viewport edge. An SVG gradient mask follows
-	   the element's aspect ratio, which collapses the clear centre to a sliver on phone-shaped
-	   viewports and puts marks straight through the form. CSS masks key off alpha, so the
+	/* A true circle, not an SVG gradient mask - that would follow the element's aspect ratio and
+	   collapse the clear centre to a sliver on phone-shaped viewports. Alpha is what masks, so the
 	   transparent stop is the one that hides the pattern. */
 	.fade {
 		--mark-shadow: color-mix(in oklab, var(--color-neutral-300) 70%, transparent);
