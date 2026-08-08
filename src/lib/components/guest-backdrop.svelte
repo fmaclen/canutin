@@ -17,11 +17,12 @@
 			<circle cx="28.2369" cy="11.7814" r="4.9" />
 		</g>
 
-		<!-- The bevel is the same outline nudged 1px down and drawn first, so it reads as engraved.
-		     Dark mode flips both strokes: the mark goes lighter than the page, the bevel darker. -->
+		<!-- Carved, not raised: the shadow sits on the outline and the highlight 1px below it, as if
+		     lit from above. Which colour plays each part flips with the theme, since a highlight is
+		     lighter than the page in dark mode and the shadow is darker than it in light mode. -->
 		<g id="mark-{id}">
-			<use href="#iso-{id}" y="1" class="stroke-white dark:stroke-neutral-900" />
-			<use href="#iso-{id}" class="stroke-neutral-300/60 dark:stroke-neutral-600/60" />
+			<use href="#iso-{id}" y="1" class="stroke-white dark:stroke-neutral-600/60" />
+			<use href="#iso-{id}" class="stroke-neutral-300/60 dark:stroke-neutral-900" />
 		</g>
 
 		<!-- Two marks a half-tile apart on both axes tile into a staggered grid:
