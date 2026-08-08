@@ -64,7 +64,7 @@ test('shows auth error toast when session expires', async ({ page }) => {
 
 	await page.reload();
 	await expect(page).toHaveURL('/auth');
-	await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible();
 	await expect(
 		page.locator('[data-sonner-toast]', {
 			hasText: 'Your session has expired'
@@ -114,7 +114,7 @@ test('forces logout without reload when a request returns 401 mid-session', asyn
 
 	await goToPageViaSidebar(page, 'Transactions');
 	await expect(page).toHaveURL('/auth');
-	await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible();
 	await expect(
 		page.locator('[data-sonner-toast]', {
 			hasText: 'Your session has expired'
@@ -129,9 +129,9 @@ test('logs out user automatically when their account is deleted', async ({ page 
 	await signIn(page, user.email);
 	await expect(page.getByRole('region', { name: 'Net worth' })).toBeVisible();
 	await expect(page).not.toHaveURL('/auth');
-	await expect(page.getByRole('button', { name: 'Login' })).not.toBeVisible();
+	await expect(page.getByRole('button', { name: 'Log in' })).not.toBeVisible();
 
 	await deleteUser(user.id);
 	await expect(page).toHaveURL('/auth');
-	await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible();
 });

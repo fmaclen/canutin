@@ -85,7 +85,7 @@
 		<Button type="submit" class="w-full" disabled={auth.isSubmitting}>{primaryText}</Button>
 
 		{#if demo.isEnabled && mode === 'login'}
-			<Button href="/demo" variant="outline" class="w-full">{m.demo_try_as_guest()}</Button>
+			<Button href="/demo" variant="outline" class="w-full">{m.demo_try()}</Button>
 		{/if}
 
 		{#if dev && mode === 'login'}

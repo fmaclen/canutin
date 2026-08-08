@@ -139,9 +139,9 @@ test('locale defaults from browser locale when supported and falls back to Engli
 	// Test's explicit purpose is direct-URL locale-detection behavior on first load
 	await spanishPage.goto('/auth');
 
-	await expect(spanishPage.getByRole('button', { name: 'Login' })).not.toBeVisible();
+	await expect(spanishPage.getByRole('button', { name: 'Log in' })).not.toBeVisible();
 	await expect(spanishPage.getByRole('button', { name: 'Iniciar sesión' })).toBeVisible();
-	await expect(spanishPage.getByText('Probar como invitado')).toBeVisible();
+	await expect(spanishPage.getByText('Probar la demo')).toBeVisible();
 
 	await spanishContext.close();
 
@@ -152,8 +152,8 @@ test('locale defaults from browser locale when supported and falls back to Engli
 	await fallbackPage.goto('/auth');
 
 	await expect(fallbackPage.getByRole('button', { name: 'Iniciar sesión' })).not.toBeVisible();
-	await expect(fallbackPage.getByRole('button', { name: 'Login' })).toBeVisible();
-	await expect(fallbackPage.getByText('Try as guest')).toBeVisible();
+	await expect(fallbackPage.getByRole('button', { name: 'Log in' })).toBeVisible();
+	await expect(fallbackPage.getByText('Try the demo')).toBeVisible();
 
 	await fallbackContext.close();
 });

@@ -35,10 +35,10 @@
 </script>
 
 <div
-	class="flex min-h-dvh w-full items-center justify-center gap-2.5 px-6"
+	class="flex min-h-dvh w-full items-center justify-center gap-3.5 px-6"
 	role="img"
 	aria-label={m.app_name()}
 >
-	<CanutinIcon class="size-5 shrink-0" fill="brand" />
-	<CanutinWordmark class="dark:text-foreground h-3.5 w-auto text-stone-700" />
+	<CanutinIcon class="size-7 shrink-0" fill="brand" />
+	<CanutinWordmark class="dark:text-foreground h-5 w-auto text-stone-700" />
 </div>
