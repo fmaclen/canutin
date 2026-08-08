@@ -12,7 +12,7 @@ test('sign-ups are closed by default', async ({ page }) => {
 	await page.getByLabel('Confirm password').fill(DEFAULT_PASSWORD);
 	await page.getByRole('button', { name: 'Create account' }).click();
 
-	await expect(page.getByText('Only superusers can perform this action.')).toBeVisible();
+	await expect(page.getByText('Sign-ups are closed on this server')).toBeVisible();
 	await expect(page.getByText('Account created, you can now log in')).not.toBeVisible();
 });
 
@@ -24,7 +24,7 @@ test('sign-ups are closed by default', async ({ page }) => {
 test.skip('sign up, login and logout', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
-	await expect(page.getByText('Failed to authenticate')).not.toBeVisible();
+	await expect(page.getByText('Wrong email or password')).not.toBeVisible();
 
 	const uniqueEmail = `bob.${Date.now()}@example.com`;
 
@@ -32,7 +32,7 @@ test.skip('sign up, login and logout', async ({ page }) => {
 	await page.getByLabel('Email').fill(uniqueEmail);
 	await page.getByLabel('Password', { exact: true }).fill(DEFAULT_PASSWORD);
 	await page.getByRole('button', { name: 'Login' }).click();
-	await expect(page.getByText('Failed to authenticate')).toBeVisible();
+	await expect(page.getByText('Wrong email or password')).toBeVisible();
 
 	// Sign up
 	await page.getByRole('link', { name: 'Sign up' }).click();

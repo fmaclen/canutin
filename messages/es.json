@@ -1,7 +1,6 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
 	"app_name": "Canutin",
-	"app_tagline": "Plataforma de finanzas personales",
 	"summary_net_balance": "Saldo neto",
 	"summary_net_amount": "Importe neto",
 	"summary_net_credits": "Créditos netos",
@@ -17,8 +16,6 @@
 
 	"auth_login_title": "Iniciar sesión",
 	"auth_signup_title": "Crear cuenta",
-	"auth_login_description": "Ingresa tu correo para acceder a tu cuenta",
-	"auth_signup_description": "Ingresa tu correo para crear tu cuenta",
 	"auth_email_label": "Correo electrónico",
 	"auth_email_placeholder": "m@ejemplo.com",
 	"auth_password_label": "Contraseña",
@@ -31,6 +28,8 @@
 	"auth_link_signup": "Regístrate",
 	"auth_login_failed": "Error al iniciar sesión",
 	"auth_signup_failed": "Error al crear la cuenta",
+	"auth_login_invalid_credentials": "Correo o contraseña incorrectos",
+	"auth_signup_closed": "El registro está cerrado en este servidor",
 	"sidebar_big_picture": "Panorama",
 	"sidebar_balance_sheet": "Balances",
 	"big_picture_section_summary": "Resumen",

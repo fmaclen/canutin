@@ -3,7 +3,9 @@
 	import { resolve } from '$app/paths';
 	import { getAuthContext } from '$lib/auth.svelte';
 	import CanutinIcon from '$lib/components/canutin-icon.svelte';
+	import CanutinWordmark from '$lib/components/canutin-wordmark.svelte';
 	import { getDemoContext } from '$lib/demo/demo.svelte';
+	import { m } from '$lib/paraglide/messages.js';
 
 	const auth = getAuthContext();
 	const demo = getDemoContext();
@@ -32,6 +34,11 @@
 	}
 </script>
 
-<div class="flex h-screen w-full items-center justify-center">
-	<CanutinIcon class="size-12" fill="brand" />
+<div
+	class="flex h-screen w-full items-center justify-center gap-2.5 px-4"
+	role="img"
+	aria-label={m.app_name()}
+>
+	<CanutinIcon class="size-5 shrink-0" fill="brand" />
+	<CanutinWordmark class="dark:text-foreground h-3.5 w-auto text-stone-700" />
 </div>

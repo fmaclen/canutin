@@ -26,9 +26,6 @@
 	let passwordConfirm = $state('');
 
 	const title = $derived(mode === 'signup' ? m.auth_signup_title() : m.auth_login_title());
-	const description = $derived(
-		mode === 'signup' ? m.auth_signup_description() : m.auth_login_description()
-	);
 	const primaryText = $derived(
 		mode === 'signup' ? m.auth_primary_signup() : m.auth_primary_login()
 	);
@@ -55,10 +52,7 @@
 </script>
 
 <div class="mx-auto flex w-full max-w-sm flex-col gap-6">
-	<div class="flex flex-col gap-1.5">
-		<h1 class="text-2xl leading-none font-semibold">{title}</h1>
-		<p class="text-muted-foreground text-sm">{description}</p>
-	</div>
+	<h1 class="text-2xl leading-none font-semibold">{title}</h1>
 
 	<form class="grid gap-4" method="post" onsubmit={handleSubmit}>
 		<div class="grid gap-2">
