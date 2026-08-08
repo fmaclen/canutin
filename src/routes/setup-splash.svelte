@@ -11,7 +11,7 @@
 </script>
 
 <GuestBackdrop />
-<div class="relative flex h-screen w-full flex-col items-center px-4">
+<div class="relative flex min-h-dvh w-full flex-col items-center px-6">
 	<a href="https://canutin.com" aria-label={m.app_name()} class="flex items-center gap-2.5 py-8">
 		<CanutinIcon class="size-5" fill="brand" />
 		<CanutinWordmark class="dark:text-foreground h-3.5 w-auto text-stone-700" />

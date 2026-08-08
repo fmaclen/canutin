@@ -51,7 +51,7 @@
 	}
 </script>
 
-<div class="mx-auto flex w-full max-w-sm flex-col gap-6">
+<div class="mx-auto flex w-full max-w-sm flex-col gap-10">
 	<h1 class="text-2xl leading-none font-semibold">{title}</h1>
 
 	<form class="grid gap-4" method="post" onsubmit={handleSubmit}>

@@ -2,6 +2,11 @@
 	const id = $props.id();
 </script>
 
+<!-- The surface colour lives here rather than on each caller: the guest routes render inside the
+     app's own background wrapper and the setup splash renders outside it, so owning both layers
+     keeps the two entry points on the same surface. -->
+<div aria-hidden="true" class="bg-secondary pointer-events-none fixed inset-0"></div>
+
 <svg
 	aria-hidden="true"
 	class="fade pointer-events-none fixed inset-0 h-full w-full"
@@ -26,10 +31,10 @@
 		</g>
 
 		<!-- Two marks a half-tile apart on both axes tile into a staggered grid:
-		     columns every 256px, rows every 128px, alternate rows offset by half a column. -->
-		<pattern id="pattern-{id}" width="256" height="256" patternUnits="userSpaceOnUse">
-			<use href="#mark-{id}" x="52" y="52" />
-			<use href="#mark-{id}" x="180" y="180" />
+		     columns every 192px, rows every 96px, alternate rows offset by half a column. -->
+		<pattern id="pattern-{id}" width="192" height="192" patternUnits="userSpaceOnUse">
+			<use href="#mark-{id}" x="39" y="39" />
+			<use href="#mark-{id}" x="135" y="135" />
 		</pattern>
 	</defs>
 
@@ -53,12 +58,12 @@
 	}
 
 	.drift {
-		animation: drift 25s linear infinite;
+		animation: drift 19s linear infinite;
 	}
 
 	@keyframes drift {
 		to {
-			transform: translate(128px, -128px);
+			transform: translate(96px, -96px);
 		}
 	}
 

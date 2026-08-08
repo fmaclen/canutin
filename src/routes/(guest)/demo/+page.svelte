@@ -35,7 +35,7 @@
 </script>
 
 <div
-	class="flex h-screen w-full items-center justify-center gap-2.5 px-4"
+	class="flex min-h-dvh w-full items-center justify-center gap-2.5 px-6"
 	role="img"
 	aria-label={m.app_name()}
 >
