@@ -7,7 +7,6 @@
 	import { getAuthContext } from '$lib/auth.svelte';
 	import Link from '$lib/components/link.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { getDemoContext } from '$lib/demo/demo.svelte';
@@ -55,53 +54,53 @@
 	}
 </script>
 
-<Card.Root class="mx-auto w-full max-w-sm">
-	<Card.Header>
-		<Card.Title class="text-2xl">{title}</Card.Title>
-		<Card.Description>{description}</Card.Description>
-	</Card.Header>
-	<Card.Content>
-		<form class="grid gap-4" method="post" onsubmit={handleSubmit}>
-			<div class="grid gap-2">
-				<Label for="email-{id}">{m.auth_email_label()}</Label>
-				<Input
-					id="email-{id}"
-					type="email"
-					placeholder={m.auth_email_placeholder()}
-					bind:value={email}
-					required
-				/>
-			</div>
+<div class="mx-auto flex w-full max-w-sm flex-col gap-6">
+	<div class="flex flex-col gap-1.5">
+		<h1 class="text-2xl leading-none font-semibold">{title}</h1>
+		<p class="text-muted-foreground text-sm">{description}</p>
+	</div>
 
-			<div class="grid gap-2">
-				<Label for="password-{id}">{m.auth_password_label()}</Label>
-				<Input id="password-{id}" type="password" bind:value={password} required />
-			</div>
-
-			{#if mode === 'signup'}
-				<div class="grid gap-2">
-					<Label for="password2-{id}">{m.auth_password_confirm_label()}</Label>
-					<Input id="password2-{id}" type="password" bind:value={passwordConfirm} required />
-				</div>
-			{/if}
-
-			{#if auth.error}
-				<p class="text-destructive text-sm">{auth.error}</p>
-			{/if}
-
-			<Button type="submit" class="w-full" disabled={auth.isSubmitting}>{primaryText}</Button>
-
-			{#if demo.isEnabled && mode === 'login'}
-				<Button href="/demo" variant="outline" class="w-full">{m.demo_try_as_guest()}</Button>
-			{/if}
-
-			{#if dev && mode === 'login'}
-				<DevAuthShortcuts />
-			{/if}
-		</form>
-		<div class="mt-4 text-center text-sm">
-			{altCtaText}
-			<Link href={altCtaHref}>{altCtaLinkText}</Link>
+	<form class="grid gap-4" method="post" onsubmit={handleSubmit}>
+		<div class="grid gap-2">
+			<Label for="email-{id}">{m.auth_email_label()}</Label>
+			<Input
+				id="email-{id}"
+				type="email"
+				placeholder={m.auth_email_placeholder()}
+				bind:value={email}
+				required
+			/>
 		</div>
-	</Card.Content>
-</Card.Root>
+
+		<div class="grid gap-2">
+			<Label for="password-{id}">{m.auth_password_label()}</Label>
+			<Input id="password-{id}" type="password" bind:value={password} required />
+		</div>
+
+		{#if mode === 'signup'}
+			<div class="grid gap-2">
+				<Label for="password2-{id}">{m.auth_password_confirm_label()}</Label>
+				<Input id="password2-{id}" type="password" bind:value={passwordConfirm} required />
+			</div>
+		{/if}
+
+		{#if auth.error}
+			<p class="text-destructive text-sm">{auth.error}</p>
+		{/if}
+
+		<Button type="submit" class="w-full" disabled={auth.isSubmitting}>{primaryText}</Button>
+
+		{#if demo.isEnabled && mode === 'login'}
+			<Button href="/demo" variant="outline" class="w-full">{m.demo_try_as_guest()}</Button>
+		{/if}
+
+		{#if dev && mode === 'login'}
+			<DevAuthShortcuts />
+		{/if}
+	</form>
+
+	<div class="text-center text-sm">
+		{altCtaText}
+		<Link href={altCtaHref}>{altCtaLinkText}</Link>
+	</div>
+</div>

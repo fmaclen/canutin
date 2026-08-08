@@ -10,3 +10,5 @@ bun.lockb
 /.worktrees/
 pocketbase
 src/lib/pocketbase.schema.ts
+
+.agents/notes/
