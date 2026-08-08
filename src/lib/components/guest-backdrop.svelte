@@ -43,10 +43,14 @@
 
 		<!-- Carved, not raised: the shadow sits on the outline and the highlight 1px below it, as if
 		     lit from above. Which colour plays each part flips with the theme, since a highlight is
-		     lighter than the page in dark mode and the shadow is darker than it in light mode. -->
+		     lighter than the page in dark mode and the shadow is darker than it in light mode.
+		     The colours come in as custom properties because these marks are painted through a
+		     three-deep <use> chain inside a <pattern>, and a `dark:` utility's selector does not
+		     match those clones - it silently fell back to the light stroke. Inheritance does reach
+		     them, so the variables are set on the svg and inherited down. -->
 		<g id="mark-{id}">
-			<use href="#iso-{id}" y="1" class="stroke-white dark:stroke-neutral-600/60" />
-			<use href="#iso-{id}" class="stroke-neutral-300/70 dark:stroke-neutral-900" />
+			<use href="#iso-{id}" y="1" style="stroke: var(--mark-highlight)" />
+			<use href="#iso-{id}" style="stroke: var(--mark-shadow)" />
 		</g>
 
 		<!-- Centred on its own origin and counter-rotated, so it keeps its upright screen orientation
@@ -88,11 +92,19 @@
 	   viewports and puts marks straight through the form. CSS masks key off alpha, so the
 	   transparent stop is the one that hides the pattern. */
 	.fade {
+		--mark-shadow: color-mix(in oklab, var(--color-neutral-300) 70%, transparent);
+		--mark-highlight: var(--color-white);
+
 		mask-image: radial-gradient(
 			circle at 50% 50%,
 			transparent 0 clamp(160px, 12vmax, 260px),
 			black clamp(420px, 34vmax, 780px)
 		);
+	}
+
+	:global(.dark) .fade {
+		--mark-shadow: var(--color-neutral-900);
+		--mark-highlight: color-mix(in oklab, var(--color-neutral-600) 60%, transparent);
 	}
 
 	.drift {
