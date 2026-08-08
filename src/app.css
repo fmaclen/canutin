@@ -65,6 +65,9 @@
 	--primary-foreground: oklch(0.985 0 0);
 	--secondary: oklch(0.97 0 0);
 	--secondary-foreground: oklch(0.205 0 0);
+	/* --muted paints the page header, whose sticky bar is what iOS Safari samples to tint the
+	   strip behind the status bar; it is also mirrored as hex into the `theme-color` metas in
+	   app.html for other browsers. Keep those values in sync when this token changes. */
 	--muted: oklch(0.98 0 0);
 	--muted-foreground: oklch(0.66 0 0);
 	--accent: oklch(0.97 0 0);
@@ -177,6 +180,14 @@
 	body {
 		@apply bg-background text-foreground;
 		text-wrap: pretty;
+	}
+	/* Keeps scroll targets clear of the toolbar in page.svelte, which is sticky below `md`;
+	   without this, anchoring an element to the top of the viewport hides it behind the bar.
+	   Half a step taller than the bar's `h-12` so the target doesn't sit flush against it. */
+	@media (width < 48rem) {
+		html {
+			scroll-padding-top: --spacing(14);
+		}
 	}
 }
 

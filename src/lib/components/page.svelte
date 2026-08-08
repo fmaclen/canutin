@@ -28,7 +28,11 @@
 	<title>{getPageTitle(pageTitle, crumbs)}</title>
 </svelte:head>
 
-<header class="bg-muted border-b">
+<!-- iOS Safari tints the strip behind the status bar with the background of a sticky or fixed
+     element near the viewport edge, so this row has to stay pinned there on mobile or the strip
+     falls back to the body's color. It sits outside <header> because a sticky element can't
+     travel past its own parent's box, and the header ends well before the page does. -->
+<div class="bg-muted sticky top-0 z-10 md:static">
 	<div class="flex h-12 items-center gap-2 px-4">
 		<Sidebar.Trigger class="-ml-1" />
 		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
@@ -49,7 +53,9 @@
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
 	</div>
+</div>
 
+<header class="bg-muted border-b">
 	<div class="flex items-end justify-between gap-4 px-6 pt-16 pb-6 sm:px-8">
 		<h1 class="text-foreground text-2xl font-bold tracking-tight">{pageTitle}</h1>
 		{#if actions && !subNav}
