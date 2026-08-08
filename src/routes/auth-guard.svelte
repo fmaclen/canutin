@@ -11,9 +11,6 @@
 	const demo = getDemoContext();
 
 	$effect(() => {
-		// TODO(#309): Remove once language switcher UI is added
-		if (page.url.pathname.startsWith('/demo/paraglide')) return;
-
 		if (auth.isLoading) return;
 
 		const pathname = page.url.pathname;
