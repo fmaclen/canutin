@@ -13,21 +13,6 @@
 
 	const pb = getPocketBaseContext();
 
-	const choices = [
-		{
-			route: '/accounts/link',
-			icon: RefreshCwIcon,
-			title: m.accounts_link_page_title(),
-			description: m.accounts_add_choice_link_description()
-		},
-		{
-			route: '/accounts/add/manual',
-			icon: PencilLineIcon,
-			title: m.accounts_add_manual_page_title(),
-			description: m.accounts_add_choice_manual_description()
-		}
-	] as const;
-
 	let notConfigured = $state(false);
 
 	$effect(() => {
@@ -63,36 +48,51 @@
 	>
 		<GuestBackdrop contained />
 		<div class="relative grid w-full max-w-2xl gap-6 sm:grid-cols-2">
-			{#each choices as choice (choice.route)}
-				{#if choice.route === '/accounts/link' && notConfigured}
-					<Card.Root class="h-full gap-0 overflow-hidden py-0 shadow-md">
-						<div class="bg-muted text-muted-foreground flex items-center border-b px-6 py-4">
-							<choice.icon class="size-9" strokeWidth={1.25} />
+			{#if notConfigured}
+				<Card.Root class="h-full gap-0 overflow-hidden py-0 shadow-md">
+					<div class="bg-muted text-muted-foreground flex items-center border-b px-6 py-4">
+						<RefreshCwIcon class="size-9" strokeWidth={1.25} />
+					</div>
+					<Card.Header class="gap-2 py-5">
+						<Card.Title>{m.accounts_link_page_title()}</Card.Title>
+						<Card.Description>{m.accounts_link_unavailable()}</Card.Description>
+					</Card.Header>
+				</Card.Root>
+			{:else}
+				<a
+					href={resolve('/accounts/link')}
+					class="focus-visible:ring-ring group rounded-md focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+				>
+					<Card.Root
+						class="h-full gap-0 overflow-hidden py-0 shadow-md transition-shadow group-hover:shadow-xl"
+					>
+						<div class="bg-brand-secondary text-brand flex items-center border-b px-6 py-4">
+							<RefreshCwIcon class="size-9" strokeWidth={1.25} />
 						</div>
 						<Card.Header class="gap-2 py-5">
-							<Card.Title>{choice.title}</Card.Title>
-							<Card.Description>{m.accounts_link_unavailable()}</Card.Description>
+							<Card.Title>{m.accounts_link_page_title()}</Card.Title>
+							<Card.Description>{m.accounts_add_choice_link_description()}</Card.Description>
 						</Card.Header>
 					</Card.Root>
-				{:else}
-					<a
-						href={resolve(choice.route)}
-						class="focus-visible:ring-ring group rounded-md focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-					>
-						<Card.Root
-							class="h-full gap-0 overflow-hidden py-0 shadow-md transition-shadow group-hover:shadow-xl"
-						>
-							<div class="bg-brand-secondary text-brand flex items-center border-b px-6 py-4">
-								<choice.icon class="size-9" strokeWidth={1.25} />
-							</div>
-							<Card.Header class="gap-2 py-5">
-								<Card.Title>{choice.title}</Card.Title>
-								<Card.Description>{choice.description}</Card.Description>
-							</Card.Header>
-						</Card.Root>
-					</a>
-				{/if}
-			{/each}
+				</a>
+			{/if}
+
+			<a
+				href={resolve('/accounts/add/manual')}
+				class="focus-visible:ring-ring group rounded-md focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+			>
+				<Card.Root
+					class="h-full gap-0 overflow-hidden py-0 shadow-md transition-shadow group-hover:shadow-xl"
+				>
+					<div class="bg-brand-secondary text-brand flex items-center border-b px-6 py-4">
+						<PencilLineIcon class="size-9" strokeWidth={1.25} />
+					</div>
+					<Card.Header class="gap-2 py-5">
+						<Card.Title>{m.accounts_add_manual_page_title()}</Card.Title>
+						<Card.Description>{m.accounts_add_choice_manual_description()}</Card.Description>
+					</Card.Header>
+				</Card.Root>
+			</a>
 		</div>
 	</div>
 </Page>

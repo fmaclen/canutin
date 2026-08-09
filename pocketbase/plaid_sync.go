@@ -316,38 +316,27 @@ func syncConnection(app core.App, connection *core.Record) (plaidSyncSummary, er
 		logEvent("plaidSync", fmt.Sprintf("connection=%s session=%s collection=%s op=%s", connection.Id, session.Id, collection, operation), err)
 	}
 
-	for _, transaction := range added {
-		created, skipped, accountID, err := writePlaidCashTransaction(app, transactionCollection, session.Id, ownerID, accountsByPlaidID, transaction, false, reconcileExistingTransactions, claimedTransactions, providerTransactionIDs)
-		if err != nil {
-			applicationFailures++
-			recordFailure("transactions", "add", err)
-			continue
-		}
-		if created {
-			summary.Created++
-		}
-		if skipped {
-			summary.Skipped++
-		}
-		if accountID != "" {
-			changedAccounts[accountID] = struct{}{}
-		}
-	}
-	for _, transaction := range modified {
-		created, skipped, accountID, err := writePlaidCashTransaction(app, transactionCollection, session.Id, ownerID, accountsByPlaidID, transaction, true, false, claimedTransactions, providerTransactionIDs)
-		if err != nil {
-			applicationFailures++
-			recordFailure("transactions", "modify", err)
-			continue
-		}
-		if created {
-			summary.Created++
-		}
-		if skipped {
-			summary.Skipped++
-		}
-		if accountID != "" {
-			changedAccounts[accountID] = struct{}{}
+	for _, batch := range []struct {
+		transactions []plaidCashTransaction
+		modified     bool
+		operation    string
+	}{{added, false, "add"}, {modified, true, "modify"}} {
+		for _, transaction := range batch.transactions {
+			created, skipped, accountID, err := writePlaidCashTransaction(app, transactionCollection, session.Id, ownerID, accountsByPlaidID, transaction, batch.modified, !batch.modified && reconcileExistingTransactions, claimedTransactions, providerTransactionIDs)
+			if err != nil {
+				applicationFailures++
+				recordFailure("transactions", batch.operation, err)
+				continue
+			}
+			if created {
+				summary.Created++
+			}
+			if skipped {
+				summary.Skipped++
+			}
+			if accountID != "" {
+				changedAccounts[accountID] = struct{}{}
+			}
 		}
 	}
 	for _, transaction := range removed {
@@ -808,19 +797,6 @@ func syncConnection(app core.App, connection *core.Record) (plaidSyncSummary, er
 				setOptionalNumber(record, "amount", amount)
 				setOptionalNumber(record, "fees", transaction.Fees)
 				if err := app.Save(record); err != nil {
-					_, duplicateErr := app.FindFirstRecordByFilter("securityTransactions",
-						"account = {:account} && externalId = {:externalId} && security = {:security} && owner = {:owner}",
-						map[string]any{
-							"account":    account.Id,
-							"externalId": transaction.InvestmentTransactionID,
-							"security":   securityID,
-							"owner":      ownerID,
-						},
-					)
-					if duplicateErr == nil {
-						summary.Skipped++
-						continue
-					}
 					recordFailure("securityTransactions", "save", err)
 					continue
 				}

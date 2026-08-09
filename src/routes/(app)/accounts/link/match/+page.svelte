@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import { toast } from 'svelte-sonner';
+	import { SvelteSet } from 'svelte/reactivity';
 
 	import { beforeNavigate, goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -22,7 +23,7 @@
 	import { interfacePreferences } from '$lib/interface-preferences.svelte';
 	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
-	import { AccountsBalanceGroupOptions, type AccountsResponse } from '$lib/pocketbase.schema';
+	import { AccountsBalanceGroupOptions } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 
 	import { linkSession, type PlaidAccount } from '../link-session.svelte';
@@ -66,8 +67,8 @@
 	);
 	let isSaving = $state(false);
 	let submissionSucceeded = $state(false);
-	let connectionAccountsLoaded = $state(false);
-	let completedPlaidAccountIds: string[] = $state([]);
+	// Tracked across retries so a second submit doesn't re-create accounts that already went through.
+	const completedPlaidAccountIds = new SvelteSet<string>();
 	let formError = $state('');
 	let discardConfirmOpen = $state(false);
 	let connectionDiscarded = $state(false);
@@ -130,25 +131,8 @@
 
 		isSaving = true;
 		try {
-			if (!connectionAccountsLoaded) {
-				const connectedAccounts = await pb.authedClient
-					.collection('accounts')
-					.getFullList<AccountsResponse>({
-						filter: `owner = '${currentOwnerId}' && connection = '${connectionId}'`
-					});
-				completedPlaidAccountIds = [
-					...new Set([
-						...completedPlaidAccountIds,
-						...connectedAccounts.flatMap((account) =>
-							account.externalId ? [account.externalId] : []
-						)
-					])
-				];
-				connectionAccountsLoaded = true;
-			}
-
 			for (const account of plaidAccounts) {
-				if (completedPlaidAccountIds.includes(account.plaidAccountId)) continue;
+				if (completedPlaidAccountIds.has(account.plaidAccountId)) continue;
 				const matchedAccountId = matches[account.plaidAccountId];
 				if (matchedAccountId !== CREATE_NEW) {
 					await pb.authedClient.collection('accounts').update(matchedAccountId, {
@@ -156,7 +140,7 @@
 						externalMask: account.mask || undefined,
 						connection: connectionId
 					});
-					completedPlaidAccountIds = [...completedPlaidAccountIds, account.plaidAccountId];
+					completedPlaidAccountIds.add(account.plaidAccountId);
 					continue;
 				}
 
@@ -175,7 +159,7 @@
 					externalMask: account.mask || undefined,
 					connection: connectionId
 				});
-				completedPlaidAccountIds = [...completedPlaidAccountIds, account.plaidAccountId];
+				completedPlaidAccountIds.add(account.plaidAccountId);
 			}
 
 			submissionSucceeded = true;

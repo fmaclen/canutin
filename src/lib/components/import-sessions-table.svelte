@@ -1,21 +1,38 @@
 <script lang="ts" module>
-	import type { ImportSessionsResponse } from '$lib/pocketbase.schema';
+	import type { BadgeVariant } from '$lib/components/ui/badge/badge.svelte';
+	import { m } from '$lib/paraglide/messages';
+	import { ImportSessionsStatusOptions, type ImportSessionsResponse } from '$lib/pocketbase.schema';
 
 	export type ImportSessionTableRow = Pick<
 		ImportSessionsResponse,
-		'id' | 'label' | 'status' | 'recordsCreated' | 'recordsSkipped' | 'recordsFailed'
-	> & { created: string };
+		'id' | 'label' | 'status' | 'recordsCreated' | 'recordsSkipped' | 'recordsFailed' | 'created'
+	>;
+
+	const statusVariants: Record<ImportSessionsStatusOptions, BadgeVariant> = {
+		[ImportSessionsStatusOptions.completed]: 'positive',
+		[ImportSessionsStatusOptions.completed_with_errors]: 'warning',
+		[ImportSessionsStatusOptions.failed]: 'negative',
+		[ImportSessionsStatusOptions.pending]: 'outline',
+		[ImportSessionsStatusOptions.rolled_back]: 'outline'
+	};
+
+	const statusLabels: Record<ImportSessionsStatusOptions, () => string> = {
+		[ImportSessionsStatusOptions.completed]: m.settings_imports_status_completed,
+		[ImportSessionsStatusOptions.completed_with_errors]:
+			m.settings_imports_status_completed_with_errors,
+		[ImportSessionsStatusOptions.failed]: m.settings_imports_status_failed,
+		[ImportSessionsStatusOptions.pending]: m.settings_imports_status_pending,
+		[ImportSessionsStatusOptions.rolled_back]: m.settings_imports_status_rolled_back
+	};
 </script>
 
 <script lang="ts">
-	import ImportSessionStatusBadge from '$lib/components/import-session-status-badge.svelte';
 	import TableViewAllRow from '$lib/components/table-view-all-row.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
+	import { Badge } from '$lib/components/ui/badge/index.js';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Table from '$lib/components/ui/table/index';
 	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
-	import { m } from '$lib/paraglide/messages';
-	import { ImportSessionsStatusOptions } from '$lib/pocketbase.schema';
 	import { TableSort } from '$lib/sorting.svelte';
 	import { createSortComparator, type SortState } from '$lib/utils';
 
@@ -133,7 +150,9 @@
 					<Table.Cell>
 						<span class="text-foreground/90 text-sm font-medium">{row.label}</span>
 					</Table.Cell>
-					<Table.Cell><ImportSessionStatusBadge status={row.status} /></Table.Cell>
+					<Table.Cell>
+						<Badge variant={statusVariants[row.status]}>{statusLabels[row.status]()}</Badge>
+					</Table.Cell>
 					<Table.Cell class="text-foreground/80 text-right text-sm tabular-nums">
 						{row.recordsCreated}
 					</Table.Cell>

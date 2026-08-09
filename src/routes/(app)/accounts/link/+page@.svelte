@@ -13,29 +13,6 @@
 
 	import { linkSession, type PlaidAccount } from './link-session.svelte';
 
-	type PlaidHandler = {
-		open: () => void;
-		destroy: () => void;
-	};
-
-	type PlaidFactory = {
-		create: (options: {
-			token: string;
-			onSuccess: (publicToken: string, metadata: { institution?: { name?: string } }) => void;
-			onExit: () => void;
-		}) => PlaidHandler;
-	};
-
-	function hasPlaidFactory(value: Window): value is Window & { Plaid: PlaidFactory } {
-		return (
-			'Plaid' in value &&
-			typeof value.Plaid === 'object' &&
-			value.Plaid !== null &&
-			'create' in value.Plaid &&
-			typeof value.Plaid.create === 'function'
-		);
-	}
-
 	type SyncResponse = {
 		created: number;
 		skipped: number;
@@ -64,10 +41,9 @@
 				);
 				if (cancelled) return;
 
-				if (!hasPlaidFactory(window)) {
+				if (!window.Plaid) {
 					await new Promise<void>((resolveScript, rejectScript) => {
-						const existing = document.querySelector<HTMLScriptElement>('script[data-plaid-link]');
-						const script = existing ?? document.createElement('script');
+						const script = document.createElement('script');
 						script.addEventListener('load', () => resolveScript(), { once: true });
 						script.addEventListener(
 							'error',
@@ -77,14 +53,11 @@
 							},
 							{ once: true }
 						);
-						if (!existing) {
-							script.src = 'https://cdn.plaid.com/link/v2/stable/link-initialize.js';
-							script.dataset.plaidLink = '';
-							document.head.append(script);
-						}
+						script.src = 'https://cdn.plaid.com/link/v2/stable/link-initialize.js';
+						document.head.append(script);
 					});
 				}
-				if (cancelled || !hasPlaidFactory(window)) return;
+				if (cancelled || !window.Plaid) return;
 
 				const createdHandler = window.Plaid.create({
 					token: linkToken,
