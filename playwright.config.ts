@@ -1,6 +1,8 @@
 import { existsSync } from 'node:fs';
 import { defineConfig, devices } from '@playwright/test';
 
+import { plaidFakePort } from './e2e/plaid.helpers';
+
 // Worktrees pin their ports in a repo-local .env; load it here so an unsourced
 // shell still targets this checkout's servers instead of the defaults below
 // (which can attach to another checkout's PocketBase via reuseExistingServer).
@@ -19,13 +21,24 @@ export default defineConfig({
 	globalSetup: 'e2e/global.setup.ts',
 	webServer: [
 		{
+			command: 'bun e2e/plaid.server.ts',
+			port: plaidFakePort(),
+			reuseExistingServer: true
+		},
+		{
 			command: 'bun run pb',
 			port: PB_PORT,
 			reuseExistingServer: true,
+			// The Plaid values come last on purpose: they must beat whatever credentials the
+			// developer's .env holds so a test can never reach a real Plaid environment.
 			env: {
 				...process.env,
 				PUBLIC_DEMO_ENABLED: 'true',
-				FX_FETCH_DISABLED: 'true'
+				FX_FETCH_DISABLED: 'true',
+				PLAID_CLIENT_ID: 'fake-client-id',
+				PLAID_SECRET: 'fake-secret',
+				PLAID_ENV: 'sandbox',
+				PLAID_BASE_URL: `http://127.0.0.1:${plaidFakePort()}`
 			}
 		},
 		{

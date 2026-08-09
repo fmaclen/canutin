@@ -261,7 +261,7 @@ test('reverting an import deletes its records and updates status', async ({ page
 	await expect(page.getByText('samuel-scraper-to-revert')).toBeVisible();
 	await expect(page.getByText('Completed')).toBeVisible();
 
-	await page.getByRole('button', { name: 'Revert' }).first().click();
+	await page.getByRole('button', { name: 'Revert' }).click();
 	await expect(page.getByText('This will permanently delete all records')).toBeVisible();
 
 	await page.getByRole('alertdialog').getByRole('button', { name: 'Revert' }).click();

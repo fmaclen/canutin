@@ -17,7 +17,11 @@
 	import * as Tabs from '$lib/components/ui/tabs/index';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { m } from '$lib/paraglide/messages';
-	import type { TransactionsResponse } from '$lib/pocketbase.schema';
+	import {
+		PlaidConnectionsStatusOptions,
+		type PlaidConnectionsResponse,
+		type TransactionsResponse
+	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 	import { TableSort } from '$lib/sorting.svelte';
 	import { createSortComparator, sumPartial, type SortState } from '$lib/utils';
@@ -54,6 +58,8 @@
 		participantExcluded: boolean;
 		closed: boolean;
 		isShared: boolean;
+		isLinked: boolean;
+		needsReauth: boolean;
 	};
 
 	const filters: Array<{
@@ -85,6 +91,7 @@
 	let filter: FilterOption = $state('open');
 	const pb = getPocketBaseContext();
 	const transactionsCounts = new SvelteMap<string, number>();
+	const connectionStatuses = new SvelteMap<string, PlaidConnectionsStatusOptions>();
 
 	type AccountSortColumn = 'name' | 'institution' | 'balance' | 'transactions';
 	const validSortColumns: AccountSortColumn[] = ['name', 'institution', 'balance', 'transactions'];
@@ -108,7 +115,10 @@
 			autoCalculated: Boolean(account.autoCalculated),
 			participantExcluded: account.participantExcluded,
 			closed: Boolean(account.closed),
-			isShared: account.isShared
+			isShared: account.isShared,
+			isLinked: connectionStatuses.has(account.connection),
+			needsReauth:
+				connectionStatuses.get(account.connection) === PlaidConnectionsStatusOptions.reauth_required
 		}));
 
 		const comparator = createSortComparator<AccountRow, AccountSortColumn>(sort.state, {
@@ -171,8 +181,27 @@
 		}
 	}
 
+	// The status of every connection is all the list needs: which accounts are linked and which of
+	// those have gone stale.
+	async function refreshConnections() {
+		try {
+			const connections = await pb.authedClient
+				.collection('plaidConnections')
+				.getFullList<PlaidConnectionsResponse>({
+					fields: 'id,status',
+					requestKey: 'accounts:connections'
+				});
+			connectionStatuses.clear();
+			for (const connection of connections)
+				connectionStatuses.set(connection.id, connection.status);
+		} catch (error) {
+			pb.handleConnectionError(error, 'accounts', 'refresh_connections');
+		}
+	}
+
 	$effect(() => {
 		void refreshTransactionsTotals();
+		void refreshConnections();
 	});
 
 	const isLoaded = $derived(accountsContext.lastBalanceEvent !== 0);
@@ -212,6 +241,9 @@
 
 <Page pageTitle={m.accounts_title()}>
 	{#snippet actions()}
+		<Link href={resolve('/settings/connections')} class="text-sm">
+			{m.accounts_linked_institutions_link()}
+		</Link>
 		<Link href={resolve('/accounts/add')} class="text-sm">{m.accounts_add_page_title()}</Link>
 	{/snippet}
 	<Section>
@@ -334,25 +366,38 @@
 												</Table.Cell>
 												<Table.Cell>
 													{@const statuses = statusBadges(row)}
-													<div class="flex flex-wrap gap-2">
-														{#each statuses as status (status.id)}
-															<Tooltip.Root>
-																<Tooltip.Trigger class="inline-flex">
-																	<Badge
-																		variant="outline"
-																		class="border-border/60 text-foreground/70 text-xs font-normal"
-																	>
-																		{status.label}
-																	</Badge>
-																</Tooltip.Trigger>
-																<Tooltip.Content sideOffset={6}>
-																	<p class="text-xs leading-snug font-normal">
-																		{status.description}
-																	</p>
-																</Tooltip.Content>
-															</Tooltip.Root>
-														{/each}
-													</div>
+													{#if statuses.length === 0 && !row.isLinked}
+														<span class="text-muted-foreground">~</span>
+													{:else}
+														<div class="flex flex-wrap gap-2">
+															{#each statuses as status (status.id)}
+																<Tooltip.Root>
+																	<Tooltip.Trigger class="inline-flex">
+																		<Badge
+																			variant="outline"
+																			class="border-border/60 text-foreground/70 text-xs font-normal"
+																		>
+																			{status.label}
+																		</Badge>
+																	</Tooltip.Trigger>
+																	<Tooltip.Content sideOffset={6}>
+																		<p class="text-xs leading-snug font-normal">
+																			{status.description}
+																		</p>
+																	</Tooltip.Content>
+																</Tooltip.Root>
+															{/each}
+															{#if row.needsReauth}
+																<Badge variant="warning" href={resolve('/settings/connections')}>
+																	{m.accounts_status_reauth_label()}
+																</Badge>
+															{:else if row.isLinked}
+																<Badge variant="outline" href={resolve('/settings/connections')}>
+																	{m.accounts_status_linked_label()}
+																</Badge>
+															{/if}
+														</div>
+													{/if}
 												</Table.Cell>
 												<Table.Cell class="text-right tabular-nums">
 													{@const txnCount = transactionsCounts.get(row.id)}

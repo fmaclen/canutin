@@ -6,22 +6,33 @@
 	import { m } from '$lib/paraglide/messages';
 
 	const isImports = $derived(page.url.pathname.endsWith('/imports'));
+	const isConnections = $derived(page.url.pathname.endsWith('/connections'));
 
 	const subNavItems = $derived([
-		{ label: m.nav_general(), href: resolve('/settings'), active: !isImports },
+		{ label: m.nav_general(), href: resolve('/settings'), active: !isImports && !isConnections },
 		{
 			label: m.settings_imports_section_title(),
 			href: resolve('/settings/imports'),
 			active: isImports
+		},
+		{
+			label: m.settings_connections_nav_title(),
+			href: resolve('/settings/connections'),
+			active: isConnections
 		}
 	]);
 
-	const crumbs = $derived(
+	const subPageTitle = $derived(
 		isImports
-			? [
-					{ label: m.settings_page_title(), href: resolve('/settings') },
-					{ label: m.settings_imports_section_title() }
-				]
+			? m.settings_imports_section_title()
+			: isConnections
+				? m.settings_connections_nav_title()
+				: null
+	);
+
+	const crumbs = $derived(
+		subPageTitle
+			? [{ label: m.settings_page_title(), href: resolve('/settings') }, { label: subPageTitle }]
 			: undefined
 	);
 

@@ -174,6 +174,8 @@ test('user can add a new account', async ({ page }) => {
 
 	await page.getByRole('link', { name: 'Add account' }).click();
 	await expect(page).toHaveURL('/accounts/add');
+	await page.getByRole('link', { name: 'Add manually' }).click();
+	await expect(page).toHaveURL('/accounts/add/manual');
 
 	await page.getByLabel('Name').fill('High Yield Savings');
 	await page.getByLabel('Institution').fill('Chase Bank');
@@ -196,6 +198,8 @@ test('user can add a new account', async ({ page }) => {
 
 	await page.getByRole('link', { name: 'Add account' }).click();
 	await expect(page).toHaveURL('/accounts/add');
+	await page.getByRole('link', { name: 'Add manually' }).click();
+	await expect(page).toHaveURL('/accounts/add/manual');
 
 	await page.getByLabel('Name').fill('Credit Card');
 	await page.getByLabel('Balance group').click();
@@ -456,7 +460,7 @@ test('user can delete account and cascade deletes transactions and balances', as
 	await goToEditTab(page);
 	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}/edit`));
 
-	await page.getByRole('button', { name: 'Delete' }).first().click();
+	await page.getByRole('button', { name: 'Delete' }).click();
 	const dialog = page.getByRole('alertdialog');
 	await expect(dialog).toBeVisible();
 	await expect(dialog.getByText('Are you absolutely sure?')).toBeVisible();

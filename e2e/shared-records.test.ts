@@ -528,7 +528,7 @@ test('recipient can leave a shared account via UI', async ({ page }) => {
 
 	await accountRow.getByRole('link', { name: 'Leavable savings' }).click();
 	await goToEditTab(page);
-	await page.getByRole('button', { name: 'Leave' }).first().click();
+	await page.getByRole('button', { name: 'Leave' }).click();
 	await page.getByRole('button', { name: 'Continue' }).click();
 
 	await expect(page).toHaveURL(/\/accounts$/);
@@ -574,7 +574,7 @@ test('recipient can leave a shared asset via UI', async ({ page }) => {
 
 	await assetRow.getByRole('link', { name: 'Leavable brokerage' }).click();
 	await goToEditTab(page);
-	await page.getByRole('button', { name: 'Leave' }).first().click();
+	await page.getByRole('button', { name: 'Leave' }).click();
 	await page.getByRole('button', { name: 'Continue' }).click();
 
 	await expect(page).toHaveURL(/\/assets$/);

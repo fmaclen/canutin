@@ -377,7 +377,7 @@ test('batch editor displays mixed values correctly', async ({ page }) => {
 
 	// Danger zone should show correct count
 	await expect(page.getByText('Permanently delete all 3 transactions')).toBeVisible();
-	await expect(page.getByRole('button', { name: 'Delete' }).first()).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Delete' })).toBeVisible();
 
 	// Discard returns to the list without changing rows or retaining selection.
 	await page.getByRole('button', { name: 'Discard' }).click();
@@ -640,8 +640,8 @@ test('user can batch delete transactions', async ({ page }) => {
 	await page.getByRole('link', { name: 'Edit 2 transactions' }).click();
 	await expect(page).toHaveURL('/transactions/batch');
 
-	// The first Delete opens the danger-zone dialog; the dialog action is separate.
-	await page.getByRole('button', { name: 'Delete' }).first().click();
+	// The danger-zone Delete opens the dialog; the dialog's own action confirms it.
+	await page.getByRole('button', { name: 'Delete' }).click();
 
 	// Confirmation dialog should appear
 	const dialog = page.getByRole('alertdialog');

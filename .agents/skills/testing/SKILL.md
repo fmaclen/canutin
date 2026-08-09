@@ -113,6 +113,12 @@ The full pre-push workflow (quality checks plus Playwright) lives in [verify](..
 bun run test -- -g 'name of the test you care about'
 ```
 
+## Plaid
+
+Plaid tests never touch the real Plaid API. Playwright starts [`e2e/plaid.server.ts`](../../../e2e/plaid.server.ts), an in-memory stand-in that implements the endpoints the Go backend calls, and points the backend at it through `PLAID_BASE_URL` alongside fake credentials that override anything in `.env`. It listens one port above PocketBase.
+
+A test declares what a bank returns with `setPlaidItem()` and replaces Plaid's Link widget with `stubPlaidWidget()`, both from [`e2e/plaid.helpers.ts`](../../../e2e/plaid.helpers.ts). Banks are addressed only by their own public token, so derive that token from the seeded user (`public-token-${user.id}`) — the desktop and mobile projects run the same file at the same time and a shared token makes them share a bank.
+
 ## Seeding a user for QA
 
 The user's preferred QA bootstrap is a one-liner that creates a basic user via the existing helpers:

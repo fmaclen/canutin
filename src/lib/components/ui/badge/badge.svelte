@@ -10,6 +10,10 @@
 					'bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90 border-transparent',
 				destructive:
 					'bg-destructive [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/70 border-transparent text-white',
+				positive: 'bg-cash/10 text-cash dark:bg-cash/20 dark:text-emerald-400 border-transparent',
+				negative: 'bg-debt/10 text-debt dark:bg-debt/20 dark:text-red-400 border-transparent',
+				warning:
+					'bg-amber-500/10 text-amber-600 dark:bg-amber-500/12 dark:text-amber-400 border-transparent',
 				outline: 'text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
 				cash: 'bg-cash text-white border-transparent',
 				debt: 'bg-debt text-white border-transparent',
