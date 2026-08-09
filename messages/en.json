@@ -656,6 +656,7 @@
 	"settings_connections_sync_partial": "Sync finished with errors: {created} created, {skipped} skipped, {failed} failed",
 	"settings_connections_sync_in_progress": "A sync is already in progress",
 	"settings_connections_sync_failed": "Couldn't sync the connection",
+	"settings_connections_reconnect_button": "Reconnect",
 	"settings_connections_unlink_button": "Unlink",
 	"settings_connections_unlink_confirm_title": "Unlink {institution}?",
 	"settings_connections_unlink_confirm_description": "These accounts will stop syncing automatically. They stay in Canutin with all their data and become fully editable again.",

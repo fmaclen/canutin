@@ -2,6 +2,7 @@
 	import { ClientResponseError } from 'pocketbase';
 	import { toast } from 'svelte-sonner';
 
+	import { resolve } from '$app/paths';
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
@@ -246,17 +247,27 @@
 							</Table.Cell>
 							<Table.Cell class="text-right">
 								<div class="flex items-center justify-end gap-2">
-									<Button
-										variant="secondary"
-										size="sm"
-										disabled={isBusy ||
-											connection.status === PlaidConnectionsStatusOptions.reauth_required}
-										onclick={() => handleSync(connection.id)}
-									>
-										{syncingConnectionId === connection.id
-											? m.settings_connections_sync_button_pending()
-											: m.settings_connections_sync_button()}
-									</Button>
+									{#if connection.status === PlaidConnectionsStatusOptions.reauth_required}
+										<Button
+											variant="secondary"
+											size="sm"
+											disabled={isBusy}
+											href={`${resolve('/accounts/link')}?reconnect=${connection.id}`}
+										>
+											{m.settings_connections_reconnect_button()}
+										</Button>
+									{:else}
+										<Button
+											variant="secondary"
+											size="sm"
+											disabled={isBusy}
+											onclick={() => handleSync(connection.id)}
+										>
+											{syncingConnectionId === connection.id
+												? m.settings_connections_sync_button_pending()
+												: m.settings_connections_sync_button()}
+										</Button>
+									{/if}
 									<AlertDialog.Root>
 										<AlertDialog.Trigger disabled={isBusy}>
 											<Button variant="secondary" size="sm" disabled={isBusy}>

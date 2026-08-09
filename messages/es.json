@@ -656,6 +656,7 @@
 	"settings_connections_sync_partial": "Sincronización terminada con errores: {created} creados, {skipped} omitidos, {failed} fallidos",
 	"settings_connections_sync_in_progress": "Ya hay una sincronización en curso",
 	"settings_connections_sync_failed": "No se pudo sincronizar la conexión",
+	"settings_connections_reconnect_button": "Volver a conectar",
 	"settings_connections_unlink_button": "Desvincular",
 	"settings_connections_unlink_confirm_title": "¿Desvincular {institution}?",
 	"settings_connections_unlink_confirm_description": "Estas cuentas dejarán de sincronizarse automáticamente. Permanecen en Canutin con todos sus datos y vuelven a ser totalmente editables.",

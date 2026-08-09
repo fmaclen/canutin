@@ -120,18 +120,6 @@ const skillCustomEndpointsSection = "## Custom endpoints\n\n" +
 	"financial rows, but does not remove import-created `currencies` rows or their manual " +
 	"`exchangeRates` quotes because those rows do not carry an `importSession` tag. Reverting a " +
 	"Plaid sync session also clears its connection cursor and last sync time so the next sync refetches history.\n" +
-	"- `POST /api/canutin/plaid/link-token` — requires a `users` token and no body. Creates a Plaid " +
-	"Link token for Transactions with Investments as an optional product, and returns `{ linkToken }`. " +
-	"Returns `{ error: \"plaid_not_configured\" }` with status 503 when Plaid credentials are unavailable, " +
-	"or `{ error: \"plaid_request_failed\", message: \"Plaid is temporarily unavailable\" }` with status 502 " +
-	"when Plaid rejects or cannot complete the request.\n" +
-	"- `POST /api/canutin/plaid/exchange` — requires a `users` token. Body is " +
-	"`{ publicToken, institutionName }`. Exchanges the public token, stores the resulting connection, " +
-	"and returns `{ connectionId, accounts: [{ plaidAccountId, name, mask, type, subtype, currency, balance }] }`; " +
-	"`balance` is nullable when Plaid does not report a current balance. Access tokens are never returned. " +
-	"Returns `{ error: \"plaid_not_configured\" }` with status 503 when Plaid credentials are unavailable, " +
-	"or `{ error: \"plaid_request_failed\", message: \"Plaid is temporarily unavailable\" }` with status 502 " +
-	"when Plaid rejects or cannot complete either upstream request.\n" +
 	"- `POST /api/canutin/plaid/connections/{id}/sync` — requires a `users` token and an owned Plaid " +
 	"connection. Synchronizes posted cash transactions from the connection's saved cursor, applies Plaid " +
 	"adds, modifications, and removals to matched accounts, and imports current balance snapshots only for " +

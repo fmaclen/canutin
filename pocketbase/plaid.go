@@ -70,6 +70,10 @@ type plaidExchangeBody struct {
 	InstitutionName string `json:"institutionName"`
 }
 
+type plaidLinkTokenBody struct {
+	ConnectionID string `json:"connectionId"`
+}
+
 type plaidAccountResponse struct {
 	PlaidAccountID string   `json:"plaidAccountId"`
 	Name           string   `json:"name"`
@@ -189,8 +193,30 @@ func plaidBadGateway(re *core.RequestEvent, operation string, err error) error {
 	})
 }
 
-func plaidLinkTokenHandler(_ core.App) func(*core.RequestEvent) error {
+func plaidLinkTokenHandler(app core.App) func(*core.RequestEvent) error {
 	return func(re *core.RequestEvent) error {
+		var body plaidLinkTokenBody
+		if err := re.BindBody(&body); err != nil {
+			return re.BadRequestError("Invalid request body", err)
+		}
+
+		var accessToken string
+		if body.ConnectionID != "" {
+			connection, err := app.FindRecordById("plaidConnections", body.ConnectionID)
+			if errors.Is(err, sql.ErrNoRows) || err == nil && connection.GetString("owner") != re.Auth.Id {
+				return re.NotFoundError("Plaid connection not found", nil)
+			}
+			if err != nil {
+				logEvent("plaid", "failed to find Plaid connection for link token", err)
+				return re.InternalServerError("Failed to create Plaid link token", nil)
+			}
+			accessToken = connection.GetString("accessToken")
+			if accessToken == "" {
+				logEvent("plaid", "failed to create update link token", errors.New("Plaid connection access token is missing"))
+				return re.InternalServerError("Failed to create Plaid link token", nil)
+			}
+		}
+
 		config, err := plaidConfigFromEnv()
 		if err != nil {
 			logEvent("plaid", "link token request rejected", err)
@@ -203,19 +229,23 @@ func plaidLinkTokenHandler(_ core.App) func(*core.RequestEvent) error {
 			ClientName       string   `json:"client_name"`
 			Language         string   `json:"language"`
 			CountryCodes     []string `json:"country_codes"`
-			Products         []string `json:"products"`
-			OptionalProducts []string `json:"optional_products"`
+			Products         []string `json:"products,omitempty"`
+			OptionalProducts []string `json:"optional_products,omitempty"`
+			AccessToken      string   `json:"access_token,omitempty"`
 			User             struct {
 				ClientUserID string `json:"client_user_id"`
 			} `json:"user"`
 		}{
-			ClientID:         config.clientID,
-			Secret:           config.secret,
-			ClientName:       "Canutin",
-			Language:         "en",
-			CountryCodes:     []string{"US"},
-			Products:         []string{"transactions"},
-			OptionalProducts: []string{"investments"},
+			ClientID:     config.clientID,
+			Secret:       config.secret,
+			ClientName:   "Canutin",
+			Language:     "en",
+			CountryCodes: []string{"US"},
+			AccessToken:  accessToken,
+		}
+		if accessToken == "" {
+			request.Products = []string{"transactions"}
+			request.OptionalProducts = []string{"investments"}
 		}
 		request.User.ClientUserID = re.Auth.Id
 
