@@ -369,7 +369,7 @@ test('user can delete transaction', async ({ page }) => {
 	await page.getByRole('link', { name: 'StreamFlix Annual Subscription' }).click();
 	await expect(page).toHaveURL(new RegExp(`/transactions/${transaction.id}(\\?|$)`));
 
-	await page.getByRole('button', { name: 'Delete' }).first().click();
+	await page.getByRole('button', { name: 'Delete' }).click();
 	const dialog = page.getByRole('alertdialog');
 	await expect(dialog).toBeVisible();
 	await expect(dialog.getByText('Are you absolutely sure?')).toBeVisible();

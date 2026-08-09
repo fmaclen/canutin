@@ -314,7 +314,9 @@
 						</div>
 						<AlertDialog.Root>
 							<AlertDialog.Trigger>
-								<Button variant="destructive">{m.transactions_delete_button()}</Button>
+								{#snippet child({ props })}
+									<Button {...props} variant="destructive">{m.transactions_delete_button()}</Button>
+								{/snippet}
 							</AlertDialog.Trigger>
 							<AlertDialog.Content>
 								<AlertDialog.Header>

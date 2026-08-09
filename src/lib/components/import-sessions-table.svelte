@@ -155,9 +155,11 @@
 							{#if row.status === ImportSessionsStatusOptions.completed || row.status === ImportSessionsStatusOptions.completed_with_errors}
 								<AlertDialog.Root>
 									<AlertDialog.Trigger disabled={revertingSessionId === row.id}>
-										<Button variant="secondary" size="sm" disabled={revertingSessionId === row.id}>
-											{m.settings_imports_revert_button()}
-										</Button>
+										{#snippet child({ props })}
+											<Button {...props} variant="secondary" size="sm">
+												{m.settings_imports_revert_button()}
+											</Button>
+										{/snippet}
 									</AlertDialog.Trigger>
 									<AlertDialog.Content>
 										<AlertDialog.Header>

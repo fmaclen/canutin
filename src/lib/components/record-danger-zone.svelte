@@ -40,7 +40,9 @@
 				</div>
 				<AlertDialog.Root>
 					<AlertDialog.Trigger>
-						<Button variant="destructive">{action.buttonLabel}</Button>
+						{#snippet child({ props })}
+							<Button {...props} variant="destructive">{action.buttonLabel}</Button>
+						{/snippet}
 					</AlertDialog.Trigger>
 					<AlertDialog.Content>
 						<AlertDialog.Header>

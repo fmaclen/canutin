@@ -419,7 +419,7 @@ test('currency delete blocks in-use currencies and removes unused quotes', async
 	// is only reachable by navigating here directly.
 	await page.goto(`/currencies/${guardedCurrency.id}/edit`);
 
-	await page.getByRole('button', { name: 'Delete' }).first().click();
+	await page.getByRole('button', { name: 'Delete' }).click();
 	const guardedDialog = page.getByRole('alertdialog');
 	await expect(guardedDialog).toBeVisible();
 	await guardedDialog.getByRole('button').last().click();
@@ -433,7 +433,7 @@ test('currency delete blocks in-use currencies and removes unused quotes', async
 
 	await goToRecordDetail(page, 'Currencies', unusedCode);
 	await goToEditTab(page);
-	await page.getByRole('button', { name: 'Delete' }).first().click();
+	await page.getByRole('button', { name: 'Delete' }).click();
 	const unusedDialog = page.getByRole('alertdialog');
 	await expect(unusedDialog).toBeVisible();
 	await unusedDialog.getByRole('button').last().click();

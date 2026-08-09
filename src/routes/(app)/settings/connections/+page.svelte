@@ -270,9 +270,11 @@
 									{/if}
 									<AlertDialog.Root>
 										<AlertDialog.Trigger disabled={isBusy}>
-											<Button variant="secondary" size="sm" disabled={isBusy}>
-												{m.settings_connections_unlink_button()}
-											</Button>
+											{#snippet child({ props })}
+												<Button {...props} variant="secondary" size="sm">
+													{m.settings_connections_unlink_button()}
+												</Button>
+											{/snippet}
 										</AlertDialog.Trigger>
 										<AlertDialog.Content>
 											<AlertDialog.Header>

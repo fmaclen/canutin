@@ -460,7 +460,7 @@ test('user can delete account and cascade deletes transactions and balances', as
 	await goToEditTab(page);
 	await expect(page).toHaveURL(new RegExp(`/accounts/${checkingAccount.id}/edit`));
 
-	await page.getByRole('button', { name: 'Delete' }).first().click();
+	await page.getByRole('button', { name: 'Delete' }).click();
 	const dialog = page.getByRole('alertdialog');
 	await expect(dialog).toBeVisible();
 	await expect(dialog.getByText('Are you absolutely sure?')).toBeVisible();

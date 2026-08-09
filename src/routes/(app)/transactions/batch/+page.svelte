@@ -415,9 +415,9 @@
 					</div>
 					<AlertDialog.Root>
 						<AlertDialog.Trigger disabled={isSubmitting}>
-							<Button variant="destructive" disabled={isSubmitting}
-								>{m.transactions_delete_button()}</Button
-							>
+							{#snippet child({ props })}
+								<Button {...props} variant="destructive">{m.transactions_delete_button()}</Button>
+							{/snippet}
 						</AlertDialog.Trigger>
 						<AlertDialog.Content>
 							<AlertDialog.Header>

@@ -112,7 +112,7 @@ test('user can edit and delete a trade from the trades list', async ({ page }) =
 	await expect(page.getByLabel('Price')).toHaveValue('$210.00');
 	await expect(page.getByLabel('Amount')).toHaveValue('$3,150.00');
 
-	await page.getByRole('button', { name: 'Delete' }).first().click();
+	await page.getByRole('button', { name: 'Delete' }).click();
 	const dialog = page.getByRole('alertdialog');
 	await expect(dialog).toBeVisible();
 	await expect(dialog.getByText('Are you absolutely sure?')).toBeVisible();
@@ -187,7 +187,7 @@ test('creating, editing, and deleting trades never changes a position market val
 
 	await goToPageViaSidebar(page, 'Trades');
 	await page.getByRole('link', { name: 'Basalt accumulation buy' }).click();
-	await page.getByRole('button', { name: 'Delete' }).first().click();
+	await page.getByRole('button', { name: 'Delete' }).click();
 	const deleteDialog = page.getByRole('alertdialog');
 	await expect(deleteDialog).toBeVisible();
 	await deleteDialog.getByRole('button', { name: 'Continue' }).click();
