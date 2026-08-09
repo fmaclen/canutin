@@ -10,7 +10,7 @@
 			variant: {
 				default: 'bg-primary text-primary-foreground hover:bg-primary/90',
 				destructive:
-					'bg-destructive hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60 text-white',
+					'bg-destructive hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 text-white',
 				outline:
 					'hover:bg-background hover:text-accent-foreground dark:border-input dark:hover:bg-input/50 border',
 				secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',

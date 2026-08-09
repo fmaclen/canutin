@@ -4,9 +4,9 @@
 	import { ImportSessionsStatusOptions } from '$lib/pocketbase.schema';
 
 	const variants: Record<ImportSessionsStatusOptions, BadgeVariant> = {
-		[ImportSessionsStatusOptions.completed]: 'cash',
-		[ImportSessionsStatusOptions.completed_with_errors]: 'secondary',
-		[ImportSessionsStatusOptions.failed]: 'destructive',
+		[ImportSessionsStatusOptions.completed]: 'positive',
+		[ImportSessionsStatusOptions.completed_with_errors]: 'warning',
+		[ImportSessionsStatusOptions.failed]: 'negative',
 		[ImportSessionsStatusOptions.pending]: 'outline',
 		[ImportSessionsStatusOptions.rolled_back]: 'outline'
 	};

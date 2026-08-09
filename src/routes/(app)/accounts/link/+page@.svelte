@@ -5,10 +5,8 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import CanutinIcon from '$lib/components/canutin-icon.svelte';
-	import CanutinWordmark from '$lib/components/canutin-wordmark.svelte';
-	import GuestBackdrop from '$lib/components/guest-backdrop.svelte';
 	import { getPageTitle } from '$lib/components/page';
+	import SplashScreen from '$lib/components/splash-screen.svelte';
 	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
@@ -185,12 +183,4 @@
 	<title>{getPageTitle(m.accounts_link_page_title())}</title>
 </svelte:head>
 
-<GuestBackdrop />
-<div
-	class="relative flex min-h-dvh w-full items-center justify-center gap-3.5 px-6"
-	role="img"
-	aria-label={m.app_name()}
->
-	<CanutinIcon class="size-7 shrink-0" fill="brand" />
-	<CanutinWordmark class="dark:text-foreground h-5 w-auto text-stone-700" />
-</div>
+<SplashScreen linked={false} />
