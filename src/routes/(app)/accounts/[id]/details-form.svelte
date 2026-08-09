@@ -57,15 +57,19 @@
 				<Input id="currency" value={currency} disabled />
 			</FormFieldRow>
 
-			<FormFieldRow>
-				<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-					<Label for="institution" class="justify-start pr-0 md:justify-end"
-						>{m.accounts_label_institution()}</Label
-					>
-					<span class="text-muted-foreground text-sm">{m.accounts_text_optional()}</span>
-				</div>
-				<Input id="institution" bind:value={formData.institution} disabled={bankOwned} />
-			</FormFieldRow>
+			<!-- A linked account gets its institution from the connection section above, which shows the
+			     same name as a read-only field. -->
+			{#if !isLinked}
+				<FormFieldRow>
+					<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+						<Label for="institution" class="justify-start pr-0 md:justify-end"
+							>{m.accounts_label_institution()}</Label
+						>
+						<span class="text-muted-foreground text-sm">{m.accounts_text_optional()}</span>
+					</div>
+					<Input id="institution" bind:value={formData.institution} {disabled} />
+				</FormFieldRow>
+			{/if}
 
 			{#if accountNumber}
 				<FormFieldRow>
