@@ -121,8 +121,14 @@ const skillCustomEndpointsSection = "## Custom endpoints\n\n" +
 	"`exchangeRates` quotes because those rows do not carry an `importSession` tag. Reverting a " +
 	"Plaid sync session also clears its connection cursor and last sync time so the next sync refetches history.\n" +
 	"- `POST /api/canutin/plaid/connections/{id}/sync` — requires a `users` token and an owned Plaid " +
-	"connection. Synchronizes posted cash transactions from the connection's saved cursor, applies Plaid " +
-	"adds, modifications, and removals to matched accounts, and imports current balance snapshots only for " +
+	"connection. Synchronizes posted cash transactions from the connection's saved cursor, stores Plaid's original " +
+	"transaction description when available, and translates Plaid personal finance primary categories into sentence-case " +
+	"labels for newly created transactions. New transfer-in and transfer-out transactions are excluded from cashflow; " +
+	"later Plaid modifications preserve the transaction's existing labels and exclusion state. On the first sync, a Plaid " +
+	"transaction reuses exactly one existing transaction with the same account, owner, calendar date, value, and normalized " +
+	"description, attaching the Plaid transaction ID while preserving its labels, exclusion state, notes, and original import session; " +
+	"ambiguous matches remain separate. " +
+	"It applies adds, modifications, and removals to matched accounts, and imports current balance snapshots only for " +
 	"non-investment accounts that are not auto-calculated. For matched investment accounts it imports current holdings " +
 	"snapshots and investment transactions from 30 days before the previous sync (or from 1990-01-01 on the " +
 	"first sync). The cursor advances after every page and all added, modified, and removed cash transactions " +
@@ -179,7 +185,8 @@ Backend hooks enforce invariants that are not visible in the access rules:
 - Setting ` + "`autoCalculated`" + ` on an account makes the engine recompute its latest cash balance by
   summing imported cash transactions into a new ` + "`source = derived`" + ` row stamped with the current
   time, which overrides any imported cash snapshot and re-fires on later transaction edits. Leave it
-  off to preserve an imported snapshot.
+  off to preserve an imported snapshot. Accounts linked to Plaid always force it off so Plaid's balance
+  snapshots remain authoritative.
 - Share records (` + "`accountShares`" + `, ` + "`assetShares`" + `) can only be updated by the recipient,
   and only the ` + "`includeInNetWorth`" + ` field may change. The sharer must revoke and recreate
   a share to change anything else.

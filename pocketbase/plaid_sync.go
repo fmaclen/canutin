@@ -27,13 +27,17 @@ type plaidSyncSummary struct {
 }
 
 type plaidCashTransaction struct {
-	AccountID     string  `json:"account_id"`
-	TransactionID string  `json:"transaction_id"`
-	Date          string  `json:"date"`
-	Name          string  `json:"name"`
-	MerchantName  string  `json:"merchant_name"`
-	Amount        float64 `json:"amount"`
-	Pending       bool    `json:"pending"`
+	AccountID               string  `json:"account_id"`
+	TransactionID           string  `json:"transaction_id"`
+	Date                    string  `json:"date"`
+	Name                    string  `json:"name"`
+	MerchantName            string  `json:"merchant_name"`
+	OriginalDescription     string  `json:"original_description"`
+	Amount                  float64 `json:"amount"`
+	Pending                 bool    `json:"pending"`
+	PersonalFinanceCategory *struct {
+		Primary string `json:"primary"`
+	} `json:"personal_finance_category"`
 }
 
 type plaidRemovedTransaction struct {
@@ -51,7 +55,7 @@ type plaidProviderAccount struct {
 	} `json:"balances"`
 }
 
-func writePlaidCashTransaction(app core.App, collection *core.Collection, sessionID, ownerID string, accounts map[string]*core.Record, transaction plaidCashTransaction, modified bool) (created, skipped bool, changedAccountID string, err error) {
+func writePlaidCashTransaction(app core.App, collection *core.Collection, sessionID, ownerID string, accounts map[string]*core.Record, transaction plaidCashTransaction, modified, reconcileExisting bool, claimedTransactions, providerTransactionIDs map[string]struct{}) (created, skipped bool, changedAccountID string, err error) {
 	if transaction.Pending {
 		return false, true, "", nil
 	}
@@ -66,34 +70,98 @@ func writePlaidCashTransaction(app core.App, collection *core.Collection, sessio
 		map[string]any{"account": account.Id, "externalId": transaction.TransactionID, "owner": ownerID},
 	)
 	if findErr == nil && !modified {
+		claimedTransactions[existing.Id] = struct{}{}
 		return false, true, "", nil
 	}
 	if findErr != nil && !errors.Is(findErr, sql.ErrNoRows) {
 		return false, false, "", fmt.Errorf("find transaction: %w", findErr)
 	}
 
-	description := transaction.MerchantName
+	description := strings.TrimSpace(transaction.OriginalDescription)
 	if description == "" {
-		description = transaction.Name
+		description = strings.TrimSpace(transaction.MerchantName)
 	}
+	if description == "" {
+		description = strings.TrimSpace(transaction.Name)
+	}
+	value := -transaction.Amount
 
 	record := existing
+	if record == nil && reconcileExisting {
+		// Initial history can overlap an account's prior import. Only an unambiguous exact match is
+		// safe to adopt because the Plaid transaction ID is the durable identity after this sync.
+		start, end := pbDateRange(transaction.Date)
+		candidates, err := app.FindRecordsByFilter("transactions",
+			"account = {:account} && date >= {:start} && date < {:end} && value = {:value} && owner = {:owner}",
+			"", 0, 0,
+			map[string]any{
+				"account": account.Id,
+				"start":   start,
+				"end":     end,
+				"value":   value,
+				"owner":   ownerID,
+			},
+		)
+		if err != nil {
+			return false, false, "", fmt.Errorf("find reconciliation candidates: %w", err)
+		}
+		var match *core.Record
+		for _, candidate := range candidates {
+			_, claimed := claimedTransactions[candidate.Id]
+			_, belongsToPlaidBatch := providerTransactionIDs[candidate.GetString("externalId")]
+			if claimed || belongsToPlaidBatch || normalizeDescription(candidate.GetString("description")) != normalizeDescription(description) {
+				continue
+			}
+			if match != nil {
+				match = nil
+				break
+			}
+			match = candidate
+		}
+		if match != nil {
+			record = match
+			record.Set("externalId", transaction.TransactionID)
+		}
+	}
 	if record == nil {
 		record = core.NewRecord(collection)
+		created = true
 		record.Set("account", account.Id)
 		record.Set("externalId", transaction.TransactionID)
 		record.Set("owner", ownerID)
 		record.Set("importSession", sessionID)
+		if transaction.PersonalFinanceCategory != nil {
+			category := strings.TrimSpace(transaction.PersonalFinanceCategory.Primary)
+			if category == "TRANSFER_IN" || category == "TRANSFER_OUT" {
+				record.Set("excluded", time.Now().UTC().Format(time.RFC3339Nano))
+			}
+			if category != "" {
+				labelName := strings.ToLower(strings.ReplaceAll(category, "_", " "))
+				labelName = strings.ToUpper(labelName[:1]) + labelName[1:]
+				label, _, err := findOrCreate(app,
+					"transactionLabels", "name = {:name} && owner = {:owner}",
+					map[string]any{"name": labelName, "owner": ownerID},
+					map[string]any{"name": labelName, "owner": ownerID},
+				)
+				if err != nil {
+					return false, false, "", fmt.Errorf("find or create transaction label: %w", err)
+				}
+				record.Set("labels", []string{label.Id})
+			}
+		}
 	}
 	record.Set("date", transaction.Date)
 	record.Set("description", description)
 	// Plaid reports money out as positive; Canutin stores expenses as negative values.
-	record.Set("value", -transaction.Amount)
+	record.Set("value", value)
 	if err := app.Save(record); err != nil {
 		return false, false, "", fmt.Errorf("save transaction: %w", err)
 	}
+	if reconcileExisting {
+		claimedTransactions[record.Id] = struct{}{}
+	}
 
-	return existing == nil, false, account.Id, nil
+	return created, false, account.Id, nil
 }
 
 func syncConnection(app core.App, connection *core.Record) (plaidSyncSummary, error) {
@@ -177,6 +245,7 @@ func syncConnection(app core.App, connection *core.Record) (plaidSyncSummary, er
 	}
 
 	nextCursor := connection.GetString("cursor")
+	reconcileExistingTransactions := nextCursor == ""
 	var added []plaidCashTransaction
 	var modified []plaidCashTransaction
 	var removed []plaidRemovedTransaction
@@ -187,6 +256,9 @@ func syncConnection(app core.App, connection *core.Record) (plaidSyncSummary, er
 			AccessToken string `json:"access_token"`
 			Cursor      string `json:"cursor,omitempty"`
 			Count       int    `json:"count"`
+			Options     struct {
+				IncludeOriginalDescription bool `json:"include_original_description"`
+			} `json:"options"`
 		}{
 			ClientID:    config.clientID,
 			Secret:      config.secret,
@@ -194,6 +266,7 @@ func syncConnection(app core.App, connection *core.Record) (plaidSyncSummary, er
 			Cursor:      nextCursor,
 			Count:       500,
 		}
+		request.Options.IncludeOriginalDescription = true
 		var response struct {
 			Added      []plaidCashTransaction    `json:"added"`
 			Modified   []plaidCashTransaction    `json:"modified"`
@@ -226,6 +299,17 @@ func syncConnection(app core.App, connection *core.Record) (plaidSyncSummary, er
 		return failedSummary, errors.Join(err, finishErr)
 	}
 	changedAccounts := map[string]struct{}{}
+	claimedTransactions := map[string]struct{}{}
+	providerTransactionIDs := make(map[string]struct{}, len(added)+len(modified)+len(removed))
+	for _, transaction := range added {
+		providerTransactionIDs[transaction.TransactionID] = struct{}{}
+	}
+	for _, transaction := range modified {
+		providerTransactionIDs[transaction.TransactionID] = struct{}{}
+	}
+	for _, transaction := range removed {
+		providerTransactionIDs[transaction.TransactionID] = struct{}{}
+	}
 	applicationFailures := 0
 	recordFailure := func(collection, operation string, err error) {
 		summary.Failed++
@@ -233,7 +317,7 @@ func syncConnection(app core.App, connection *core.Record) (plaidSyncSummary, er
 	}
 
 	for _, transaction := range added {
-		created, skipped, accountID, err := writePlaidCashTransaction(app, transactionCollection, session.Id, ownerID, accountsByPlaidID, transaction, false)
+		created, skipped, accountID, err := writePlaidCashTransaction(app, transactionCollection, session.Id, ownerID, accountsByPlaidID, transaction, false, reconcileExistingTransactions, claimedTransactions, providerTransactionIDs)
 		if err != nil {
 			applicationFailures++
 			recordFailure("transactions", "add", err)
@@ -250,7 +334,7 @@ func syncConnection(app core.App, connection *core.Record) (plaidSyncSummary, er
 		}
 	}
 	for _, transaction := range modified {
-		created, skipped, accountID, err := writePlaidCashTransaction(app, transactionCollection, session.Id, ownerID, accountsByPlaidID, transaction, true)
+		created, skipped, accountID, err := writePlaidCashTransaction(app, transactionCollection, session.Id, ownerID, accountsByPlaidID, transaction, true, false, claimedTransactions, providerTransactionIDs)
 		if err != nil {
 			applicationFailures++
 			recordFailure("transactions", "modify", err)

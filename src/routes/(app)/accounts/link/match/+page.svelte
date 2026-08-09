@@ -15,7 +15,7 @@
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
-	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
@@ -357,10 +357,7 @@
 			<AlertDialog.Cancel onclick={() => (pendingNavigationUrl = null)}>
 				{m.accounts_link_discard_confirm_cancel()}
 			</AlertDialog.Cancel>
-			<AlertDialog.Action
-				class={buttonVariants({ variant: 'destructive' })}
-				onclick={handleDiscard}
-			>
+			<AlertDialog.Action onclick={handleDiscard}>
 				{m.accounts_link_discard_confirm_continue()}
 			</AlertDialog.Action>
 		</AlertDialog.Footer>

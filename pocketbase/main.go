@@ -234,6 +234,9 @@ func main() {
 		if e.Record.GetString("currency") == "" {
 			e.Record.Set("currency", "USD")
 		}
+		if e.Record.Collection().Name == "accounts" && e.Record.GetString("connection") != "" {
+			e.Record.Set("autoCalculated", "")
+		}
 		if !e.Record.IsNew() && original != "" && e.Record.GetString("currency") != original {
 			return apis.NewBadRequestError("Currency cannot be changed", nil)
 		}
