@@ -1,4 +1,8 @@
 <script lang="ts">
+	// Contained pins the backdrop to the nearest positioned ancestor instead of the viewport, so a
+	// route inside the app shell can fill its content area without covering the sidebar.
+	let { contained = false }: { contained?: boolean } = $props();
+
 	const id = $props.id();
 
 	// The grid is drawn rotated so each 45 degree line of marks is simply a row. STEP is the lattice
@@ -21,11 +25,14 @@
 
 <!-- The surface colour is owned here so the guest routes and the setup splash share it; the splash
      renders outside the app's own background wrapper. -->
-<div aria-hidden="true" class="bg-secondary pointer-events-none fixed inset-0"></div>
+<div
+	aria-hidden="true"
+	class="bg-secondary pointer-events-none inset-0 {contained ? 'absolute' : 'fixed'}"
+></div>
 
 <svg
 	aria-hidden="true"
-	class="fade pointer-events-none fixed inset-0 h-full w-full"
+	class="fade pointer-events-none inset-0 h-full w-full {contained ? 'absolute' : 'fixed'}"
 	xmlns="http://www.w3.org/2000/svg"
 >
 	<defs>

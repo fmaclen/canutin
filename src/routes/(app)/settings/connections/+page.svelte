@@ -5,7 +5,6 @@
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import Currency from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
-	import Link from '$lib/components/link.svelte';
 	import RecordLink from '$lib/components/record-link.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
@@ -31,9 +30,9 @@
 	};
 
 	const statusVariants: Record<PlaidConnectionsStatusOptions, BadgeVariant> = {
-		[PlaidConnectionsStatusOptions.ok]: 'cash',
-		[PlaidConnectionsStatusOptions.error]: 'destructive',
-		[PlaidConnectionsStatusOptions.reauth_required]: 'secondary'
+		[PlaidConnectionsStatusOptions.ok]: 'positive',
+		[PlaidConnectionsStatusOptions.error]: 'negative',
+		[PlaidConnectionsStatusOptions.reauth_required]: 'warning'
 	};
 
 	const statusLabels: Record<PlaidConnectionsStatusOptions, () => string> = {
@@ -53,13 +52,17 @@
 		minute: '2-digit'
 	});
 
-	// The `plaidSync` cron runs at 06:00 UTC every day; anchoring to today's date keeps the time
-	// rendered in the viewer's zone correct across daylight saving changes.
+	// The `plaidSync` cron runs at 06:00 UTC every day, so the next run is today's slot when it
+	// hasn't passed yet and tomorrow's otherwise.
 	const now = new Date();
-	const dailySyncTime = new Intl.DateTimeFormat(getFormattingLocale(), {
-		hour: '2-digit',
-		minute: '2-digit'
-	}).format(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 6)));
+	const nextAutoSyncAt = new Date(
+		Date.UTC(
+			now.getUTCFullYear(),
+			now.getUTCMonth(),
+			now.getUTCDate() + (now.getUTCHours() < 6 ? 0 : 1),
+			6
+		)
+	);
 
 	let connections: PlaidConnectionsResponse[] = $state([]);
 	let isLoadingConnections = $state(true);
@@ -172,32 +175,12 @@
 </script>
 
 <Section>
-	<SectionTitle title={m.settings_connections_section_title()}>
-		{#if connections.length > 0}
-			<span
-				class="text-muted-foreground font-mono text-sm whitespace-nowrap uppercase tabular-nums"
-			>
-				{m.settings_connections_schedule({ time: dailySyncTime })}
-			</span>
-		{/if}
-	</SectionTitle>
+	<SectionTitle title={m.settings_connections_section_title()} />
 	{#if isLoading}
 		<Skeleton class="h-64" showSpinner />
 	{:else if notConfigured}
 		<Empty>
-			<div class="space-y-2 text-center">
-				<p>{m.accounts_link_not_configured()}</p>
-				<p>
-					{m.accounts_link_configuration({
-						clientId: 'PLAID_CLIENT_ID',
-						secret: 'PLAID_SECRET',
-						environment: 'PLAID_ENV'
-					})}
-				</p>
-				<Link href="https://plaid.com/docs" target="_blank" rel="noreferrer">
-					{m.accounts_link_documentation()}
-				</Link>
-			</div>
+			{m.accounts_link_unavailable()}
 		</Empty>
 	{:else if connections.length === 0}
 		<Empty>
@@ -216,6 +199,9 @@
 						</Table.Head>
 						<Table.Head class="text-left whitespace-nowrap">
 							{m.settings_connections_table_header_last_synced()}
+						</Table.Head>
+						<Table.Head class="text-left whitespace-nowrap">
+							{m.settings_connections_table_header_next_sync()}
 						</Table.Head>
 						<Table.Head class="text-right whitespace-nowrap">
 							{m.settings_connections_table_header_accounts()}
@@ -246,6 +232,13 @@
 									{dateTimeFormatter.format(new Date(connection.lastSyncedAt))}
 								{:else}
 									<span class="text-muted-foreground">~</span>
+								{/if}
+							</Table.Cell>
+							<Table.Cell class="text-muted-foreground text-sm whitespace-nowrap">
+								{#if connection.status === PlaidConnectionsStatusOptions.reauth_required}
+									<span class="text-muted-foreground">~</span>
+								{:else}
+									{dateTimeFormatter.format(nextAutoSyncAt)}
 								{/if}
 							</Table.Cell>
 							<Table.Cell class="text-foreground/80 text-right text-sm tabular-nums">

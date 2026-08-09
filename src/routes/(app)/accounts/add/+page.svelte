@@ -1,98 +1,50 @@
 <script lang="ts">
-	import { toast } from 'svelte-sonner';
+	import PencilLineIcon from '@lucide/svelte/icons/pencil-line';
+	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
+	import { ClientResponseError } from 'pocketbase';
 
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { getAccountsContext } from '$lib/accounts.svelte';
-	import { getAuthContext } from '$lib/auth.svelte';
-	import { getBalanceTypesContext } from '$lib/balance-types.svelte';
-	import CurrencyField from '$lib/components/currency-field.svelte';
-	import Fieldset from '$lib/components/fieldset.svelte';
-	import FormFieldRow from '$lib/components/form-field-row.svelte';
+	import GuestBackdrop from '$lib/components/guest-backdrop.svelte';
 	import Page from '$lib/components/page.svelte';
-	import SectionTitle from '$lib/components/section-title.svelte';
-	import Section from '$lib/components/section.svelte';
-	import { Button } from '$lib/components/ui/button/index.js';
-	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
-	import { Label } from '$lib/components/ui/label/index.js';
-	import * as Select from '$lib/components/ui/select/index.js';
-	import { Textarea } from '$lib/components/ui/textarea/index.js';
-	import { getCurrenciesContext } from '$lib/currencies.svelte';
-	import { interfacePreferences } from '$lib/interface-preferences.svelte';
+	import * as Card from '$lib/components/ui/card/index.js';
 	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
-	import { AccountsBalanceGroupOptions } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
 
 	const pb = getPocketBaseContext();
-	const auth = getAuthContext();
-	const accountsContext = getAccountsContext();
-	const balanceTypesContext = getBalanceTypesContext();
-	const currenciesContext = getCurrenciesContext();
 
-	const ownerId = $derived(auth.currentUser?.record?.id);
-	const currencyOptions = $derived(currenciesContext.currencyOptions);
+	const choices = [
+		{
+			route: '/accounts/link',
+			icon: RefreshCwIcon,
+			title: m.accounts_link_page_title(),
+			description: m.accounts_add_choice_link_description()
+		},
+		{
+			route: '/accounts/add/manual',
+			icon: PencilLineIcon,
+			title: m.accounts_add_manual_page_title(),
+			description: m.accounts_add_choice_manual_description()
+		}
+	] as const;
 
-	let name = $state('');
-	let institution = $state('');
-	let balanceGroup: AccountsBalanceGroupOptions | '' = $state('');
-	let accountTypeName = $state('');
-	let notes = $state('');
-	let excluded = $state(false);
-	let closed = $state(false);
-	let currency = $state(interfacePreferences.displayCurrency);
-	let currencyWasChanged = $state(false);
-	let value = $state('');
-
-	const selectedCurrency = $derived(currenciesContext.getCurrency(currency));
+	let notConfigured = $state(false);
 
 	$effect(() => {
-		if (!currencyWasChanged) {
-			currency = interfacePreferences.displayCurrency;
-		}
+		void probePlaid();
 	});
 
-	async function handleSubmit() {
-		const currentOwnerId = ownerId;
-		if (!currentOwnerId) return;
-		if (!currenciesContext.hasCurrency(currency)) {
-			toast.error(m.currency_required());
-			return;
-		}
-
+	// Asking for a link token is the only way to tell whether this server has Plaid credentials, and
+	// probing here keeps the user from clicking through to a dead end.
+	async function probePlaid() {
 		try {
-			const balanceTypeId = await balanceTypesContext.getOrCreate(accountTypeName, currentOwnerId);
-
-			const accountData: Record<string, unknown> = {
-				name: name.trim(),
-				balanceGroup: balanceGroup as AccountsBalanceGroupOptions,
-				balanceType: balanceTypeId,
-				currency,
-				owner: currentOwnerId,
-				institution: institution.trim() || undefined,
-				notes: notes.trim() || undefined,
-				excluded: excluded ? new Date().toISOString() : undefined,
-				closed: closed ? new Date().toISOString() : undefined
-			};
-
-			const account = await pb.authedClient.collection('accounts').create(accountData);
-
-			const balanceData: Record<string, unknown> = {
-				account: account.id,
-				owner: currentOwnerId,
-				asOf: new Date().toISOString(),
-				value: value ? parseFloat(value) : undefined
-			};
-
-			await pb.authedClient.collection('accountBalances').create(balanceData);
-			await accountsContext.refreshForCurrentUser();
-
-			toast.success(m.accounts_add_success());
-			await goto(resolve('/accounts'));
+			await pb.authedClient.send('/api/canutin/plaid/link-token', { method: 'POST' });
 		} catch (error) {
-			logError('addAccount', 'create', error);
-			toast.error(m.accounts_add_failed());
+			notConfigured =
+				error instanceof ClientResponseError &&
+				error.status === 503 &&
+				error.response?.error === 'plaid_not_configured';
+			if (!notConfigured) logError('accountsAdd', 'link_token_probe', error);
 		}
 	}
 </script>
@@ -104,206 +56,43 @@
 		{ label: m.accounts_add_page_title() }
 	]}
 >
-	<Section>
-		<SectionTitle title={m.accounts_section_details()} />
-		<div class="border-border overflow-hidden rounded border">
-			<form
-				onsubmit={(e) => {
-					e.preventDefault();
-					handleSubmit();
-				}}
-				class="space-y-0"
-			>
-				<Fieldset isFirst={true}>
-					<FormFieldRow>
-						<Label for="name" class="justify-start pr-0 md:justify-end"
-							>{m.accounts_label_name()}</Label
-						>
-						<Input id="name" bind:value={name} required />
-					</FormFieldRow>
-
-					<FormFieldRow>
-						<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
-							<Label for="institution" class="justify-start pr-0 md:justify-end"
-								>{m.accounts_label_institution()}</Label
-							>
-							<span class="text-muted-foreground text-sm">{m.accounts_text_optional()}</span>
+	<!-- Negative margins cancel the page's own padding so the backdrop reaches the edges of the
+	     content area; the height allowance is the sticky breadcrumb bar plus the page header. -->
+	<div
+		class="relative -m-6 flex min-h-[calc(100dvh-10.5rem)] items-center justify-center p-6 sm:-m-8 sm:p-8"
+	>
+		<GuestBackdrop contained />
+		<div class="relative grid w-full max-w-2xl gap-6 sm:grid-cols-2">
+			{#each choices as choice (choice.route)}
+				{#if choice.route === '/accounts/link' && notConfigured}
+					<Card.Root class="h-full gap-0 overflow-hidden py-0 shadow-md">
+						<div class="bg-muted text-muted-foreground flex items-center border-b px-6 py-4">
+							<choice.icon class="size-9" strokeWidth={1.25} />
 						</div>
-						<Input id="institution" bind:value={institution} />
-					</FormFieldRow>
-
-					<FormFieldRow>
-						<Label id="category-label" for="category" class="justify-start pr-0 md:justify-end"
-							>{m.accounts_label_category()}</Label
+						<Card.Header class="gap-2 py-5">
+							<Card.Title>{choice.title}</Card.Title>
+							<Card.Description>{m.accounts_link_unavailable()}</Card.Description>
+						</Card.Header>
+					</Card.Root>
+				{:else}
+					<a
+						href={resolve(choice.route)}
+						class="focus-visible:ring-ring group rounded-md focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+					>
+						<Card.Root
+							class="h-full gap-0 overflow-hidden py-0 shadow-md transition-shadow group-hover:shadow-xl"
 						>
-						<Input
-							id="category"
-							name="category"
-							bind:value={accountTypeName}
-							placeholder={m.accounts_category_placeholder()}
-							required
-						/>
-					</FormFieldRow>
-
-					<FormFieldRow>
-						<Label for="balance-group" class="justify-start pr-0 md:justify-end"
-							>{m.accounts_label_balance_group()}</Label
-						>
-						<Select.Root type="single" bind:value={balanceGroup}>
-							<Select.Trigger id="balance-group" class="bg-background w-full">
-								{#if balanceGroup}
-									<div class="flex items-center gap-2">
-										<div
-											class="size-2 rounded-full {balanceGroup === AccountsBalanceGroupOptions.CASH
-												? 'bg-cash'
-												: balanceGroup === AccountsBalanceGroupOptions.DEBT
-													? 'bg-debt'
-													: balanceGroup === AccountsBalanceGroupOptions.INVESTMENT
-														? 'bg-investment'
-														: 'bg-other-assets'}"
-										></div>
-										{#if balanceGroup === AccountsBalanceGroupOptions.CASH}
-											{m.accounts_group_cash_label()}
-										{:else if balanceGroup === AccountsBalanceGroupOptions.DEBT}
-											{m.accounts_group_debt_label()}
-										{:else if balanceGroup === AccountsBalanceGroupOptions.INVESTMENT}
-											{m.accounts_group_investment_label()}
-										{:else if balanceGroup === AccountsBalanceGroupOptions.OTHER}
-											{m.accounts_group_other_label()}
-										{/if}
-									</div>
-								{:else}
-									<span class="text-muted-foreground"
-										>{m.accounts_balance_group_select_placeholder()}</span
-									>
-								{/if}
-							</Select.Trigger>
-							<Select.Content>
-								<Select.Item value={AccountsBalanceGroupOptions.CASH}>
-									<div class="flex items-center gap-2">
-										<div class="bg-cash size-2 rounded-full"></div>
-										{m.accounts_group_cash_label()}
-									</div>
-								</Select.Item>
-								<Select.Item value={AccountsBalanceGroupOptions.DEBT}>
-									<div class="flex items-center gap-2">
-										<div class="bg-debt size-2 rounded-full"></div>
-										{m.accounts_group_debt_label()}
-									</div>
-								</Select.Item>
-								<Select.Item value={AccountsBalanceGroupOptions.INVESTMENT}>
-									<div class="flex items-center gap-2">
-										<div class="bg-investment size-2 rounded-full"></div>
-										{m.accounts_group_investment_label()}
-									</div>
-								</Select.Item>
-								<Select.Item value={AccountsBalanceGroupOptions.OTHER}>
-									<div class="flex items-center gap-2">
-										<div class="bg-other-assets size-2 rounded-full"></div>
-										{m.accounts_group_other_label()}
-									</div>
-								</Select.Item>
-							</Select.Content>
-						</Select.Root>
-					</FormFieldRow>
-
-					<FormFieldRow>
-						<Label for="currency" class="justify-start pr-0 md:justify-end"
-							>{m.accounts_label_currency()}</Label
-						>
-						<Select.Root
-							type="single"
-							value={currency}
-							onValueChange={(value) => {
-								currency = value;
-								currencyWasChanged = true;
-							}}
-						>
-							<Select.Trigger id="currency" class="bg-background w-full">
-								{#if selectedCurrency}
-									<div class="flex min-w-0 items-center gap-2">
-										<span>{selectedCurrency.code}</span>
-										{#if selectedCurrency.name}
-											<span class="text-muted-foreground truncate">{selectedCurrency.name}</span>
-										{/if}
-									</div>
-								{:else if currency}
-									{currency}
-								{:else}
-									<span class="text-muted-foreground">{m.currencies_select_placeholder()}</span>
-								{/if}
-							</Select.Trigger>
-							<Select.Content>
-								{#if currencyOptions.length === 0}
-									<Select.Item value="__no-currencies" disabled>
-										{m.currencies_select_empty()}
-									</Select.Item>
-								{:else}
-									{#each currencyOptions as option (option.value)}
-										<Select.Item value={option.value}>
-											<div class="flex min-w-0 items-center gap-2">
-												<span>{option.code}</span>
-												{#if option.name}
-													<span class="text-muted-foreground truncate">{option.name}</span>
-												{/if}
-											</div>
-										</Select.Item>
-									{/each}
-								{/if}
-							</Select.Content>
-						</Select.Root>
-					</FormFieldRow>
-
-					<FormFieldRow itemsAlignment="items-start">
-						<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1 md:pt-2">
-							<Label for="notes" class="justify-start pr-0 md:justify-end"
-								>{m.accounts_label_notes()}</Label
-							>
-							<span class="text-muted-foreground text-sm">{m.accounts_text_optional()}</span>
-						</div>
-						<Textarea id="notes" bind:value={notes} class="bg-background" />
-					</FormFieldRow>
-				</Fieldset>
-
-				<Fieldset>
-					<FormFieldRow>
-						<Label for="value" class="justify-start pr-0 md:justify-end"
-							>{m.accounts_label_balance()}</Label
-						>
-						<CurrencyField id="value" name="value" bind:value {currency} />
-					</FormFieldRow>
-				</Fieldset>
-
-				<Fieldset>
-					<FormFieldRow itemsAlignment="items-start">
-						<Label class="justify-start pr-0 md:justify-end md:pt-2.5"
-							>{m.accounts_label_marked_as()}</Label
-						>
-						<div class="space-y-2">
-							<Label
-								for="excluded"
-								class="flex h-9 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
-							>
-								<Checkbox id="excluded" bind:checked={excluded} class="bg-background" />
-								<span>{m.accounts_label_exclude_from_net_worth()}</span>
-							</Label>
-							<Label
-								for="closed"
-								class="flex h-9 cursor-pointer items-center gap-2 rounded border px-3 py-1 font-normal"
-							>
-								<Checkbox id="closed" bind:checked={closed} class="bg-background" />
-								<span>{m.accounts_label_closed()}</span>
-							</Label>
-						</div>
-					</FormFieldRow>
-				</Fieldset>
-
-				<footer class="border-border bg-border border-t p-2">
-					<div class="flex justify-end">
-						<Button type="submit">{m.accounts_button_add()}</Button>
-					</div>
-				</footer>
-			</form>
+							<div class="bg-brand-secondary text-brand flex items-center border-b px-6 py-4">
+								<choice.icon class="size-9" strokeWidth={1.25} />
+							</div>
+							<Card.Header class="gap-2 py-5">
+								<Card.Title>{choice.title}</Card.Title>
+								<Card.Description>{choice.description}</Card.Description>
+							</Card.Header>
+						</Card.Root>
+					</a>
+				{/if}
+			{/each}
 		</div>
-	</Section>
+	</div>
 </Page>

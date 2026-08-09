@@ -160,6 +160,7 @@ export type AccountsRecord = {
 	currency: string
 	excluded?: IsoDateString
 	externalId?: string
+	externalMask?: string
 	id: string
 	importSession?: RecordIdString
 	institution?: string

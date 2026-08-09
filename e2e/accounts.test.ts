@@ -174,6 +174,8 @@ test('user can add a new account', async ({ page }) => {
 
 	await page.getByRole('link', { name: 'Add account' }).click();
 	await expect(page).toHaveURL('/accounts/add');
+	await page.getByRole('link', { name: 'Add manually' }).click();
+	await expect(page).toHaveURL('/accounts/add/manual');
 
 	await page.getByLabel('Name').fill('High Yield Savings');
 	await page.getByLabel('Institution').fill('Chase Bank');
@@ -196,6 +198,8 @@ test('user can add a new account', async ({ page }) => {
 
 	await page.getByRole('link', { name: 'Add account' }).click();
 	await expect(page).toHaveURL('/accounts/add');
+	await page.getByRole('link', { name: 'Add manually' }).click();
+	await expect(page).toHaveURL('/accounts/add/manual');
 
 	await page.getByLabel('Name').fill('Credit Card');
 	await page.getByLabel('Balance group').click();

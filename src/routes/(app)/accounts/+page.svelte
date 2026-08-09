@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { ClientResponseError } from 'pocketbase';
-	import { toast } from 'svelte-sonner';
 	import { SvelteMap } from 'svelte/reactivity';
 
 	import { resolve } from '$app/paths';
@@ -14,12 +12,10 @@
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
-	import { Button } from '$lib/components/ui/button/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index';
 	import * as Table from '$lib/components/ui/table/index';
 	import * as Tabs from '$lib/components/ui/tabs/index';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
-	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import {
 		PlaidConnectionsStatusOptions,
@@ -62,6 +58,8 @@
 		participantExcluded: boolean;
 		closed: boolean;
 		isShared: boolean;
+		isLinked: boolean;
+		needsReauth: boolean;
 	};
 
 	const filters: Array<{
@@ -93,6 +91,7 @@
 	let filter: FilterOption = $state('open');
 	const pb = getPocketBaseContext();
 	const transactionsCounts = new SvelteMap<string, number>();
+	const connectionStatuses = new SvelteMap<string, PlaidConnectionsStatusOptions>();
 
 	type AccountSortColumn = 'name' | 'institution' | 'balance' | 'transactions';
 	const validSortColumns: AccountSortColumn[] = ['name', 'institution', 'balance', 'transactions'];
@@ -116,7 +115,10 @@
 			autoCalculated: Boolean(account.autoCalculated),
 			participantExcluded: account.participantExcluded,
 			closed: Boolean(account.closed),
-			isShared: account.isShared
+			isShared: account.isShared,
+			isLinked: connectionStatuses.has(account.connection),
+			needsReauth:
+				connectionStatuses.get(account.connection) === PlaidConnectionsStatusOptions.reauth_required
 		}));
 
 		const comparator = createSortComparator<AccountRow, AccountSortColumn>(sort.state, {
@@ -179,98 +181,28 @@
 		}
 	}
 
-	$effect(() => {
-		void refreshTransactionsTotals();
-	});
-
-	type SyncResponse = {
-		created: number;
-		skipped: number;
-		failed: number;
-	};
-
-	let connections: PlaidConnectionsResponse[] = $state([]);
-	let isSyncing = $state(false);
-
-	// Connections waiting on re-linking can't be synced, only unlinked and linked again, so they
-	// don't count toward showing the action either.
-	const syncableConnections = $derived(
-		connections.filter(
-			(connection) => connection.status !== PlaidConnectionsStatusOptions.reauth_required
-		)
-	);
-
-	$effect(() => {
-		void (async () => {
-			try {
-				connections = await pb.authedClient
-					.collection('plaidConnections')
-					.getFullList<PlaidConnectionsResponse>({
-						fields: 'id,status',
-						requestKey: 'accounts:connections'
-					});
-			} catch (error) {
-				pb.handleConnectionError(error, 'accounts', 'load_connections');
-			}
-		})();
-	});
-
-	async function handleSync() {
-		if (isSyncing) return;
-		const connectionIds = syncableConnections.map((connection) => connection.id);
-		if (connectionIds.length === 0) return;
-
-		isSyncing = true;
-		const loadingToast = toast.loading(m.accounts_sync_pending());
-		let created = 0;
-		let skipped = 0;
-		let failed = 0;
-		let succeeded = 0;
-		let inProgress = 0;
-
+	// The status of every connection is all the list needs: which accounts are linked and which of
+	// those have gone stale.
+	async function refreshConnections() {
 		try {
-			// Syncing is per-connection, so the header action fans out over every connection the user
-			// has and reports a single aggregate result.
-			for (const connectionId of connectionIds) {
-				try {
-					const result = await pb.authedClient.send<SyncResponse>(
-						`/api/canutin/plaid/connections/${connectionId}/sync`,
-						{ method: 'POST' }
-					);
-					created += result.created;
-					skipped += result.skipped;
-					failed += result.failed;
-					succeeded += 1;
-				} catch (error) {
-					if (
-						error instanceof ClientResponseError &&
-						error.status === 409 &&
-						error.response?.error === 'plaid_sync_in_progress'
-					) {
-						inProgress += 1;
-						continue;
-					}
-					logError('accounts', 'sync_connections', error);
-				}
-			}
-
-			toast.dismiss(loadingToast);
-
-			if (succeeded === 0 && inProgress === connectionIds.length) {
-				toast.info(m.accounts_sync_in_progress());
-			} else if (succeeded === 0) {
-				toast.error(m.accounts_sync_failed());
-			} else if (succeeded < connectionIds.length || failed > 0) {
-				toast.warning(m.accounts_sync_partial({ created, skipped, failed }));
-			} else {
-				toast.success(m.accounts_sync_success({ created, skipped }));
-			}
-
-			await refreshTransactionsTotals();
-		} finally {
-			isSyncing = false;
+			const connections = await pb.authedClient
+				.collection('plaidConnections')
+				.getFullList<PlaidConnectionsResponse>({
+					fields: 'id,status',
+					requestKey: 'accounts:connections'
+				});
+			connectionStatuses.clear();
+			for (const connection of connections)
+				connectionStatuses.set(connection.id, connection.status);
+		} catch (error) {
+			pb.handleConnectionError(error, 'accounts', 'refresh_connections');
 		}
 	}
+
+	$effect(() => {
+		void refreshTransactionsTotals();
+		void refreshConnections();
+	});
 
 	const isLoaded = $derived(accountsContext.lastBalanceEvent !== 0);
 
@@ -309,13 +241,10 @@
 
 <Page pageTitle={m.accounts_title()}>
 	{#snippet actions()}
-		<Link href={resolve('/accounts/link')} class="text-sm">{m.accounts_link_page_title()}</Link>
+		<Link href={resolve('/settings/connections')} class="text-sm">
+			{m.accounts_linked_institutions_link()}
+		</Link>
 		<Link href={resolve('/accounts/add')} class="text-sm">{m.accounts_add_page_title()}</Link>
-		{#if syncableConnections.length > 0}
-			<Button variant="outline" onclick={handleSync} disabled={isSyncing}>
-				{m.accounts_sync_button()}
-			</Button>
-		{/if}
 	{/snippet}
 	<Section>
 		{#if !isLoaded}
@@ -437,25 +366,38 @@
 												</Table.Cell>
 												<Table.Cell>
 													{@const statuses = statusBadges(row)}
-													<div class="flex flex-wrap gap-2">
-														{#each statuses as status (status.id)}
-															<Tooltip.Root>
-																<Tooltip.Trigger class="inline-flex">
-																	<Badge
-																		variant="outline"
-																		class="border-border/60 text-foreground/70 text-xs font-normal"
-																	>
-																		{status.label}
-																	</Badge>
-																</Tooltip.Trigger>
-																<Tooltip.Content sideOffset={6}>
-																	<p class="text-xs leading-snug font-normal">
-																		{status.description}
-																	</p>
-																</Tooltip.Content>
-															</Tooltip.Root>
-														{/each}
-													</div>
+													{#if statuses.length === 0 && !row.isLinked}
+														<span class="text-muted-foreground">~</span>
+													{:else}
+														<div class="flex flex-wrap gap-2">
+															{#each statuses as status (status.id)}
+																<Tooltip.Root>
+																	<Tooltip.Trigger class="inline-flex">
+																		<Badge
+																			variant="outline"
+																			class="border-border/60 text-foreground/70 text-xs font-normal"
+																		>
+																			{status.label}
+																		</Badge>
+																	</Tooltip.Trigger>
+																	<Tooltip.Content sideOffset={6}>
+																		<p class="text-xs leading-snug font-normal">
+																			{status.description}
+																		</p>
+																	</Tooltip.Content>
+																</Tooltip.Root>
+															{/each}
+															{#if row.needsReauth}
+																<Badge variant="warning" href={resolve('/settings/connections')}>
+																	{m.accounts_status_reauth_label()}
+																</Badge>
+															{:else if row.isLinked}
+																<Badge variant="outline" href={resolve('/settings/connections')}>
+																	{m.accounts_status_linked_label()}
+																</Badge>
+															{/if}
+														</div>
+													{/if}
 												</Table.Cell>
 												<Table.Cell class="text-right tabular-nums">
 													{@const txnCount = transactionsCounts.get(row.id)}

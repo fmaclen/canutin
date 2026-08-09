@@ -16,7 +16,7 @@
 			active: isImports
 		},
 		{
-			label: m.settings_connections_section_title(),
+			label: m.settings_connections_nav_title(),
 			href: resolve('/settings/connections'),
 			active: isConnections
 		}
@@ -26,7 +26,7 @@
 		isImports
 			? m.settings_imports_section_title()
 			: isConnections
-				? m.settings_connections_section_title()
+				? m.settings_connections_nav_title()
 				: null
 	);
 

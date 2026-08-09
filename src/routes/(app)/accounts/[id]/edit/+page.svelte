@@ -49,6 +49,9 @@
 	// Only the owner of a linked account can see or manage its bank connection; recipients of a share
 	// get the plain account.
 	const connectionId = $derived(account?.isOwner ? account.connection : '');
+	// The bank owns a linked account's institution, category, group and balance regardless of who is
+	// looking at it, so recipients of a share can't edit them either.
+	const isLinked = $derived(Boolean(account?.connection));
 	const recentConnectionImports = $derived(
 		connectionId
 			? importSessionsContext.sessions
@@ -302,7 +305,7 @@
 			currency={account.currency}
 			balanceAsOf={account.balanceAsOf}
 			onSubmit={handleUpdateBalance}
-			disabled={!canWrite}
+			disabled={!canWrite || isLinked}
 			{hasPositions}
 		/>
 	{/if}
@@ -316,8 +319,10 @@
 		<DetailsForm
 			{formData}
 			currency={account.currency}
+			accountNumber={account.externalMask}
 			onSubmit={handleUpdateDetails}
 			disabled={!canWrite}
+			{isLinked}
 		/>
 	{/if}
 </Section>

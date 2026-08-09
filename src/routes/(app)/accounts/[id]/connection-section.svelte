@@ -58,15 +58,6 @@
 		};
 	});
 
-	// A healthy connection needs no status row - seeing this section at all means it is connected.
-	const statusLabel = $derived(
-		connection?.status === PlaidConnectionsStatusOptions.error
-			? m.accounts_connection_status_error()
-			: connection?.status === PlaidConnectionsStatusOptions.reauth_required
-				? m.accounts_connection_status_reauth_required()
-				: null
-	);
-
 	// The `plaidSync` cron runs at 06:00 UTC every day, so the next run is today's 06:00 UTC while it
 	// is still ahead of us and tomorrow's once it has passed. Connections that need re-authentication
 	// are skipped by the job until they are linked again.
@@ -104,15 +95,6 @@
 						/>
 					</FormFieldRow>
 
-					{#if statusLabel}
-						<FormFieldRow>
-							<Label for="connection-status" class="justify-start pr-0 md:justify-end">
-								{m.accounts_connection_status_label()}
-							</Label>
-							<Input id="connection-status" value={statusLabel} disabled />
-						</FormFieldRow>
-					{/if}
-
 					<FormFieldRow>
 						<Label for="connection-last-synced" class="justify-start pr-0 md:justify-end">
 							{m.accounts_connection_last_synced_label()}
@@ -131,6 +113,8 @@
 						<Label for="connection-next-sync" class="justify-start pr-0 md:justify-end">
 							{m.accounts_connection_next_sync_label()}
 						</Label>
+						<!-- The paused copy is the only signal that this connection is stuck: inputs have no
+						     error/warning treatment yet, so this field should get one once they do. -->
 						<Input
 							id="connection-next-sync"
 							value={nextScheduledSync

@@ -21,11 +21,18 @@
 			closed: boolean;
 		};
 		currency: string;
+		accountNumber: string;
 		onSubmit: () => void;
 		disabled?: boolean;
+		isLinked: boolean;
 	}
 
-	let { formData, currency, onSubmit, disabled = false }: Props = $props();
+	let { formData, currency, accountNumber, onSubmit, disabled = false, isLinked }: Props = $props();
+
+	// The bank owns how a linked account is classified, so those fields are frozen while the
+	// connection is in place. The name stays editable because the bank's label for an account is
+	// rarely what the user wants to call it.
+	const bankOwned = $derived(disabled || isLinked);
 </script>
 
 <div class="border-border overflow-hidden rounded border">
@@ -57,8 +64,17 @@
 					>
 					<span class="text-muted-foreground text-sm">{m.accounts_text_optional()}</span>
 				</div>
-				<Input id="institution" bind:value={formData.institution} {disabled} />
+				<Input id="institution" bind:value={formData.institution} disabled={bankOwned} />
 			</FormFieldRow>
+
+			{#if accountNumber}
+				<FormFieldRow>
+					<Label for="account-number" class="justify-start pr-0 md:justify-end"
+						>{m.accounts_label_account_number()}</Label
+					>
+					<Input id="account-number" value={accountNumber} disabled />
+				</FormFieldRow>
+			{/if}
 
 			<FormFieldRow>
 				<Label id="category-label" for="category" class="justify-start pr-0 md:justify-end"
@@ -70,7 +86,7 @@
 					bind:value={formData.accountTypeName}
 					placeholder={m.accounts_category_placeholder()}
 					required
-					{disabled}
+					disabled={bankOwned}
 				/>
 			</FormFieldRow>
 
@@ -78,7 +94,7 @@
 				<Label for="balance-group" class="justify-start pr-0 md:justify-end"
 					>{m.accounts_label_balance_group()}</Label
 				>
-				<Select.Root type="single" bind:value={formData.balanceGroup} {disabled}>
+				<Select.Root type="single" bind:value={formData.balanceGroup} disabled={bankOwned}>
 					<Select.Trigger id="balance-group" class="bg-background w-full">
 						{#if formData.balanceGroup}
 							<div class="flex items-center gap-2">
