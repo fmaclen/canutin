@@ -142,6 +142,12 @@ func plaidConfigFromEnv() (plaidConfig, error) {
 		return plaidConfig{}, fmt.Errorf("%w: PLAID_ENV must be sandbox or production", errPlaidNotConfigured)
 	}
 
+	// The end-to-end suite points this at a local stand-in for the Plaid API so no test can reach a
+	// real Plaid environment. Unset, requests go to the host selected by PLAID_ENV.
+	if baseURL := os.Getenv("PLAID_BASE_URL"); baseURL != "" {
+		config.baseURL = baseURL
+	}
+
 	return config, nil
 }
 

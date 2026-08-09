@@ -216,6 +216,9 @@ Backend hooks enforce invariants that are not visible in the access rules:
   runtime kill-switch. The scheduled refresh runs daily at 05:00 UTC.
 - Plaid connections sync sequentially every night at 06:00 UTC. Connections marked
   ` + "`reauth_required`" + ` are skipped, as is the whole job when Plaid is not configured.
+- Plaid requests go to the host selected by ` + "`PLAID_ENV`" + ` (` + "`sandbox`" + ` or ` + "`production`" + `),
+  unless ` + "`PLAID_BASE_URL`" + ` overrides it with another origin. The override exists so automated tests
+  can run the whole linking and syncing flow against a local stand-in for the Plaid API.
 `
 
 // canutinSkillHandler serves a live, SKILL.md-formatted reference of the Canutin API,
