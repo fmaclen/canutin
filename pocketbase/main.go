@@ -189,6 +189,13 @@ func main() {
 	app.OnRecordDelete("currencies").BindFunc(func(e *core.RecordEvent) error {
 		code := e.Record.GetString("code")
 		owner := e.Record.GetString("owner")
+		_, err := e.App.FindRecordById("users", owner)
+		if errors.Is(err, sql.ErrNoRows) {
+			return e.Next()
+		}
+		if err != nil {
+			return fmt.Errorf("check currency owner: %w", err)
+		}
 		for _, collection := range []string{"accounts", "assets", "securities"} {
 			_, err := e.App.FindFirstRecordByFilter(collection,
 				"owner = {:owner} && currency = {:currency}",
