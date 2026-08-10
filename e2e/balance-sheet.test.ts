@@ -173,11 +173,45 @@ test('balance sheet', async ({ page }) => {
 		asOf: new Date().toISOString(),
 		marketValue: 1234
 	});
+	const excludedAccount = await seedAccount({
+		name: 'Summit Rewards',
+		balanceGroup: AccountsBalanceGroupOptions.DEBT,
+		owner: user.id,
+		balanceType: 'Credit card',
+		excluded: new Date().toISOString()
+	});
+	await seedAccountBalance({
+		account: excludedAccount.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: -2000
+	});
 
 	await expect(cash).toContainText('$500');
 	await expect(investments).toContainText('$1,000');
 	await expect(debt).toContainText('-$1,000');
 	await expect(other).toContainText('$1,000');
+
+	const creditCardItems = page
+		.getByRole('region', { name: 'Credit card' })
+		.getByRole('listitem');
+	await expect(creditCardItems).toHaveCount(2);
+	await expect(creditCardItems.nth(0)).toContainText('Summit Rewards');
+	await expect(creditCardItems.nth(0)).toContainText('-$2,000');
+	await expect(creditCardItems.nth(1)).toContainText('Crescent Classic');
+	await expect(creditCardItems.nth(1)).toContainText('-$1,000');
+
+	const excludedBalance = creditCardItems.nth(0).getByRole('button');
+	await expect(excludedBalance).toHaveClass(/border-b/);
+	await expect(excludedBalance).toHaveClass(/border-dashed/);
+
+	// Hover tooltips are unavailable in mobile projects.
+	if (!test.info().project.name.toLowerCase().includes('mobile')) {
+		await excludedBalance.hover();
+		await expect(
+			page.getByText('This account is excluded from totals', { exact: true })
+		).toBeVisible();
+	}
 
 	const autoCalculatedAccount = await seedAccount({
 		name: 'Maple Reserve',
