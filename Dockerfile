@@ -25,6 +25,10 @@ LABEL org.opencontainers.image.source=https://github.com/fmaclen/canutin
 LABEL org.opencontainers.image.description="Personal finance app"
 LABEL org.opencontainers.image.licenses=AGPL-3.0
 
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends ca-certificates \
+	&& rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY --from=builder /app/build ./build
