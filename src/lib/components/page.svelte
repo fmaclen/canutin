@@ -36,17 +36,25 @@
 	<div class="flex h-12 items-center gap-2 px-4">
 		<Sidebar.Trigger class="-ml-1" />
 		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
-		<Breadcrumb.Root>
-			<Breadcrumb.List>
+		<Breadcrumb.Root class="min-w-0 overflow-hidden">
+			<!-- The trail has to stay on a single line: wrapping pushes the first crumb under the phone's
+			     status bar. The section and the current page are never allowed to shrink, so any overflow
+			     is absorbed by the crumbs in between - in practice the entity name, which is the only
+			     segment of arbitrary length. -->
+			<Breadcrumb.List class="flex-nowrap">
 				{#each trail as crumb, index (index)}
 					{#if index > 0}
-						<Breadcrumb.Separator />
+						<Breadcrumb.Separator class="shrink-0" />
 					{/if}
-					<Breadcrumb.Item>
+					<Breadcrumb.Item
+						class={index === 0 || index === trail.length - 1 ? 'shrink-0' : 'min-w-0'}
+					>
 						{#if crumb.href}
-							<Breadcrumb.Link href={crumb.href}>{crumb.label}</Breadcrumb.Link>
+							<Breadcrumb.Link href={crumb.href} title={crumb.label} class="truncate"
+								>{crumb.label}</Breadcrumb.Link
+							>
 						{:else}
-							<Breadcrumb.Page>{crumb.label}</Breadcrumb.Page>
+							<Breadcrumb.Page title={crumb.label}>{crumb.label}</Breadcrumb.Page>
 						{/if}
 					</Breadcrumb.Item>
 				{/each}
