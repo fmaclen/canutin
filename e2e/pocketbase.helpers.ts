@@ -53,11 +53,27 @@ export async function pbSend(path: string, body: Record<string, unknown>, email?
 
 export async function resetDatabase() {
 	const pbAdmin = await getAdminPB();
-	try {
-		// Deleting the users collection will cascade delete all other collections
-		await pbAdmin.collections.truncate('users');
-	} catch {
-		// HACK: PB may 400 during cascade but deletions still apply; ignore.
+	// Required relation fields prevent a single transactional user truncate from cascading.
+	// Empty dependent collections first so every truncate either succeeds or fails the test run.
+	for (const collection of [
+		'transactions',
+		'transactionLabels',
+		'accountBalances',
+		'securityTransactions',
+		'securityBalances',
+		'assetBalances',
+		'accountShares',
+		'assetShares',
+		'accounts',
+		'securities',
+		'assets',
+		'exchangeRates',
+		'balanceTypes',
+		'currencies',
+		'importSessions',
+		'users'
+	]) {
+		await pbAdmin.collections.truncate(collection);
 	}
 }
 
