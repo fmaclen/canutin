@@ -2,7 +2,7 @@
 	import { getBalanceGroupMeta } from '$lib/account-utils';
 	import { getAccountsContext } from '$lib/accounts.svelte';
 	import { getAssetsContext } from '$lib/assets.svelte';
-	import Currency from '$lib/components/currency.svelte';
+	import Currency, { getCurrencyFxLabel } from '$lib/components/currency.svelte';
 	import Empty from '$lib/components/empty.svelte';
 	import KeyValue from '$lib/components/key-value.svelte';
 	import Page from '$lib/components/page.svelte';
@@ -10,6 +10,7 @@
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import { sumPartial } from '$lib/utils';
 
@@ -205,6 +206,40 @@
 											>
 												{#if item.balance === null}
 													<span class="text-muted-foreground">~</span>
+												{:else if item.excluded}
+													<Tooltip.Root>
+														<Tooltip.Trigger
+															class="border-border inline-block border-b border-dashed leading-none hover:border-current"
+														>
+															<Currency
+																value={item.balance}
+																isConverted={item.isConverted}
+																isUnconverted={item.isUnconverted}
+																missingCurrency={item.missingCurrency}
+																nativeCurrency={item.nativeCurrency}
+																nativeValue={item.nativeValue ?? undefined}
+																showFxTooltip={false}
+															/>
+														</Tooltip.Trigger>
+														<Tooltip.Content sideOffset={6}>
+															<p class="text-xs leading-snug font-normal">
+																{item.type === 'account'
+																	? m.accounts_balance_tooltip_excluded()
+																	: m.assets_balance_tooltip_excluded()}
+															</p>
+															{#if item.isConverted || item.isUnconverted}
+																<p class="text-xs leading-snug font-normal">
+																	{getCurrencyFxLabel({
+																		decimalScale: 0,
+																		isUnconverted: item.isUnconverted,
+																		missingCurrency: item.missingCurrency,
+																		nativeCurrency: item.nativeCurrency,
+																		nativeValue: item.nativeValue ?? undefined
+																	})}
+																</p>
+															{/if}
+														</Tooltip.Content>
+													</Tooltip.Root>
 												{:else}
 													<Currency
 														value={item.balance}
