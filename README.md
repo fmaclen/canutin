@@ -17,7 +17,7 @@ services:
     environment:
       PLAID_CLIENT_ID: ${PLAID_CLIENT_ID:-}
       PLAID_SECRET: ${PLAID_SECRET:-}
-      PLAID_ENV: ${PLAID_ENV:-sandbox}
+      PLAID_ENV: ${PLAID_ENV:-}
     volumes:
       - canutin-data:/app/pocketbase/pb_data
     restart: unless-stopped
@@ -37,13 +37,15 @@ volumes:
   canutin-data:
 ```
 
-To enable Plaid, create a `.env` file beside `docker-compose.yml` with production credentials:
+To enable Plaid, create a `.env` file beside `docker-compose.yml` with all three production values:
 
 ```dotenv
 PLAID_CLIENT_ID=<client-id>
 PLAID_SECRET=<secret>
 PLAID_ENV=production
 ```
+
+`PLAID_ENV` has no default. Use `production` for live data and `sandbox` only for development.
 
 Then run:
 

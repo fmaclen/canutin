@@ -139,7 +139,7 @@ const skillCustomEndpointsSection = "## Custom endpoints\n\n" +
 	"same connection return `{ error: \"plaid_sync_in_progress\" }` with status 409, " +
 	"and a connection requiring renewed Plaid login completes with status `failed` and is marked " +
 	"`reauth_required`. A missing or foreign connection returns status 404. Returns " +
-	"`{ error: \"plaid_not_configured\" }` with status 503 when Plaid credentials are unavailable, or " +
+	"`{ error: \"plaid_not_configured\" }` with status 503 when any required Plaid setting is missing or invalid, or " +
 	"`{ error: \"plaid_request_failed\", message: \"Plaid is temporarily unavailable\" }` with status 502 " +
 	"when Plaid rejects or cannot complete an upstream request.\n" +
 	"- `DELETE /api/canutin/plaid/connections/{id}` — requires a `users` token and an owned Plaid " +
@@ -217,9 +217,10 @@ Backend hooks enforce invariants that are not visible in the access rules:
   runtime kill-switch. The scheduled refresh runs daily at 05:00 UTC.
 - Plaid connections sync sequentially every night at 06:00 UTC. Connections marked
   ` + "`reauth_required`" + ` are skipped, as is the whole job when Plaid is not configured.
-- Plaid requests go to the host selected by ` + "`PLAID_ENV`" + ` (` + "`sandbox`" + ` or ` + "`production`" + `),
-  unless ` + "`PLAID_BASE_URL`" + ` overrides it with another origin. The override exists so automated tests
-  can run the whole linking and syncing flow against a local stand-in for the Plaid API.
+- Plaid requires ` + "`PLAID_CLIENT_ID`" + `, ` + "`PLAID_SECRET`" + `, and an explicit ` + "`PLAID_ENV`" + `
+  (` + "`sandbox`" + ` or ` + "`production`" + `). Requests go to the selected host unless ` + "`PLAID_BASE_URL`" + `
+  overrides it with another origin. The override lets automated tests run the whole linking and syncing flow
+  against a local stand-in for the Plaid API.
 `
 
 // canutinSkillHandler serves a live, SKILL.md-formatted reference of the Canutin API,
