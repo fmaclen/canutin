@@ -454,7 +454,7 @@
 			<Skeleton class="h-64" showSpinner />
 		{:else if positionsRows.length > 0}
 			<div
-				class="grid overflow-hidden rounded-sm shadow-md [&>div]:rounded-none [&>div]:shadow-none"
+				class="full-bleed grid overflow-hidden rounded-sm shadow-md [&>div]:rounded-none [&>div]:shadow-none"
 			>
 				<PositionsTable
 					rows={topPositionsRows}
@@ -486,7 +486,7 @@
 		{#if !loaded || samplesLoading || !account}
 			<Skeleton class="h-64" showSpinner />
 		{:else if tradeRows.length > 0}
-			<div class="bg-background overflow-hidden rounded-sm shadow-md">
+			<div class="full-bleed bg-background overflow-hidden rounded-sm shadow-md">
 				<Table.Root>
 					<Table.Header>
 						<Table.Row>
@@ -597,7 +597,7 @@
 		{#if !loaded || samplesLoading || !account}
 			<Skeleton class="h-64" showSpinner />
 		{:else if transactionRows.length > 0}
-			<div class="bg-background overflow-hidden rounded-sm shadow-md">
+			<div class="full-bleed bg-background overflow-hidden rounded-sm shadow-md">
 				<Table.Root>
 					<Table.Header>
 						<Table.Row>

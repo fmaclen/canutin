@@ -61,6 +61,9 @@
 		'[&_.lc-legend-swatch-button]:items-center [&_.lc-legend-swatch-button]:gap-1.5',
 		'[&_.lc-legend-swatch-group]:items-center [&_.lc-legend-swatch-group]:gap-x-4 [&_.lc-legend-swatch-group]:gap-y-1',
 		'[&_.lc-legend-swatch]:size-2.5 [&_.lc-legend-swatch]:rounded-xl',
+		// Below `sm` the chart runs edge to edge (see `.full-bleed`), which would leave the outer
+		// legend items flush against the viewport; keep them inset by the same hairline the plot uses
+		'max-sm:[&_.lc-legend-container]:px-3',
 
 		// Labels
 		'[&_.lc-labels-text:not([fill])]:fill-foreground [&_text]:stroke-transparent',

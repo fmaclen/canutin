@@ -188,7 +188,7 @@
 			{m.settings_connections_empty()}
 		</Empty>
 	{:else}
-		<div class="bg-background overflow-hidden rounded-sm shadow-md">
+		<div class="full-bleed bg-background overflow-hidden rounded-sm shadow-md">
 			<Table.Root>
 				<Table.Header>
 					<Table.Row>

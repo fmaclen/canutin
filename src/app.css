@@ -207,4 +207,15 @@
 	.font-mono span.font-mono {
 		vertical-align: baseline;
 	}
+
+	/* Charts and tables run to the viewport edges on phones: cancels the horizontal padding the
+	   page layout applies below `sm` (see page.svelte) so only the surface's own internal padding
+	   is left, and drops the corner radius that would otherwise sit on the screen edge. The
+	   `:not()` guard stops a surface nested inside another one from bleeding twice. */
+	@media (width < 40rem) {
+		.full-bleed:not(.full-bleed *) {
+			margin-inline: calc(--spacing(6) * -1);
+			border-radius: 0;
+		}
+	}
 }

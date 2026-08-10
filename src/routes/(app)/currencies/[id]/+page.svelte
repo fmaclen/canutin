@@ -161,7 +161,7 @@
 			{#if sortedRows.length === 0}
 				<Empty>{m.currencies_no_quotes()}</Empty>
 			{:else}
-				<div class="bg-background overflow-hidden rounded-sm shadow-md">
+				<div class="full-bleed bg-background overflow-hidden rounded-sm shadow-md">
 					<Table.Root>
 						<Table.Header>
 							<Table.Row>

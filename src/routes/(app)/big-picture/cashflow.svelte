@@ -6,17 +6,23 @@
 	import Currency from '$lib/components/currency.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
 	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
 
 	const cashflow = getCashflowContext();
 	const periods = $derived(cashflow.periods);
 
+	// Tracks the `sm` breakpoint, below which the chart runs edge to edge
+	const isNarrowViewport = new IsMobile(640);
+
 	let hoveredIndex = $state<number | null>(null);
 
 	const chartData = $derived.by(() => {
+		// Twelve columns share the viewport width, so phones get single-letter month names;
+		// the full month is still reachable through each column's label and tooltip
 		const monthFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
-			month: 'short',
+			month: isNarrowViewport.current ? 'narrow' : 'short',
 			timeZone: 'UTC'
 		});
 		const yearFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
@@ -110,7 +116,7 @@
 </script>
 
 {#if chartData.length > 0}
-	<div class="bg-background h-[30vh] min-h-[220px] overflow-hidden rounded shadow-md">
+	<div class="full-bleed bg-background h-[30vh] min-h-[220px] overflow-hidden rounded shadow-md">
 		<Tooltip.Provider>
 			<!-- Outer grid: one column per period -->
 			<div
@@ -253,5 +259,5 @@
 		</Tooltip.Provider>
 	</div>
 {:else if cashflow.isLoading}
-	<Skeleton class="h-[30vh] min-h-[220px]" showSpinner />
+	<Skeleton class="full-bleed h-[30vh] min-h-[220px]" showSpinner />
 {/if}

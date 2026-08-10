@@ -12,6 +12,8 @@
 	import { axisTicks } from '$lib/components/ui/chart/chart-utils.js';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import Skeleton from '$lib/components/ui/skeleton/skeleton.svelte';
+	import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
+	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
 
 	type SeriesDef = {
@@ -62,6 +64,9 @@
 	const lastRow = $derived(windowedRows.at(-1) ?? null);
 	const isMultiSeries = $derived(series.length > 1);
 	const hasLegend = $derived(showLegend ?? isMultiSeries);
+
+	// Tracks the `sm` breakpoint, below which the chart runs edge to edge (see `.full-bleed`)
+	const isNarrowViewport = new IsMobile(640);
 
 	// The legend overlays the plot from the top and wraps within the container width, so
 	// the chart's top padding tracks its measured height to keep it clear of the marks
@@ -193,6 +198,34 @@
 		const widest = labels.reduce((width, label) => Math.max(width, textWidthMono(label)), 0);
 		return Math.max(48, Math.ceil(widest) + 16);
 	});
+
+	// Y labels overlay the plot on phones, so they trade precision for width: $200,000 becomes
+	// $200K. A unit only applies ten times above its own size, which keeps every label at two
+	// significant digits ($1,860 stays spelled out instead of collapsing to $2K).
+	function formatCompactAxisValue(value: number) {
+		const magnitude = Math.abs(value);
+		const unit =
+			magnitude >= 1e10
+				? { divisor: 1e9, suffix: 'B' }
+				: magnitude >= 1e7
+					? { divisor: 1e6, suffix: 'M' }
+					: magnitude >= 1e4
+						? { divisor: 1e3, suffix: 'K' }
+						: null;
+		if (!unit) return formatAxisValue(value);
+		// The suffix goes after the last digit rather than at the end of the string, so currencies
+		// formatted with a trailing code ("1,234 USDT") keep the code in place
+		return formatAxisValue(value / unit.divisor).replace(/(\d)(?=\D*$)/, `$1${unit.suffix}`);
+	}
+
+	// Phones can't fit the ISO x labels, so they get the short month and apostrophe year the
+	// cashflow chart uses ("Jul '26")
+	const formatNarrowDate = $derived.by(() => {
+		const locale = getFormattingLocale();
+		const month = new Intl.DateTimeFormat(locale, { month: 'short', timeZone: 'UTC' });
+		const year = new Intl.DateTimeFormat(locale, { year: '2-digit', timeZone: 'UTC' });
+		return (date: Date) => `${month.format(date)} '${year.format(date)}`;
+	});
 </script>
 
 <svelte:window onpointerup={endComparison} onpointercancel={endComparison} />
@@ -201,18 +234,18 @@
 	<PeriodTabs bind:value={period} label={m.period_tabs_label({ section: title })} />
 </SectionTitle>
 {#if isLoading}
-	<Skeleton class="h-[30vh] min-h-96" showSpinner />
+	<Skeleton class="full-bleed h-[30vh] min-h-96" showSpinner />
 {:else if rows.length < 2}
 	<div class="h-[30vh] min-h-96">
-		<Empty class="h-full">{emptyMessage}</Empty>
+		<Empty class="full-bleed h-full">{emptyMessage}</Empty>
 	</div>
 {:else if windowedRows.length < 2}
 	<div class="h-[30vh] min-h-96">
-		<Empty class="h-full">{m.chart_period_empty()}</Empty>
+		<Empty class="full-bleed h-full">{m.chart_period_empty()}</Empty>
 	</div>
 {:else}
 	<div
-		class="bg-background overflow-visible rounded-sm shadow-md"
+		class="full-bleed bg-background overflow-visible rounded-sm shadow-md"
 		data-chart-period={period}
 		data-chart-points={windowedRows.length}
 		data-chart-start={firstRow?.date.toISOString().slice(0, 10)}
@@ -269,9 +302,11 @@
 						yDomain={yDomain ?? undefined}
 						padding={{
 							top: hasLegend ? legendHeight + 16 : 16,
-							right: 48,
+							// Phones drop both gutters to a hairline inset: the y labels move inside the plot
+							// so the marks can run the full width of the screen
+							right: isNarrowViewport.current ? 12 : 48,
 							bottom: 24,
-							left: leftPadding
+							left: isNarrowViewport.current ? 12 : leftPadding
 						}}
 						series={series.map((s) => ({
 							key: s.key,
@@ -288,19 +323,49 @@
 							// for seconds when several charts mount at once.
 							spline: { curve: curveBumpX, opacity: 1, strokeWidth: 1.25, motion: 'none' },
 							xAxis: {
-								format: (v: Date) => v.toISOString().slice(0, 10),
-								ticks: 6,
+								format: (v: Date) =>
+									isNarrowViewport.current ? formatNarrowDate(v) : v.toISOString().slice(0, 10),
+								ticks: (scale) => {
+									const ticks = scale.ticks?.(isNarrowViewport.current ? 4 : 6) ?? [];
+									if (!isNarrowViewport.current) return ticks;
+									// Labels are centered on their tick and the plot now reaches the screen edges,
+									// so a tick sitting within half a label of an edge is dropped rather than clipped
+									const [rangeStart, rangeEnd] = scale.range();
+									return ticks.filter((tick) => {
+										const x = scale(tick);
+										return x - rangeStart >= 24 && rangeEnd - x >= 24;
+									});
+								},
 								motion: 'none'
 							},
 							yAxis: {
 								motion: 'none',
-								format: (v: number) => formatAxisValue(v),
+								format: (v: number) =>
+									isNarrowViewport.current ? formatCompactAxisValue(v) : formatAxisValue(v),
 								ticks: (scale) => {
 									const [min, max] = scale.domain();
 									return axisTicks(min, max);
-								}
+								},
+								// Without a gutter to sit in, narrow labels overlay the plot: flush with its left
+								// edge, resting just above their own tick, with a background-colored halo so they
+								// stay legible where a line runs underneath
+								tickLabelProps: isNarrowViewport.current
+									? {
+											textAnchor: 'start',
+											verticalAnchor: 'end',
+											dx: 0,
+											dy: -4,
+											class: 'stroke-background! stroke-2 [paint-order:stroke]'
+										}
+									: undefined
 							},
-							grid: { x: true, y: true, xTicks: 6, yTicks: [0], motion: 'none' },
+							grid: {
+								x: true,
+								y: true,
+								xTicks: isNarrowViewport.current ? 4 : 6,
+								yTicks: [0],
+								motion: 'none'
+							},
 							highlight: { motion: 'none', points: { r: 3, opacity: 1 } }
 						}}
 					>
