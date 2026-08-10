@@ -138,9 +138,7 @@
 				const result = sumPartial(values);
 				balanceType.total = result.total;
 				balanceType.isPartial = result.isPartial || hasMixedAccounts;
-				balanceType.items.sort(
-					(a, b) => Math.abs(b.balance ?? 0) - Math.abs(a.balance ?? 0)
-				);
+				balanceType.items.sort((a, b) => Math.abs(b.balance ?? 0) - Math.abs(a.balance ?? 0));
 				groupValues.push(...values);
 				groupHasMixedAccounts ||= hasMixedAccounts;
 			}
