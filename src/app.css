@@ -61,6 +61,10 @@
 	--card-foreground: oklch(0.145 0 0);
 	--popover: oklch(1 0 0);
 	--popover-foreground: oklch(0.145 0 0);
+	/* Tooltips float above cards, which share the page background, so they get their own surface
+	   instead of `--background`: in dark mode it has to be darker than everything underneath to
+	   read as a separate layer, since the shadow alone doesn't separate it. */
+	--tooltip: oklch(1 0 0);
 	--primary: var(--brand);
 	--primary-foreground: oklch(0.985 0 0);
 	--secondary: oklch(0.97 0 0);
@@ -100,6 +104,7 @@
 	--card-foreground: oklch(0.985 0 0);
 	--popover: oklch(0.31 0 0);
 	--popover-foreground: oklch(0.985 0 0);
+	--tooltip: oklch(0.21 0 0);
 	--primary: var(--brand);
 	--primary-foreground: oklch(0.985 0 0);
 	--secondary: oklch(0.27 0 0);
@@ -146,6 +151,7 @@
 	--color-card-foreground: var(--card-foreground);
 	--color-popover: var(--popover);
 	--color-popover-foreground: var(--popover-foreground);
+	--color-tooltip: var(--tooltip);
 	--color-primary: var(--primary);
 	--color-primary-foreground: var(--primary-foreground);
 	--color-secondary: var(--secondary);

@@ -120,6 +120,57 @@
 		comparisonCurrent = null;
 	}
 
+	// Touch has no hover to drive layerchart's tooltip: a finger that lands on the chart on its way
+	// to scrolling the page opens one, and the pointercancel the scroll begins with leaves it
+	// stranded on screen. Touch pointer events are stopped before layerchart sees them (see the plot
+	// wrapper below) and the tooltip is driven from the gesture instead - a tap pins it to the tapped
+	// point, a horizontal drag scrubs it along the x-axis and pins it where the finger lifts, and any
+	// other touch, on this chart or elsewhere, clears it.
+	const TAP_SLOP_PX = 10;
+	const SCRUB_DIRECTION_PX = 8;
+	let tapOrigin: { x: number; y: number } | null = null;
+	let isScrubbing = false;
+
+	// The gesture's axis is decided once, off its first few pixels of movement: mostly horizontal
+	// scrubs, mostly vertical is the page scroll the plot's `touch-action: pan-y` leaves to the
+	// browser (dropping the origin so the lift neither pins nor counts as a tap). Deciding once
+	// means vertical wobble can't cancel a scrub halfway through.
+	function trackScrub(event: PointerEvent) {
+		if (!tapOrigin) return;
+		if (!isScrubbing) {
+			const dx = event.clientX - tapOrigin.x;
+			const dy = event.clientY - tapOrigin.y;
+			if (Math.hypot(dx, dy) < SCRUB_DIRECTION_PX) return;
+			if (Math.abs(dy) >= Math.abs(dx)) {
+				tapOrigin = null;
+				return;
+			}
+			isScrubbing = true;
+		}
+		chartContext?.tooltip.show(event);
+	}
+
+	function onWindowPointerUp(event: PointerEvent) {
+		endComparison();
+		if (event.pointerType === 'mouse') return;
+		const origin = tapOrigin;
+		const wasScrubbing = isScrubbing;
+		tapOrigin = null;
+		isScrubbing = false;
+		const isTap =
+			origin !== null &&
+			Math.hypot(event.clientX - origin.x, event.clientY - origin.y) <= TAP_SLOP_PX;
+		if (wasScrubbing || isTap) chartContext?.tooltip.show(event);
+		else chartContext?.tooltip.hide();
+	}
+
+	function onWindowPointerCancel() {
+		endComparison();
+		tapOrigin = null;
+		isScrubbing = false;
+		chartContext?.tooltip.hide();
+	}
+
 	// Legend toggling narrows the chart's visible series; the compare tooltip and y-domain follow it
 	const visibleKeys = $derived(
 		new Set(chartContext?.series.visibleSeries.map((s) => s.key) ?? series.map((s) => s.key))
@@ -228,7 +279,7 @@
 	});
 </script>
 
-<svelte:window onpointerup={endComparison} onpointercancel={endComparison} />
+<svelte:window onpointerup={onWindowPointerUp} onpointercancel={onWindowPointerCancel} />
 
 <SectionTitle {title}>
 	<PeriodTabs bind:value={period} label={m.period_tabs_label({ section: title })} />
@@ -259,6 +310,16 @@
 			role={hasLegend ? undefined : 'img'}
 			aria-label={hasLegend ? undefined : series[0].label}
 			onpointerdown={(event) => {
+				if (event.pointerType !== 'mouse') {
+					// Comparison drag stays mouse-only - on touch that gesture is the scrub - so a touch
+					// only ever records where it started. Touches landing outside the plot can't be
+					// resolved to a data point, so they start neither a tap nor a scrub.
+					const isInPlot =
+						event.target instanceof Element && event.target.closest('.lc-root-container') !== null;
+					tapOrigin = isInPlot ? { x: event.clientX, y: event.clientY } : null;
+					isScrubbing = false;
+					return;
+				}
 				if (event.button !== 0) return;
 				dragging = true;
 				comparisonAnchor = hovered;
@@ -266,7 +327,23 @@
 			}}
 		>
 			<div
-				class="relative w-full"
+				class="relative w-full touch-pan-y"
+				{@attach (node) => {
+					// layerchart opens its tooltip on pointerenter/pointermove and clears it on pointerleave,
+					// none of which describe a touch gesture. Touch pointers are stopped on the way down so
+					// they never reach layerchart's tooltip surface, leaving the tooltip under the explicit
+					// control of the gesture handling above; mouse pointers pass through untouched.
+					const stopTouchPointers = (event: Event) => {
+						if (!(event instanceof PointerEvent) || event.pointerType === 'mouse') return;
+						event.stopPropagation();
+						if (event.type === 'pointermove') trackScrub(event);
+					};
+					const names = ['pointerenter', 'pointermove', 'pointerleave'];
+					for (const name of names) node.addEventListener(name, stopTouchPointers, true);
+					return () => {
+						for (const name of names) node.removeEventListener(name, stopTouchPointers, true);
+					};
+				}}
 				{@attach (node) => {
 					let lastLayoutAt = Number.NEGATIVE_INFINITY;
 					let timer = 0;
