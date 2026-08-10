@@ -14,6 +14,10 @@ services:
     command: ['./pocketbase-custom', 'serve', '--http', '0.0.0.0:42070']
     ports:
       - '42070:42070'
+    environment:
+      PLAID_CLIENT_ID: ${PLAID_CLIENT_ID:-}
+      PLAID_SECRET: ${PLAID_SECRET:-}
+      PLAID_ENV: ${PLAID_ENV:-sandbox}
     volumes:
       - canutin-data:/app/pocketbase/pb_data
     restart: unless-stopped
@@ -31,6 +35,14 @@ services:
 
 volumes:
   canutin-data:
+```
+
+To enable Plaid, create a `.env` file beside `docker-compose.yml` with production credentials:
+
+```dotenv
+PLAID_CLIENT_ID=<client-id>
+PLAID_SECRET=<secret>
+PLAID_ENV=production
 ```
 
 Then run:

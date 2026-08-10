@@ -53,6 +53,18 @@ Minimum required at runtime:
 
 Additional variables depend on your deployment target and any custom Go hooks you've added. Check `.env.example` if one exists; otherwise inspect the compose files.
 
+### Plaid
+
+The PocketBase container reads the Plaid credentials. Set these in the `.env` file beside `docker-compose.prod.yml`:
+
+```dotenv
+PLAID_CLIENT_ID=<client-id>
+PLAID_SECRET=<secret>
+PLAID_ENV=production
+```
+
+`PLAID_ENV` defaults to `sandbox` when omitted. Compose's `.env` file supplies substitution values; the `pocketbase.environment` mappings in `docker-compose.prod.yml` pass them into the container. After changing them, recreate PocketBase with `docker compose -f docker-compose.prod.yml up -d --force-recreate pocketbase`. Omit `-f docker-compose.prod.yml` when the deployment uses that content as `docker-compose.yml`.
+
 ## Anti-patterns
 
 - **Hand-editing production pb_data** — use the PocketBase admin UI or import API
