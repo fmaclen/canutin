@@ -202,8 +202,9 @@ Backend hooks enforce invariants that are not visible in the access rules:
   rate unless ` + "`FX_FETCH_DISABLED=true`" + ` is set. A failed upstream request rejects the create with
   ` + "`currency_auto_update_request_failed`" + ` on ` + "`autoUpdate`" + `; an unavailable code rejects it with
   ` + "`currency_auto_update_code_unavailable`" + `.
-  Deleting a currency is rejected with a 400 while any owned account, asset, or security references
-  its code; successful deletion also deletes that user's manual quotes for the code.
+  Deleting a currency while its owner exists is rejected with a 400 if any owned account, asset, or
+  security references its code. Deleting the owner cascades through currencies and their references;
+  successful direct currency deletion also deletes that user's manual quotes for the code.
 - Exchange rates (` + "`exchangeRates`" + `) are a two-tier store. Rows with empty ` + "`owner`" + ` are the
   global fetched cache (` + "`source = fetched`" + `) and are visible to all users but engine-written only.
   Rows with ` + "`owner = @request.auth.id`" + ` are the user's manual quotes (` + "`source = manual`" + `).

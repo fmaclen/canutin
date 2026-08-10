@@ -9,7 +9,9 @@ import {
 	signIn
 } from './playwright.helpers';
 import {
+	deleteUser,
 	getUserPB,
+	recordExists,
 	seedAccount,
 	seedCurrency,
 	seedExchangeRate,
@@ -446,4 +448,28 @@ test('currency delete blocks in-use currencies and removes unused quotes', async
 		filter: `owner='${user.id}' && currency='${unusedCode}'`
 	});
 	expect(quotes).toHaveLength(0);
+});
+
+test('deleting a user cascades through an in-use currency', async () => {
+	const user = await seedUser('josephine');
+	const code = uniqueCurrency('QD');
+	const currency = await seedCurrency({
+		owner: user.id,
+		code,
+		name: 'Delete cascade coin',
+		autoUpdate: false
+	});
+	const account = await seedAccount({
+		name: 'Delete cascade account',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking',
+		currency: code
+	});
+
+	await deleteUser(user.id);
+
+	expect(await recordExists('users', user.id)).toBe(false);
+	expect(await recordExists('currencies', currency.id)).toBe(false);
+	expect(await recordExists('accounts', account.id)).toBe(false);
 });
