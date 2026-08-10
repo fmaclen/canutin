@@ -82,6 +82,7 @@ Pattern for new hooks:
 - **Hand-written migrations** — always go through the admin API
 - **Starting PocketBase by default** — follow the ownership rules in [local-servers](../local-servers/SKILL.md)
 - **Raw `app.Save()` Go calls for schema** — use the collection API endpoints so automigrate hooks fire
+- **Original Ozzo validation module** — use PocketBase's maintained fork (`github.com/pocketbase/ozzo-validation/v4`) so custom validation errors use the same types PocketBase recognizes
 
 ## See Also
 
