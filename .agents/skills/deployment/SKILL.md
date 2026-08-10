@@ -63,7 +63,7 @@ PLAID_SECRET=<secret>
 PLAID_ENV=production
 ```
 
-`PLAID_ENV` defaults to `sandbox` when omitted. Compose's `.env` file supplies substitution values; the `pocketbase.environment` mappings in `docker-compose.prod.yml` pass them into the container. After changing them, recreate PocketBase with `docker compose -f docker-compose.prod.yml up -d --force-recreate pocketbase`. Omit `-f docker-compose.prod.yml` when the deployment uses that content as `docker-compose.yml`.
+Compose's `.env` file supplies substitution values; the `pocketbase.environment` mappings in `docker-compose.prod.yml` pass them into the container. After changing them, recreate PocketBase with `docker compose -f docker-compose.prod.yml up -d --force-recreate pocketbase`. Omit `-f docker-compose.prod.yml` when the deployment uses that content as `docker-compose.yml`.
 
 ## Anti-patterns
 

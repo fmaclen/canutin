@@ -9,7 +9,7 @@ services:
       PUBLIC_DEMO_ENABLED: 'true'
       PLAID_CLIENT_ID: ${PLAID_CLIENT_ID:-}
       PLAID_SECRET: ${PLAID_SECRET:-}
-      PLAID_ENV: ${PLAID_ENV:-sandbox}
+      PLAID_ENV: ${PLAID_ENV:-}
     volumes:
       - pocketbase-data:/app/pocketbase/pb_data
     restart: unless-stopped

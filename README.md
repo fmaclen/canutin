@@ -17,7 +17,7 @@ services:
     environment:
       PLAID_CLIENT_ID: ${PLAID_CLIENT_ID:-}
       PLAID_SECRET: ${PLAID_SECRET:-}
-      PLAID_ENV: ${PLAID_ENV:-sandbox}
+      PLAID_ENV: ${PLAID_ENV:-}
     volumes:
       - canutin-data:/app/pocketbase/pb_data
     restart: unless-stopped
