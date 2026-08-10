@@ -63,6 +63,8 @@ PLAID_SECRET=<secret>
 PLAID_ENV=production
 ```
 
+Set all three values to enable Plaid. Use `sandbox` for development and `production` for live data; credentials without an explicit environment are rejected.
+
 Compose's `.env` file supplies substitution values; the `pocketbase.environment` mappings in `docker-compose.prod.yml` pass them into the container. After changing them, recreate PocketBase with `docker compose -f docker-compose.prod.yml up -d --force-recreate pocketbase`. Omit `-f docker-compose.prod.yml` when the deployment uses that content as `docker-compose.yml`.
 
 ## Anti-patterns

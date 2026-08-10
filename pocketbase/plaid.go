@@ -128,16 +128,18 @@ func plaidConfigFromEnv() (plaidConfig, error) {
 	config := plaidConfig{
 		clientID: os.Getenv("PLAID_CLIENT_ID"),
 		secret:   os.Getenv("PLAID_SECRET"),
-		baseURL:  plaidSandboxURL,
 	}
 	if config.clientID == "" || config.secret == "" {
 		return plaidConfig{}, fmt.Errorf("%w: PLAID_CLIENT_ID and PLAID_SECRET are required", errPlaidNotConfigured)
 	}
 
 	switch os.Getenv("PLAID_ENV") {
-	case "", "sandbox":
+	case "sandbox":
+		config.baseURL = plaidSandboxURL
 	case "production":
 		config.baseURL = plaidProductionURL
+	case "":
+		return plaidConfig{}, fmt.Errorf("%w: PLAID_ENV is required", errPlaidNotConfigured)
 	default:
 		return plaidConfig{}, fmt.Errorf("%w: PLAID_ENV must be sandbox or production", errPlaidNotConfigured)
 	}
