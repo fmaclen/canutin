@@ -192,9 +192,7 @@ test('balance sheet', async ({ page }) => {
 	await expect(debt).toContainText('-$1,000');
 	await expect(other).toContainText('$1,000');
 
-	const creditCardItems = page
-		.getByRole('region', { name: 'Credit card' })
-		.getByRole('listitem');
+	const creditCardItems = page.getByRole('region', { name: 'Credit card' }).getByRole('listitem');
 	await expect(creditCardItems).toHaveCount(2);
 	await expect(creditCardItems.nth(0)).toContainText('Summit Rewards');
 	await expect(creditCardItems.nth(0)).toContainText('-$2,000');
