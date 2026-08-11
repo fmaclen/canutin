@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { subDays } from 'date-fns';
 
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
 import { setPlaidItem, stubPlaidWidget } from './plaid.helpers';
@@ -74,8 +75,9 @@ test('matches an existing account, adopts its transaction, and preserves derived
 }) => {
 	const user = await seedUser('lucien');
 	const publicToken = `public-token-${user.id}`;
-	const openingDate = '2025-01-01';
-	const matchedDate = '2025-02-01';
+	const matchedAt = new Date();
+	const openingDate = formatDateForInput(subDays(matchedAt, 30));
+	const matchedDate = formatDateForInput(matchedAt);
 
 	const existingAccount = await seedAccount({
 		name: 'Household Checking',
