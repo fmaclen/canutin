@@ -18,7 +18,11 @@
 	);
 </script>
 
-<div role="region" aria-label={m.transactions_summary_aria_label()} class="grid gap-2 {columns}">
+<div
+	role="region"
+	aria-label={m.transactions_summary_aria_label()}
+	class="grid gap-2 max-sm:mb-3.5 {columns}"
+>
 	<KeyValue
 		title={m.transactions_summary_count_label()}
 		value={txContext.totalItems}

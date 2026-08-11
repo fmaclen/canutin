@@ -217,7 +217,7 @@
 							value: null,
 							isPartial: false
 						}}
-						<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+						<div class="grid grid-cols-1 gap-2 max-sm:mt-1.5 max-sm:mb-4 sm:grid-cols-2">
 							<KeyValue
 								title={m.sidebar_assets()}
 								value={rowsForOption.length}

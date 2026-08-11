@@ -278,7 +278,7 @@
 			{#if rows.length === 0}
 				<Empty>{accountRows.length === 0 ? m.portfolio_empty() : m.portfolio_table_empty()}</Empty>
 			{:else}
-				<div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+				<div class="grid grid-cols-1 gap-2 max-sm:mb-4 sm:grid-cols-3">
 					<KeyValue
 						title={m.summary_net_gain_loss()}
 						value={gainLossTotal.total}

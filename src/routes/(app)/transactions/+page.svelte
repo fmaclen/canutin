@@ -56,7 +56,7 @@
 			<TransactionSummary />
 			{#if txContext.selectedCount > 0}
 				<div
-					class="bg-brand-secondary border-border flex h-12 items-center justify-between rounded-sm border pr-2 pl-4"
+					class="bg-brand-secondary border-border flex h-12 items-center justify-between rounded-sm border pr-2 pl-4 max-sm:mb-4"
 					transition:slide={{ duration: 150 }}
 				>
 					<span class="text-sm font-semibold tracking-tight">
