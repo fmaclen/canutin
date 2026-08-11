@@ -410,6 +410,40 @@ func syncConnection(app core.App, connection *core.Record) (plaidSyncSummary, er
 		return failedSummary, errors.Join(err, finishErr)
 	}
 	asOf := time.Now().UTC()
+	writeCashSnapshot := func(account *core.Record, value float64) {
+		start, end := pbDateRange(asOf.Format("2006-01-02"))
+		_, err := app.FindFirstRecordByFilter("accountBalances",
+			"account = {:account} && asOf >= {:start} && asOf < {:end} && value = {:value} && owner = {:owner}",
+			map[string]any{
+				"account": account.Id,
+				"start":   start,
+				"end":     end,
+				"value":   value,
+				"owner":   ownerID,
+			},
+		)
+		if err == nil {
+			summary.Skipped++
+			return
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			recordFailure("accountBalances", "find duplicate", err)
+			return
+		}
+
+		balance := core.NewRecord(balanceCollection)
+		balance.Set("account", account.Id)
+		balance.Set("value", value)
+		balance.Set("asOf", asOf)
+		balance.Set("owner", ownerID)
+		balance.Set("importSession", session.Id)
+		balance.Set("source", "import")
+		if err := app.Save(balance); err != nil {
+			recordFailure("accountBalances", "save snapshot", err)
+			return
+		}
+		summary.Created++
+	}
 	registeredCurrencies := map[string]bool{}
 	var investmentAccounts []plaidProviderAccount
 	for _, providerAccount := range accountsResponse.Accounts {
@@ -454,38 +488,7 @@ func syncConnection(app core.App, connection *core.Record) (plaidSyncSummary, er
 			continue
 		}
 
-		start, end := pbDateRange(asOf.Format("2006-01-02"))
-		_, err := app.FindFirstRecordByFilter("accountBalances",
-			"account = {:account} && asOf >= {:start} && asOf < {:end} && value = {:value} && owner = {:owner}",
-			map[string]any{
-				"account": account.Id,
-				"start":   start,
-				"end":     end,
-				"value":   *currentBalance,
-				"owner":   ownerID,
-			},
-		)
-		if err == nil {
-			summary.Skipped++
-			continue
-		}
-		if !errors.Is(err, sql.ErrNoRows) {
-			recordFailure("accountBalances", "find duplicate", err)
-			continue
-		}
-
-		balance := core.NewRecord(balanceCollection)
-		balance.Set("account", account.Id)
-		balance.Set("value", *currentBalance)
-		balance.Set("asOf", asOf)
-		balance.Set("owner", ownerID)
-		balance.Set("importSession", session.Id)
-		balance.Set("source", "import")
-		if err := app.Save(balance); err != nil {
-			recordFailure("accountBalances", "save snapshot", err)
-			continue
-		}
-		summary.Created++
+		writeCashSnapshot(account, *currentBalance)
 	}
 
 	investmentFailuresBefore := summary.Failed
@@ -607,55 +610,21 @@ func syncConnection(app core.App, connection *core.Record) (plaidSyncSummary, er
 			for _, providerAccount := range investmentAccounts {
 				account := accountsByPlaidID[providerAccount.AccountID]
 				currentBalance := plaidBalanceForCanutin(providerAccount.Type, providerAccount.Balances.Current)
-				if currentBalance == nil {
-					recordFailure("accountBalances", "derive cash snapshot", errors.New("current balance is unavailable"))
-					cashSnapshotDataFailures++
-					investmentCashFailures++
-				}
-				if unknownHoldingValues[providerAccount.AccountID] {
-					recordFailure("accountBalances", "derive cash snapshot", errors.New("holding value is unavailable"))
-					cashSnapshotDataFailures++
-					investmentCashFailures++
-				}
 				if currentBalance == nil || unknownHoldingValues[providerAccount.AccountID] {
+					reason := errors.New("current balance is unavailable")
+					if currentBalance != nil {
+						reason = errors.New("holding value is unavailable")
+					}
+					recordFailure("accountBalances", "derive cash snapshot", reason)
+					cashSnapshotDataFailures++
+					investmentCashFailures++
 					continue
 				}
 
 				// Plaid's investment current balance is the total account value. Some institutions
 				// include cash as a holding and others do not, so the remainder is the cash snapshot.
 				cashBalance := *currentBalance - holdingValues[providerAccount.AccountID]
-				start, end := pbDateRange(asOf.Format("2006-01-02"))
-				_, err := app.FindFirstRecordByFilter("accountBalances",
-					"account = {:account} && asOf >= {:start} && asOf < {:end} && value = {:value} && owner = {:owner}",
-					map[string]any{
-						"account": account.Id,
-						"start":   start,
-						"end":     end,
-						"value":   cashBalance,
-						"owner":   ownerID,
-					},
-				)
-				if err == nil {
-					summary.Skipped++
-					continue
-				}
-				if !errors.Is(err, sql.ErrNoRows) {
-					recordFailure("accountBalances", "find duplicate", err)
-					continue
-				}
-
-				balance := core.NewRecord(balanceCollection)
-				balance.Set("account", account.Id)
-				balance.Set("value", cashBalance)
-				balance.Set("asOf", asOf)
-				balance.Set("owner", ownerID)
-				balance.Set("importSession", session.Id)
-				balance.Set("source", "import")
-				if err := app.Save(balance); err != nil {
-					recordFailure("accountBalances", "save snapshot", err)
-					continue
-				}
-				summary.Created++
+				writeCashSnapshot(account, cashBalance)
 			}
 		}
 
