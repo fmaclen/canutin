@@ -65,7 +65,8 @@
 	const isMultiSeries = $derived(series.length > 1);
 	const hasLegend = $derived(showLegend ?? isMultiSeries);
 
-	// Tracks the `sm` breakpoint, below which the chart runs edge to edge (see `.full-bleed`)
+	// Tracks the `sm` breakpoint, below which the x-axis thins its ticks so the labels
+	// keep their distance on a phone-width plot
 	const isNarrowViewport = new IsMobile(640);
 
 	// The legend overlays the plot from the top and wraps within the container width, so
@@ -208,11 +209,7 @@
 		) satisfies Chart.ChartConfig
 	);
 
-	// Identity-stable: recomputes triggered by chart-context ticks (visibleKeys is rebuilt on
-	// every context change) must not hand the chart a fresh-but-equal array, or the domain prop
-	// re-renders the chart, which ticks the context again in a mount-time feedback loop.
-	let lastYDomain: [number, number] | null = null;
-	const yDomain = $derived.by(() => {
+	const yExtent = $derived.by(() => {
 		let min = Number.POSITIVE_INFINITY;
 		let max = Number.NEGATIVE_INFINITY;
 		for (const row of windowedRows) {
@@ -222,35 +219,25 @@
 				max = Math.max(max, s.value(row));
 			}
 		}
-		if (min > max) return (lastYDomain = null);
-		const range = max - min;
+		return min > max ? null : { min, max };
+	});
+
+	// Identity-stable: recomputes triggered by chart-context ticks (visibleKeys is rebuilt on
+	// every context change) must not hand the chart a fresh-but-equal array, or the domain prop
+	// re-renders the chart, which ticks the context again in a mount-time feedback loop.
+	let lastYDomain: [number, number] | null = null;
+	const yDomain = $derived.by(() => {
+		if (!yExtent) return (lastYDomain = null);
+		const range = yExtent.max - yExtent.min;
 		// NOTE: a flat series (min === max) needs a pad scaled to the value's own magnitude -
 		// a fixed pad works for money (thousands) but would swamp small units like exchange rates.
-		const pad = range > 0 ? range * 0.05 : Math.max(Math.abs(max) * 0.05, 0.01);
-		const next: [number, number] = [min - pad, max + pad];
+		const pad = range > 0 ? range * 0.05 : Math.max(Math.abs(yExtent.max) * 0.05, 0.01);
+		const next: [number, number] = [yExtent.min - pad, yExtent.max + pad];
 		if (lastYDomain && lastYDomain[0] === next[0] && lastYDomain[1] === next[1]) return lastYDomain;
 		return (lastYDomain = next);
 	});
 
-	let measureCanvas: HTMLCanvasElement | null = null;
-	function textWidthMono(text: string) {
-		if (typeof document === 'undefined') return text.length * 8;
-		if (!measureCanvas) measureCanvas = document.createElement('canvas');
-		const context = measureCanvas.getContext('2d');
-		if (!context) return text.length * 8;
-		context.font =
-			'12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
-		return context.measureText(text).width;
-	}
-
-	const leftPadding = $derived.by(() => {
-		if (!yDomain) return 48;
-		const labels = axisTicks(yDomain[0], yDomain[1]).map((tick) => formatAxisValue(tick));
-		const widest = labels.reduce((width, label) => Math.max(width, textWidthMono(label)), 0);
-		return Math.max(48, Math.ceil(widest) + 16);
-	});
-
-	// Y labels overlay the plot on phones, so they trade precision for width: $200,000 becomes
+	// Y labels overlay the plot, so they trade precision for width: $200,000 becomes
 	// $200K. A unit only applies ten times above its own size, which keeps every label at two
 	// significant digits ($1,860 stays spelled out instead of collapsing to $2K).
 	function formatCompactAxisValue(value: number) {
@@ -269,14 +256,11 @@
 		return formatAxisValue(value / unit.divisor).replace(/(\d)(?=\D*$)/, `$1${unit.suffix}`);
 	}
 
-	// Phones can't fit the ISO x labels, so they get the short month and apostrophe year the
-	// cashflow chart uses ("Jul '26")
-	const formatNarrowDate = $derived.by(() => {
-		const locale = getFormattingLocale();
-		const month = new Intl.DateTimeFormat(locale, { month: 'short', timeZone: 'UTC' });
-		const year = new Intl.DateTimeFormat(locale, { year: '2-digit', timeZone: 'UTC' });
-		return (date: Date) => `${month.format(date)} '${year.format(date)}`;
-	});
+	// A tick label reads against its neighbors - a month repeated across ticks says nothing, and
+	// so does a year repeated on every label - but the axis formats one tick at a time, so the
+	// labels are built for the whole tick list as it is handed over and looked up per tick here
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- lookup cache written during chart render, never read reactively
+	const xTickLabels = new Map<number, string>();
 </script>
 
 <svelte:window onpointerup={onWindowPointerUp} onpointercancel={onWindowPointerCancel} />
@@ -379,11 +363,12 @@
 						yDomain={yDomain ?? undefined}
 						padding={{
 							top: hasLegend ? legendHeight + 16 : 16,
-							// Phones drop both gutters to a hairline inset: the y labels move inside the plot
-							// so the marks can run the full width of the screen
-							right: isNarrowViewport.current ? 12 : 48,
+							// Both gutters are a hairline inset matching the tables' px-4 cell padding, so
+							// the overlaid y labels align with first-column text while the marks still run
+							// nearly the full width of the card
+							right: 16,
 							bottom: 24,
-							left: isNarrowViewport.current ? 12 : leftPadding
+							left: 16
 						}}
 						series={series.map((s) => ({
 							key: s.key,
@@ -400,47 +385,77 @@
 							// for seconds when several charts mount at once.
 							spline: { curve: curveBumpX, opacity: 1, strokeWidth: 1.25, motion: 'none' },
 							xAxis: {
-								format: (v: Date) =>
-									isNarrowViewport.current ? formatNarrowDate(v) : v.toISOString().slice(0, 10),
+								format: (v: Date) => xTickLabels.get(+v) ?? '',
 								ticks: (scale) => {
-									const ticks = scale.ticks?.(isNarrowViewport.current ? 4 : 6) ?? [];
-									if (!isNarrowViewport.current) return ticks;
-									// Labels are centered on their tick and the plot now reaches the screen edges,
-									// so a tick sitting within half a label of an edge is dropped rather than clipped
+									let ticks: Date[] = scale.ticks?.(isNarrowViewport.current ? 4 : 6) ?? [];
+									// Labels are centered on their tick and the plot reaches the card's edges, so a
+									// tick sitting within half a label of an edge is dropped rather than clipped
 									const [rangeStart, rangeEnd] = scale.range();
-									return ticks.filter((tick) => {
+									ticks = ticks.filter((tick) => {
 										const x = scale(tick);
 										return x - rangeStart >= 24 && rangeEnd - x >= 24;
 									});
+									// Ticks closer together than a month would repeat the same month name, so the
+									// whole axis drops to days once any two neighbors share one ("Jul 14"). The
+									// year is written the way the cashflow chart writes it, on the first label and
+									// on every tick that opens a new one ("Jul 14 '26")
+									const sharesMonth = ticks.some(
+										(tick, index) =>
+											index > 0 &&
+											tick.toISOString().slice(0, 7) === ticks[index - 1].toISOString().slice(0, 7)
+									);
+									const locale = getFormattingLocale();
+									const date = new Intl.DateTimeFormat(locale, {
+										month: 'short',
+										day: sharesMonth ? 'numeric' : undefined,
+										timeZone: 'UTC'
+									});
+									const year = new Intl.DateTimeFormat(locale, {
+										year: '2-digit',
+										timeZone: 'UTC'
+									});
+									xTickLabels.clear();
+									for (const [index, tick] of ticks.entries()) {
+										const previous = ticks[index - 1];
+										const opensYear =
+											!previous ||
+											previous.toISOString().slice(0, 4) !== tick.toISOString().slice(0, 4);
+										xTickLabels.set(
+											+tick,
+											opensYear ? `${date.format(tick)} '${year.format(tick)}` : date.format(tick)
+										);
+									}
+									return ticks;
 								},
 								motion: 'none'
 							},
 							yAxis: {
 								motion: 'none',
-								format: (v: number) =>
-									isNarrowViewport.current ? formatCompactAxisValue(v) : formatAxisValue(v),
+								format: formatCompactAxisValue,
 								ticks: (scale) => {
 									const [min, max] = scale.domain();
 									return axisTicks(min, max);
 								},
-								// Without a gutter to sit in, narrow labels overlay the plot: flush with its left
+								// Without a gutter to sit in, the labels overlay the plot: flush with its left
 								// edge, resting just above their own tick, with a background-colored halo so they
 								// stay legible where a line runs underneath
-								tickLabelProps: isNarrowViewport.current
-									? {
-											textAnchor: 'start',
-											verticalAnchor: 'end',
-											dx: 0,
-											dy: -4,
-											class: 'stroke-background! stroke-2 [paint-order:stroke]'
-										}
-									: undefined
+								tickLabelProps: {
+									textAnchor: 'start',
+									verticalAnchor: 'end',
+									dx: 0,
+									dy: -4,
+									class: 'stroke-background! stroke-2 [paint-order:stroke]'
+								}
 							},
 							grid: {
 								x: true,
-								y: true,
-								xTicks: isNarrowViewport.current ? 4 : 6,
+								// The horizontal rule marks where the series crosses between positive and
+								// negative. With every value on one side of zero there is no crossing to mark,
+								// and the y scale extrapolates past its domain, so the rule would still be
+								// drawn - stranded under the marks by the domain's padding, or off-plot
+								y: yExtent !== null && yExtent.min < 0 && yExtent.max > 0,
 								yTicks: [0],
+								xTicks: isNarrowViewport.current ? 4 : 6,
 								motion: 'none'
 							},
 							highlight: { motion: 'none', points: { r: 3, opacity: 1 } }
