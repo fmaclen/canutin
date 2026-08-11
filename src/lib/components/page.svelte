@@ -31,8 +31,11 @@
 <!-- iOS Safari tints the strip behind the status bar with the background of a sticky or fixed
      element near the viewport edge, so this row has to stay pinned there on mobile or the strip
      falls back to the body's color. It sits outside <header> because a sticky element can't
-     travel past its own parent's box, and the header ends well before the page does. -->
-<div class="bg-muted sticky top-0 z-10 md:static">
+     travel past its own parent's box, and the header ends well before the page does.
+     The stacking is dropped at `md`: a flex item's z-index applies even while it's static, so
+     `z-10` would tie with the fixed sidebar's own `z-10` and win on DOM order, painting over the
+     sidebar wherever the two overlap - which is anywhere the page scrolls horizontally. -->
+<div class="bg-muted sticky top-0 z-10 md:static md:z-auto">
 	<div class="flex h-12 items-center gap-2 px-4">
 		<Sidebar.Trigger class="-ml-1" />
 		<Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
