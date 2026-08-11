@@ -374,6 +374,8 @@ func main() {
 		return e.Next()
 	})
 
+	app.OnRecordAfterUpdateSuccess("accounts").BindFunc(materializeAccountBalanceHistoryOnLink)
+
 	app.OnRecordAfterUpdateSuccess("accounts", "assets", "securities").BindFunc(func(e *core.RecordEvent) error {
 		enqueueRatesForContainer(e.App, e.Record)
 		return e.Next()
