@@ -128,13 +128,16 @@ const skillCustomEndpointsSection = "## Custom endpoints\n\n" +
 	"transaction reuses exactly one existing transaction with the same account, owner, calendar date, value, and normalized " +
 	"description, attaching the Plaid transaction ID while preserving its labels, exclusion state, notes, and original import session; " +
 	"ambiguous matches remain separate. " +
-	"It applies adds, modifications, and removals to matched accounts, and imports current balance snapshots only for " +
-	"non-investment accounts that are not auto-calculated. For matched investment accounts it imports current holdings " +
+	"It applies adds, modifications, and removals to matched accounts, and imports current balance snapshots for " +
+	"non-investment accounts. For matched investment accounts with complete balance and holding values, " +
+	"it stores cash as Plaid's current total minus the summed holding values, and imports current holdings " +
 	"snapshots and investment transactions from 30 days before the previous sync (or from 1990-01-01 on the " +
-	"first sync). The cursor advances after every page and all added, modified, and removed cash transactions " +
+	"first sync). Missing current balances or holding values preserve the previous cash snapshot and are reported as failures. " +
+	"The cursor advances after every page and all added, modified, and removed cash transactions " +
 	"apply successfully; balance, currency, holding, and investment-transaction failures are reported without " +
-	"holding it back. The investment sync time advances only after investments are fetched and applied without " +
-	"failures, or when there are no investment accounts; unavailable investment data preserves the previous window. " +
+	"holding it back. The investment sync time advances only after investments are fetched and holdings and transactions " +
+	"apply without failures, or when there are no investment accounts; cash data-quality failures do not hold it back, " +
+	"while unavailable investment data preserves the previous window. " +
 	"Returns `{ sessionId, created, skipped, failed, status }`; concurrent syncs of the " +
 	"same connection return `{ error: \"plaid_sync_in_progress\" }` with status 409, " +
 	"and a connection requiring renewed Plaid login completes with status `failed` and is marked " +
@@ -172,7 +175,10 @@ Backend hooks enforce invariants that are not visible in the access rules:
   in one column: cash comes from the latest ` + "`accountBalances`" + ` snapshot, positions from
   ` + "`securityBalances`" + ` holding snapshots. Holdings come exclusively from ` + "`securityBalances`" + `;
   ` + "`securityTransactions`" + ` are display-only trade history that never affect balances. Writing
-  portfolio value into an account balance double-counts it.
+  portfolio value into an account balance double-counts it. Plaid reports an investment account's
+  current balance as its total value, so sync stores cash as that total minus the sum of the account's
+  reported holding values. If the current balance or any holding value is unknown, sync reports an
+  account-balance failure and preserves the previous cash snapshot.
 - Number fields on ` + "`securityBalances`" + ` and ` + "`securityTransactions`" + ` are nullable:
   ` + "`null`" + ` (or an omitted field) means unknown, while ` + "`0`" + ` is a known zero. When resolving
   ` + "`securityBalances`" + ` snapshots, market value (` + "`value`" + `) carries forward from the most recent
@@ -185,8 +191,9 @@ Backend hooks enforce invariants that are not visible in the access rules:
 - Setting ` + "`autoCalculated`" + ` on an account makes the engine recompute its latest cash balance by
   summing imported cash transactions into a new ` + "`source = derived`" + ` row stamped with the current
   time, which overrides any imported cash snapshot and re-fires on later transaction edits. Leave it
-  off to preserve an imported snapshot. Accounts linked to Plaid always force it off so Plaid's balance
-  snapshots remain authoritative.
+  off to preserve an imported snapshot. When an auto-calculated account is first linked to Plaid, the
+  engine materializes its running non-excluded transaction balance at each transaction date while
+  forcing auto-calculation off, preserving the account's cash history while Plaid snapshots become authoritative.
 - Share records (` + "`accountShares`" + `, ` + "`assetShares`" + `) can only be updated by the recipient,
   and only the ` + "`includeInNetWorth`" + ` field may change. The sharer must revoke and recreate
   a share to change anything else.

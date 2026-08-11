@@ -212,3 +212,82 @@ func recomputeDerivedBalance(app core.App, accountID string, importSession strin
 	}
 	return nil
 }
+
+func materializeAccountBalanceHistoryOnLink(e *core.RecordEvent) error {
+	original := e.Record.Original()
+	// Connected accounts are saved with auto-calculation cleared; the original record identifies
+	// the one-time link transition whose live transaction history must become durable snapshots.
+	if original.GetDateTime("autoCalculated").IsZero() ||
+		original.GetString("connection") != "" ||
+		e.Record.GetString("connection") == "" ||
+		!e.Record.GetDateTime("autoCalculated").IsZero() {
+		return e.Next()
+	}
+
+	owner := e.Record.GetString("owner")
+	transactions, err := e.App.FindRecordsByFilter(
+		"transactions", "account = {:account} && owner = {:owner}", "date,created,id", 0, 0,
+		map[string]any{"account": e.Record.Id, "owner": owner},
+	)
+	if err != nil {
+		return fmt.Errorf("find transactions for linked account history: %w", err)
+	}
+
+	type balancePoint struct {
+		asOf  time.Time
+		value float64
+	}
+	var points []balancePoint
+	var running float64
+	for _, transaction := range transactions {
+		if !transaction.GetDateTime("excluded").IsZero() {
+			continue
+		}
+		running += transaction.GetFloat("value")
+		asOf := transaction.GetDateTime("date").Time()
+		if len(points) > 0 && points[len(points)-1].asOf.Equal(asOf) {
+			points[len(points)-1].value = running
+			continue
+		}
+		points = append(points, balancePoint{asOf: asOf, value: running})
+	}
+	if len(points) == 0 {
+		return e.Next()
+	}
+
+	collection, err := e.App.FindCollectionByNameOrId("accountBalances")
+	if err != nil {
+		return fmt.Errorf("find accountBalances collection for linked account history: %w", err)
+	}
+	for _, point := range points {
+		start, end := pbDateRange(point.asOf.Format("2006-01-02"))
+		_, err := e.App.FindFirstRecordByFilter("accountBalances",
+			"account = {:account} && asOf >= {:start} && asOf < {:end} && value = {:value} && owner = {:owner}",
+			map[string]any{
+				"account": e.Record.Id,
+				"start":   start,
+				"end":     end,
+				"value":   point.value,
+				"owner":   owner,
+			},
+		)
+		if err == nil {
+			continue
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("find linked account history duplicate: %w", err)
+		}
+
+		balance := core.NewRecord(collection)
+		balance.Set("account", e.Record.Id)
+		balance.Set("asOf", point.asOf)
+		balance.Set("value", point.value)
+		balance.Set("owner", owner)
+		balance.Set("source", "derived")
+		if err := e.App.Save(balance); err != nil {
+			return fmt.Errorf("save linked account history snapshot: %w", err)
+		}
+	}
+
+	return e.Next()
+}

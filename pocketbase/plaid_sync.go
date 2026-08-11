@@ -315,6 +315,7 @@ func syncConnection(app core.App, connection *core.Record) (plaidSyncSummary, er
 		summary.Failed++
 		logEvent("plaidSync", fmt.Sprintf("connection=%s session=%s collection=%s op=%s", connection.Id, session.Id, collection, operation), err)
 	}
+	cashSnapshotDataFailures := 0
 
 	for _, batch := range []struct {
 		transactions []plaidCashTransaction
@@ -409,15 +410,49 @@ func syncConnection(app core.App, connection *core.Record) (plaidSyncSummary, er
 		return failedSummary, errors.Join(err, finishErr)
 	}
 	asOf := time.Now().UTC()
+	writeCashSnapshot := func(account *core.Record, value float64) {
+		start, end := pbDateRange(asOf.Format("2006-01-02"))
+		_, err := app.FindFirstRecordByFilter("accountBalances",
+			"account = {:account} && asOf >= {:start} && asOf < {:end} && value = {:value} && owner = {:owner}",
+			map[string]any{
+				"account": account.Id,
+				"start":   start,
+				"end":     end,
+				"value":   value,
+				"owner":   ownerID,
+			},
+		)
+		if err == nil {
+			summary.Skipped++
+			return
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			recordFailure("accountBalances", "find duplicate", err)
+			return
+		}
+
+		balance := core.NewRecord(balanceCollection)
+		balance.Set("account", account.Id)
+		balance.Set("value", value)
+		balance.Set("asOf", asOf)
+		balance.Set("owner", ownerID)
+		balance.Set("importSession", session.Id)
+		balance.Set("source", "import")
+		if err := app.Save(balance); err != nil {
+			recordFailure("accountBalances", "save snapshot", err)
+			return
+		}
+		summary.Created++
+	}
 	registeredCurrencies := map[string]bool{}
-	var investmentAccountIDs []string
+	var investmentAccounts []plaidProviderAccount
 	for _, providerAccount := range accountsResponse.Accounts {
 		account := accountsByPlaidID[providerAccount.AccountID]
 		if account == nil {
 			continue
 		}
 		if providerAccount.Type == "investment" {
-			investmentAccountIDs = append(investmentAccountIDs, providerAccount.AccountID)
+			investmentAccounts = append(investmentAccounts, providerAccount)
 			continue
 		}
 
@@ -447,51 +482,27 @@ func syncConnection(app core.App, connection *core.Record) (plaidSyncSummary, er
 		}
 		currentBalance := plaidBalanceForCanutin(providerAccount.Type, providerAccount.Balances.Current)
 		// A reported zero is a real balance; nil means Plaid did not provide a current balance.
-		if !account.GetDateTime("autoCalculated").IsZero() || currentBalance == nil {
-			summary.Skipped++
+		if currentBalance == nil {
+			recordFailure("accountBalances", "derive cash snapshot", errors.New("current balance is unavailable"))
+			cashSnapshotDataFailures++
 			continue
 		}
 
-		start, end := pbDateRange(asOf.Format("2006-01-02"))
-		_, err := app.FindFirstRecordByFilter("accountBalances",
-			"account = {:account} && asOf >= {:start} && asOf < {:end} && value = {:value} && owner = {:owner}",
-			map[string]any{
-				"account": account.Id,
-				"start":   start,
-				"end":     end,
-				"value":   *currentBalance,
-				"owner":   ownerID,
-			},
-		)
-		if err == nil {
-			summary.Skipped++
-			continue
-		}
-		if !errors.Is(err, sql.ErrNoRows) {
-			recordFailure("accountBalances", "find duplicate", err)
-			continue
-		}
-
-		balance := core.NewRecord(balanceCollection)
-		balance.Set("account", account.Id)
-		balance.Set("value", *currentBalance)
-		balance.Set("asOf", asOf)
-		balance.Set("owner", ownerID)
-		balance.Set("importSession", session.Id)
-		balance.Set("source", "import")
-		if err := app.Save(balance); err != nil {
-			recordFailure("accountBalances", "save snapshot", err)
-			continue
-		}
-		summary.Created++
+		writeCashSnapshot(account, *currentBalance)
 	}
 
 	investmentFailuresBefore := summary.Failed
+	investmentCashFailures := 0
 	investmentsAvailable := true
-	if len(investmentAccountIDs) > 0 {
+	if len(investmentAccounts) > 0 {
+		investmentAccountIDs := make([]string, len(investmentAccounts))
+		for index, providerAccount := range investmentAccounts {
+			investmentAccountIDs[index] = providerAccount.AccountID
+		}
 		providerSecurities := map[string]plaidInvestmentSecurity{}
 		var holdings []plaidHolding
 		var investmentTransactions []plaidInvestmentTransaction
+		holdingsFetched := false
 
 		holdingsRequest := struct {
 			ClientID    string `json:"client_id"`
@@ -519,6 +530,7 @@ func syncConnection(app core.App, connection *core.Record) (plaidSyncSummary, er
 				recordFailure("securityBalances", "fetch holdings", err)
 			}
 		} else {
+			holdingsFetched = true
 			holdings = holdingsResponse.Holdings
 			for _, security := range holdingsResponse.Securities {
 				providerSecurities[security.SecurityID] = security
@@ -581,6 +593,38 @@ func syncConnection(app core.App, connection *core.Record) (plaidSyncSummary, er
 					recordFailure("securityTransactions", "paginate transactions", errors.New("Plaid returned more investment transactions without advancing the offset"))
 					break
 				}
+			}
+		}
+
+		if investmentsAvailable && holdingsFetched {
+			holdingValues := map[string]float64{}
+			unknownHoldingValues := map[string]bool{}
+			for _, holding := range holdings {
+				if holding.InstitutionValue == nil {
+					unknownHoldingValues[holding.AccountID] = true
+					continue
+				}
+				holdingValues[holding.AccountID] += *holding.InstitutionValue
+			}
+
+			for _, providerAccount := range investmentAccounts {
+				account := accountsByPlaidID[providerAccount.AccountID]
+				currentBalance := plaidBalanceForCanutin(providerAccount.Type, providerAccount.Balances.Current)
+				if currentBalance == nil || unknownHoldingValues[providerAccount.AccountID] {
+					reason := errors.New("current balance is unavailable")
+					if currentBalance != nil {
+						reason = errors.New("holding value is unavailable")
+					}
+					recordFailure("accountBalances", "derive cash snapshot", reason)
+					cashSnapshotDataFailures++
+					investmentCashFailures++
+					continue
+				}
+
+				// Plaid's investment current balance is the total account value. Some institutions
+				// include cash as a holding and others do not, so the remainder is the cash snapshot.
+				cashBalance := *currentBalance - holdingValues[providerAccount.AccountID]
+				writeCashSnapshot(account, cashBalance)
 			}
 		}
 
@@ -804,13 +848,13 @@ func syncConnection(app core.App, connection *core.Record) (plaidSyncSummary, er
 			}
 		}
 	}
-	// Only a complete investment fetch and apply advances the window. No accounts is complete;
-	// unavailable products retry the prior window.
-	investmentsPhaseSucceeded = investmentsAvailable && summary.Failed == investmentFailuresBefore
+	// Cash data quality does not indicate missed investment transactions, so those failures do not
+	// hold back the transaction window. Unavailable or incomplete investment fetches still do.
+	investmentsPhaseSucceeded = investmentsAvailable && summary.Failed == investmentFailuresBefore+investmentCashFailures
 
 	if summary.Failed > 0 {
 		status := importStatusFailed
-		if summary.Created > 0 || summary.Failed > investmentFailuresBefore {
+		if summary.Created > 0 || cashSnapshotDataFailures > 0 || summary.Failed > investmentFailuresBefore {
 			status = importStatusCompletedWithErrors
 		}
 		return finish(status, "error", cursorAfterApplication)

@@ -1,9 +1,17 @@
 import { expect, test } from '@playwright/test';
+import { subDays } from 'date-fns';
 
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
 import { setPlaidItem, stubPlaidWidget } from './plaid.helpers';
 import { formatDateForInput, goToPageViaSidebar, signIn } from './playwright.helpers';
-import { seedAccount, seedTransaction, seedUser } from './pocketbase.helpers';
+import {
+	getUserPB,
+	listAccountBalances,
+	seedAccount,
+	seedAccountBalance,
+	seedTransaction,
+	seedUser
+} from './pocketbase.helpers';
 
 test('links a bank through the Plaid widget and syncs its transactions', async ({ page }) => {
 	const user = await seedUser('marcel');
@@ -62,25 +70,35 @@ test('links a bank through the Plaid widget and syncs its transactions', async (
 	await expect(page.getByRole('row', { name: 'Fake Coffee Roasters' })).toBeVisible();
 });
 
-test('matches a bank account to an existing account and adopts its manual transaction', async ({
+test('matches an existing account, adopts its transaction, and preserves derived history', async ({
 	page
 }) => {
 	const user = await seedUser('lucien');
 	const publicToken = `public-token-${user.id}`;
-	const today = formatDateForInput(new Date());
+	const matchedAt = new Date();
+	const openingDate = formatDateForInput(subDays(matchedAt, 30));
+	const matchedDate = formatDateForInput(matchedAt);
 
 	const existingAccount = await seedAccount({
 		name: 'Household Checking',
 		balanceGroup: AccountsBalanceGroupOptions.CASH,
 		balanceType: 'Checking',
-		owner: user.id
+		owner: user.id,
+		autoCalculated: new Date().toISOString()
+	});
+	await seedTransaction({
+		account: existingAccount.id,
+		owner: user.id,
+		date: `${openingDate}T12:00:00.000Z`,
+		description: 'Opening deposit',
+		value: 100
 	});
 	// Same account, day and amount as the Plaid transaction below, so the first sync has an
 	// unambiguous manual counterpart to adopt instead of a second copy to create.
 	await seedTransaction({
 		account: existingAccount.id,
 		owner: user.id,
-		date: `${today}T12:00:00.000Z`,
+		date: `${matchedDate}T12:00:00.000Z`,
 		description: 'Fake Coffee Roasters',
 		value: -4.5
 	});
@@ -111,7 +129,7 @@ test('matches a bank account to an existing account and adopts its manual transa
 					{
 						account_id: 'fake-checking',
 						transaction_id: 'fake-transaction-coffee',
-						date: today,
+						date: matchedDate,
 						name: 'Coffee',
 						original_description: 'Fake Coffee Roasters',
 						amount: 4.5
@@ -119,7 +137,7 @@ test('matches a bank account to an existing account and adopts its manual transa
 					{
 						account_id: 'fake-checking',
 						transaction_id: 'fake-transaction-books',
-						date: today,
+						date: matchedDate,
 						name: 'Books',
 						original_description: 'Fake Bookstore',
 						amount: 18
@@ -165,6 +183,22 @@ test('matches a bank account to an existing account and adopts its manual transa
 	await expect(page.getByRole('row', { name: 'Household Checking' })).toBeVisible();
 	await expect(page.getByRole('row', { name: 'Everyday Checking' })).toHaveCount(0);
 
+	const userPB = await getUserPB(user.email);
+	const linkedAccount = await userPB.collection('accounts').getOne(existingAccount.id);
+	const materializedHistory = (await listAccountBalances(userPB, existingAccount.id))
+		.filter(
+			(balance) =>
+				balance.source === 'derived' &&
+				[openingDate, matchedDate].includes(balance.asOf.slice(0, 10))
+		)
+		.map((balance) => ({ date: balance.asOf.slice(0, 10), value: balance.value }))
+		.sort((left, right) => left.date.localeCompare(right.date));
+	expect(linkedAccount.autoCalculated).toBe('');
+	expect(materializedHistory).toEqual([
+		{ date: openingDate, value: 100 },
+		{ date: matchedDate, value: 95.5 }
+	]);
+
 	// The new transaction landing is what proves the sync ran, so the coffee count below is read
 	// after the reconciliation had its chance to duplicate it.
 	await goToPageViaSidebar(page, 'Transactions');
@@ -173,6 +207,74 @@ test('matches a bank account to an existing account and adopts its manual transa
 
 	await goToPageViaSidebar(page, 'Accounts');
 	await expect(page.getByRole('row', { name: 'Platinum Card' })).toContainText('-$450.00');
+});
+
+test('derives investment cash when linking to an existing account', async ({ page }) => {
+	const user = await seedUser('desmond');
+	const publicToken = `public-token-${user.id}`;
+	const existingAccount = await seedAccount({
+		name: 'Retirement Fund',
+		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+		balanceType: 'Brokerage',
+		owner: user.id
+	});
+	await seedAccountBalance({
+		account: existingAccount.id,
+		owner: user.id,
+		asOf: '2020-01-01T12:00:00.000Z',
+		value: 700
+	});
+	await setPlaidItem({
+		publicToken,
+		accounts: [
+			{
+				account_id: 'fake-investment',
+				name: 'Investment Account',
+				mask: '6789',
+				type: 'investment',
+				subtype: 'brokerage',
+				balances: { current: 1000, iso_currency_code: 'USD' }
+			}
+		],
+		holdings: [
+			{
+				account_id: 'fake-investment',
+				security_id: 'fake-security',
+				quantity: 8,
+				institution_price: 100,
+				institution_value: 800
+			}
+		],
+		securities: [
+			{
+				security_id: 'fake-security',
+				name: 'Fake Index Fund',
+				ticker_symbol: 'FAKE',
+				type: 'equity',
+				iso_currency_code: 'USD'
+			}
+		]
+	});
+	await stubPlaidWidget(page, {
+		publicToken,
+		institutionName: 'Fake Brokerage',
+		outcome: 'success'
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Accounts');
+	await expect(page.getByRole('row', { name: 'Retirement Fund' })).toContainText('$700.00');
+
+	await page.getByRole('link', { name: 'Add account' }).click();
+	await page.getByRole('link', { name: 'Link account' }).click();
+	await expect(page.getByText('Match accounts')).toBeVisible();
+
+	await page.getByLabel('Link to').click();
+	await page.getByRole('option', { name: 'Retirement Fund' }).click();
+	await page.getByRole('button', { name: 'Confirm' }).click();
+	await expect(page.getByText('Accounts linked', { exact: true })).toBeVisible();
+	await expect(page.getByRole('row', { name: 'Retirement Fund' })).toContainText('$1,000.00');
 });
 
 test('discarding the match step deletes the bank connection', async ({ page }) => {
