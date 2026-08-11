@@ -410,6 +410,7 @@ func syncConnection(app core.App, connection *core.Record) (plaidSyncSummary, er
 		return failedSummary, errors.Join(err, finishErr)
 	}
 	asOf := time.Now().UTC()
+	cashAsOf := asOf.Truncate(24 * time.Hour)
 	writeCashSnapshot := func(account *core.Record, value float64) {
 		start, end := pbDateRange(asOf.Format("2006-01-02"))
 		_, err := app.FindFirstRecordByFilter("accountBalances",
@@ -434,7 +435,7 @@ func syncConnection(app core.App, connection *core.Record) (plaidSyncSummary, er
 		balance := core.NewRecord(balanceCollection)
 		balance.Set("account", account.Id)
 		balance.Set("value", value)
-		balance.Set("asOf", asOf)
+		balance.Set("asOf", cashAsOf)
 		balance.Set("owner", ownerID)
 		balance.Set("importSession", session.Id)
 		balance.Set("source", "import")
