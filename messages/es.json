@@ -107,7 +107,7 @@
 	"accounts_link_empty": "Plaid no devolvió ninguna cuenta",
 	"accounts_link_cancel": "Cancelar",
 	"accounts_link_confirm": "Confirmar",
-	"accounts_link_confirming": "Vinculando cuentas",
+	"accounts_link_loading": "Vinculando cuentas",
 	"accounts_link_discard_confirm_title": "¿Descartar esta conexión bancaria?",
 	"accounts_link_discard_confirm_description": "La conexión bancaria se descartará y no se creará ninguna cuenta. Puedes vincular este banco de nuevo más tarde.",
 	"accounts_link_discard_confirm_cancel": "Seguir vinculando",
