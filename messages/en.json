@@ -112,7 +112,7 @@
 	"accounts_link_empty": "Plaid didn't return any accounts",
 	"accounts_link_cancel": "Cancel",
 	"accounts_link_confirm": "Confirm",
-	"accounts_link_confirming": "Linking accounts",
+	"accounts_link_loading": "Linking accounts",
 	"accounts_link_discard_confirm_title": "Discard this bank connection?",
 	"accounts_link_discard_confirm_description": "The bank connection will be discarded and no accounts will be created. You can link this bank again later.",
 	"accounts_link_discard_confirm_cancel": "Keep linking",

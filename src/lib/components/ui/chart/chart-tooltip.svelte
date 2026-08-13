@@ -43,7 +43,7 @@ highlighted point's crosshair and the default `contained="container"` flips it a
 <TooltipPrimitive.Root variant="none" motion="none" x="data" xOffset={12} y={chart.padding.top}>
 	<div
 		class={cn(
-			'bg-background grid min-w-[9rem] items-start gap-1.5 rounded-lg px-2.5 py-1.5 shadow-xl',
+			'bg-tooltip grid min-w-[9rem] items-start gap-1.5 rounded-lg px-2.5 py-1.5 shadow-xl',
 			className
 		)}
 		{...restProps}

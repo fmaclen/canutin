@@ -275,6 +275,13 @@ test('derives investment cash when linking to an existing account', async ({ pag
 	await page.getByRole('button', { name: 'Confirm' }).click();
 	await expect(page.getByText('Accounts linked', { exact: true })).toBeVisible();
 	await expect(page.getByRole('row', { name: 'Retirement Fund' })).toContainText('$1,000.00');
+
+	const userPB = await getUserPB(user.email);
+	const importedCashBalance = (await listAccountBalances(userPB, existingAccount.id)).find(
+		(balance) => balance.source === 'import'
+	);
+	expect(importedCashBalance?.value).toBe(200);
+	expect(importedCashBalance?.asOf).toBe(`${formatDateForInput(new Date())} 00:00:00.000Z`);
 });
 
 test('discarding the match step deletes the bank connection', async ({ page }) => {

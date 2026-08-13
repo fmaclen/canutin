@@ -12,6 +12,8 @@
 	import { axisTicks } from '$lib/components/ui/chart/chart-utils.js';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import Skeleton from '$lib/components/ui/skeleton/skeleton.svelte';
+	import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
+	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
 
 	type SeriesDef = {
@@ -62,6 +64,10 @@
 	const lastRow = $derived(windowedRows.at(-1) ?? null);
 	const isMultiSeries = $derived(series.length > 1);
 	const hasLegend = $derived(showLegend ?? isMultiSeries);
+
+	// Tracks the `sm` breakpoint, below which the x-axis thins its ticks so the labels
+	// keep their distance on a phone-width plot
+	const isNarrowViewport = new IsMobile(640);
 
 	// The legend overlays the plot from the top and wraps within the container width, so
 	// the chart's top padding tracks its measured height to keep it clear of the marks
@@ -115,6 +121,57 @@
 		comparisonCurrent = null;
 	}
 
+	// Touch has no hover to drive layerchart's tooltip: a finger that lands on the chart on its way
+	// to scrolling the page opens one, and the pointercancel the scroll begins with leaves it
+	// stranded on screen. Touch pointer events are stopped before layerchart sees them (see the plot
+	// wrapper below) and the tooltip is driven from the gesture instead - a tap pins it to the tapped
+	// point, a horizontal drag scrubs it along the x-axis and pins it where the finger lifts, and any
+	// other touch, on this chart or elsewhere, clears it.
+	const TAP_SLOP_PX = 10;
+	const SCRUB_DIRECTION_PX = 8;
+	let tapOrigin: { x: number; y: number } | null = null;
+	let isScrubbing = false;
+
+	// The gesture's axis is decided once, off its first few pixels of movement: mostly horizontal
+	// scrubs, mostly vertical is the page scroll the plot's `touch-action: pan-y` leaves to the
+	// browser (dropping the origin so the lift neither pins nor counts as a tap). Deciding once
+	// means vertical wobble can't cancel a scrub halfway through.
+	function trackScrub(event: PointerEvent) {
+		if (!tapOrigin) return;
+		if (!isScrubbing) {
+			const dx = event.clientX - tapOrigin.x;
+			const dy = event.clientY - tapOrigin.y;
+			if (Math.hypot(dx, dy) < SCRUB_DIRECTION_PX) return;
+			if (Math.abs(dy) >= Math.abs(dx)) {
+				tapOrigin = null;
+				return;
+			}
+			isScrubbing = true;
+		}
+		chartContext?.tooltip.show(event);
+	}
+
+	function onWindowPointerUp(event: PointerEvent) {
+		endComparison();
+		if (event.pointerType === 'mouse') return;
+		const origin = tapOrigin;
+		const wasScrubbing = isScrubbing;
+		tapOrigin = null;
+		isScrubbing = false;
+		const isTap =
+			origin !== null &&
+			Math.hypot(event.clientX - origin.x, event.clientY - origin.y) <= TAP_SLOP_PX;
+		if (wasScrubbing || isTap) chartContext?.tooltip.show(event);
+		else chartContext?.tooltip.hide();
+	}
+
+	function onWindowPointerCancel() {
+		endComparison();
+		tapOrigin = null;
+		isScrubbing = false;
+		chartContext?.tooltip.hide();
+	}
+
 	// Legend toggling narrows the chart's visible series; the compare tooltip and y-domain follow it
 	const visibleKeys = $derived(
 		new Set(chartContext?.series.visibleSeries.map((s) => s.key) ?? series.map((s) => s.key))
@@ -152,11 +209,7 @@
 		) satisfies Chart.ChartConfig
 	);
 
-	// Identity-stable: recomputes triggered by chart-context ticks (visibleKeys is rebuilt on
-	// every context change) must not hand the chart a fresh-but-equal array, or the domain prop
-	// re-renders the chart, which ticks the context again in a mount-time feedback loop.
-	let lastYDomain: [number, number] | null = null;
-	const yDomain = $derived.by(() => {
+	const yExtent = $derived.by(() => {
 		let min = Number.POSITIVE_INFINITY;
 		let max = Number.NEGATIVE_INFINITY;
 		for (const row of windowedRows) {
@@ -166,53 +219,68 @@
 				max = Math.max(max, s.value(row));
 			}
 		}
-		if (min > max) return (lastYDomain = null);
-		const range = max - min;
+		return min > max ? null : { min, max };
+	});
+
+	// Identity-stable: recomputes triggered by chart-context ticks (visibleKeys is rebuilt on
+	// every context change) must not hand the chart a fresh-but-equal array, or the domain prop
+	// re-renders the chart, which ticks the context again in a mount-time feedback loop.
+	let lastYDomain: [number, number] | null = null;
+	const yDomain = $derived.by(() => {
+		if (!yExtent) return (lastYDomain = null);
+		const range = yExtent.max - yExtent.min;
 		// NOTE: a flat series (min === max) needs a pad scaled to the value's own magnitude -
 		// a fixed pad works for money (thousands) but would swamp small units like exchange rates.
-		const pad = range > 0 ? range * 0.05 : Math.max(Math.abs(max) * 0.05, 0.01);
-		const next: [number, number] = [min - pad, max + pad];
+		const pad = range > 0 ? range * 0.05 : Math.max(Math.abs(yExtent.max) * 0.05, 0.01);
+		const next: [number, number] = [yExtent.min - pad, yExtent.max + pad];
 		if (lastYDomain && lastYDomain[0] === next[0] && lastYDomain[1] === next[1]) return lastYDomain;
 		return (lastYDomain = next);
 	});
 
-	let measureCanvas: HTMLCanvasElement | null = null;
-	function textWidthMono(text: string) {
-		if (typeof document === 'undefined') return text.length * 8;
-		if (!measureCanvas) measureCanvas = document.createElement('canvas');
-		const context = measureCanvas.getContext('2d');
-		if (!context) return text.length * 8;
-		context.font =
-			'12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
-		return context.measureText(text).width;
+	// Y labels overlay the plot, so they trade precision for width: $200,000 becomes
+	// $200K. A unit only applies ten times above its own size, which keeps every label at two
+	// significant digits ($1,860 stays spelled out instead of collapsing to $2K).
+	function formatCompactAxisValue(value: number) {
+		const magnitude = Math.abs(value);
+		const unit =
+			magnitude >= 1e10
+				? { divisor: 1e9, suffix: 'B' }
+				: magnitude >= 1e7
+					? { divisor: 1e6, suffix: 'M' }
+					: magnitude >= 1e4
+						? { divisor: 1e3, suffix: 'K' }
+						: null;
+		if (!unit) return formatAxisValue(value);
+		// The suffix goes after the last digit rather than at the end of the string, so currencies
+		// formatted with a trailing code ("1,234 USDT") keep the code in place
+		return formatAxisValue(value / unit.divisor).replace(/(\d)(?=\D*$)/, `$1${unit.suffix}`);
 	}
 
-	const leftPadding = $derived.by(() => {
-		if (!yDomain) return 48;
-		const labels = axisTicks(yDomain[0], yDomain[1]).map((tick) => formatAxisValue(tick));
-		const widest = labels.reduce((width, label) => Math.max(width, textWidthMono(label)), 0);
-		return Math.max(48, Math.ceil(widest) + 16);
-	});
+	// A tick label reads against its neighbors - a month repeated across ticks says nothing, and
+	// so does a year repeated on every label - but the axis formats one tick at a time, so the
+	// labels are built for the whole tick list as it is handed over and looked up per tick here
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- lookup cache written during chart render, never read reactively
+	const xTickLabels = new Map<number, string>();
 </script>
 
-<svelte:window onpointerup={endComparison} onpointercancel={endComparison} />
+<svelte:window onpointerup={onWindowPointerUp} onpointercancel={onWindowPointerCancel} />
 
 <SectionTitle {title}>
 	<PeriodTabs bind:value={period} label={m.period_tabs_label({ section: title })} />
 </SectionTitle>
 {#if isLoading}
-	<Skeleton class="h-[30vh] min-h-96" showSpinner />
+	<Skeleton class="full-bleed h-[30vh] min-h-96" showSpinner />
 {:else if rows.length < 2}
 	<div class="h-[30vh] min-h-96">
-		<Empty class="h-full">{emptyMessage}</Empty>
+		<Empty class="full-bleed h-full">{emptyMessage}</Empty>
 	</div>
 {:else if windowedRows.length < 2}
 	<div class="h-[30vh] min-h-96">
-		<Empty class="h-full">{m.chart_period_empty()}</Empty>
+		<Empty class="full-bleed h-full">{m.chart_period_empty()}</Empty>
 	</div>
 {:else}
 	<div
-		class="bg-background overflow-visible rounded-sm shadow-md"
+		class="full-bleed bg-background overflow-visible rounded-sm shadow-md"
 		data-chart-period={period}
 		data-chart-points={windowedRows.length}
 		data-chart-start={firstRow?.date.toISOString().slice(0, 10)}
@@ -226,6 +294,16 @@
 			role={hasLegend ? undefined : 'img'}
 			aria-label={hasLegend ? undefined : series[0].label}
 			onpointerdown={(event) => {
+				if (event.pointerType !== 'mouse') {
+					// Comparison drag stays mouse-only - on touch that gesture is the scrub - so a touch
+					// only ever records where it started. Touches landing outside the plot can't be
+					// resolved to a data point, so they start neither a tap nor a scrub.
+					const isInPlot =
+						event.target instanceof Element && event.target.closest('.lc-root-container') !== null;
+					tapOrigin = isInPlot ? { x: event.clientX, y: event.clientY } : null;
+					isScrubbing = false;
+					return;
+				}
 				if (event.button !== 0) return;
 				dragging = true;
 				comparisonAnchor = hovered;
@@ -233,7 +311,23 @@
 			}}
 		>
 			<div
-				class="relative w-full"
+				class="relative w-full touch-pan-y"
+				{@attach (node) => {
+					// layerchart opens its tooltip on pointerenter/pointermove and clears it on pointerleave,
+					// none of which describe a touch gesture. Touch pointers are stopped on the way down so
+					// they never reach layerchart's tooltip surface, leaving the tooltip under the explicit
+					// control of the gesture handling above; mouse pointers pass through untouched.
+					const stopTouchPointers = (event: Event) => {
+						if (!(event instanceof PointerEvent) || event.pointerType === 'mouse') return;
+						event.stopPropagation();
+						if (event.type === 'pointermove') trackScrub(event);
+					};
+					const names = ['pointerenter', 'pointermove', 'pointerleave'];
+					for (const name of names) node.addEventListener(name, stopTouchPointers, true);
+					return () => {
+						for (const name of names) node.removeEventListener(name, stopTouchPointers, true);
+					};
+				}}
 				{@attach (node) => {
 					let lastLayoutAt = Number.NEGATIVE_INFINITY;
 					let timer = 0;
@@ -269,9 +363,12 @@
 						yDomain={yDomain ?? undefined}
 						padding={{
 							top: hasLegend ? legendHeight + 16 : 16,
-							right: 48,
+							// Both gutters are a hairline inset matching the tables' px-4 cell padding, so
+							// the overlaid y labels align with first-column text while the marks still run
+							// nearly the full width of the card
+							right: 16,
 							bottom: 24,
-							left: leftPadding
+							left: 16
 						}}
 						series={series.map((s) => ({
 							key: s.key,
@@ -288,19 +385,79 @@
 							// for seconds when several charts mount at once.
 							spline: { curve: curveBumpX, opacity: 1, strokeWidth: 1.25, motion: 'none' },
 							xAxis: {
-								format: (v: Date) => v.toISOString().slice(0, 10),
-								ticks: 6,
+								format: (v: Date) => xTickLabels.get(+v) ?? '',
+								ticks: (scale) => {
+									let ticks: Date[] = scale.ticks?.(isNarrowViewport.current ? 4 : 6) ?? [];
+									// Labels are centered on their tick and the plot reaches the card's edges, so a
+									// tick sitting within half a label of an edge is dropped rather than clipped
+									const [rangeStart, rangeEnd] = scale.range();
+									ticks = ticks.filter((tick) => {
+										const x = scale(tick);
+										return x - rangeStart >= 24 && rangeEnd - x >= 24;
+									});
+									// Ticks closer together than a month would repeat the same month name, so the
+									// whole axis drops to days once any two neighbors share one ("Jul 14"). The
+									// year is written the way the cashflow chart writes it, on the first label and
+									// on every tick that opens a new one ("Jul 14 '26")
+									const sharesMonth = ticks.some(
+										(tick, index) =>
+											index > 0 &&
+											tick.toISOString().slice(0, 7) === ticks[index - 1].toISOString().slice(0, 7)
+									);
+									const locale = getFormattingLocale();
+									const date = new Intl.DateTimeFormat(locale, {
+										month: 'short',
+										day: sharesMonth ? 'numeric' : undefined,
+										timeZone: 'UTC'
+									});
+									const year = new Intl.DateTimeFormat(locale, {
+										year: '2-digit',
+										timeZone: 'UTC'
+									});
+									xTickLabels.clear();
+									for (const [index, tick] of ticks.entries()) {
+										const previous = ticks[index - 1];
+										const opensYear =
+											!previous ||
+											previous.toISOString().slice(0, 4) !== tick.toISOString().slice(0, 4);
+										xTickLabels.set(
+											+tick,
+											opensYear ? `${date.format(tick)} '${year.format(tick)}` : date.format(tick)
+										);
+									}
+									return ticks;
+								},
 								motion: 'none'
 							},
 							yAxis: {
 								motion: 'none',
-								format: (v: number) => formatAxisValue(v),
+								format: formatCompactAxisValue,
 								ticks: (scale) => {
 									const [min, max] = scale.domain();
 									return axisTicks(min, max);
+								},
+								// Without a gutter to sit in, the labels overlay the plot: flush with its left
+								// edge, resting just above their own tick, with a background-colored halo so they
+								// stay legible where a line runs underneath
+								tickLabelProps: {
+									textAnchor: 'start',
+									verticalAnchor: 'end',
+									dx: 0,
+									dy: -4,
+									class: 'stroke-background! stroke-2 [paint-order:stroke]'
 								}
 							},
-							grid: { x: true, y: true, xTicks: 6, yTicks: [0], motion: 'none' },
+							grid: {
+								x: true,
+								// The horizontal rule marks where the series crosses between positive and
+								// negative. With every value on one side of zero there is no crossing to mark,
+								// and the y scale extrapolates past its domain, so the rule would still be
+								// drawn - stranded under the marks by the domain's padding, or off-plot
+								y: yExtent !== null && yExtent.min < 0 && yExtent.max > 0,
+								yTicks: [0],
+								xTicks: isNarrowViewport.current ? 4 : 6,
+								motion: 'none'
+							},
 							highlight: { motion: 'none', points: { r: 3, opacity: 1 } }
 						}}
 					>

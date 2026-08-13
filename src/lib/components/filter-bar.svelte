@@ -83,7 +83,7 @@
 	});
 </script>
 
-<div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+<div class="flex flex-col gap-2 max-sm:-mt-0.5 max-sm:mb-3.5 sm:flex-row sm:items-center">
 	<div class="relative flex-1">
 		<div class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 -translate-y-1/2">
 			{#if isLoading}

@@ -10,7 +10,6 @@
 	import * as Pagination from '$lib/components/ui/pagination/index';
 	import * as Table from '$lib/components/ui/table/index';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
-	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { getTransactionsContext } from '$lib/transactions.svelte';
 	import { cn } from '$lib/utils.js';
@@ -27,17 +26,6 @@
 		txContext.setSort(column);
 	}
 
-	const dateFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
-		year: 'numeric',
-		month: 'short',
-		day: 'numeric',
-		timeZone: 'UTC'
-	});
-
-	function formatDate(date: Date) {
-		return dateFormatter.format(date);
-	}
-
 	function amountClass(value: number) {
 		if (value > 0) return 'text-cash';
 		if (value < 0) return 'text-debt';
@@ -46,15 +34,15 @@
 </script>
 
 {#if txContext.totalItems === 0}
-	<Empty>
+	<Empty class="full-bleed">
 		{m.transactions_table_empty()}
 	</Empty>
 {:else}
-	<div class="bg-background overflow-hidden rounded-sm shadow-md">
+	<div class="full-bleed bg-background overflow-hidden rounded-sm shadow-md">
 		<Table.Root>
 			<Table.Header>
 				<Table.Row>
-					<Table.Head class="w-10 pl-4">
+					<Table.Head class="w-10">
 						<Checkbox
 							checked={txContext.isAllVisibleSelected}
 							indeterminate={txContext.isIndeterminate}
@@ -122,7 +110,7 @@
 								? '[&>td]:bg-brand-secondary odd:[&>td]:bg-brand-secondary'
 								: ''}
 					>
-						<Table.Cell class="w-10 pl-4">
+						<Table.Cell class="w-10">
 							<Checkbox
 								checked={isSelected}
 								onCheckedChange={() => txContext.toggleSelection(row.id)}
@@ -131,14 +119,15 @@
 						<Table.Cell
 							class="text-muted-foreground font-mono whitespace-nowrap uppercase tabular-nums"
 						>
-							{formatDate(row.date)}
+							{row.date.toISOString().slice(0, 10)}
 						</Table.Cell>
 						<Table.Cell>
 							{#if row.description}
 								<Link
 									href="/transactions/{row.id}"
 									onclick={(event) => openTransaction(event, row.id)}
-									class="text-foreground/90 text-sm font-medium"
+									title={row.description}
+									class="cell-truncate text-foreground/90 text-sm font-medium"
 								>
 									{row.description}
 								</Link>
@@ -152,7 +141,7 @@
 						</Table.Cell>
 						<Table.Cell>
 							{#if row.labelChips.length}
-								<div class="flex flex-wrap gap-2">
+								<div class="flex flex-wrap gap-2 max-sm:max-w-[18ch]">
 									{#each row.labelChips as label (label.id)}
 										{@const isActive = txContext.labelFilters.includes(label.id)}
 										<button
@@ -180,10 +169,12 @@
 									id={row.accountId}
 									name={row.accountName}
 									isShared={row.accountIsShared}
-									class="text-foreground/80 text-sm"
+									class="cell-truncate text-foreground/80 text-sm"
 								/>
 							{:else if row.accountName}
-								<span class="text-foreground/80 text-sm">{row.accountName}</span>
+								<span class="cell-truncate text-foreground/80 text-sm" title={row.accountName}
+									>{row.accountName}</span
+								>
 							{:else}
 								<span class="text-muted-foreground text-sm">~</span>
 							{/if}

@@ -130,7 +130,7 @@
 		}
 
 		isSaving = true;
-		const loadingToast = toast.loading(m.accounts_link_confirming());
+		const loadingToast = toast.loading(m.accounts_link_loading());
 		try {
 			for (const account of plaidAccounts) {
 				if (completedPlaidAccountIds.has(account.plaidAccountId)) continue;
@@ -171,14 +171,14 @@
 					logError('plaidLink', 'sync', error);
 					toast.error(m.accounts_link_sync_failed());
 				});
+			toast.dismiss(loadingToast);
 			toast.success(m.accounts_link_success());
 			await goto(resolve('/accounts'));
 		} catch (error) {
 			logError('plaidLink', 'save_matches', error);
+			toast.dismiss(loadingToast);
 			toast.error(m.accounts_link_save_failed());
 			isSaving = false;
-		} finally {
-			toast.dismiss(loadingToast);
 		}
 	}
 </script>
@@ -320,9 +320,7 @@
 								>
 									{m.accounts_link_cancel()}
 								</Button>
-								<Button type="submit" disabled={isSaving}>
-									{m.accounts_link_confirm()}
-								</Button>
+								<Button type="submit" disabled={isSaving}>{m.accounts_link_confirm()}</Button>
 							</div>
 						</footer>
 					</form>

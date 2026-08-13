@@ -21,16 +21,17 @@
 </script>
 
 <Tabs.Root value="six-months">
-	<nav class="flex items-center justify-between space-x-2">
-		<SectionTitle {title} />
-
-		<Tabs.List aria-label={m.period_tabs_label({ section: title })}>
+	<SectionTitle {title}>
+		<Tabs.List
+			class="w-full max-sm:mb-1.5 sm:w-fit"
+			aria-label={m.period_tabs_label({ section: title })}
+		>
 			<Tabs.Trigger value="three-months">{m.period_3m_label()}</Tabs.Trigger>
 			<Tabs.Trigger value="six-months">{m.period_6m_label()}</Tabs.Trigger>
 			<Tabs.Trigger value="year-to-date">{m.period_ytd_label()}</Tabs.Trigger>
 			<Tabs.Trigger value="one-year">{m.period_1y_label()}</Tabs.Trigger>
 		</Tabs.List>
-	</nav>
+	</SectionTitle>
 
 	<Tabs.Content value="three-months">
 		<div class="grid gap-2 lg:grid-cols-[1.3fr_1fr_1fr]">

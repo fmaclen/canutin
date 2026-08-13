@@ -61,6 +61,10 @@
 	--card-foreground: oklch(0.145 0 0);
 	--popover: oklch(1 0 0);
 	--popover-foreground: oklch(0.145 0 0);
+	/* Tooltips float above cards, which share the page background, so they get their own surface
+	   instead of `--background`: in dark mode it has to be darker than everything underneath to
+	   read as a separate layer, since the shadow alone doesn't separate it. */
+	--tooltip: oklch(1 0 0);
 	--primary: var(--brand);
 	--primary-foreground: oklch(0.985 0 0);
 	--secondary: oklch(0.97 0 0);
@@ -100,6 +104,7 @@
 	--card-foreground: oklch(0.985 0 0);
 	--popover: oklch(0.31 0 0);
 	--popover-foreground: oklch(0.985 0 0);
+	--tooltip: oklch(0.21 0 0);
 	--primary: var(--brand);
 	--primary-foreground: oklch(0.985 0 0);
 	--secondary: oklch(0.27 0 0);
@@ -146,6 +151,7 @@
 	--color-card-foreground: var(--card-foreground);
 	--color-popover: var(--popover);
 	--color-popover-foreground: var(--popover-foreground);
+	--color-tooltip: var(--tooltip);
 	--color-primary: var(--primary);
 	--color-primary-foreground: var(--primary-foreground);
 	--color-secondary: var(--secondary);
@@ -206,5 +212,33 @@
 
 	.font-mono span.font-mono {
 		vertical-align: baseline;
+	}
+
+	/* Charts and tables run to the viewport edges on phones: cancels the horizontal padding the
+	   page layout applies below `sm` (see page.svelte) so only the surface's own internal padding
+	   is left, and drops the corner radius that would otherwise sit on the screen edge. The
+	   `:not()` guard stops a surface nested inside another one from bleeding twice. */
+	@media (width < 40rem) {
+		.full-bleed:not(.full-bleed *) {
+			margin-inline: calc(--spacing(6) * -1);
+			border-radius: 0;
+		}
+	}
+
+	/* Free text in a table cell - descriptions, account and security names - has no length limit, and
+	   on a phone a long value either wraps into a stack of one-word lines or drags the rest of the
+	   columns off screen. Below `sm` it is capped and clipped to a single line instead. `max-width`
+	   has no effect on a `td` in an auto table layout, so the cap has to sit on the text element
+	   inside the cell; that also keeps a link's clip box identical to its own box, so it stays
+	   tappable. The DOM text is untouched - call sites carry a `title` with the full value. */
+	@media (width < 40rem) {
+		.cell-truncate {
+			display: inline-block;
+			max-width: 18ch;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			vertical-align: middle;
+		}
 	}
 }

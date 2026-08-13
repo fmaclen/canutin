@@ -32,7 +32,7 @@
 </script>
 
 <div class={'flex items-center gap-2 ' + wrapperClass}>
-	<Link {href} class={className}>{name}</Link>
+	<Link {href} title={name} class={className}>{name}</Link>
 	{#if isShared}
 		<SharedIndicator label={sharedLabel} />
 	{/if}

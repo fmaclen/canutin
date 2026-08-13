@@ -131,7 +131,8 @@ const skillCustomEndpointsSection = "## Custom endpoints\n\n" +
 	"It applies adds, modifications, and removals to matched accounts, and imports current balance snapshots for " +
 	"non-investment accounts. For matched investment accounts with complete balance and holding values, " +
 	"it stores cash as Plaid's current total minus the summed holding values, and imports current holdings " +
-	"snapshots and investment transactions from 30 days before the previous sync (or from 1990-01-01 on the " +
+	"snapshots. Cash and holding snapshots are stamped at midnight UTC on the sync date so they supersede together. It imports " +
+	"investment transactions from 30 days before the previous sync (or from 1990-01-01 on the " +
 	"first sync). Missing current balances or holding values preserve the previous cash snapshot and are reported as failures. " +
 	"The cursor advances after every page and all added, modified, and removed cash transactions " +
 	"apply successfully; balance, currency, holding, and investment-transaction failures are reported without " +

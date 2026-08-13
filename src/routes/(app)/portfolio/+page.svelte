@@ -278,7 +278,7 @@
 			{#if rows.length === 0}
 				<Empty>{accountRows.length === 0 ? m.portfolio_empty() : m.portfolio_table_empty()}</Empty>
 			{:else}
-				<div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+				<div class="grid grid-cols-1 gap-2 max-sm:mb-4 sm:grid-cols-3">
 					<KeyValue
 						title={m.summary_net_gain_loss()}
 						value={gainLossTotal.total}
@@ -343,13 +343,13 @@
 					</Tabs.List>
 				</SectionTitle>
 				{#if securitiesContext.isLoading}
-					<Skeleton class="h-[30vh] min-h-96" showSpinner />
+					<Skeleton class="full-bleed h-[30vh] min-h-96" showSpinner />
 				{:else if allocationRows.length === 0}
 					<div class="h-[30vh] min-h-96">
-						<Empty class="h-full">{m.allocation_empty()}</Empty>
+						<Empty class="full-bleed h-full">{m.allocation_empty()}</Empty>
 					</div>
 				{:else}
-					<div class="bg-background overflow-hidden rounded-sm shadow-md">
+					<div class="full-bleed bg-background overflow-hidden rounded-sm shadow-md">
 						<AllocationTreemap rows={allocationRows} mode={allocationMode} />
 					</div>
 				{/if}

@@ -217,7 +217,7 @@
 							value: null,
 							isPartial: false
 						}}
-						<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+						<div class="grid grid-cols-1 gap-2 max-sm:mt-1.5 max-sm:mb-4 sm:grid-cols-2">
 							<KeyValue
 								title={m.sidebar_assets()}
 								value={rowsForOption.length}
@@ -237,7 +237,7 @@
 								{option.empty}
 							</Empty>
 						{:else}
-							<div class="bg-background overflow-hidden rounded-sm shadow-md">
+							<div class="full-bleed bg-background overflow-hidden rounded-sm shadow-md">
 								<Table.Root>
 									<Table.Header>
 										<Table.Row>
@@ -306,7 +306,7 @@
 														id={row.id}
 														name={row.name}
 														isShared={row.isShared}
-														class="text-foreground/90 text-sm font-medium"
+														class="cell-truncate text-foreground/90 text-sm font-medium"
 													/>
 												</Table.Cell>
 												<Table.Cell>

@@ -130,7 +130,7 @@
 				{m.currencies_empty()}
 			</Empty>
 		{:else}
-			<div class="bg-background overflow-hidden rounded-sm shadow-md">
+			<div class="full-bleed bg-background overflow-hidden rounded-sm shadow-md">
 				<Table.Root>
 					<Table.Header>
 						<Table.Row>
@@ -192,7 +192,7 @@
 								</Table.Cell>
 								<Table.Cell class="text-foreground/80 text-sm">
 									{#if row.name}
-										{row.name}
+										<span class="cell-truncate" title={row.name}>{row.name}</span>
 									{:else}
 										<span class="text-muted-foreground">~</span>
 									{/if}
