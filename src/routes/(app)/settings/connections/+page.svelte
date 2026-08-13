@@ -110,7 +110,14 @@
 	async function handleSync(connectionId: string) {
 		if (syncingConnectionId) return;
 		syncingConnectionId = connectionId;
-		const loadingToast = toast.loading(m.settings_connections_syncing());
+		const institution = connections.find(
+			(connection) => connection.id === connectionId
+		)?.institutionName;
+		const loadingToast = toast.loading(
+			m.settings_connections_syncing({
+				institution: institution || m.settings_connections_unnamed_institution()
+			})
+		);
 
 		try {
 			const result = await pb.authedClient.send<SyncResponse>(

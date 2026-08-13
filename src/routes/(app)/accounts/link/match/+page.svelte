@@ -131,7 +131,11 @@
 		}
 
 		isSaving = true;
-		const loadingToast = toast.loading(m.accounts_link_loading());
+		const loadingToast = toast.loading(
+			m.accounts_link_loading({
+				institution: institutionName || m.settings_connections_unnamed_institution()
+			})
+		);
 		try {
 			for (const account of plaidAccounts) {
 				if (completedPlaidAccountIds.has(account.plaidAccountId)) continue;
