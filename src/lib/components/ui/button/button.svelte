@@ -4,8 +4,10 @@
 
 	import { cn, type WithElementRef } from '$lib/utils.js';
 
+	// pt-px optically centers labels: Inter's tall ascender makes flex-centered text sit ~1px
+	// high, and text-box-trim can't correct it inside flex containers.
 	export const buttonVariants = tv({
-		base: "focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded text-sm font-medium outline-none transition-all focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground aria-disabled:pointer-events-none aria-disabled:bg-muted aria-disabled:text-muted-foreground [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 cursor-pointer",
+		base: "focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded pt-px text-sm font-medium outline-none transition-all focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:bg-muted-foreground/30 disabled:text-muted-foreground disabled:border-transparent aria-disabled:pointer-events-none aria-disabled:bg-muted-foreground/30 aria-disabled:text-muted-foreground aria-disabled:border-transparent [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 cursor-pointer",
 		variants: {
 			variant: {
 				default: 'bg-primary text-primary-foreground hover:bg-primary/90',
@@ -13,7 +15,8 @@
 					'bg-destructive hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 text-white',
 				outline:
 					'hover:bg-background hover:text-accent-foreground dark:border-input dark:hover:bg-input/50 border',
-				secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+				secondary:
+					'border-muted-foreground/30 text-secondary-foreground hover:bg-muted-foreground/10 border bg-transparent',
 				ghost: 'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
 				link: 'text-primary underline-offset-4 hover:underline'
 			},

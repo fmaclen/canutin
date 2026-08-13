@@ -20,6 +20,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
+	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { interfacePreferences } from '$lib/interface-preferences.svelte';
 	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
@@ -130,7 +131,11 @@
 		}
 
 		isSaving = true;
-		const loadingToast = toast.loading(m.accounts_link_loading());
+		const loadingToast = toast.loading(
+			m.accounts_link_loading({
+				institution: institutionName || m.settings_connections_unnamed_institution()
+			})
+		);
 		try {
 			for (const account of plaidAccounts) {
 				if (completedPlaidAccountIds.has(account.plaidAccountId)) continue;
@@ -194,7 +199,11 @@
 	>
 		<Section>
 			<SectionTitle title={m.accounts_link_match_section_title()} />
-			{#if plaidAccounts.length === 0}
+			<!-- The "Link to" selects read the app-wide accounts list; the whole form waits for it so
+			     existing accounts can never pop into an already-open dropdown. -->
+			{#if accountsContext.isLoading}
+				<Skeleton class="h-64" showSpinner />
+			{:else if plaidAccounts.length === 0}
 				<Empty>{m.accounts_link_empty()}</Empty>
 			{:else}
 				<div class="border-border overflow-hidden rounded border">

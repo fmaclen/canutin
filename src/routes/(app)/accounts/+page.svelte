@@ -247,18 +247,18 @@
 		<Link href={resolve('/accounts/add')} class="text-sm">{m.accounts_add_page_title()}</Link>
 	{/snippet}
 	<Section>
-		{#if !isLoaded}
-			<Skeleton class="h-64" showSpinner />
-		{:else}
-			<Tabs.Root bind:value={filter}>
-				<SectionTitle title={m.accounts_section_title()}>
-					<Tabs.List>
-						{#each filters as option (option.key)}
-							<Tabs.Trigger value={option.key}>{option.label}</Tabs.Trigger>
-						{/each}
-					</Tabs.List>
-				</SectionTitle>
+		<Tabs.Root bind:value={filter}>
+			<SectionTitle title={m.accounts_section_title()}>
+				<Tabs.List>
+					{#each filters as option (option.key)}
+						<Tabs.Trigger value={option.key}>{option.label}</Tabs.Trigger>
+					{/each}
+				</Tabs.List>
+			</SectionTitle>
 
+			{#if !isLoaded}
+				<Skeleton class="h-64" showSpinner />
+			{:else}
 				{#each filters as option (option.key)}
 					<Tabs.Content value={option.key} class="flex flex-col space-y-2">
 						{@const rowsForOption = rowsByFilter.get(option.key) ?? []}
@@ -476,7 +476,7 @@
 						{/if}
 					</Tabs.Content>
 				{/each}
-			</Tabs.Root>
-		{/if}
+			{/if}
+		</Tabs.Root>
 	</Section>
 </Page>

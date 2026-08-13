@@ -684,19 +684,7 @@
 	</Section>
 {/snippet}
 
-{#snippet samplePlaceholder()}
-	<Section>
-		<Skeleton class="h-7 w-40" />
-		<Skeleton class="h-64" showSpinner />
-	</Section>
-{/snippet}
-
-{#if !loaded}
-	{@render samplePlaceholder()}
-	{@render samplePlaceholder()}
-	{@render samplePlaceholder()}
-	{@render samplePlaceholder()}
-{:else if isInvestmentAccount}
+{#if isInvestmentAccount}
 	{@render positionsAndTrades()}
 	{@render cashflowAndTransactions()}
 {:else}

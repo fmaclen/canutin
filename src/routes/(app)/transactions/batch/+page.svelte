@@ -100,7 +100,11 @@
 		if (!currentOwnerId || isSubmitting) return;
 
 		isSubmitting = true;
-		const loadingToast = toast.loading(m.transactions_batch_updating());
+		const loadingToast = toast.loading(
+			selectedTransactions.length === 1
+				? m.transactions_batch_updating_one()
+				: m.transactions_batch_updating_other({ count: selectedTransactions.length })
+		);
 
 		try {
 			const updates: Record<string, unknown> = {};
@@ -185,7 +189,11 @@
 		if (isSubmitting) return;
 
 		isSubmitting = true;
-		const loadingToast = toast.loading(m.transactions_batch_deleting());
+		const loadingToast = toast.loading(
+			selectedTransactions.length === 1
+				? m.transactions_batch_deleting_one()
+				: m.transactions_batch_deleting_other({ count: selectedTransactions.length })
+		);
 
 		try {
 			const total = selectedTransactions.length;
