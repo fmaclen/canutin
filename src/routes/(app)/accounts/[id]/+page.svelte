@@ -516,7 +516,8 @@
 									{#if row.description}
 										<Link
 											href={resolve(`/trades/${row.id}`)}
-											class="text-foreground/90 text-sm font-medium"
+											title={row.description}
+											class="cell-truncate text-foreground/90 text-sm font-medium"
 										>
 											{row.description}
 										</Link>
@@ -530,12 +531,15 @@
 									{#if row.securityName && row.securityId}
 										<Link
 											href={resolve(`/securities/${row.securityId}`)}
-											class="text-foreground/80 text-sm"
+											title={row.securityName}
+											class="cell-truncate text-foreground/80 text-sm"
 										>
 											{row.securityName}
 										</Link>
 									{:else if row.securityName}
-										<span class="text-foreground/80 text-sm">{row.securityName}</span>
+										<span class="cell-truncate text-foreground/80 text-sm" title={row.securityName}
+											>{row.securityName}</span
+										>
 									{:else}
 										<span class="text-muted-foreground text-sm">~</span>
 									{/if}
@@ -627,7 +631,8 @@
 									{#if row.description}
 										<Link
 											href={resolve(`/transactions/${row.id}`)}
-											class="text-foreground/90 text-sm font-medium"
+											title={row.description}
+											class="cell-truncate text-foreground/90 text-sm font-medium"
 										>
 											{row.description}
 										</Link>
@@ -640,7 +645,7 @@
 								</Table.Cell>
 								<Table.Cell>
 									{#if row.labelChips.length}
-										<div class="flex flex-wrap gap-2">
+										<div class="flex flex-wrap gap-2 max-sm:max-w-[18ch]">
 											{#each row.labelChips as label (label.id)}
 												<span class={badgeVariants({ variant: 'outline' })}>{label.name}</span>
 											{/each}

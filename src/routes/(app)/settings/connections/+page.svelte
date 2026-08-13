@@ -219,7 +219,10 @@
 							syncingConnectionId === connection.id || unlinkingConnectionId === connection.id}
 						<Table.Row>
 							<Table.Cell>
-								<span class="text-foreground/90 text-sm font-medium">
+								<span
+									class="cell-truncate text-foreground/90 text-sm font-medium"
+									title={connection.institutionName || m.settings_connections_unnamed_institution()}
+								>
 									{connection.institutionName || m.settings_connections_unnamed_institution()}
 								</span>
 							</Table.Cell>

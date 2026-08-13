@@ -72,7 +72,8 @@
 								<Table.Cell>
 									<Link
 										href={resolve(`/securities/${row.id}`)}
-										class="text-foreground/90 text-sm font-medium"
+										title={row.name}
+										class="cell-truncate text-foreground/90 text-sm font-medium"
 									>
 										{row.name}
 									</Link>

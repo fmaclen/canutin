@@ -148,7 +148,9 @@
 					class={row.status === ImportSessionsStatusOptions.rolled_back ? 'bg-muted/30' : ''}
 				>
 					<Table.Cell>
-						<span class="text-foreground/90 text-sm font-medium">{row.label}</span>
+						<span class="cell-truncate text-foreground/90 text-sm font-medium" title={row.label}
+							>{row.label}</span
+						>
 					</Table.Cell>
 					<Table.Cell>
 						<Badge variant={statusVariants[row.status]}>{statusLabels[row.status]()}</Badge>

@@ -306,7 +306,7 @@
 														id={row.id}
 														name={row.name}
 														isShared={row.isShared}
-														class="text-foreground/90 text-sm font-medium"
+														class="cell-truncate text-foreground/90 text-sm font-medium"
 													/>
 												</Table.Cell>
 												<Table.Cell>

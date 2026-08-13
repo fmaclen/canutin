@@ -193,7 +193,7 @@
 									</Table.Cell>
 									<Table.Cell class="text-foreground/80 text-sm">
 										{#if row.name}
-											{row.name}
+											<span class="cell-truncate" title={row.name}>{row.name}</span>
 										{:else}
 											<span class="text-muted-foreground">~</span>
 										{/if}

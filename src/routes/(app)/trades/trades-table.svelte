@@ -9,7 +9,6 @@
 	import * as Pagination from '$lib/components/ui/pagination/index';
 	import * as Table from '$lib/components/ui/table/index';
 	import { getExchangeRatesContext } from '$lib/exchange-rates.svelte';
-	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { formatSecurityQuantity } from '$lib/security-balance-values';
 	import { tradeTypeLabel } from '$lib/trade-display';
@@ -22,16 +21,6 @@
 		event.preventDefault();
 		const from = window.location.pathname + window.location.search;
 		await goto(resolve(`/trades/${id}?from=${encodeURIComponent(from)}`));
-	}
-
-	const dateFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
-		year: 'numeric',
-		month: 'short',
-		day: 'numeric',
-		timeZone: 'UTC'
-	});
-	function formatDate(date: Date) {
-		return dateFormatter.format(date);
 	}
 
 	function amountClass(value: number) {
@@ -88,14 +77,15 @@
 						<Table.Cell
 							class="text-muted-foreground font-mono whitespace-nowrap uppercase tabular-nums"
 						>
-							{formatDate(row.date)}
+							{row.date.toISOString().slice(0, 10)}
 						</Table.Cell>
 						<Table.Cell>
 							{#if row.description}
 								<Link
 									href="/trades/{row.id}"
 									onclick={(event) => openTrade(event, row.id)}
-									class="text-foreground/90 text-sm font-medium"
+									title={row.description}
+									class="cell-truncate text-foreground/90 text-sm font-medium"
 								>
 									{row.description}
 								</Link>
@@ -111,12 +101,15 @@
 							{#if row.securityName && row.securityId}
 								<Link
 									href={resolve(`/securities/${row.securityId}`)}
-									class="text-foreground/80 text-sm"
+									title={row.securityName}
+									class="cell-truncate text-foreground/80 text-sm"
 								>
 									{row.securityName}
 								</Link>
 							{:else if row.securityName}
-								<span class="text-foreground/80 text-sm">{row.securityName}</span>
+								<span class="cell-truncate text-foreground/80 text-sm" title={row.securityName}
+									>{row.securityName}</span
+								>
 							{:else}
 								<span class="text-muted-foreground text-sm">~</span>
 							{/if}
@@ -143,10 +136,12 @@
 									id={row.accountId}
 									name={row.accountName}
 									isShared={row.accountIsShared}
-									class="text-foreground/80 text-sm"
+									class="cell-truncate text-foreground/80 text-sm"
 								/>
 							{:else if row.accountName}
-								<span class="text-foreground/80 text-sm">{row.accountName}</span>
+								<span class="cell-truncate text-foreground/80 text-sm" title={row.accountName}
+									>{row.accountName}</span
+								>
 							{:else}
 								<span class="text-muted-foreground text-sm">~</span>
 							{/if}

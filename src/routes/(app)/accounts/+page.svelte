@@ -346,12 +346,14 @@
 														id={row.id}
 														name={row.name}
 														isShared={row.isShared}
-														class="text-foreground/90 text-sm font-medium"
+														class="cell-truncate text-foreground/90 text-sm font-medium"
 													/>
 												</Table.Cell>
 												<Table.Cell class="text-foreground/80 text-sm">
 													{#if row.institution}
-														{row.institution}
+														<span class="cell-truncate" title={row.institution}
+															>{row.institution}</span
+														>
 													{:else}
 														<span class="text-muted-foreground">~</span>
 													{/if}

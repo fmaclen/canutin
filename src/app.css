@@ -224,4 +224,21 @@
 			border-radius: 0;
 		}
 	}
+
+	/* Free text in a table cell - descriptions, account and security names - has no length limit, and
+	   on a phone a long value either wraps into a stack of one-word lines or drags the rest of the
+	   columns off screen. Below `sm` it is capped and clipped to a single line instead. `max-width`
+	   has no effect on a `td` in an auto table layout, so the cap has to sit on the text element
+	   inside the cell; that also keeps a link's clip box identical to its own box, so it stays
+	   tappable. The DOM text is untouched - call sites carry a `title` with the full value. */
+	@media (width < 40rem) {
+		.cell-truncate {
+			display: inline-block;
+			max-width: 18ch;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			vertical-align: middle;
+		}
+	}
 }
