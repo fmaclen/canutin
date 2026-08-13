@@ -47,8 +47,8 @@
 	let { value = $bindable(), label }: { value: PeriodKey; label: string } = $props();
 </script>
 
-<Tabs.Root bind:value>
-	<Tabs.List aria-label={label}>
+<Tabs.Root bind:value class="w-full max-sm:mb-1.5 sm:w-fit">
+	<Tabs.List class="w-full sm:w-fit" aria-label={label}>
 		<Tabs.Trigger value="3m">{m.period_3m_label()}</Tabs.Trigger>
 		<Tabs.Trigger value="6m">{m.period_6m_label()}</Tabs.Trigger>
 		<Tabs.Trigger value="ytd">{m.period_ytd_label()}</Tabs.Trigger>

@@ -5,7 +5,6 @@
 	import NumberDisplay from '$lib/components/number.svelte';
 	import * as Table from '$lib/components/ui/table/index';
 	import { getExchangeRatesContext } from '$lib/exchange-rates.svelte';
-	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import {
 		formatSecurityQuantity,
@@ -54,15 +53,9 @@
 	let { rows, entity, sortState, onSort }: Props = $props();
 
 	const fx = getExchangeRatesContext();
-	const dateFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
-		year: 'numeric',
-		month: 'short',
-		day: 'numeric',
-		timeZone: 'UTC'
-	});
 </script>
 
-<div class="bg-background overflow-hidden rounded-sm shadow-md">
+<div class="full-bleed bg-background overflow-hidden rounded-sm shadow-md">
 	<Table.Root>
 		<Table.Header>
 			<Table.Row>
@@ -176,7 +169,8 @@
 						<Table.Cell>
 							<Link
 								href={resolve(`/securities/${row.id}`)}
-								class="text-foreground/90 text-sm font-medium"
+								title={row.name}
+								class="cell-truncate text-foreground/90 text-sm font-medium"
 							>
 								{row.name}
 							</Link>
@@ -189,11 +183,12 @@
 							{/if}
 						</Table.Cell>
 						<Table.Cell class="text-foreground/80 max-w-80 text-sm">
-							<div class="flex flex-wrap gap-x-1.5 gap-y-0.5">
+							<div class="flex flex-wrap gap-x-1.5 gap-y-0.5 max-sm:max-w-[18ch]">
 								{#each row.accounts as account (account.id)}
 									<Link
 										href={resolve(`/accounts/${account.id}`)}
-										class="text-foreground/80 text-sm"
+										title={account.name}
+										class="cell-truncate text-foreground/80 text-sm"
 									>
 										{account.name}
 									</Link>
@@ -204,14 +199,15 @@
 						<Table.Cell
 							class="text-muted-foreground font-mono whitespace-nowrap uppercase tabular-nums"
 						>
-							{dateFormatter.format(new Date(row.asOf))}
+							{new Date(row.asOf).toISOString().slice(0, 10)}
 						</Table.Cell>
 						<Table.Cell>
 							<Link
 								href={entity === 'account'
 									? resolve(`/accounts/${row.entityId}`)
 									: resolve(`/securities/${row.entityId}`)}
-								class="text-foreground/90 text-sm font-medium"
+								title={row.entityName}
+								class="cell-truncate text-foreground/90 text-sm font-medium"
 							>
 								{row.entityName}
 							</Link>

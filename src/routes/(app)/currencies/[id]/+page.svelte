@@ -148,7 +148,7 @@
 				<div
 					role="region"
 					aria-label={m.currencies_table_header_latest_quote()}
-					class="grid grid-cols-1 gap-2"
+					class="grid grid-cols-1 gap-2 max-sm:-mt-0.5 max-sm:mb-4"
 				>
 					<KeyValue
 						title={m.currencies_table_header_latest_quote()}
@@ -161,7 +161,7 @@
 			{#if sortedRows.length === 0}
 				<Empty>{m.currencies_no_quotes()}</Empty>
 			{:else}
-				<div class="bg-background overflow-hidden rounded-sm shadow-md">
+				<div class="full-bleed bg-background overflow-hidden rounded-sm shadow-md">
 					<Table.Root>
 						<Table.Header>
 							<Table.Row>

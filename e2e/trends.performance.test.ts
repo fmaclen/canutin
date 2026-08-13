@@ -354,11 +354,12 @@ test('trends performance table', async ({ page }) => {
 	// full-range domain to just the visible series (cash 1,000..8,000, padded then niced
 	// by the scale to 0..9,000). Tick texts are scoped to the growth chart because the
 	// per-group cash chart below nices to the same $9,000 tick.
-	await expect(maxChart.getByText('$45,000', { exact: true })).toBeVisible();
+	// Axis labels compact above $10,000 on every viewport, so the top tick reads $45K.
+	await expect(maxChart.getByText('$45K', { exact: true })).toBeVisible();
 	await expect(maxChart.getByText('$9,000', { exact: true })).not.toBeVisible();
 	await page.getByRole('button', { name: 'Cash', exact: true }).click();
 	await expect(maxChart.getByText('$9,000', { exact: true })).toBeVisible();
-	await expect(maxChart.getByText('$45,000', { exact: true })).not.toBeVisible();
+	await expect(maxChart.getByText('$45K', { exact: true })).not.toBeVisible();
 	// Recapture the box: the legend click can scroll the chart and stale coords miss it
 	await dragChart(page, maxChart, 0, 1, 0.6, 4);
 	await expect(compareTooltip.getByText('+$7,000')).toBeVisible();
@@ -367,7 +368,7 @@ test('trends performance table', async ({ page }) => {
 
 	// Toggling the series back restores the full-range y-axis
 	await page.getByRole('button', { name: 'Cash', exact: true }).click();
-	await expect(maxChart.getByText('$45,000', { exact: true })).toBeVisible();
+	await expect(maxChart.getByText('$45K', { exact: true })).toBeVisible();
 	await expect(maxChart.getByText('$9,000', { exact: true })).not.toBeVisible();
 
 	// Each chart windows independently: switching the Cash group chart to 2Y leaves the growth

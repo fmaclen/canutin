@@ -481,11 +481,11 @@
 {/snippet}
 
 {#if isLoading}
-	<Skeleton class="h-64" showSpinner />
+	<Skeleton class="full-bleed h-64" showSpinner />
 {:else if isEmpty}
-	<Empty>{m.trends_empty()}</Empty>
+	<Empty class="full-bleed">{m.trends_empty()}</Empty>
 {:else}
-	<div class="bg-background rounded-sm shadow-md">
+	<div class="full-bleed bg-background rounded-sm shadow-md">
 		<div class="overflow-x-auto">
 			<Tooltip.Provider delayDuration={150}>
 				<Table.Root>
