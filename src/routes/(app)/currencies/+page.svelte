@@ -122,149 +122,147 @@
 		<Link href={resolve('/currencies/add')} class="text-sm">{m.currencies_add_page_title()}</Link>
 	{/snippet}
 	<Section>
+		<SectionTitle title={m.currencies_section_title()} />
 		{#if !currenciesContext.isLoaded || !exchangeRatesContext.isLoaded}
 			<Skeleton class="h-64" showSpinner />
+		{:else if sortedRows.length === 0}
+			<Empty>
+				{m.currencies_empty()}
+			</Empty>
 		{:else}
-			<SectionTitle title={m.currencies_section_title()} />
-			{#if sortedRows.length === 0}
-				<Empty>
-					{m.currencies_empty()}
-				</Empty>
-			{:else}
-				<div class="bg-background overflow-hidden rounded-sm shadow-md">
-					<Table.Root>
-						<Table.Header>
+			<div class="bg-background overflow-hidden rounded-sm shadow-md">
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							<Table.SortableHead
+								class="text-left whitespace-nowrap"
+								column="code"
+								sortColumn={sort.column}
+								sortDirection={sort.direction}
+								onSort={handleSort}
+							>
+								{m.currencies_table_header_code()}
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-left whitespace-nowrap"
+								column="name"
+								sortColumn={sort.column}
+								sortDirection={sort.direction}
+								onSort={handleSort}
+							>
+								{m.currencies_table_header_name()}
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-left whitespace-nowrap"
+								column="autoUpdate"
+								sortColumn={sort.column}
+								sortDirection={sort.direction}
+								onSort={handleSort}
+							>
+								{m.currencies_table_header_auto_update()}
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-left whitespace-nowrap"
+								column="lastUpdated"
+								sortColumn={sort.column}
+								sortDirection={sort.direction}
+								onSort={handleSort}
+							>
+								{m.currencies_table_header_last_updated()}
+							</Table.SortableHead>
+							<Table.SortableHead
+								class="text-right whitespace-nowrap"
+								column="latestQuote"
+								sortColumn={sort.column}
+								sortDirection={sort.direction}
+								onSort={handleSort}
+							>
+								{m.currencies_table_header_latest_quote()}
+							</Table.SortableHead>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each paginatedRows as row (row.id)}
 							<Table.Row>
-								<Table.SortableHead
-									class="text-left whitespace-nowrap"
-									column="code"
-									sortColumn={sort.column}
-									sortDirection={sort.direction}
-									onSort={handleSort}
-								>
-									{m.currencies_table_header_code()}
-								</Table.SortableHead>
-								<Table.SortableHead
-									class="text-left whitespace-nowrap"
-									column="name"
-									sortColumn={sort.column}
-									sortDirection={sort.direction}
-									onSort={handleSort}
-								>
-									{m.currencies_table_header_name()}
-								</Table.SortableHead>
-								<Table.SortableHead
-									class="text-left whitespace-nowrap"
-									column="autoUpdate"
-									sortColumn={sort.column}
-									sortDirection={sort.direction}
-									onSort={handleSort}
-								>
-									{m.currencies_table_header_auto_update()}
-								</Table.SortableHead>
-								<Table.SortableHead
-									class="text-left whitespace-nowrap"
-									column="lastUpdated"
-									sortColumn={sort.column}
-									sortDirection={sort.direction}
-									onSort={handleSort}
-								>
-									{m.currencies_table_header_last_updated()}
-								</Table.SortableHead>
-								<Table.SortableHead
-									class="text-right whitespace-nowrap"
-									column="latestQuote"
-									sortColumn={sort.column}
-									sortDirection={sort.direction}
-									onSort={handleSort}
-								>
-									{m.currencies_table_header_latest_quote()}
-								</Table.SortableHead>
+								<Table.Cell>
+									<Link
+										href={`${resolve(`/currencies/${row.id}`)}?from=${encodeURIComponent(listUrl)}`}
+										class="text-foreground/90 text-sm font-medium">{row.code}</Link
+									>
+								</Table.Cell>
+								<Table.Cell class="text-foreground/80 text-sm">
+									{#if row.name}
+										{row.name}
+									{:else}
+										<span class="text-muted-foreground">~</span>
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="text-foreground/80 text-sm">
+									{#if row.isUsd}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										{autoUpdateLabel(row)}
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="text-muted-foreground text-sm">
+									{#if row.isUsd}
+										<span class="text-muted-foreground">~</span>
+									{:else if row.latestDate}
+										{formatDate(row.latestDate)}
+									{:else}
+										{m.currencies_no_quotes()}
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									{#if row.latestRate === null}
+										<span class="text-muted-foreground">~</span>
+									{:else}
+										<Number value={formatNativeCurrency(row.latestRate, 2, row.code)} />
+									{/if}
+								</Table.Cell>
 							</Table.Row>
-						</Table.Header>
-						<Table.Body>
-							{#each paginatedRows as row (row.id)}
-								<Table.Row>
-									<Table.Cell>
-										<Link
-											href={`${resolve(`/currencies/${row.id}`)}?from=${encodeURIComponent(listUrl)}`}
-											class="text-foreground/90 text-sm font-medium">{row.code}</Link
-										>
-									</Table.Cell>
-									<Table.Cell class="text-foreground/80 text-sm">
-										{#if row.name}
-											{row.name}
-										{:else}
-											<span class="text-muted-foreground">~</span>
-										{/if}
-									</Table.Cell>
-									<Table.Cell class="text-foreground/80 text-sm">
-										{#if row.isUsd}
-											<span class="text-muted-foreground">~</span>
-										{:else}
-											{autoUpdateLabel(row)}
-										{/if}
-									</Table.Cell>
-									<Table.Cell class="text-muted-foreground text-sm">
-										{#if row.isUsd}
-											<span class="text-muted-foreground">~</span>
-										{:else if row.latestDate}
-											{formatDate(row.latestDate)}
-										{:else}
-											{m.currencies_no_quotes()}
-										{/if}
-									</Table.Cell>
-									<Table.Cell class="text-right tabular-nums">
-										{#if row.latestRate === null}
-											<span class="text-muted-foreground">~</span>
-										{:else}
-											<Number value={formatNativeCurrency(row.latestRate, 2, row.code)} />
-										{/if}
-									</Table.Cell>
-								</Table.Row>
-							{/each}
-						</Table.Body>
-						{#if totalPages > 1}
-							<Table.Footer>
-								<Table.Row class="border-t">
-									<Table.Cell colspan={5} class="bg-background px-0 py-3 whitespace-normal">
-										<Pagination.Root
-											count={totalItems}
-											perPage={pageSize}
-											page={currentPage}
-											onPageChange={(newPage) => (currentPage = newPage)}
-										>
-											{#snippet children({ pages, currentPage: activePage })}
-												<Pagination.Content
-													class="flex flex-wrap items-center justify-center gap-1 px-4 sm:justify-between"
-												>
+						{/each}
+					</Table.Body>
+					{#if totalPages > 1}
+						<Table.Footer>
+							<Table.Row class="border-t">
+								<Table.Cell colspan={5} class="bg-background px-0 py-3 whitespace-normal">
+									<Pagination.Root
+										count={totalItems}
+										perPage={pageSize}
+										page={currentPage}
+										onPageChange={(newPage) => (currentPage = newPage)}
+									>
+										{#snippet children({ pages, currentPage: activePage })}
+											<Pagination.Content
+												class="flex flex-wrap items-center justify-center gap-1 px-4 sm:justify-between"
+											>
+												<Pagination.Item>
+													<Pagination.PrevButton />
+												</Pagination.Item>
+												{#each pages as item (item.key)}
 													<Pagination.Item>
-														<Pagination.PrevButton />
+														{#if item.type === 'page'}
+															<Pagination.Link page={item} isActive={activePage === item.value}>
+																{item.value}
+															</Pagination.Link>
+														{:else}
+															<Pagination.Ellipsis />
+														{/if}
 													</Pagination.Item>
-													{#each pages as item (item.key)}
-														<Pagination.Item>
-															{#if item.type === 'page'}
-																<Pagination.Link page={item} isActive={activePage === item.value}>
-																	{item.value}
-																</Pagination.Link>
-															{:else}
-																<Pagination.Ellipsis />
-															{/if}
-														</Pagination.Item>
-													{/each}
-													<Pagination.Item>
-														<Pagination.NextButton />
-													</Pagination.Item>
-												</Pagination.Content>
-											{/snippet}
-										</Pagination.Root>
-									</Table.Cell>
-								</Table.Row>
-							</Table.Footer>
-						{/if}
-					</Table.Root>
-				</div>
-			{/if}
+												{/each}
+												<Pagination.Item>
+													<Pagination.NextButton />
+												</Pagination.Item>
+											</Pagination.Content>
+										{/snippet}
+									</Pagination.Root>
+								</Table.Cell>
+							</Table.Row>
+						</Table.Footer>
+					{/if}
+				</Table.Root>
+			</div>
 		{/if}
 	</Section>
 </Page>

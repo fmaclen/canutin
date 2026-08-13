@@ -636,7 +636,7 @@
 	"settings_connections_status_error": "Last sync had errors",
 	"settings_connections_status_reauth_required": "Reconnection required",
 	"settings_connections_sync_button": "Sync",
-	"settings_connections_sync_button_pending": "Syncing",
+	"settings_connections_syncing": "Syncing connection",
 	"settings_connections_sync_success": "Sync complete: {created} created, {skipped} skipped",
 	"settings_connections_sync_partial": "Sync finished with errors: {created} created, {skipped} skipped, {failed} failed",
 	"settings_connections_sync_in_progress": "A sync is already in progress",

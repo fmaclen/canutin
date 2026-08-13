@@ -130,6 +130,7 @@
 		}
 
 		isSaving = true;
+		const loadingToast = toast.loading(m.accounts_link_confirming());
 		try {
 			for (const account of plaidAccounts) {
 				if (completedPlaidAccountIds.has(account.plaidAccountId)) continue;
@@ -176,6 +177,8 @@
 			logError('plaidLink', 'save_matches', error);
 			toast.error(m.accounts_link_save_failed());
 			isSaving = false;
+		} finally {
+			toast.dismiss(loadingToast);
 		}
 	}
 </script>
@@ -318,7 +321,7 @@
 									{m.accounts_link_cancel()}
 								</Button>
 								<Button type="submit" disabled={isSaving}>
-									{isSaving ? m.accounts_link_confirming() : m.accounts_link_confirm()}
+									{m.accounts_link_confirm()}
 								</Button>
 							</div>
 						</footer>

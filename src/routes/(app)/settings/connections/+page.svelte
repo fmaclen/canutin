@@ -110,6 +110,7 @@
 	async function handleSync(connectionId: string) {
 		if (syncingConnectionId) return;
 		syncingConnectionId = connectionId;
+		const loadingToast = toast.loading(m.settings_connections_syncing());
 
 		try {
 			const result = await pb.authedClient.send<SyncResponse>(
@@ -147,6 +148,7 @@
 				toast.error(m.settings_connections_sync_failed());
 			}
 		} finally {
+			toast.dismiss(loadingToast);
 			syncingConnectionId = null;
 		}
 	}
@@ -263,9 +265,7 @@
 											disabled={isBusy}
 											onclick={() => handleSync(connection.id)}
 										>
-											{syncingConnectionId === connection.id
-												? m.settings_connections_sync_button_pending()
-												: m.settings_connections_sync_button()}
+											{m.settings_connections_sync_button()}
 										</Button>
 									{/if}
 									<AlertDialog.Root>
