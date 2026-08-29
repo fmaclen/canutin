@@ -9,6 +9,9 @@ declare global {
 		// interface Platform {}
 	}
 
+	// Injected by Vite's `define` at build time from package.json or APP_VERSION.
+	const __APP_VERSION__: string;
+
 	type PlaidHandler = {
 		open: () => void;
 		destroy: () => void;

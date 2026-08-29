@@ -57,10 +57,9 @@ Each skill lives at `.agents/skills/<slug>/SKILL.md`. Read the ones that match t
 
 ### Authoring
 
-| Synopsis                                                                       | Slug          |
-| ------------------------------------------------------------------------------ | ------------- |
-| How to write GitHub issues that describe the problem, not the solution         | issue-writing |
-| Where to put working notes, plans, and research so they don't pollute the repo | working-notes |
+| Synopsis                                                               | Slug          |
+| ---------------------------------------------------------------------- | ------------- |
+| How to write GitHub issues that describe the problem, not the solution | issue-writing |
 
 ## Checks
 

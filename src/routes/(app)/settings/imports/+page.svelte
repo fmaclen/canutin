@@ -64,7 +64,7 @@
 				<Label for="agent-access-url" class="justify-start pr-0 md:justify-end"
 					>{m.settings_agent_access_url_label()}</Label
 				>
-				<Input id="agent-access-url" readonly value={agentAccessUrl} class="bg-background" />
+				<Input id="agent-access-url" readonly value={agentAccessUrl} />
 			</FormFieldRow>
 		</Fieldset>
 	</div>

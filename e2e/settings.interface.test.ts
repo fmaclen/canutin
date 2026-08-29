@@ -90,6 +90,8 @@ test('settings exposes default currency without the old exchange-rate toggle', a
 	await expect(page.getByText('Interface')).toBeVisible();
 	await expect(page.getByLabel('Default currency')).toContainText('USD');
 	await expect(page.getByText('Exchange rates', { exact: true })).toHaveCount(0);
+	await expect(page.getByText('About', { exact: true })).toBeVisible();
+	await expect(page.getByLabel('Version')).toHaveValue(/^v\d+\.\d+\.\d+/);
 });
 
 test('settings switches display currency only after clicking Save and persists after reload', async ({
