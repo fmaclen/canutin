@@ -36,6 +36,7 @@ src/lib/paraglide
 # Temporary files
 /temp
 SCRATCHPAD.md
+/.playwright-mcp/
 
 # Local coding agent package manager noise
 .agents/package.json
