@@ -1,5 +1,5 @@
 {
-	"name": "canutin-next",
+	"name": "canutin",
 	"version": "2.0.0",
 	"devDependencies": {
 		"@canutin/svelte-currency-input": "^1.1.1",
