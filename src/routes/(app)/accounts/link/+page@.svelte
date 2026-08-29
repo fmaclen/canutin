@@ -156,4 +156,4 @@
 	<title>{getPageTitle(m.accounts_link_page_title())}</title>
 </svelte:head>
 
-<SplashScreen linked={false} />
+<SplashScreen spinner={false} />

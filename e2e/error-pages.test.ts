@@ -20,8 +20,9 @@ test('displays error 404 page when visiting non-existent route', async ({ page }
 	// Explicit purpose of this test is direct-URL 404 behavior for a route the UI never links to
 	await page.goto('/this-route-does-not-exist');
 	await expect(page).toHaveURL('/this-route-does-not-exist');
-	await expect(page.getByText('Error 404')).toBeVisible();
-	await expect(page.getByText('Not Found')).toBeVisible();
+	await expect(page.getByText('404', { exact: true })).toBeVisible();
+	await expect(page.getByText("There's nothing at this address")).toBeVisible();
+	await expect(page.getByRole('link', { name: 'go back' })).toBeVisible();
 });
 
 test('displays error 500 page when server error occurs', async ({ page }) => {
@@ -32,12 +33,12 @@ test('displays error 500 page when server error occurs', async ({ page }) => {
 
 	await signIn(page, user.email);
 	await expect(page).toHaveURL('/big-picture');
-	await expect(page.getByText('Error 500')).not.toBeVisible();
+	await expect(page.getByText('500', { exact: true })).not.toBeVisible();
 
 	// Explicit purpose of this test is direct-URL 500 behavior; the dev-only error route
 	// has no UI link
 	await page.goto('/dev/error-500');
 	await expect(page).toHaveURL('/dev/error-500');
-	await expect(page.getByText('Error 500')).toBeVisible();
+	await expect(page.getByText('500', { exact: true })).toBeVisible();
 	await expect(page.getByText('Test server error for playwright')).toBeVisible();
 });
