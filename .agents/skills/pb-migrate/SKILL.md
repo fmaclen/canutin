@@ -1,0 +1,122 @@
+---
+name: pb-migrate
+description: Create or modify PocketBase collections programmatically via the collections API, generating JS migration files automatically. Use this skill when the user asks to create collections, add fields, or change API rules on PocketBase.
+---
+
+Generate PocketBase schema changes programmatically through the live collections API. The running PocketBase server has `Automigrate: true` with `TemplateLangJS`, so every collection create/update/delete request automatically writes a `.js` migration file to `pocketbase/pb_migrations/`.
+
+## Prerequisites
+
+- PocketBase running on this checkout's port — each checkout has its own, so read it from the generated `.env` rather than assuming the default (see [local-servers](../local-servers/SKILL.md))
+- Superadmin credentials (dev defaults are in the [pocketbase skill](../pocketbase/SKILL.md))
+
+Every example below reaches PocketBase through `$PUBLIC_PB_URL`, so export the checkout's `.env` first:
+
+```bash
+set -a; source .env; set +a
+```
+
+## How It Works
+
+1. Authenticate as superuser and keep the token
+2. Send the schema change to `/api/collections` with that token
+3. PocketBase writes a `.js` migration file to `pocketbase/pb_migrations/` for the change
+
+The key insight: the `migratecmd` plugin in `pocketbase/main.go` writes JS migrations (not Go) via `TemplateLangJS`, and the automigrate hooks fire on the collection **request** endpoints. Any HTTP client will do — what matters is that the change travels over `/api/collections`, because a schema edit made any other way generates no migration file.
+
+## Authentication
+
+```bash
+TOKEN=$(curl -s "$PUBLIC_PB_URL/api/collections/_superusers/auth-with-password" \
+  -H 'Content-Type: application/json' \
+  -d '{"identity":"superadmin@example.com","password":"123qweasdzxc"}' \
+  | python3 -c 'import sys,json; print(json.load(sys.stdin)["token"])')
+```
+
+Every request below sends that token as `Authorization: Bearer $TOKEN`.
+
+## Inspecting the Live Schema
+
+Collection endpoints accept a collection name or ID, but relation fields need the target's ID. List the live schema to find one:
+
+```bash
+curl -s "$PUBLIC_PB_URL/api/collections?perPage=200" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+## Creating a New Collection
+
+`POST /api/collections` with the full collection payload.
+
+```bash
+curl -s "$PUBLIC_PB_URL/api/collections" \
+  -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "myCollection",
+    "type": "base",
+    "listRule": "owner = @request.auth.id",
+    "viewRule": "owner = @request.auth.id",
+    "createRule": "owner = @request.auth.id",
+    "updateRule": "owner = @request.auth.id",
+    "deleteRule": "owner = @request.auth.id",
+    "fields": [
+      {
+        "name": "myRelation",
+        "type": "relation",
+        "collectionId": "<target_collection_id>",
+        "required": true,
+        "minSelect": 0,
+        "maxSelect": 1,
+        "cascadeDelete": true
+      },
+      { "name": "myText", "type": "text", "required": true, "min": 0, "max": 0, "pattern": "" },
+      {
+        "name": "mySelect",
+        "type": "select",
+        "required": true,
+        "maxSelect": 1,
+        "values": ["OPTION_A", "OPTION_B"]
+      },
+      { "name": "myBool", "type": "bool", "required": false }
+    ],
+    "indexes": ["CREATE UNIQUE INDEX idx_name ON myCollection (field1, field2)"]
+  }'
+```
+
+## Updating an Existing Collection (e.g. Rule Changes)
+
+`PATCH /api/collections/<name_or_id>` with only the properties you want to change.
+
+```bash
+curl -s "$PUBLIC_PB_URL/api/collections/myCollection" \
+  -X PATCH \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "listRule": "owner = @request.auth.id",
+    "viewRule": "owner = @request.auth.id"
+  }'
+```
+
+Adding or changing a field is the same call with a `fields` array — but that array replaces the collection's entire field set, and PocketBase reconciles it against the live schema by field `id`, not by name. Fetch the collection first and send its existing fields back with their real `id`s alongside the new one.
+
+A field sent without an `id` gets a deterministic one built from its type and a checksum of its name, so re-sending an unchanged field lands back on the original `id` and keeps its data. Change the name or the type and the `id` changes with it: PocketBase drops the old column and creates an empty one, which is how a rename written from memory silently empties a column. Carrying the real `id` is what makes a rename a rename.
+
+Nothing here fails loudly. Fields left out of the array are deleted without warning, and omitted system fields are silently re-added rather than rejected, so there is no error to catch — only the field `id`s protect you.
+
+## Verification
+
+After each request:
+
+1. The response is `200` and echoes back the collection
+2. A new `.js` file appeared in `pocketbase/pb_migrations/`
+3. `src/lib/pocketbase.schema.ts` picked up the change — the running server regenerates it whenever a migration file lands
+
+## Important
+
+- **Never** hand-write a schema migration. Schema changes go over `/api/collections` so PocketBase generates the file. Hand-written migrations are for data repairs only — `pocketbase/pb_migrations/1783785600_repair_currency_rollout.js` backfills currency rows and touches no schema.
+- **Never** use the raw `app.Save()` Go API or direct DB writes for schema. They bypass the automigrate hooks, so no migration file is written and the change never reaches other environments.
+- `pocketbase migrate collections` writes a full schema snapshot rather than an incremental diff — it is not a substitute for the HTTP path.
+- If PocketBase was restarted after a `main.go` change, the binary must be recompiled first (the `bun run pb` script handles this).

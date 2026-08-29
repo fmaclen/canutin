@@ -1,0 +1,62 @@
+---
+name: code-quality
+description: "Code rules the linter doesn't catch: types, comments, structure, UI text"
+---
+
+# Code Quality
+
+## Skill rules outrank neighbors
+
+This skill - and every convention skill in your bundle - takes precedence over patterns in existing code. Legacy violations are not permission to add new ones; they are signal that the area is owed a cleanup pass. Do not infer conventions by skimming nearby files. Read the skill, then write.
+
+When a touched file already contains an instance of the rule you are now applying, delete that instance in the same diff. Same logic as the "delete dead code adjacent to what you're touching" rule below, applied to convention drift instead of dead code. Compatibility shims and `// keep for now` exemptions require a documented reason the user has agreed to.
+
+## Types
+
+- No `any` - use `unknown` or a proper type
+- No explicit return types - let TypeScript infer. Exceptions: class getters and places where a framework requires an explicit signature
+- No `@ts-ignore` - fix the underlying issue
+- No disabling lint rules - fix the code instead. Exception: `svelte/no-navigation-without-resolve` for dynamic URLs (see [svelte5](../svelte5/SKILL.md#navigation))
+- Prefer type guards (functions returning `x is T`) over `as` assertions - `as` silences the compiler without proving anything
+
+## Comments
+
+- Comments are notes to the repo's future readers - humans and agents alike. Write them as if the change that produced them never happened
+- Add short comments on complex or non-obvious logic describing its intent. Tests especially: step comments that walk the reader through what each phase of a test does and why are welcome - they make test intent scannable
+- Never write session narration - comments that only make sense in the context of the change or conversation that produced them ("removed the old handler", "now uses X", "as requested"). If a comment describes the diff rather than the code, it belongs in the PR, not the repo
+- Deleting an existing comment needs a stronger reason than adding one: only delete it when it is wrong, stale, or references a past editing session. "It restates the code" is not reason enough - what reads as obvious to the author is often the fastest path into the test for the next reader
+- No prefix required - a plain comment is a note by default. Two flags remain useful when they apply: `HACK:` for deliberate workarounds or temporary compromises, `TODO:` for intentionally deferred follow-up work
+- Keep pragma/framework comments in their required syntax when tooling depends on them
+- Update or delete stale comments when the code changes; a comment's usefulness to a future reader is the only test for keeping it
+
+## Structure
+
+- Every named function or variable is indirection - a jump the reader must make or a name they must hold in memory. Pay that cost only when it removes real duplication, or, for variables, when the name conveys information the expression does not
+- Extract a function only when the same logic already appears in 3+ places, or in 2 places where the duplication is multi-line or carries subtle conditions that are easy to get wrong if copied
+- A function called from exactly one place is never the right answer - inline it. The alternative is a longer top-to-bottom procedural function, and that's fine
+- Anticipated future duplication does not count - wait for the duplication to exist
+- YAGNI - never add functionality, parameters, exports, or configuration for a speculative future use case. Wait for the use case to exist
+- Never leave old code behind for backwards compatibility - delete what's being replaced. Compatibility shims, deprecated wrappers, and "just in case" code paths are speculation about the past in the same way YAGNI is speculation about the future. If a real caller breaks, that's a signal, not a regression
+- Avoid wrapper layers - re-exports, aliases, thin adapter modules, delegation. Callers should reference the receiver directly
+- Prefer a larger refactor that simplifies several things at once over a surgical change threaded through complexity that should be removed. Before starting, zoom out and consider whether the change should be bigger
+- Name an intermediate value only when the name conveys information the expression does not; a `const` assigned and consumed on the following line is noise
+- Don't abbreviate names unless the abbreviation is broadly known
+- No default parameter values - function arguments should be required. Only add a fallback (`= value`) when there is a clear, justified reason
+- Always delete dead code and useless comments adjacent to what you're touching, even when they fall outside the current change - unused imports, variables, functions, unreachable paths, stale narration. Deletions are cheap to review and easy to revert, and unchecked rot compounds
+
+## UI Text
+
+- Sentence case (except acronyms and proper names)
+- No trailing periods in single-sentence UI text - labels, buttons, headings, tooltips, descriptions, toasts
+- No ellipsis (`...` or `…`) to indicate loading or progress - use a spinner component or `toast.loading()`. Write "Creating account", not "Creating account..."
+
+## Libraries
+
+- Use project dependencies - don't reimplement what they provide
+- Use `date-fns` for date/time math: comparisons, ranges, calendar boundaries
+- Avoid manual millisecond arithmetic for calendar boundaries - it breaks on timezone, DST, and month-boundary edges
+
+## Dependencies
+
+- All packages go in `devDependencies` - this project has no `dependencies` section
+- Use `bun add -d` to add, `bun install` to install - never npm

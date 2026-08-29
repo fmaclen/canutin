@@ -1,32 +1,48 @@
-FROM node:20-slim
+FROM golang:1.25-alpine AS go-builder
 
-# Install OpenSSL for Prisma
-RUN apt-get update -y && apt-get install -y openssl
+WORKDIR /pocketbase
 
-WORKDIR /canutin
+COPY pocketbase/go.mod pocketbase/go.sum ./
+RUN go mod download
 
-ENV HOST "0.0.0.0"
-ENV PORT "42069"
-ENV SHOULD_CHECK_VAULT "true"
-ENV DATABASE_URL "file:../vaults/Canutin.vault"
+COPY pocketbase/*.go ./
+RUN CGO_ENABLED=0 go build -o pocketbase-custom .
 
-COPY /sveltekit/package.json .
-COPY /sveltekit/package-lock.json .
-COPY /sveltekit/build .
-COPY /sveltekit/prisma ./prisma
-COPY /scripts/docker-entrypoint.sh .
+FROM oven/bun:1 AS builder
 
-# Installing production dependencies
-RUN npm ci --omit=dev
+WORKDIR /app
 
-# Generating Prisma's artifacts
-RUN npx prisma generate
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
 
-# Creating vaults directory
-RUN mkdir vaults
+COPY . .
+ARG APP_VERSION
+ENV APP_VERSION=$APP_VERSION
+ENV DOCKER_BUILD=true
+RUN bun run build
 
-# Setting the entrypoint script as executable
-RUN chmod +x docker-entrypoint.sh
+FROM node:22-slim
 
-# Start the server
-ENTRYPOINT ["/bin/sh", "docker-entrypoint.sh"]
+LABEL org.opencontainers.image.source=https://github.com/fmaclen/canutin
+LABEL org.opencontainers.image.description="Personal finance app"
+LABEL org.opencontainers.image.licenses=Apache-2.0
+
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends ca-certificates \
+	&& rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=builder /app/build ./build
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/pocketbase/pb_migrations ./pocketbase/pb_migrations
+COPY --from=go-builder /pocketbase/pocketbase-custom ./pocketbase/pocketbase-custom
+
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV PORT=42069
+
+EXPOSE 42069
+EXPOSE 42070
+
+CMD ["node", "build/index.js"]

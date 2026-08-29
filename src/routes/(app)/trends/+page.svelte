@@ -1,0 +1,582 @@
+<script lang="ts">
+	import { UTCDate } from '@date-fns/utc';
+	import { startOfDay } from 'date-fns';
+	import { untrack } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
+
+	import { getAccountsContext } from '$lib/accounts.svelte';
+	import { getAssetsContext } from '$lib/assets.svelte';
+	import { type TrendSecurityBalance } from '$lib/balance-series';
+	import { formatCurrency } from '$lib/components/currency';
+	import Page from '$lib/components/page.svelte';
+	import {
+		computeBoundedHistoryStart,
+		slicePeriodRows,
+		type PeriodKey
+	} from '$lib/components/period-tabs.svelte';
+	import SectionTitle from '$lib/components/section-title.svelte';
+	import Section from '$lib/components/section.svelte';
+	import TimeSeriesChart from '$lib/components/time-series-chart.svelte';
+	import { logError } from '$lib/logger';
+	import { m } from '$lib/paraglide/messages';
+	import type {
+		AccountBalancesResponse,
+		AccountsResponse,
+		AssetBalancesResponse,
+		AssetsResponse,
+		SecurityBalancesResponse
+	} from '$lib/pocketbase.schema';
+	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+	import { Debouncer, RequestSequence } from '$lib/realtime-sync';
+	import { getSecuritiesContext } from '$lib/securities.svelte';
+	import { projectSignedValue } from '$lib/sharing';
+	import { toNumber } from '$lib/utils';
+
+	import ChartNetWorth from './growth.svelte';
+	import Performance from './performance.svelte';
+	import {
+		buildPreparedMaps,
+		findEarliestBalanceDate,
+		type TrendMemberRow,
+		type TrendMemberSeries
+	} from './trends';
+
+	const pb = getPocketBaseContext();
+	const accountsCtx = getAccountsContext();
+	const assetsCtx = getAssetsContext();
+	const securitiesCtx = getSecuritiesContext();
+
+	let bootstrapped = $state(false);
+	const isLoading = $derived(!bootstrapped);
+
+	// Raw state: the balance collections and derived series are large (thousands of rows),
+	// always replaced wholesale, and never mutated in place - deep proxies would only add
+	// per-property traps to the recompute loops and charts that read them.
+	let memberSeries: TrendMemberSeries = $state.raw({ members: [], rows: [] });
+	let rawAccounts: AccountsResponse[] = $state.raw([]);
+	let rawAssets: AssetsResponse[] = $state.raw([]);
+	let rawAccountBalances: AccountBalancesResponse[] = $state.raw([]);
+	let rawSecurityBalances: TrendSecurityBalance[] = $state.raw([]);
+	let rawAssetBalances: AssetBalancesResponse[] = $state.raw([]);
+	let rawFullHistoryAccountBalances: AccountBalancesResponse[] = $state.raw([]);
+	let rawFullHistorySecurityBalances: TrendSecurityBalance[] = $state.raw([]);
+	let rawFullHistoryAssetBalances: AssetBalancesResponse[] = $state.raw([]);
+
+	const includedAccounts = $derived.by(
+		() =>
+			new Map(
+				(accountsCtx?.accounts ?? [])
+					.filter((account) => !account.participantExcluded)
+					.map((account) => [account.id, account] as const)
+			)
+	);
+	const includedAssets = $derived.by(
+		() =>
+			new Map(
+				(assetsCtx?.assets ?? [])
+					.filter((asset) => !asset.participantExcluded)
+					.map((asset) => [asset.id, asset] as const)
+			)
+	);
+	const includedSignature = $derived.by(() =>
+		JSON.stringify({
+			accounts: (accountsCtx?.accounts ?? []).map((account) => [
+				account.id,
+				account.participantExcluded,
+				account.perspective,
+				account.closed,
+				account.balanceGroup,
+				account.name,
+				account.currency
+			]),
+			assets: (assetsCtx?.assets ?? []).map((asset) => [
+				asset.id,
+				asset.participantExcluded,
+				asset.perspective,
+				asset.sold,
+				asset.balanceGroup,
+				asset.name,
+				asset.currency
+			])
+		})
+	);
+	const prepared = $derived.by(() =>
+		buildPreparedMaps(
+			rawAccounts,
+			rawAssets,
+			securitiesCtx?.securities ?? [],
+			rawAccountBalances,
+			rawSecurityBalances,
+			rawAssetBalances
+		)
+	);
+	const fullHistoryPrepared = $derived.by(() =>
+		buildPreparedMaps(
+			rawAccounts,
+			rawAssets,
+			securitiesCtx?.securities ?? [],
+			rawFullHistoryAccountBalances,
+			rawFullHistorySecurityBalances,
+			rawFullHistoryAssetBalances
+		)
+	);
+
+	function isDefined<T>(value: T | null | undefined): value is T {
+		return value !== null && value !== undefined;
+	}
+
+	function quoteFilterValue(value: string) {
+		return value.replaceAll("'", "\\'");
+	}
+
+	function filterByIds(field: string, ids: string[]) {
+		return ids.map((id) => `${field}='${quoteFilterValue(id)}'`).join(' || ');
+	}
+
+	function historyFilter(idsFilter: string, start: Date) {
+		if (!idsFilter) return '';
+		return `(${idsFilter}) && asOf>='${start.toISOString()}'`;
+	}
+
+	function compareBalances<T extends { asOf: string; created: string; id: string }>(a: T, b: T) {
+		if (a.asOf !== b.asOf) return a.asOf.localeCompare(b.asOf);
+		if (a.created !== b.created) return a.created.localeCompare(b.created);
+		return a.id.localeCompare(b.id);
+	}
+
+	function trimBalances<T extends { asOf: string; created: string; id: string }>(
+		records: T[],
+		start: Date | null,
+		carryKey: (record: T) => string
+	) {
+		if (!start) return records.toSorted(compareBalances);
+		const previousByKey = new SvelteMap<string, T>();
+		const inRange: T[] = [];
+		for (const record of records) {
+			if (new Date(record.asOf) >= start) {
+				inRange.push(record);
+				continue;
+			}
+			const key = carryKey(record);
+			const previous = previousByKey.get(key);
+			if (!previous || compareBalances(previous, record) < 0) previousByKey.set(key, record);
+		}
+		return [...previousByKey.values(), ...inRange].toSorted(compareBalances);
+	}
+
+	function projectAccountBalance(balance: AccountBalancesResponse) {
+		const account = includedAccounts.get(balance.account);
+		if (!account) return null;
+		return {
+			...balance,
+			value:
+				account.closed && new Date(balance.asOf) >= new Date(account.closed)
+					? 0
+					: projectSignedValue(balance.value, account.perspective)
+		};
+	}
+
+	function projectSecurityBalance(
+		balance: SecurityBalancesResponse<number, number, number, number>
+	) {
+		const account = includedAccounts.get(balance.account);
+		if (!account) return null;
+		const value = toNumber(balance.value);
+		return {
+			id: balance.id,
+			account: balance.account,
+			security: balance.security,
+			created: balance.created,
+			asOf: balance.asOf,
+			value:
+				account.closed && new Date(balance.asOf) >= new Date(account.closed)
+					? 0
+					: value === null
+						? null
+						: projectSignedValue(value, account.perspective),
+			quantity:
+				account.closed && new Date(balance.asOf) >= new Date(account.closed) ? 0 : balance.quantity
+		};
+	}
+
+	function projectAssetBalance(balance: AssetBalancesResponse) {
+		const asset = includedAssets.get(balance.asset);
+		if (!asset) return null;
+		return {
+			...balance,
+			marketValue:
+				asset.sold && new Date(balance.asOf) >= new Date(asset.sold)
+					? 0
+					: projectSignedValue(balance.marketValue, asset.perspective)
+		};
+	}
+
+	async function listAccountBalances(filter: string) {
+		if (!filter) return [];
+		return pb.authedClient.collection('accountBalances').getFullList<AccountBalancesResponse>({
+			sort: 'asOf,created,id',
+			filter,
+			fields: 'id,account,value,asOf,created',
+			requestKey: null
+		});
+	}
+
+	async function listSecurityBalances(filter: string) {
+		if (!filter) return [];
+		return pb.authedClient
+			.collection('securityBalances')
+			.getFullList<SecurityBalancesResponse<number, number, number, number>>({
+				sort: 'asOf,created,id',
+				filter,
+				fields: 'id,account,security,value,quantity,asOf,created',
+				requestKey: null
+			});
+	}
+
+	async function listAssetBalances(filter: string) {
+		if (!filter) return [];
+		return pb.authedClient.collection('assetBalances').getFullList<AssetBalancesResponse>({
+			sort: 'asOf,created,id',
+			filter,
+			fields: 'id,asset,marketValue,asOf,created',
+			requestKey: null
+		});
+	}
+
+	const sequence = new RequestSequence();
+	const debouncer = new Debouncer(200);
+	let disposed = false;
+	let lastIncludedSignature = '';
+
+	async function refresh() {
+		if (disposed) return;
+		const token = sequence.next();
+		try {
+			const start = computeBoundedHistoryStart('5y');
+			if (!start) return;
+			// Snapshot the signature this refresh reflects; the signature effect treats any later
+			// divergence - including one committed while this refresh is in flight - as a change.
+			lastIncludedSignature = includedSignature;
+			const accountIds = Array.from(includedAccounts.keys());
+			const assetIds = Array.from(includedAssets.keys());
+			const accountFilter = filterByIds('account', accountIds);
+			const assetFilter = filterByIds('asset', assetIds);
+			const accountHistoryFilter = historyFilter(accountFilter, start);
+			const assetHistoryFilter = historyFilter(assetFilter, start);
+			try {
+				const [
+					accountBalancesRange,
+					securityBalancesRangeRaw,
+					assetBalancesRange,
+					accountBalancesFullHistory,
+					securityBalancesFullHistoryRaw,
+					assetBalancesFullHistory
+				] = await Promise.all([
+					listAccountBalances(accountHistoryFilter),
+					listSecurityBalances(accountHistoryFilter),
+					listAssetBalances(assetHistoryFilter),
+					listAccountBalances(accountFilter),
+					listSecurityBalances(accountFilter),
+					listAssetBalances(assetFilter)
+				]);
+
+				const securityBalancesRange = securityBalancesRangeRaw
+					.map(projectSecurityBalance)
+					.filter(isDefined);
+				const securityBalancesFullHistory = securityBalancesFullHistoryRaw
+					.map(projectSecurityBalance)
+					.filter(isDefined);
+				const [accountBalancesPrevious, securityBalancesPrevious, assetBalancesPrevious] =
+					await Promise.all([
+						Promise.all(
+							accountIds.map(async (accountId) => {
+								const result = await pb.authedClient
+									.collection('accountBalances')
+									.getList<AccountBalancesResponse>(1, 1, {
+										filter: `account='${quoteFilterValue(accountId)}' && asOf<'${start.toISOString()}'`,
+										sort: '-asOf,-created,-id',
+										fields: 'id,account,value,asOf,created',
+										requestKey: null
+									});
+								return result.items[0] ?? null;
+							})
+						),
+						(async () => {
+							if (!accountFilter) return [];
+							const balances = await pb.authedClient
+								.collection('securityBalances')
+								.getFullList<SecurityBalancesResponse<number, number, number, number>>({
+									filter: `(${accountFilter}) && asOf<'${start.toISOString()}'`,
+									sort: 'account,security,asOf,created,id',
+									fields: 'id,account,security,value,quantity,asOf,created',
+									requestKey: null
+								});
+
+							const latestByKey = new SvelteMap<
+								string,
+								{
+									balance: SecurityBalancesResponse<number, number, number, number>;
+									lastKnownValue: number | null;
+									soldOut: boolean;
+								}
+							>();
+							for (const balance of balances) {
+								const key = `${balance.account}:${balance.security}`;
+								const existing = latestByKey.get(key) ?? {
+									balance,
+									lastKnownValue: null,
+									soldOut: false
+								};
+								if (toNumber(balance.quantity) === 0) {
+									existing.lastKnownValue = 0;
+									existing.soldOut = true;
+								} else {
+									const value = toNumber(balance.value);
+									if (value !== null) {
+										existing.lastKnownValue = value;
+										existing.soldOut = false;
+									}
+								}
+								existing.balance = balance;
+								latestByKey.set(key, existing);
+							}
+							return Array.from(latestByKey.values()).map(
+								({ balance, lastKnownValue, soldOut }) => ({
+									...balance,
+									value: soldOut ? balance.value : lastKnownValue
+								})
+							);
+						})(),
+						Promise.all(
+							assetIds.map(async (assetId) => {
+								const result = await pb.authedClient
+									.collection('assetBalances')
+									.getList<AssetBalancesResponse>(1, 1, {
+										filter: `asset='${quoteFilterValue(assetId)}' && asOf<'${start.toISOString()}'`,
+										sort: '-asOf,-created,-id',
+										fields: 'id,asset,marketValue,asOf,created',
+										requestKey: null
+									});
+								return result.items[0] ?? null;
+							})
+						)
+					]);
+
+				if (disposed || !sequence.isCurrent(token)) return;
+
+				const accountBalances = trimBalances(
+					[...accountBalancesPrevious, ...accountBalancesRange]
+						.map((balance) => (balance ? projectAccountBalance(balance) : null))
+						.filter(isDefined),
+					start,
+					(balance) => balance.account
+				);
+				const securityBalances = trimBalances(
+					[
+						...securityBalancesPrevious
+							.map((balance) => (balance ? projectSecurityBalance(balance) : null))
+							.filter(isDefined),
+						...securityBalancesRange
+					],
+					start,
+					(balance) => `${balance.account}:${balance.security}`
+				);
+				const assetBalances = trimBalances(
+					[...assetBalancesPrevious, ...assetBalancesRange]
+						.map((balance) => (balance ? projectAssetBalance(balance) : null))
+						.filter(isDefined),
+					start,
+					(balance) => balance.asset
+				);
+				rawAccounts = Array.from(includedAccounts.values());
+				rawAssets = Array.from(includedAssets.values());
+				rawAccountBalances = accountBalances;
+				rawSecurityBalances = securityBalances;
+				rawAssetBalances = assetBalances;
+				rawFullHistoryAccountBalances = trimBalances(
+					accountBalancesFullHistory.map(projectAccountBalance).filter(isDefined),
+					null,
+					(balance) => balance.account
+				);
+				rawFullHistorySecurityBalances = trimBalances(
+					securityBalancesFullHistory,
+					null,
+					(balance) => `${balance.account}:${balance.security}`
+				);
+				rawFullHistoryAssetBalances = trimBalances(
+					assetBalancesFullHistory.map(projectAssetBalance).filter(isDefined),
+					null,
+					(balance) => balance.asset
+				);
+			} catch (error) {
+				if (!disposed && sequence.isCurrent(token))
+					pb.handleConnectionError(error, 'trends', 'refresh_balances');
+			}
+		} finally {
+			if (!disposed && sequence.isCurrent(token)) bootstrapped = true;
+		}
+	}
+
+	function invalidate() {
+		if (disposed) return;
+		sequence.bump();
+		debouncer.schedule(() => void refresh());
+	}
+
+	$effect(() => {
+		const unsubscribes: Array<() => void> = [];
+		pb.registerRealtimeReconnect(invalidate);
+		function addSubscription(subscription: Promise<() => void>) {
+			subscription
+				.then((unsubscribe) => {
+					if (disposed) {
+						unsubscribe();
+						return;
+					}
+					unsubscribes.push(unsubscribe);
+				})
+				.catch((error) => {
+					if (disposed) logError('trends', 'stale_subscription', error);
+					else pb.handleSubscriptionError(error, 'trends', 'subscribe_balances');
+				});
+		}
+
+		addSubscription(pb.authedClient.collection('accountBalances').subscribe('*', invalidate));
+		addSubscription(pb.authedClient.collection('securityBalances').subscribe('*', invalidate));
+		addSubscription(pb.authedClient.collection('assetBalances').subscribe('*', invalidate));
+
+		return () => {
+			disposed = true;
+			sequence.bump();
+			debouncer.cancel();
+			pb.unregisterRealtimeReconnect(invalidate);
+			for (const unsubscribe of unsubscribes) unsubscribe();
+		};
+	});
+
+	// Defer the bootstrap refresh until the accounts and assets contexts have finished their
+	// initial load - refreshing earlier would query with empty inclusion maps and resolve to a
+	// false empty state before the contexts ever land.
+	$effect(() => {
+		if (bootstrapped) return;
+		if (accountsCtx?.isLoading || assetsCtx?.isLoading) return;
+		untrack(() => {
+			void refresh();
+		});
+	});
+
+	$effect(() => {
+		const signature = includedSignature;
+		if (signature === lastIncludedSignature) return;
+		const refreshStarted = sequence.current > 0;
+		lastIncludedSignature = signature;
+		if (!bootstrapped && !refreshStarted) return;
+		invalidate();
+	});
+
+	const isEmpty = $derived(!rawAccounts.length && !rawAssets.length);
+	// NOTE: reference the raw tokens (--cash, not --color-cash): ChartStyle re-emits each config
+	// color as --color-<key> per chart, so var(--color-cash) would be a circular reference.
+	const groupCharts = [
+		{ key: 'cash', label: m.trends_series_cash_label(), color: 'var(--cash)' },
+		{ key: 'debt', label: m.trends_series_debt_label(), color: 'var(--debt)' },
+		{ key: 'investment', label: m.trends_series_investment_label(), color: 'var(--investment)' },
+		{ key: 'other', label: m.trends_series_other_label(), color: 'var(--other-assets)' }
+	] as const;
+	const membersByGroup = $derived(
+		Map.groupBy(
+			memberSeries.members.toSorted((a, b) => a.label.localeCompare(b.label)),
+			(member) => member.group
+		)
+	);
+	// Shades of the group color, stepping toward the background so the chart reads as its group
+	function memberColor(color: string, index: number, count: number) {
+		return `color-mix(in oklab, ${color}, var(--background) ${Math.round((index * 60) / count)}%)`;
+	}
+	const groupPeriods = $state<Record<(typeof groupCharts)[number]['key'], PeriodKey>>({
+		cash: '1y',
+		debt: '1y',
+		investment: '1y',
+		other: '1y'
+	});
+	// Anchors every chart's MAX window at the earliest balance instead of the base range start,
+	// so MAX never pads a zero lead-in when history is shorter than five years
+	const maxStartTime = $derived.by(() => {
+		const earliest = findEarliestBalanceDate(
+			rawFullHistoryAccountBalances,
+			rawFullHistorySecurityBalances,
+			rawFullHistoryAssetBalances
+		);
+		return earliest ? startOfDay(new UTCDate(earliest.getTime())).getTime() : null;
+	});
+	const maxStart = $derived(maxStartTime === null ? null : new UTCDate(maxStartTime));
+</script>
+
+<Page pageTitle={m.trends_page_title()}>
+	<Section>
+		<ChartNetWorth
+			{maxStart}
+			bind:memberSeries
+			{isLoading}
+			prepared={fullHistoryPrepared}
+			{rawAccounts}
+			{rawAssets}
+		/>
+	</Section>
+
+	<Section>
+		<SectionTitle title={m.trends_performance_section_title()} />
+		<Performance
+			{isLoading}
+			{prepared}
+			{fullHistoryPrepared}
+			{rawAccounts}
+			{rawAssets}
+			{rawFullHistoryAccountBalances}
+			{rawFullHistorySecurityBalances}
+			{rawFullHistoryAssetBalances}
+		/>
+	</Section>
+
+	{#if isLoading || !isEmpty}
+		<div class="grid grid-cols-1 gap-8 xl:grid-cols-2">
+			{#each groupCharts as group (group.key)}
+				{@const members = membersByGroup.get(group.key) ?? []}
+				{#if isLoading || members.length}
+					<Section>
+						<!-- The window is sliced here as well as inside the chart so members with no
+						data in the chosen period drop out of the series entirely (null means "no
+						data in this window", not a contributed zero) -->
+						{@const windowedRows = slicePeriodRows(
+							memberSeries.rows,
+							groupPeriods[group.key],
+							maxStart
+						)}
+						{@const windowedMembers = members.filter((member) =>
+							windowedRows.some((row) => row.values[member.key] !== null)
+						)}
+						<TimeSeriesChart
+							title={group.label}
+							{isLoading}
+							rows={memberSeries.rows}
+							bind:period={groupPeriods[group.key]}
+							{maxStart}
+							series={windowedMembers.map((member, index) => ({
+								key: member.key,
+								label: member.label,
+								color: memberColor(group.color, index, windowedMembers.length),
+								value: (row: TrendMemberRow) => row.values[member.key] ?? 0,
+								isLiability: group.key === 'debt'
+							}))}
+							emptyMessage={m.trends_empty()}
+							formatAxisValue={(value) => formatCurrency(Math.round(value))}
+							formatTooltipValue={(value) => formatCurrency(value)}
+							showLegend
+							data-group-chart={group.key}
+						/>
+					</Section>
+				{/if}
+			{/each}
+		</div>
+	{/if}
+</Page>

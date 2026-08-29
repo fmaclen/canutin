@@ -1,0 +1,21 @@
+name: Verify
+
+on:
+  pull_request:
+
+jobs:
+  verify:
+    name: Run verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Verify
+        run: bun run verify

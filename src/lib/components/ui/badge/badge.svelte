@@ -1,0 +1,58 @@
+<script lang="ts" module>
+	import { tv, type VariantProps } from 'tailwind-variants';
+
+	export const badgeVariants = tv({
+		base: 'focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden whitespace-nowrap rounded border px-2 py-0.5 text-xs font-medium transition-[color,box-shadow] focus-visible:ring-[3px] [&>svg]:pointer-events-none [&>svg]:size-3',
+		variants: {
+			variant: {
+				default: 'bg-primary text-primary-foreground [a&]:hover:bg-primary/90 border-transparent',
+				secondary:
+					'bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90 border-transparent',
+				destructive:
+					'bg-destructive [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/70 border-transparent text-white',
+				positive: 'bg-cash/10 text-cash dark:bg-cash/20 dark:text-emerald-400 border-transparent',
+				negative: 'bg-debt/10 text-debt dark:bg-debt/20 dark:text-red-400 border-transparent',
+				warning:
+					'bg-amber-500/10 text-amber-600 dark:bg-amber-500/12 dark:text-amber-400 border-transparent',
+				outline: 'text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
+				cash: 'bg-cash text-white border-transparent',
+				debt: 'bg-debt text-white border-transparent',
+				investment: 'bg-investment text-white border-transparent',
+				other: 'bg-other-assets text-white border-transparent'
+			}
+		},
+		defaultVariants: {
+			variant: 'default'
+		}
+	});
+
+	export type BadgeVariant = VariantProps<typeof badgeVariants>['variant'];
+</script>
+
+<script lang="ts">
+	import type { HTMLAnchorAttributes } from 'svelte/elements';
+
+	import { cn, type WithElementRef } from '$lib/utils.js';
+
+	let {
+		ref = $bindable(null),
+		href,
+		class: className,
+		variant = 'default',
+		children,
+		...restProps
+	}: WithElementRef<HTMLAnchorAttributes> & {
+		variant?: BadgeVariant;
+	} = $props();
+</script>
+
+<svelte:element
+	this={href ? 'a' : 'span'}
+	bind:this={ref}
+	data-slot="badge"
+	{href}
+	class={cn(badgeVariants({ variant }), className)}
+	{...restProps}
+>
+	{@render children?.()}
+</svelte:element>

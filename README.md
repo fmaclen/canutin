@@ -1,124 +1,118 @@
-# Canutin: desktop
+# Canutin
 
-<img width="1495" alt="image" src="https://user-images.githubusercontent.com/1434675/201496760-84c132ba-9685-4313-8668-9d72fd52537b.png">
+Canutin is a personal finance app you run on your own server. It keeps your accounts, assets, transactions, and investments in one place and shows you the whole picture: net worth, balance sheet, cash flow trends, and portfolio performance, in any mix of currencies.
 
-<p align="center">
-  ⚡ <strong>Live demo <a href="https://demo.canutin.com/">https://demo.canutin.com</a></strong><br/>
-  <em>(data will be wiped frequently)</em>
-</p>
+Try it at [demo.canutin.com](https://demo.canutin.com).
 
----
+- Track bank accounts, credit cards, loans, property, vehicles, or anything else with a balance.
+- Browse, label, and filter every transaction.
+- Follow your investments with securities, trades, and portfolio views.
+- Hold balances in multiple currencies with automatic exchange rates.
+- Sync balances and transactions from your bank through [Plaid](docs/plaid.md), using your own Plaid credentials.
+- Let [AI agents](docs/ai-agents.md) import statements, label spending, and answer questions about your data.
+- Import data in bulk through the API, and revert any import that went wrong.
+- Install it as an app on desktop and mobile.
 
-- [What is Canutin?](#what-is-canutin)
-- Install...
-  - [💻 Desktop (macOS, Windows, Linux)](#install-macos-windows--linux)
-  - [📦 Server (Docker)](#install-docker)
-- [Getting data in](#getting-data-in)
-- [Frequenty asked questions](#frequenty-asked-questions)
-- [Contributing](#contributing)
-- [Development](#development)
+Your data lives in a single SQLite database on your server and is accessible through a fully documented REST API.
 
-## What is Canutin?
+## Self-hosting (Docker)
 
-- Canutin is a desktop app for managing your personal finances.
-- It consolidates all your accounts, transactions and assets in one place and tracks them over time.
-- Runs entirely on your computer and stores your data locally.
-- It's open source, free to use and available for Windows, macOS & Linux.
-- Allows you to import accounts, assets and transactions [via API](#getting-data-in).
-- No sign up is required.
-
-## Install (macOS, Windows & Linux)
-
-1. Begin by downloading the [latest release](https://github.com/Canutin/desktop/releases) for your operating system.
-2. Run the installer and follow the instructions.
-3. Once the installation is complete, you can run the app from your applications menu\*
-4. The first time you run the app you'll be asked to create a new _vault_. This is where your data will be stored.
-5. After your vault is set, Canutin will open as a new tab in default browser and you'll be ready to start using the app 🎉
-6. **If you close the tab** you can re-open it again by looking for the Canutin icon in your tray bar and clicking `Open in browser` or by visiting [`http://localhost:42069`](http://localhost:42069).
-
-### \* Note for Windows and macOS users
-
-Canutin hasn't paid the _app-store tax_ that Microsoft and Apple require to _notarize_ the app, this means that when you first run it you'll see a warning that it's from an _"unidentified developer"_. Follow these steps to get the app running:
-
-- **On Windows**: On the warning screen click on `More info` and then `Run anyway`.
-- **On macOS**: After you see `Canutin.app cannot be opened because the developer cannont be verified`, click `Cancel`, then head over to `System Preferences > Security & Privacy` and click `Open Anyway`.
-
-You might need to do this step again in the future when you update the app.
-
-## Install (Docker)
-
-Run the command below, then visit [http://localhost:42069](http://localhost:42069).
-
-```shell
-docker run -d \
-  --name canutin \
-  -p 42069:42069 \
-  -v ./vaults:/canutin/vaults \
-  --restart=unless-stopped \
-  ghcr.io/fmaclen/canutin:latest
-```
-
-Or create a `docker-compose.yml` file:
+Create a `docker-compose.yml` file:
 
 ```yaml
-version: '3'
 services:
-  canutin:
+  pocketbase:
     image: ghcr.io/fmaclen/canutin:latest
-    container_name: canutin
+    working_dir: /app/pocketbase
+    command: ['./pocketbase-custom', 'serve', '--http', '0.0.0.0:42070']
     ports:
-      - "42069:42069"
-    volumes:
-      - ./vaults:/canutin/vaults
-    restart: unless-stopped
-    # Optional environment variables
+      - '42070:42070'
     environment:
-      HOST: "0.0.0.0"
-      PORT: "42069"
-      SHOULD_CHECK_VAULT: "true"
-      DATABASE_URL: "file:../vaults/Canutin.vault"
+      PLAID_CLIENT_ID: ${PLAID_CLIENT_ID:-}
+      PLAID_SECRET: ${PLAID_SECRET:-}
+      PLAID_ENV: ${PLAID_ENV:-}
+    volumes:
+      - canutin-data:/app/pocketbase/pb_data
+    restart: unless-stopped
+
+  sveltekit:
+    image: ghcr.io/fmaclen/canutin:latest
+    command: ['node', 'build/index.js']
+    ports:
+      - '42069:42069'
+    environment:
+      PUBLIC_PB_URL: ${PUBLIC_PB_URL:-http://localhost:42070}
+      ORIGIN: ${ORIGIN:-http://localhost:42069}
+    depends_on:
+      - pocketbase
+    restart: unless-stopped
+
+volumes:
+  canutin-data:
 ```
 
-And then run `docker compose up -d`.
+Then run:
 
-## Getting data in
+```bash
+docker compose up -d
+```
 
-There's multiple ways to get data into Canutin, these are available from the **Add or update data** page.
+Open [http://localhost:42069](http://localhost:42069) to access Canutin.
 
-- **By hand:** you can add or edit any account, transaction or asset manually like you would if you used a spreadsheet.
-- **Importing via API:** at the moment this process requires some degree of technical knowledge but it allows you to import data from other apps or services, for example by scraping the data from your bank's website. You can find more information and examples in the **[API documentation](docs/API.md)**.
-- **Importing from CSV:** _This is currently planned but not yet available_. If you'd like this feature to be prioritized, comment or upvote [this issue](https://github.com/Canutin/desktop/issues/74).
+### Initial setup
 
-## Frequenty asked questions
+On first run, PocketBase needs a superuser to be configured. Get the setup link from the logs:
 
-- **Can I use Canutin on my phone?**
-  At the moment Canutin only runs on desktop operating systems, though a mobile app is in the roadmap.
+```bash
+docker compose logs pocketbase | grep "pbinstal"
+```
 
-- **How do I share data between devices?**
-  The simplest way to do this is to use a cloud storage service like Dropbox or Google Drive. You can then set up Canutin to use that folder as the vault location. This way you can access the same data from multiple devices.
+Open the URL in your browser to create your superuser account. Once complete, refresh Canutin and sign up for your regular user account.
 
-- **How do I backup my data?**
-  All of the data Canutin interacts with is stored in a single file (referred to as a Vault file). You can backup this file the same way you would any other file on your computer.
+### Serving behind a domain
 
-- **What about security?**
-  In it's current version Canutin does not encrypt your data though that is in the roadmap. Canutin is as secure as your computer is, anyone who has access to your device will be able to access the data in the vaults stored in such device. By default Canutin's server is only accessible from your computer's browser but it's possible to expose it to your local network and/or the public Internet if your networking settings allow it.
+The defaults above only work on `localhost`. To serve Canutin at a real domain, put both services behind your reverse proxy and set two variables in a `.env` file next to `docker-compose.yml`:
 
-- **What about privacy?**
-  The data is stored locally in your device. Canutin does not collect any data about you or your usage of the app and does not contain any kind of telemetry or analytics.
+```dotenv
+ORIGIN=https://canutin.example.com
+PUBLIC_PB_URL=https://canutin-pb.example.com
+```
 
-- **How do you make money?**
-  We don't. Canutin is a hobby project at the moment.
+`ORIGIN` is the URL your users load the app from; without it, form submissions fail cross-origin checks. `PUBLIC_PB_URL` is the URL of the PocketBase service and must be reachable from your users' browsers, not just from inside Docker.
+
+### Bank syncing
+
+To sync balances and transactions from your bank, add your Plaid credentials to the same `.env` file. See the [Plaid guide](docs/plaid.md).
+
+## Documentation
+
+- [Migrating from Canutin v1](docs/migrating-from-v1.md)
+- [Syncing banks with Plaid](docs/plaid.md)
+- [Using AI agents with Canutin](docs/ai-agents.md)
 
 ## Development
 
-If you are interested in extending what Canutin can do, take a look at the [development documentation](docs/DEVELOPMENT.md).
+Canutin is built with SvelteKit, PocketBase, and Bun. All you need to start is [Bun](https://bun.sh) installed, then run:
 
-## Contributing
+```bash
+bun install && bunx playwright install && bun run test
+```
 
-Here's ways in which you can contribute:
+| Command             | Description                                                                     |
+| ------------------- | ------------------------------------------------------------------------------- |
+| `bun run dev`       | Start Vite dev server                                                           |
+| `bun run build`     | Production build via Vite/SvelteKit                                             |
+| `bun run preview`   | Preview the built app                                                           |
+| `bun run check`     | Type-check with svelte-check                                                    |
+| `bun run lint`      | Prettier check + ESLint                                                         |
+| `bun run verify`    | Non-mutating gate: lint, type-check, and build                                  |
+| `bun run format`    | Auto-format with Prettier (writes files)                                        |
+| `bun run quality`   | Format, lint, and type-check (writes files via format)                          |
+| `bun run test`      | Run Playwright e2e tests                                                        |
+| `bun run pb`        | Ensure and start PocketBase locally (dev)                                       |
+| `bun run pb:import` | Import a Canutin v1 vault, see the [migration guide](docs/migrating-from-v1.md) |
+| `bun run pb:reset`  | Reset (delete) the PocketBase dev database                                      |
 
-- Found a **bug** or have a **feature request**?
-  1. Search for it in the [existing issues](https://github.com/canutin/desktop/issues)
-  2. Open a [new issue](https://github.com/canutin/desktop/issues/new) if it doesn't yet exist
-- Comment or upvote [existing issues](https://github.com/canutin/desktop/issues) _(active issues will likely be prioritized)_
-- Submit a [pull request](https://github.com/canutin/desktop/pulls) _(please discuss in an issue first)_
+## License
+
+Canutin is open source under the [Apache 2.0 license](LICENSE).

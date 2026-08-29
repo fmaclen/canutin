@@ -1,0 +1,263 @@
+<script lang="ts">
+	import { addMonths, format } from 'date-fns';
+
+	import { getCashflowContext } from '$lib/cashflow.svelte';
+	import { formatCurrency } from '$lib/components/currency';
+	import Currency from '$lib/components/currency.svelte';
+	import { Skeleton } from '$lib/components/ui/skeleton';
+	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
+	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
+	import { m } from '$lib/paraglide/messages';
+
+	const cashflow = getCashflowContext();
+	const periods = $derived(cashflow.periods);
+
+	// Tracks the `sm` breakpoint, below which the chart runs edge to edge
+	const isNarrowViewport = new IsMobile(640);
+
+	let hoveredIndex = $state<number | null>(null);
+
+	const chartData = $derived.by(() => {
+		// Twelve columns share the viewport width, so phones get single-letter month names;
+		// the full month is still reachable through each column's label and tooltip
+		const monthFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
+			month: isNarrowViewport.current ? 'narrow' : 'short',
+			timeZone: 'UTC'
+		});
+		const yearFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
+			year: '2-digit',
+			timeZone: 'UTC'
+		});
+
+		return periods.map((p) => {
+			const isJanuary = p.month.getMonth() === 0;
+			const month = monthFormatter.format(p.month);
+			const periodFrom = format(p.month, 'yyyy-MM-dd');
+			const periodTo = format(addMonths(p.month, 1), 'yyyy-MM-dd');
+			const periodLabel = encodeURIComponent(p.periodLabel);
+			return {
+				...p,
+				label: isJanuary ? `${month} '${yearFormatter.format(p.month)}` : month,
+				transactionsUrl: `/transactions?periodFrom=${periodFrom}&periodTo=${periodTo}&periodLabel=${periodLabel}`
+			};
+		});
+	});
+
+	const chartRatios = $derived.by(() => {
+		if (!periods.length) {
+			return { positiveRatio: 1, negativeRatio: 1, highestSurplus: 0, lowestSurplus: 0 };
+		}
+
+		// Get highest positive surplus
+		const positiveSurpluses = periods.filter((p) => p.surplus > 0).map((p) => p.surplus);
+		const highestSurplus = positiveSurpluses.length > 0 ? Math.max(...positiveSurpluses) : 0;
+
+		// Get lowest negative surplus
+		const negativeSurpluses = periods.filter((p) => p.surplus < 0).map((p) => p.surplus);
+		const lowestSurplus = negativeSurpluses.length > 0 ? Math.min(...negativeSurpluses) : 0;
+
+		// Calculate the range and initial ratios
+		const surplusRange = highestSurplus + Math.abs(lowestSurplus);
+
+		// proportionBetween: (a * 100) / b, or 0 if either is 0
+		const proportionBetween = (num1: number, num2: number) => {
+			return num1 !== 0 && num2 !== 0 ? Math.round(((num1 * 100) / num2) * 100) / 100 : 0;
+		};
+
+		let positiveRatio = proportionBetween(highestSurplus, surplusRange);
+		let negativeRatio = proportionBetween(Math.abs(lowestSurplus), surplusRange);
+
+		// Normalize so the larger ratio is relative to 1
+		if (positiveRatio === 0 && negativeRatio === 0) {
+			positiveRatio = 1;
+			negativeRatio = 1;
+		} else if (positiveRatio > negativeRatio) {
+			const isNegativeRatioZero = negativeRatio === 0;
+			positiveRatio = isNegativeRatioZero ? 1 : positiveRatio / negativeRatio;
+			negativeRatio = isNegativeRatioZero ? 0 : 1;
+		} else {
+			const isPositiveRatioZero = positiveRatio === 0;
+			negativeRatio = isPositiveRatioZero ? 1 : negativeRatio / positiveRatio;
+			positiveRatio = isPositiveRatioZero ? 0 : 1;
+		}
+		return { positiveRatio, negativeRatio, highestSurplus, lowestSurplus };
+	});
+
+	// Calculate bar height as percentage within its zone
+	function getBarHeight(surplus: number) {
+		if (surplus === 0) return 0;
+
+		const { highestSurplus, lowestSurplus } = chartRatios;
+
+		if (surplus > 0) {
+			return highestSurplus !== 0 ? (surplus / highestSurplus) * 100 : 0;
+		} else {
+			return lowestSurplus !== 0 ? (Math.abs(surplus) / Math.abs(lowestSurplus)) * 100 : 0;
+		}
+	}
+
+	const extremeIndices = $derived.by(() => {
+		if (!periods.length) return { highestIndex: null, lowestIndex: null };
+		const surpluses = periods.map((p) => p.surplus);
+		return {
+			highestIndex: surpluses.indexOf(Math.max(...surpluses)),
+			lowestIndex: surpluses.indexOf(Math.min(...surpluses))
+		};
+	});
+
+	function shouldShowLabel(index: number): boolean {
+		if (hoveredIndex === index) return true;
+		if (periods[index].isCurrentPeriod && periods[index].surplus !== 0) return true;
+		if (index === extremeIndices.highestIndex && periods[index].surplus > 0) return true;
+		if (index === extremeIndices.lowestIndex && periods[index].surplus < 0) return true;
+		return false;
+	}
+</script>
+
+{#if chartData.length > 0}
+	<div class="full-bleed bg-background h-[30vh] min-h-[220px] overflow-hidden rounded shadow-md">
+		<Tooltip.Provider>
+			<!-- Outer grid: one column per period -->
+			<div
+				class="grid h-full"
+				style="grid-template-columns: repeat({chartData.length}, minmax(0, 1fr));"
+			>
+				{#each chartData as period, i (period.id)}
+					{@const isHovered = hoveredIndex === i}
+					{@const isDecember = period.month.getMonth() === 11}
+					{@const isLastColumn = i === chartData.length - 1}
+					{@const isPositive = period.surplus > 0}
+					{@const isNegative = period.surplus < 0}
+					{@const barHeight = getBarHeight(period.surplus)}
+					{@const isCurrentPeriod = period.isCurrentPeriod}
+					{@const trend = isPositive ? 'positive' : isNegative ? 'negative' : null}
+
+					<Tooltip.Root delayDuration={50}>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<!-- eslint-disable svelte/no-navigation-without-resolve -->
+								<a
+									{...props}
+									href={period.transactionsUrl}
+									aria-label="{period.periodLabel}: {formatCurrency(period.surplus)}"
+									class="flex h-full flex-col pt-2 {!isLastColumn
+										? isDecember
+											? 'border-border border-r border-dashed'
+											: 'border-border border-r'
+										: ''} {isHovered ? 'bg-muted/50' : ''}"
+									onmouseenter={() => (hoveredIndex = i)}
+									onmouseleave={() => (hoveredIndex = null)}
+								>
+									<!-- Chart area: bars scale to fill the space above the fixed-height x-axis label -->
+									<div
+										class="box-border grid min-h-0 flex-1 py-7"
+										style="grid-template-rows: {chartRatios.positiveRatio}fr 1px {chartRatios.negativeRatio}fr;"
+									>
+										<!-- Negative trend: placeholder, hr, then bar -->
+										{#if trend === 'negative'}
+											<div></div>
+											<hr class="bg-border m-0 h-px border-none" />
+										{/if}
+
+										<!-- The bar zone (positive or negative) -->
+										{#if trend === 'positive' || trend === 'negative'}
+											<div
+												class="flex flex-col {trend === 'positive' ? 'text-cash' : 'text-debt'}"
+												style="height: 100%;"
+											>
+												<div
+													class="relative box-content transition-colors duration-200
+												{trend === 'positive' ? 'border-t-cash mt-auto border-t-3' : 'border-b-debt mb-auto border-b-3'}
+												{isCurrentPeriod
+														? ''
+														: isHovered
+															? trend === 'positive'
+																? 'bg-cash'
+																: 'bg-debt'
+															: trend === 'positive'
+																? 'bg-cash/10'
+																: 'bg-debt/10'}"
+													style="height: {barHeight}%; {isCurrentPeriod
+														? 'background-image: url(/chart-current-background.svg);'
+														: ''}"
+												>
+													<!-- Label positioned outside the bar -->
+													<p
+														class="pointer-events-none absolute m-0 hidden w-full overflow-hidden px-1 text-center font-mono text-ellipsis sm:block
+													{trend === 'positive' ? 'bottom-full pb-2' : 'top-full pt-2'}
+													{shouldShowLabel(i) ? 'opacity-100' : 'opacity-0'}"
+													>
+														{formatCurrency(period.surplus)}
+													</p>
+												</div>
+											</div>
+										{:else}
+											<!-- No trend (zero): placeholder, hr, placeholder -->
+											<div></div>
+											<hr class="bg-border m-0 h-px border-none" />
+											<div></div>
+										{/if}
+
+										<!-- Positive trend: hr, then placeholder -->
+										{#if trend === 'positive'}
+											<hr class="bg-border m-0 h-px border-none" />
+											<div></div>
+										{/if}
+									</div>
+
+									<!-- X-axis label -->
+									<div
+										class="text-muted-foreground flex h-8 shrink-0 items-center justify-center text-xs"
+									>
+										{period.label}
+									</div>
+								</a>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content class="grid min-w-[9rem] items-start gap-1.5">
+							<p class="border-border -mx-2.5 border-b px-2.5 pb-1.5 text-sm font-medium">
+								{period.periodLabel}
+							</p>
+							<div class="grid gap-1.5">
+								<div class="flex items-center gap-2">
+									<span class="border-cash size-2.5 shrink-0 rounded-full border-2"></span>
+									<div
+										class="flex flex-1 items-center justify-between gap-4 text-base leading-none"
+									>
+										<span class="text-muted-foreground text-sm">{m.cashflow_income_label()}</span>
+										<Currency value={period.income} isUnconverted={period.isUnconverted} />
+									</div>
+								</div>
+								<div class="flex items-center gap-2">
+									<span class="border-debt size-2.5 shrink-0 rounded-full border-2"></span>
+									<div
+										class="flex flex-1 items-center justify-between gap-4 text-base leading-none"
+									>
+										<span class="text-muted-foreground text-sm">{m.cashflow_expenses_label()}</span>
+										<Currency value={period.expenses} isUnconverted={period.isUnconverted} />
+									</div>
+								</div>
+								<div class="flex items-center gap-2">
+									<span
+										class="size-2.5 shrink-0 rounded-full {period.surplus >= 0
+											? 'bg-cash'
+											: 'bg-debt'}"
+									></span>
+									<div
+										class="flex flex-1 items-center justify-between gap-4 text-base leading-none"
+									>
+										<span class="text-muted-foreground text-sm">{m.cashflow_surplus_label()}</span>
+										<Currency value={period.surplus} isUnconverted={period.isUnconverted} />
+									</div>
+								</div>
+							</div>
+						</Tooltip.Content>
+					</Tooltip.Root>
+				{/each}
+			</div>
+		</Tooltip.Provider>
+	</div>
+{:else if cashflow.isLoading}
+	<Skeleton class="full-bleed h-[30vh] min-h-[220px]" showSpinner />
+{/if}

@@ -1,94 +1,108 @@
-name: Release
+name: Version & release
 
 on:
   push:
     branches:
       - master
+      - next
+  workflow_dispatch:
+
+# Releases must never overlap. Two runs racing to tag and push produce a failed
+# release or a skipped version, so queue them instead of cancelling.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  versioning:
-    name: Versioning
+  version:
+    name: Run semantic release
     runs-on: ubuntu-latest
     outputs:
       new_release_published: ${{ steps.semantic.outputs.new_release_published }}
       new_release_version: ${{ steps.semantic.outputs.new_release_version }}
 
+    permissions:
+      contents: write
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          persist-credentials: false
           fetch-depth: 0
+          persist-credentials: true
+          # master requires a pull request review and the github-actions bot is not in
+          # the bypass list, so the release commit needs a token that acts as the
+          # repository owner. next is unprotected and the default token is enough.
+          token: ${{ github.ref_name == 'master' && secrets.GH_PERSONAL_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
 
       - name: Semantic Release
-        uses: cycjimmy/semantic-release-action@v4
-        with:
-          branches: master
-          tag_format: v${version}
         id: semantic
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-
-  electron:
-    needs: versioning
-    if: ${{ needs.versioning.outputs.new_release_published == 'true' }}
-
-    name: Desktop app (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        os: [macos-13, macos-latest, ubuntu-latest, windows-latest] # macos-13 is the lastest one on x86
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install Electron dependencies
-        run: npm ci
-
-      - name: "Generate Electron build"
-        run: npm run build
-
-      - name: Install & build SvelteKit
-        uses: ./.github/actions/install-build-sveltekit
-        env:
-          APP_VERSION: ${{ needs.versioning.outputs.new_release_version }}
-
-      - name: Build & release Electron app
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          CSC_LINK: ${{ secrets.APPLE_CERTIFICATE }}
-          CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-        run: npm run package:electron
+          GITHUB_TOKEN: ${{ github.ref_name == 'master' && secrets.GH_PERSONAL_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -o pipefail
+          BEFORE=$(node -p "require('./package.json').version")
+          bunx semantic-release
+          AFTER=$(node -p "require('./package.json').version")
+          # semantic-release writes the new version into package.json during prepare,
+          # so comparing before and after is more reliable than parsing its log output.
+          if [ "$BEFORE" != "$AFTER" ]; then
+            echo "new_release_published=true" >> $GITHUB_OUTPUT
+            echo "new_release_version=$AFTER" >> $GITHUB_OUTPUT
+          else
+            echo "new_release_published=false" >> $GITHUB_OUTPUT
+          fi
 
   docker:
-    needs: versioning
-    if: ${{ needs.versioning.outputs.new_release_published == 'true' }}
-
-    name: Docker image
+    name: Build & publish Docker image
+    needs: version
+    if: needs.version.outputs.new_release_published == 'true'
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install & build SvelteKit
-        uses: ./.github/actions/install-build-sveltekit
-        env:
-          APP_VERSION: ${{ needs.versioning.outputs.new_release_version }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
-      - name: Build & publish
-        uses: mr-smithers-excellent/docker-build-push@v6
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          image: canutin
           registry: ghcr.io
-          multiPlatform: true
-          platform: linux/amd64,linux/arm64
-          tags: latest, ${{ needs.versioning.outputs.new_release_version }}
-          username: ${{ secrets.GH_REGISTRY_USERNAME }}
-          password: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            APP_VERSION=${{ needs.version.outputs.new_release_version }}
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ github.ref_name == 'master' && 'latest' || 'next' }}
+            ghcr.io/${{ github.repository }}:${{ needs.version.outputs.new_release_version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

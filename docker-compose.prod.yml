@@ -1,0 +1,31 @@
+services:
+  pocketbase:
+    image: ghcr.io/fmaclen/canutin:next
+    working_dir: /app/pocketbase
+    command: ['./pocketbase-custom', 'serve', '--http', '0.0.0.0:42070']
+    ports:
+      - '127.0.0.1:42170:42070'
+    environment:
+      PUBLIC_DEMO_ENABLED: 'true'
+      PLAID_CLIENT_ID: ${PLAID_CLIENT_ID:-}
+      PLAID_SECRET: ${PLAID_SECRET:-}
+      PLAID_ENV: ${PLAID_ENV:-}
+    volumes:
+      - pocketbase-data:/app/pocketbase/pb_data
+    restart: unless-stopped
+
+  sveltekit:
+    image: ghcr.io/fmaclen/canutin:next
+    command: ['node', 'build/index.js']
+    ports:
+      - '127.0.0.1:42169:42069'
+    environment:
+      PUBLIC_PB_URL: 'https://pb.canutin.com'
+      PUBLIC_DEMO_ENABLED: 'true'
+      ORIGIN: 'https://demo.canutin.com'
+    depends_on:
+      - pocketbase
+    restart: unless-stopped
+
+volumes:
+  pocketbase-data:
