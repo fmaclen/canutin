@@ -32,4 +32,4 @@
 	}
 </script>
 
-<SplashScreen backdrop={false} linked={false} />
+<SplashScreen backdrop={false} />

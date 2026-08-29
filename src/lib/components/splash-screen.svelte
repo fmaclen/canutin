@@ -7,14 +7,16 @@
 	import GuestBackdrop from '$lib/components/guest-backdrop.svelte';
 	import { m } from '$lib/paraglide/messages';
 
-	// Without a body the screen is a loading state. The brand header only links out where leaving
-	// the app is a sensible destination, which is not the case once the user is signed in. Guest
-	// routes already paint the backdrop in their layout, so they opt out of a second one.
+	// Without a body the screen is a loading state; overlays that bring their own spinner (Plaid
+	// Link) opt out of ours. The brand header links to `href` when given and is plain branding
+	// otherwise. Guest routes already paint the backdrop in their layout, so they opt out of a
+	// second one.
 	let {
-		linked = true,
+		href,
 		backdrop = true,
+		spinner = true,
 		children
-	}: { linked?: boolean; backdrop?: boolean; children?: Snippet } = $props();
+	}: { href?: string; backdrop?: boolean; spinner?: boolean; children?: Snippet } = $props();
 </script>
 
 {#snippet brand()}
@@ -26,8 +28,8 @@
 	<GuestBackdrop />
 {/if}
 <div class="relative flex min-h-dvh w-full flex-col items-center px-6">
-	{#if linked}
-		<a href="https://canutin.com" aria-label={m.app_name()} class="flex items-center gap-2.5 py-8">
+	{#if href}
+		<a {href} aria-label={m.app_name()} class="flex items-center gap-2.5 py-8">
 			{@render brand()}
 		</a>
 	{:else}
@@ -39,7 +41,7 @@
 		<div class="mx-auto flex w-full max-w-sm flex-col gap-6">
 			{#if children}
 				{@render children()}
-			{:else}
+			{:else if spinner}
 				<div class="flex justify-center">
 					<LoaderCircleIcon class="text-muted-foreground size-8 animate-spin" />
 				</div>

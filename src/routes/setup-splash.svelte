@@ -19,7 +19,7 @@
 {/snippet}
 
 {#if status === 'needs-setup'}
-	<SplashScreen>
+	<SplashScreen href="https://canutin.com">
 		<div class="flex flex-col gap-1.5 text-center">
 			<h1 class="text-2xl leading-none font-semibold">{m.setup_title()}</h1>
 			<p class="text-muted-foreground text-sm">{m.setup_description()}</p>
@@ -27,7 +27,7 @@
 		{@render serverRow()}
 	</SplashScreen>
 {:else if status === 'unreachable'}
-	<SplashScreen>
+	<SplashScreen href="https://canutin.com">
 		<div class="flex flex-col gap-1.5 text-center">
 			<h1 class="text-2xl leading-none font-semibold">{m.setup_unreachable_title()}</h1>
 			<p class="text-muted-foreground text-sm">{m.setup_unreachable_description()}</p>
@@ -35,5 +35,5 @@
 		{@render serverRow()}
 	</SplashScreen>
 {:else}
-	<SplashScreen />
+	<SplashScreen href="https://canutin.com" />
 {/if}
