@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "canutinx",
+      "name": "canutin",
       "devDependencies": {
         "@canutin/svelte-currency-input": "^1.1.1",
         "@date-fns/utc": "^2.1.1",

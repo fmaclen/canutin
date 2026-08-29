@@ -1,6 +1,6 @@
 services:
   pocketbase:
-    image: ghcr.io/fmaclen/canutin:next
+    image: ghcr.io/fmaclen/canutin:latest
     working_dir: /app/pocketbase
     command: ['./pocketbase-custom', 'serve', '--http', '0.0.0.0:42070']
     ports:
@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
 
   sveltekit:
-    image: ghcr.io/fmaclen/canutin:next
+    image: ghcr.io/fmaclen/canutin:latest
     command: ['node', 'build/index.js']
     ports:
       - '127.0.0.1:42169:42069'

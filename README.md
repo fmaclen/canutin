@@ -4,6 +4,8 @@ Canutin is a personal finance app you run on your own server. It keeps your acco
 
 Try it at [demo.canutin.com](https://demo.canutin.com).
 
+![Canutin](docs/screenshot.png)
+
 - Track bank accounts, credit cards, loans, property, vehicles, or anything else with a balance.
 - Browse, label, and filter every transaction.
 - Follow your investments with securities, trades, and portfolio views.
