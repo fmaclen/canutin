@@ -23,7 +23,7 @@ FROM node:22-slim
 
 LABEL org.opencontainers.image.source=https://github.com/fmaclen/canutin
 LABEL org.opencontainers.image.description="Personal finance app"
-LABEL org.opencontainers.image.licenses=AGPL-3.0
+LABEL org.opencontainers.image.licenses=Apache-2.0
 
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends ca-certificates \
