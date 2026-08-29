@@ -11,13 +11,13 @@ Canutin ships as a Docker image that bundles the SvelteKit Node server and the c
 
 ## Files
 
-| File                      | Purpose                                |
-| ------------------------- | -------------------------------------- |
-| `Dockerfile`              | Multi-stage build: Go (PB) + Node (SK) |
-| `docker-compose.yml`      | Local / dev compose file               |
-| `docker-compose.prod.yml` | Production compose file                |
-| `.releaserc.json`         | semantic-release config                |
-| `.github/workflows/`      | CI workflows (tests, release, image)   |
+| File                      | Purpose                                                                   |
+| ------------------------- | ------------------------------------------------------------------------- |
+| `Dockerfile`              | Multi-stage build: Go (PB) + Node (SK); takes the `APP_VERSION` build arg |
+| `docker-compose.yml`      | Local / dev compose file                                                  |
+| `docker-compose.prod.yml` | Production compose file                                                   |
+| `.releaserc.json`         | semantic-release config                                                   |
+| `.github/workflows/`      | CI workflows (tests, release, image)                                      |
 
 ## Build
 
@@ -50,6 +50,10 @@ At runtime the container:
 Minimum required at runtime:
 
 - `PUBLIC_PB_URL` — URL the frontend uses to reach PocketBase (may be the same host as the SvelteKit server or a dedicated subdomain)
+
+At build time the image takes one optional build arg:
+
+- `APP_VERSION` — the version the app displays in Settings. Defaults to `package.json`'s `version`; the release workflow passes the freshly published version because the Docker build checks out the commit before semantic-release bumps it.
 
 Additional variables depend on your deployment target and any custom Go hooks you've added. Check `.env.example` if one exists; otherwise inspect the compose files.
 

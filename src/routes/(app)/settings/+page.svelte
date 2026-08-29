@@ -7,6 +7,7 @@
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { getCurrenciesContext } from '$lib/currencies.svelte';
@@ -193,5 +194,19 @@
 				</div>
 			</footer>
 		</form>
+	</div>
+</Section>
+
+<Section>
+	<SectionTitle title={m.settings_about_section_title()} />
+	<div class="border-border overflow-hidden rounded border">
+		<Fieldset isFirst={true}>
+			<FormFieldRow>
+				<Label for="app-version" class="justify-start pr-0 md:justify-end"
+					>{m.settings_about_version_label()}</Label
+				>
+				<Input id="app-version" readonly value={`v${__APP_VERSION__}`} />
+			</FormFieldRow>
+		</Fieldset>
 	</div>
 </Section>

@@ -539,6 +539,8 @@
 	"settings_interface_currency_label": "Default currency",
 	"settings_interface_button_save": "Save",
 	"settings_interface_success": "Settings updated",
+	"settings_about_section_title": "About",
+	"settings_about_version_label": "Version",
 	"currency_required": "Add a currency in Currencies first",
 	"currencies_section_title": "Currencies",
 	"currencies_empty": "No currencies yet",

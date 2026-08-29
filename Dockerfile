@@ -16,6 +16,8 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 
 COPY . .
+ARG APP_VERSION
+ENV APP_VERSION=$APP_VERSION
 ENV DOCKER_BUILD=true
 RUN bun run build
 

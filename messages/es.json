@@ -539,6 +539,8 @@
 	"settings_interface_currency_label": "Moneda predeterminada",
 	"settings_interface_button_save": "Guardar",
 	"settings_interface_success": "Configuración actualizada",
+	"settings_about_section_title": "Acerca de",
+	"settings_about_version_label": "Versión",
 	"currency_required": "Agrega una moneda en Monedas primero",
 	"currencies_section_title": "Monedas",
 	"currencies_empty": "No hay monedas todavía",
