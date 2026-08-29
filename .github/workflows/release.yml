@@ -1,10 +1,17 @@
-name: Version & release (next)
+name: Version & release
 
 on:
   push:
     branches:
+      - master
       - next
   workflow_dispatch:
+
+# Releases must never overlap. Two runs racing to tag and push produce a failed
+# release or a skipped version, so queue them instead of cancelling.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   version:
@@ -16,9 +23,6 @@ jobs:
 
     permissions:
       contents: write
-      issues: write
-      pull-requests: write
-      id-token: write
 
     steps:
       - name: Checkout repository
@@ -26,6 +30,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: true
+          # master requires a pull request review and the github-actions bot is not in
+          # the bypass list, so the release commit needs a token that acts as the
+          # repository owner. next is unprotected and the default token is enough.
+          token: ${{ github.ref_name == 'master' && secrets.GH_PERSONAL_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -43,14 +51,17 @@ jobs:
       - name: Semantic Release
         id: semantic
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.ref_name == 'master' && secrets.GH_PERSONAL_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           set -o pipefail
-          OUTPUT=$(bunx semantic-release 2>&1 | tee /dev/stderr)
-          if echo "$OUTPUT" | grep -q "Published release"; then
-            VERSION=$(echo "$OUTPUT" | grep -oP "Published release \K[0-9]+\.[0-9]+\.[0-9]+-next\.[0-9]+")
+          BEFORE=$(node -p "require('./package.json').version")
+          bunx semantic-release
+          AFTER=$(node -p "require('./package.json').version")
+          # semantic-release writes the new version into package.json during prepare,
+          # so comparing before and after is more reliable than parsing its log output.
+          if [ "$BEFORE" != "$AFTER" ]; then
             echo "new_release_published=true" >> $GITHUB_OUTPUT
-            echo "new_release_version=$VERSION" >> $GITHUB_OUTPUT
+            echo "new_release_version=$AFTER" >> $GITHUB_OUTPUT
           else
             echo "new_release_published=false" >> $GITHUB_OUTPUT
           fi
@@ -89,7 +100,7 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
-            ghcr.io/${{ github.repository }}:next
+            ghcr.io/${{ github.repository }}:${{ github.ref_name == 'master' && 'latest' || 'next' }}
             ghcr.io/${{ github.repository }}:${{ needs.version.outputs.new_release_version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
