@@ -91,7 +91,7 @@ test('settings exposes default currency without the old exchange-rate toggle', a
 	await expect(page.getByLabel('Default currency')).toContainText('USD');
 	await expect(page.getByText('Exchange rates', { exact: true })).toHaveCount(0);
 	await expect(page.getByText('About', { exact: true })).toBeVisible();
-	await expect(page.getByLabel('Version')).toHaveValue(/^v\d+\.\d+\.\d+/);
+	await expect(page.getByLabel('Current version')).toHaveValue(/^v\d+\.\d+\.\d+/);
 });
 
 test('settings switches display currency only after clicking Save and persists after reload', async ({
@@ -158,4 +158,20 @@ test('locale defaults from browser locale when supported and falls back to Engli
 	await expect(fallbackPage.getByText('Try the demo')).toBeVisible();
 
 	await fallbackContext.close();
+});
+
+test('settings shows the latest released version alongside the installed one', async ({ page }) => {
+	const user = await seedUser('orson');
+
+	// The build under test carries a stable version, so it checks the stable-channel endpoint
+	await page.route('https://api.github.com/repos/fmaclen/canutin/releases/latest', (route) =>
+		route.fulfill({ json: { tag_name: 'v99.0.0', prerelease: false } })
+	);
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Settings');
+
+	await expect(page.getByLabel('Current version')).toHaveValue(/^v\d+\.\d+\.\d+/);
+	await expect(page.getByLabel('Latest version')).toHaveValue('v99.0.0');
 });

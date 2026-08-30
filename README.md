@@ -84,6 +84,42 @@ PUBLIC_PB_URL=https://canutin-pb.example.com
 
 `ORIGIN` is the URL your users load the app from; without it, form submissions fail cross-origin checks. `PUBLIC_PB_URL` is the URL of the PocketBase service and must be reachable from your users' browsers, not just from inside Docker.
 
+### Updating
+
+Every release publishes a new image to `ghcr.io/fmaclen/canutin:latest`. To update by hand:
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+Settings shows the version you are running and tells you when a newer one is available, so nothing checks for updates unless you open that page.
+
+To update automatically instead, add [Watchtower](https://containrrr.dev/watchtower/) to your `docker-compose.yml`, and label the two services it should watch so the rest of the host is left alone:
+
+```yaml
+services:
+  pocketbase:
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
+    # ...rest of the service
+
+  sveltekit:
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
+    # ...rest of the service
+
+  watchtower:
+    image: containrrr/watchtower:1.7.1
+    command: ['--cleanup', '--label-enable', '--interval', '86400']
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+```
+
+Watchtower checks once a day and recreates a container when its image changes.
+
+Updates apply database migrations on start, so take a copy of the `canutin-data` volume if you want to be able to roll back.
+
 ### Bank syncing
 
 To sync balances and transactions from your bank, add your Plaid credentials to the same `.env` file. See the [Plaid guide](docs/plaid.md).

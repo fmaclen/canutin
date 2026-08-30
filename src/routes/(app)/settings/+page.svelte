@@ -20,7 +20,18 @@
 	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 
+	type GitHubRelease = { tag_name: string; prerelease: boolean };
+
+	// A `-` in the version marks a prerelease build, which tracks the newest release flagged as a
+	// prerelease. Stable builds compare against the latest published release.
+	const isPrereleaseBuild = __APP_VERSION__.includes('-');
+	const releasesEndpoint = isPrereleaseBuild
+		? 'https://api.github.com/repos/fmaclen/canutin/releases'
+		: 'https://api.github.com/repos/fmaclen/canutin/releases/latest';
+
 	const currenciesContext = getCurrenciesContext();
+
+	let latestRelease = $state<GitHubRelease | null>(null);
 
 	let themeDraft = $state<InterfaceThemeMode>(userPrefersMode.current);
 	let localeDraft = $state<'en' | 'es'>(interfacePreferences.locale);
@@ -77,6 +88,40 @@
 			toast.error(m.settings_interface_language_failed());
 		}
 	}
+
+	function isGitHubRelease(value: unknown): value is GitHubRelease {
+		return (
+			typeof value === 'object' &&
+			value !== null &&
+			'tag_name' in value &&
+			typeof value.tag_name === 'string' &&
+			'prerelease' in value &&
+			typeof value.prerelease === 'boolean'
+		);
+	}
+
+	// Unauthenticated GitHub requests are capped at 60/hour per IP, so a rejected or malformed
+	// response is expected often enough that the About section simply stays quiet about updates.
+	async function fetchLatestRelease() {
+		try {
+			const response = await fetch(releasesEndpoint);
+			if (!response.ok) return;
+
+			const payload: unknown = await response.json();
+			const release =
+				isPrereleaseBuild && Array.isArray(payload)
+					? payload.find((entry) => isGitHubRelease(entry) && entry.prerelease)
+					: payload;
+			if (isGitHubRelease(release)) latestRelease = release;
+		} catch (error) {
+			logError('settings', 'check_for_update', error);
+		}
+	}
+
+	// Runs once on mount: effects are client-only, which keeps the request out of SSR.
+	$effect(() => {
+		fetchLatestRelease();
+	});
 </script>
 
 <Section>
@@ -207,6 +252,21 @@
 				>
 				<Input id="app-version" readonly value={`v${__APP_VERSION__}`} />
 			</FormFieldRow>
+
+			{#if latestRelease}
+				<FormFieldRow>
+					<Label for="latest-version" class="justify-start pr-0 md:justify-end"
+						>{m.settings_about_latest_version_label()}</Label
+					>
+					<Input
+						id="latest-version"
+						readonly
+						value={latestRelease.tag_name === `v${__APP_VERSION__}`
+							? m.settings_about_update_latest()
+							: latestRelease.tag_name}
+					/>
+				</FormFieldRow>
+			{/if}
 		</Fieldset>
 	</div>
 </Section>
