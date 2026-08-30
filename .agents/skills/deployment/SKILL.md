@@ -37,6 +37,14 @@ Handled by semantic-release via the release workflow. Conventional commits drive
 
 See [code-quality.md](../code-quality/SKILL.md#commit-messages) for the full type list.
 
+## Updates
+
+`docker-compose.prod.yml` runs Watchtower beside the app. It polls ghcr.io once a day and recreates the containers labelled `com.centurylinklabs.watchtower.enable=true`, so a merge to `master` reaches demo.canutin.com within a day without a manual deploy. Only labelled containers are touched.
+
+New environment variables must stay optional with a safe default, because an unattended update pulls the image without touching anyone's `.env`. A variable that cannot degrade gracefully belongs in a breaking-change release, where the notes call it out.
+
+Other deployments update on their own schedule. The README documents the manual `docker compose pull` and the same Watchtower block as an opt-in for self-hosters.
+
 ## Runtime
 
 At runtime the container:

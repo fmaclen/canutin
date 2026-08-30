@@ -10,6 +10,8 @@ services:
       PLAID_CLIENT_ID: ${PLAID_CLIENT_ID:-}
       PLAID_SECRET: ${PLAID_SECRET:-}
       PLAID_ENV: ${PLAID_ENV:-}
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
     volumes:
       - pocketbase-data:/app/pocketbase/pb_data
     restart: unless-stopped
@@ -23,8 +25,20 @@ services:
       PUBLIC_PB_URL: 'https://pb.canutin.com'
       PUBLIC_DEMO_ENABLED: 'true'
       ORIGIN: 'https://demo.canutin.com'
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
     depends_on:
       - pocketbase
+    restart: unless-stopped
+
+  # Pulls the newest published image once a day so the demo tracks master without a
+  # manual deploy. --label-enable limits it to the two services labelled above, leaving
+  # any other container on the host untouched.
+  watchtower:
+    image: containrrr/watchtower:1.7.1
+    command: ['--cleanup', '--label-enable', '--interval', '86400']
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 
 volumes:
