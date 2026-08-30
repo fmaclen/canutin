@@ -44,6 +44,8 @@ services:
       - '42069:42069'
     environment:
       PUBLIC_PB_URL: ${PUBLIC_PB_URL:-http://localhost:42070}
+      PUBLIC_PLAUSIBLE_DOMAIN: ${PUBLIC_PLAUSIBLE_DOMAIN:-}
+      PUBLIC_PLAUSIBLE_SCRIPT_URL: ${PUBLIC_PLAUSIBLE_SCRIPT_URL:-}
       ORIGIN: ${ORIGIN:-http://localhost:42069}
     depends_on:
       - pocketbase
@@ -85,6 +87,15 @@ PUBLIC_PB_URL=https://canutin-pb.example.com
 ### Bank syncing
 
 To sync balances and transactions from your bank, add your Plaid credentials to the same `.env` file. See the [Plaid guide](docs/plaid.md).
+
+### Analytics
+
+Plausible analytics is disabled by default. To enable it, add the site domain and script URL from your Plausible installation to the same `.env` file:
+
+```dotenv
+PUBLIC_PLAUSIBLE_DOMAIN=canutin.example.com
+PUBLIC_PLAUSIBLE_SCRIPT_URL=https://plausible.example.com/js/script.js
+```
 
 ## Documentation
 
