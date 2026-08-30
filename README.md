@@ -94,7 +94,7 @@ docker compose pull && docker compose up -d
 
 Settings shows the version you are running and tells you when a newer one is available, so nothing checks for updates unless you open that page.
 
-To update automatically instead, add [Watchtower](https://containrrr.dev/watchtower/) to your `docker-compose.yml`, and label the two services it should watch so the rest of the host is left alone:
+To update automatically instead, add [Watchtower](https://watchtower.nickfedor.com/) to your `docker-compose.yml`, and label the two services it should watch so the rest of the host is left alone:
 
 ```yaml
 services:
@@ -109,14 +109,14 @@ services:
     # ...rest of the service
 
   watchtower:
-    image: containrrr/watchtower:1.7.1
+    image: nickfedor/watchtower:1.21.2
     command: ['--cleanup', '--label-enable', '--interval', '86400']
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 ```
 
-Watchtower checks once a day and recreates a container when its image changes.
+This actively maintained Watchtower fork supports Docker Engine 29 through Docker API version negotiation. It checks once a day and recreates a container when its image changes. The original [Containrrr project](https://github.com/containrrr/watchtower) is archived.
 
 Updates apply database migrations on start, so take a copy of the `canutin-data` volume if you want to be able to roll back.
 

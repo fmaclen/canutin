@@ -34,11 +34,11 @@ Handled by semantic-release via the release workflow. Conventional commits drive
 - `fix:` → patch
 - `feat!:` / `BREAKING CHANGE:` → major
 
-See [code-quality.md](../code-quality/SKILL.md#commit-messages) for the full type list.
+See [commits and PRs](../commits-and-prs/SKILL.md#type-prefix-decides-whether-the-change-deploys) for the supported types.
 
 ## Updates
 
-Every release publishes a new image, but nothing in this repo updates a running deployment. Each host decides when to pull, and how it does that is host configuration, not repo configuration. The README documents the manual `docker compose pull` and an optional Watchtower service for anyone who wants updates applied automatically.
+Every release publishes a new image, but nothing in this repo updates a running deployment. Each host decides when to pull, and how it does that is host configuration, not repo configuration. The README documents the manual `docker compose pull` and an optional maintained Watchtower fork for anyone who wants updates applied automatically.
 
 New environment variables must stay optional with a safe default, because a host that pulls unattended gets the new image without anyone touching its `.env`. A variable that cannot degrade gracefully belongs in a breaking-change release, where the notes call it out.
 
@@ -47,7 +47,7 @@ New environment variables must stay optional with a safe default, because a host
 At runtime the container:
 
 1. Starts the PocketBase binary (with the project's compiled Go hooks) on `:42070`
-2. Starts the SvelteKit Node adapter on `:3000` (or whatever the compose file maps)
+2. Starts the SvelteKit Node adapter on `:42069` (or whatever `PORT` sets)
 3. Uses `PUBLIC_PB_URL` to point the frontend at the in-container PocketBase
 
 ## Environment Variables
@@ -65,7 +65,7 @@ Analytics loads only when both the domain and script URL are set.
 
 At build time the image takes one optional build arg:
 
-- `APP_VERSION` — the version the app displays in Settings. Defaults to `package.json`'s `version`; the release workflow passes the freshly published version because the Docker build checks out the commit before semantic-release bumps it.
+- `APP_VERSION` — the version written to the runtime `package.json` and displayed in Settings. Defaults to `package.json`'s `version`; the release workflow passes the freshly published version because the Docker build checks out the commit before semantic-release bumps it.
 
 Additional variables depend on your deployment target and any custom Go hooks you've added. Check `.env.example` if one exists; otherwise inspect the compose files.
 

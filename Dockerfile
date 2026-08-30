@@ -19,7 +19,8 @@ COPY . .
 ARG APP_VERSION
 ENV APP_VERSION=$APP_VERSION
 ENV DOCKER_BUILD=true
-RUN bun run build
+RUN if [ -n "$APP_VERSION" ]; then bun pm pkg set version="$APP_VERSION"; fi \
+	&& bun run build
 
 FROM node:22-slim
 
