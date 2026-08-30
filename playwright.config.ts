@@ -64,10 +64,10 @@ export default defineConfig({
 	],
 	testDir: 'e2e',
 	retries: isCI ? 2 : 0,
-	// Playwright defaults to half the logical cores, which is 2 of the 4 an ubuntu-latest
-	// runner has. Seeding is I/O against PocketBase rather than CPU work, so the suite has
-	// room for all four.
-	workers: isCI ? 4 : undefined,
+	// Two is what an ubuntu-latest runner sustains. Four oversubscribes its 4 vCPUs: the
+	// headed WebKit mobile project starves against the preview server, PocketBase, and
+	// xvfb, and mobile specs start failing on 30s action timeouts.
+	workers: isCI ? 2 : undefined,
 	projects: [
 		{
 			name: 'desktop',
