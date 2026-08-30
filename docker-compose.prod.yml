@@ -22,6 +22,8 @@ services:
     environment:
       PUBLIC_PB_URL: 'https://pb.canutin.com'
       PUBLIC_DEMO_ENABLED: 'true'
+      PUBLIC_PLAUSIBLE_DOMAIN: ${PUBLIC_PLAUSIBLE_DOMAIN:-}
+      PUBLIC_PLAUSIBLE_SCRIPT_URL: ${PUBLIC_PLAUSIBLE_SCRIPT_URL:-}
       ORIGIN: 'https://demo.canutin.com'
     depends_on:
       - pocketbase
