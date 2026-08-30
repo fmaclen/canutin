@@ -26,10 +26,26 @@ export const PB_URL = process.env.PUBLIC_PB_URL ?? 'http://127.0.0.1:42070';
 const SUPERADMIN_EMAIL = 'superadmin@example.com';
 export const DEMO_EMAIL = 'demo@canutin.com';
 
-async function getAdminPB() {
-	const pb = new PocketBase(PB_URL) as TypedPocketBase;
-	await pb.collection('_superusers').authWithPassword(SUPERADMIN_EMAIL, DEFAULT_PASSWORD);
-	return pb;
+// Every seed helper below signs in as superuser, and PocketBase verifies the password with
+// bcrypt on each sign-in, so a spec that seeds dozens of records pays that cost dozens of
+// times. One session per worker process is enough. Caching the promise rather than the
+// client also collapses concurrent first calls into a single sign-in.
+let adminPB: Promise<TypedPocketBase> | null = null;
+
+function getAdminPB() {
+	if (!adminPB) {
+		const pb = new PocketBase(PB_URL) as TypedPocketBase;
+		adminPB = pb
+			.collection('_superusers')
+			.authWithPassword(SUPERADMIN_EMAIL, DEFAULT_PASSWORD)
+			.then(() => pb)
+			.catch((error) => {
+				// Clear the cache so a failed sign-in doesn't poison every later call
+				adminPB = null;
+				throw error;
+			});
+	}
+	return adminPB;
 }
 
 export async function getUserPB(email: string) {
