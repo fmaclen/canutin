@@ -20,6 +20,8 @@ services:
       HOST: '0.0.0.0'
       PORT: '42069'
       PUBLIC_PB_URL: 'http://localhost:42070'
+      PUBLIC_PLAUSIBLE_DOMAIN: ${PUBLIC_PLAUSIBLE_DOMAIN:-}
+      PUBLIC_PLAUSIBLE_SCRIPT_URL: ${PUBLIC_PLAUSIBLE_SCRIPT_URL:-}
     depends_on:
       - pocketbase
     restart: unless-stopped

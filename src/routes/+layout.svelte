@@ -3,6 +3,7 @@
 
 	import { ModeWatcher } from 'mode-watcher';
 
+	import { env } from '$env/dynamic/public';
 	import { browser } from '$app/environment';
 	import favicon from '$lib/assets/favicon.png';
 	import { setAuthContext } from '$lib/auth.svelte';
@@ -41,6 +42,13 @@
 <svelte:head>
 	<link rel="icon" href={favicon} />
 	<title>Canutin</title>
+	{#if env.PUBLIC_PLAUSIBLE_DOMAIN && env.PUBLIC_PLAUSIBLE_SCRIPT_URL}
+		<script
+			async
+			data-domain={env.PUBLIC_PLAUSIBLE_DOMAIN}
+			src={env.PUBLIC_PLAUSIBLE_SCRIPT_URL}
+		></script>
+	{/if}
 </svelte:head>
 
 <ModeWatcher />

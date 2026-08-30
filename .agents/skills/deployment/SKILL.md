@@ -56,6 +56,13 @@ Minimum required at runtime:
 
 - `PUBLIC_PB_URL` — URL the frontend uses to reach PocketBase (may be the same host as the SvelteKit server or a dedicated subdomain)
 
+Optional Plausible analytics variables for the SvelteKit container:
+
+- `PUBLIC_PLAUSIBLE_DOMAIN` — site domain registered in Plausible
+- `PUBLIC_PLAUSIBLE_SCRIPT_URL` — full URL of the Plausible tracker script
+
+Analytics loads only when both the domain and script URL are set.
+
 At build time the image takes one optional build arg:
 
 - `APP_VERSION` — the version the app displays in Settings. Defaults to `package.json`'s `version`; the release workflow passes the freshly published version because the Docker build checks out the commit before semantic-release bumps it.
