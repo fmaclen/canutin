@@ -11,13 +11,12 @@ Canutin ships as a Docker image that bundles the SvelteKit Node server and the c
 
 ## Files
 
-| File                      | Purpose                                                                   |
-| ------------------------- | ------------------------------------------------------------------------- |
-| `Dockerfile`              | Multi-stage build: Go (PB) + Node (SK); takes the `APP_VERSION` build arg |
-| `docker-compose.yml`      | Local / dev compose file                                                  |
-| `docker-compose.prod.yml` | Production compose file                                                   |
-| `.releaserc.json`         | semantic-release config                                                   |
-| `.github/workflows/`      | CI workflows (tests, release, image)                                      |
+| File                 | Purpose                                                                   |
+| -------------------- | ------------------------------------------------------------------------- |
+| `Dockerfile`         | Multi-stage build: Go (PB) + Node (SK); takes the `APP_VERSION` build arg |
+| `docker-compose.yml` | Local / dev compose file                                                  |
+| `.releaserc.json`    | semantic-release config                                                   |
+| `.github/workflows/` | CI workflows (tests, release, image)                                      |
 
 ## Build
 
@@ -35,14 +34,20 @@ Handled by semantic-release via the release workflow. Conventional commits drive
 - `fix:` → patch
 - `feat!:` / `BREAKING CHANGE:` → major
 
-See [code-quality.md](../code-quality/SKILL.md#commit-messages) for the full type list.
+See [commits and PRs](../commits-and-prs/SKILL.md#type-prefix-decides-whether-the-change-deploys) for the supported types.
+
+## Updates
+
+Every release publishes a new image, but nothing in this repo updates a running deployment. Each host decides when to pull, and how it does that is host configuration, not repo configuration. The README documents the manual `docker compose pull` and an optional maintained Watchtower fork for anyone who wants updates applied automatically.
+
+New environment variables must stay optional with a safe default, because a host that pulls unattended gets the new image without anyone touching its `.env`. A variable that cannot degrade gracefully belongs in a breaking-change release, where the notes call it out.
 
 ## Runtime
 
 At runtime the container:
 
 1. Starts the PocketBase binary (with the project's compiled Go hooks) on `:42070`
-2. Starts the SvelteKit Node adapter on `:3000` (or whatever the compose file maps)
+2. Starts the SvelteKit Node adapter on `:42069` (or whatever `PORT` sets)
 3. Uses `PUBLIC_PB_URL` to point the frontend at the in-container PocketBase
 
 ## Environment Variables
@@ -51,15 +56,22 @@ Minimum required at runtime:
 
 - `PUBLIC_PB_URL` — URL the frontend uses to reach PocketBase (may be the same host as the SvelteKit server or a dedicated subdomain)
 
+Optional Plausible analytics variables for the SvelteKit container:
+
+- `PUBLIC_PLAUSIBLE_DOMAIN` — site domain registered in Plausible
+- `PUBLIC_PLAUSIBLE_SCRIPT_URL` — full URL of the Plausible tracker script
+
+Analytics loads only when both the domain and script URL are set.
+
 At build time the image takes one optional build arg:
 
-- `APP_VERSION` — the version the app displays in Settings. Defaults to `package.json`'s `version`; the release workflow passes the freshly published version because the Docker build checks out the commit before semantic-release bumps it.
+- `APP_VERSION` — the version written to the runtime `package.json` and displayed in Settings. Defaults to `package.json`'s `version`; the release workflow passes the freshly published version because the Docker build checks out the commit before semantic-release bumps it.
 
 Additional variables depend on your deployment target and any custom Go hooks you've added. Check `.env.example` if one exists; otherwise inspect the compose files.
 
 ### Plaid
 
-The PocketBase container reads the Plaid credentials. Set these in the `.env` file beside `docker-compose.prod.yml`:
+The PocketBase container reads the Plaid credentials. Set these in the `.env` file beside the deployment's `docker-compose.yml`:
 
 ```dotenv
 PLAID_CLIENT_ID=<client-id>
@@ -69,7 +81,7 @@ PLAID_ENV=production
 
 Set all three values to enable Plaid. Use `sandbox` for development and `production` for live data; credentials without an explicit environment are rejected.
 
-Compose's `.env` file supplies substitution values; the `pocketbase.environment` mappings in `docker-compose.prod.yml` pass them into the container. After changing them, recreate PocketBase with `docker compose -f docker-compose.prod.yml up -d --force-recreate pocketbase`. Omit `-f docker-compose.prod.yml` when the deployment uses that content as `docker-compose.yml`.
+Compose's `.env` file supplies substitution values; the `pocketbase.environment` mappings in the compose file pass them into the container. After changing them, recreate PocketBase with `docker compose up -d --force-recreate pocketbase`.
 
 ## Anti-patterns
 

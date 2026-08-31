@@ -44,6 +44,8 @@ services:
       - '42069:42069'
     environment:
       PUBLIC_PB_URL: ${PUBLIC_PB_URL:-http://localhost:42070}
+      PUBLIC_PLAUSIBLE_DOMAIN: ${PUBLIC_PLAUSIBLE_DOMAIN:-}
+      PUBLIC_PLAUSIBLE_SCRIPT_URL: ${PUBLIC_PLAUSIBLE_SCRIPT_URL:-}
       ORIGIN: ${ORIGIN:-http://localhost:42069}
     depends_on:
       - pocketbase
@@ -82,9 +84,54 @@ PUBLIC_PB_URL=https://canutin-pb.example.com
 
 `ORIGIN` is the URL your users load the app from; without it, form submissions fail cross-origin checks. `PUBLIC_PB_URL` is the URL of the PocketBase service and must be reachable from your users' browsers, not just from inside Docker.
 
+### Updating
+
+Every release publishes a new image to `ghcr.io/fmaclen/canutin:latest`. To update by hand:
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+Settings shows the version you are running and tells you when a newer one is available, so nothing checks for updates unless you open that page.
+
+To update automatically instead, add [Watchtower](https://watchtower.nickfedor.com/) to your `docker-compose.yml`, and label the two services it should watch so the rest of the host is left alone:
+
+```yaml
+services:
+  pocketbase:
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
+    # ...rest of the service
+
+  sveltekit:
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
+    # ...rest of the service
+
+  watchtower:
+    image: nickfedor/watchtower:1.21.2
+    command: ['--cleanup', '--label-enable', '--interval', '86400']
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+```
+
+This actively maintained Watchtower fork supports Docker Engine 29 through Docker API version negotiation. It checks once a day and recreates a container when its image changes. The original [Containrrr project](https://github.com/containrrr/watchtower) is archived.
+
+Updates apply database migrations on start, so take a copy of the `canutin-data` volume if you want to be able to roll back.
+
 ### Bank syncing
 
 To sync balances and transactions from your bank, add your Plaid credentials to the same `.env` file. See the [Plaid guide](docs/plaid.md).
+
+### Analytics
+
+Plausible analytics is disabled by default. To enable it, add the site domain and script URL from your Plausible installation to the same `.env` file:
+
+```dotenv
+PUBLIC_PLAUSIBLE_DOMAIN=canutin.example.com
+PUBLIC_PLAUSIBLE_SCRIPT_URL=https://plausible.example.com/js/script.js
+```
 
 ## Documentation
 
