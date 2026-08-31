@@ -17,12 +17,13 @@ import {
 	type SecurityTransactionsResponse
 } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
-import { Debouncer } from './realtime-sync';
+import { StaleSync } from './realtime-sync';
 import { getSecuritiesContext } from './securities.svelte';
 import type { PeriodOption } from './transactions.svelte';
 import { toNumber, toPocketBaseDateString } from './utils';
 
-const REFRESH_DEBOUNCE_MS = 200;
+const TRADE_FIELDS =
+	'id,date,security,type,subtype,description,name,account,quantity,price,amount,fees,expand.account.id,expand.account.name,expand.security.id,expand.security.name,expand.security.symbol,expand.security.currency';
 
 type TradeExpand = {
 	account?: AccountsResponse;
@@ -54,12 +55,12 @@ class TradesContext {
 	private _customLabel: string | null = $state(null);
 	private _searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 	private _loadingDelayTimer: ReturnType<typeof setTimeout> | null = null;
-	private _refreshDebouncer = new Debouncer(REFRESH_DEBOUNCE_MS);
+	private sync: StaleSync;
 	private _activeUserId = '';
 	private _isSubscribed = false;
 	private _teardownCallback = () => this.unsubscribeRealtime();
-	private _reconnectCallback = () => this.invalidate();
-	private _refreshSequence = 0;
+	// Latest-wins guards for the two result slots a refresh commits into. They are separate because a
+	// page-only refetch must not discard an in-flight full refresh's summary commit.
 	private _pageRefreshSequence = 0;
 	private _summaryRefreshSequence = 0;
 
@@ -83,7 +84,10 @@ class TradesContext {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
-		this._pb.registerRealtimeReconnect(this._reconnectCallback);
+		this.sync = new StaleSync(pb, 'securityTransactions', 'refresh', (token) =>
+			this.refreshTransactions(token)
+		);
+		this._pb.registerRealtimeSync(this.sync);
 		this._accountsContext = getAccountsContext();
 		this._securitiesContext = getSecuritiesContext();
 		this.syncFromUrl(false);
@@ -150,7 +154,7 @@ class TradesContext {
 
 		if (shouldRefresh) {
 			this.page = 1;
-			this.refreshTransactions();
+			void this.sync.refreshNow();
 		}
 	}
 
@@ -172,7 +176,7 @@ class TradesContext {
 		}
 
 		this._searchDebounceTimer = setTimeout(() => {
-			this.refreshTransactions();
+			void this.sync.refreshNow();
 		}, TradesContext.SEARCH_DEBOUNCE_MS);
 	}
 
@@ -191,7 +195,7 @@ class TradesContext {
 
 		this.updateUrl(params);
 		this.page = 1;
-		this.refreshTransactions();
+		void this.sync.refreshNow();
 	}
 
 	setCustomRange(from: Date, to: Date) {
@@ -208,28 +212,28 @@ class TradesContext {
 
 		this.updateUrl(params);
 		this.page = 1;
-		this.refreshTransactions();
+		void this.sync.refreshNow();
 	}
 
 	setAccountFilter(accountId: string | null) {
 		this.accountFilter = accountId;
 		this.page = 1;
 		this.syncFiltersToUrl();
-		this.refreshTransactions();
+		void this.sync.refreshNow();
 	}
 
 	setSecurityFilter(securityId: string | null) {
 		this.securityFilter = securityId;
 		this.page = 1;
 		this.syncFiltersToUrl();
-		this.refreshTransactions();
+		void this.sync.refreshNow();
 	}
 
 	setTypeFilter(type: TradeTypeFilter) {
 		this.typeFilter = type;
 		this.page = 1;
 		this.syncFiltersToUrl();
-		this.refreshTransactions();
+		void this.sync.refreshNow();
 	}
 
 	private escapeFilterValue(value: string) {
@@ -268,8 +272,30 @@ class TradesContext {
 		return filterParts.length > 0 ? filterParts.join(' && ') : undefined;
 	}
 
-	async refreshTransactions(userId = this._activeUserId, includeSummary = true) {
-		if (userId && userId !== this._activeUserId) return;
+	// The spinner only appears if a refresh is still running after a beat, so a fast refetch doesn't
+	// flash it. The delayed flip is dropped once a newer refresh has taken over.
+	private startLoadingDelay(userId: string, token: number, pageRefreshId: number) {
+		this.clearLoadingDelay();
+		this._loadingDelayTimer = setTimeout(() => {
+			if (
+				userId !== this._activeUserId ||
+				!this.sync.isCurrent(token) ||
+				pageRefreshId !== this._pageRefreshSequence
+			)
+				return;
+			this.isLoading = true;
+		}, TradesContext.LOADING_DELAY_MS);
+	}
+
+	private clearLoadingDelay() {
+		if (this._loadingDelayTimer) clearTimeout(this._loadingDelayTimer);
+		this._loadingDelayTimer = null;
+	}
+
+	// A full refresh fills both result slots from one full-list query - the page is a slice of it.
+	// Errors propagate to the sync, which keeps the store marked stale and retries until one commits.
+	private async refreshTransactions(token: number) {
+		const userId = this._activeUserId;
 		if (!userId) {
 			this.rawTransactions = [];
 			this.summaryTransactions = [];
@@ -277,88 +303,85 @@ class TradesContext {
 			this.isLoading = false;
 			return;
 		}
-		const refreshId = this._refreshSequence;
 		const pageRefreshId = ++this._pageRefreshSequence;
-		const summaryRefreshId = includeSummary
-			? ++this._summaryRefreshSequence
-			: this._summaryRefreshSequence;
-
-		if (this._loadingDelayTimer) {
-			clearTimeout(this._loadingDelayTimer);
-			this._loadingDelayTimer = null;
-		}
-
-		this._loadingDelayTimer = setTimeout(() => {
-			if (
-				userId !== this._activeUserId ||
-				refreshId !== this._refreshSequence ||
-				pageRefreshId !== this._pageRefreshSequence
-			)
-				return;
-			this.isLoading = true;
-		}, TradesContext.LOADING_DELAY_MS);
+		const summaryRefreshId = ++this._summaryRefreshSequence;
+		this.startLoadingDelay(userId, token, pageRefreshId);
 
 		try {
-			const fields =
-				'id,date,security,type,subtype,description,name,account,quantity,price,amount,fees,expand.account.id,expand.account.name,expand.security.id,expand.security.name,expand.security.symbol,expand.security.currency';
-			const filter = this.activeFilter;
-			if (includeSummary) {
-				const requestedPage = this.page;
-				const summaryList = await this._pb.authedClient
-					.collection('securityTransactions')
-					.getFullList<Trade>({
-						sort: '-date,-created,-id',
-						expand: 'account,security',
-						fields,
-						filter,
-						batch: 200,
-						requestKey: null
-					});
-				if (
-					userId !== this._activeUserId ||
-					refreshId !== this._refreshSequence ||
-					summaryRefreshId !== this._summaryRefreshSequence
-				)
-					return;
-				if (pageRefreshId === this._pageRefreshSequence) {
-					const start = (requestedPage - 1) * this.pageSize;
-					this.rawTransactions = summaryList.slice(start, start + this.pageSize);
-					this.totalItems = summaryList.length;
-				}
-				this.summaryTransactions = summaryList;
+			const requestedPage = this.page;
+			const summaryList = await this._pb.authedClient
+				.collection('securityTransactions')
+				.getFullList<Trade>({
+					sort: '-date,-created,-id',
+					expand: 'account,security',
+					fields: TRADE_FIELDS,
+					filter: this.activeFilter,
+					batch: 200,
+					requestKey: null
+				});
+			if (
+				userId !== this._activeUserId ||
+				!this.sync.isCurrent(token) ||
+				summaryRefreshId !== this._summaryRefreshSequence
+			)
 				return;
+			if (pageRefreshId === this._pageRefreshSequence) {
+				const start = (requestedPage - 1) * this.pageSize;
+				this.rawTransactions = summaryList.slice(start, start + this.pageSize);
+				this.totalItems = summaryList.length;
 			}
-			const pageRequest = this._pb.authedClient
+			this.summaryTransactions = summaryList;
+		} finally {
+			this.clearLoadingDelay();
+			if (
+				userId === this._activeUserId &&
+				this.sync.isCurrent(token) &&
+				pageRefreshId === this._pageRefreshSequence
+			)
+				this.isLoading = false;
+		}
+	}
+
+	// A page change refetches only the page slot: the summary already spans the whole filtered range,
+	// so re-running its full-list query on every page click would be pure waste. Paging is a user
+	// action rather than a sync signal, so it stays outside the staleness ladder.
+	private async refreshPage() {
+		const userId = this._activeUserId;
+		const token = this.sync.current;
+		const pageRefreshId = ++this._pageRefreshSequence;
+		this.startLoadingDelay(userId, token, pageRefreshId);
+
+		try {
+			const pageList = await this._pb.authedClient
 				.collection('securityTransactions')
 				.getList<Trade>(this.page, this.pageSize, {
 					sort: '-date,-created,-id',
 					expand: 'account,security',
-					fields,
-					filter,
+					fields: TRADE_FIELDS,
+					filter: this.activeFilter,
 					requestKey: null
 				});
-			const pageList = await pageRequest;
-			if (userId !== this._activeUserId || refreshId !== this._refreshSequence) return;
-			if (pageRefreshId === this._pageRefreshSequence) {
-				this.rawTransactions = pageList.items;
-				this.totalItems = pageList.totalItems;
-			}
-		} catch (error) {
-			if (userId !== this._activeUserId || refreshId !== this._refreshSequence) return;
 			if (
-				pageRefreshId !== this._pageRefreshSequence &&
-				(!includeSummary || summaryRefreshId !== this._summaryRefreshSequence)
+				userId !== this._activeUserId ||
+				!this.sync.isCurrent(token) ||
+				pageRefreshId !== this._pageRefreshSequence
 			)
 				return;
-			this._pb.handleConnectionError(error, 'securityTransactions', 'refresh');
+			this.rawTransactions = pageList.items;
+			this.totalItems = pageList.totalItems;
+		} catch (error) {
+			if (
+				userId !== this._activeUserId ||
+				!this.sync.isCurrent(token) ||
+				pageRefreshId !== this._pageRefreshSequence
+			)
+				return;
+			this._pb.handleConnectionError(error, 'securityTransactions', 'page');
 		} finally {
-			if (this._loadingDelayTimer) {
-				clearTimeout(this._loadingDelayTimer);
-				this._loadingDelayTimer = null;
-			}
+			this.clearLoadingDelay();
 			if (
 				userId === this._activeUserId &&
-				refreshId === this._refreshSequence &&
+				this.sync.isCurrent(token) &&
 				pageRefreshId === this._pageRefreshSequence
 			)
 				this.isLoading = false;
@@ -370,12 +393,8 @@ class TradesContext {
 			const userId = this._auth.currentUserId;
 			if (userId === this._activeUserId) return;
 			this.unsubscribeRealtime();
-			this._refreshSequence++;
-			this._refreshDebouncer.cancel();
-			if (this._loadingDelayTimer) {
-				clearTimeout(this._loadingDelayTimer);
-				this._loadingDelayTimer = null;
-			}
+			this.sync.cancel();
+			this.clearLoadingDelay();
 			this._activeUserId = userId;
 
 			if (!userId) {
@@ -391,7 +410,7 @@ class TradesContext {
 				if (userId !== this._activeUserId) return;
 				this.realtimeSubscribe(userId);
 				this.syncFromUrl(false);
-				void this.refreshTransactions(userId);
+				void this.sync.refreshNow();
 			});
 		});
 	}
@@ -418,23 +437,12 @@ class TradesContext {
 		this._pb.authedClient.collection('securityTransactions').unsubscribe('*');
 	}
 
+	// A trade event or a realtime reconnect is a pure invalidation signal: it marks the store stale
+	// and schedules the page/summary refetch rather than patching the payload into the cached rows.
 	private onTradeEvent(event: RecordSubscription<Trade>, userId: string) {
 		if (!userId || userId !== this._activeUserId) return;
 		if (!event.action) return;
-		this.invalidate();
-	}
-
-	// A trade event or a realtime reconnect is a pure invalidation signal: it schedules the debounced
-	// page/summary refetch rather than patching the event payload into the cached rows.
-	private invalidate() {
-		const userId = this._activeUserId;
-		if (!userId) return;
-		this._refreshDebouncer.schedule(() => {
-			if (userId !== this._activeUserId) return;
-			this.refreshTransactions(userId).catch((error) =>
-				this._pb.handleConnectionError(error, 'securityTransactions', 'realtime_refresh')
-			);
-		});
+		this.sync.invalidate();
 	}
 
 	private get currentUrl() {
@@ -626,15 +634,15 @@ class TradesContext {
 		const nextPage = Math.min(Math.max(1, page), this.totalPages);
 		if (nextPage === this.page) return;
 		this.page = nextPage;
-		this.refreshTransactions(this._activeUserId, false);
+		void this.refreshPage();
 	}
 
 	dispose() {
 		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
-		this._pb.unregisterRealtimeReconnect(this._reconnectCallback);
+		this._pb.unregisterRealtimeSync(this.sync);
 		if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
-		if (this._loadingDelayTimer) clearTimeout(this._loadingDelayTimer);
-		this._refreshDebouncer.cancel();
+		this.clearLoadingDelay();
+		this.sync.cancel();
 		this.unsubscribeRealtime();
 	}
 }

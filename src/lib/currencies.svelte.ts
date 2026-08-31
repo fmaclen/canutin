@@ -5,9 +5,7 @@ import { getAuthContext } from './auth.svelte';
 import { logError } from './logger';
 import type { CurrenciesResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
-import { Debouncer, RequestSequence } from './realtime-sync';
-
-const DEBOUNCE_MS = 200;
+import { StaleSync } from './realtime-sync';
 
 type CurrencyRegistryRow = {
 	id: string;
@@ -35,19 +33,17 @@ class CurrenciesContext {
 
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
-	private sequence = new RequestSequence();
-	private debouncer = new Debouncer(DEBOUNCE_MS);
+	private sync: StaleSync;
 	private _activeUserId = '';
 	private _isSubscribed = false;
-	private _disposed = false;
 	private _teardownCallback = () => this.unsubscribeRealtime();
-	private _reconnectCallback = () => this.invalidate();
 
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
-		this._pb.registerRealtimeReconnect(this._reconnectCallback);
+		this.sync = new StaleSync(pb, 'currencies', 'refresh', (token) => this.refreshAll(token));
+		this._pb.registerRealtimeSync(this.sync);
 		this.init();
 	}
 
@@ -56,8 +52,7 @@ class CurrenciesContext {
 			const userId = this._auth.currentUserId;
 			if (userId === this._activeUserId) return;
 			this.unsubscribeRealtime();
-			this.debouncer.cancel();
-			this.sequence.bump();
+			this.sync.cancel();
 			this._activeUserId = userId;
 			if (!userId) {
 				this._records = [];
@@ -66,29 +61,24 @@ class CurrenciesContext {
 			}
 			this._isLoaded = false;
 			this.realtimeSubscribe(userId);
-			void this.refresh(userId);
+			void this.sync.refreshNow();
 		});
 	}
 
-	private async refresh(userId: string) {
-		if (!userId) return;
-		const token = this.sequence.next();
-		try {
-			const list = await this._pb.authedClient
-				.collection('currencies')
-				.getFullList<CurrenciesResponse>({
-					sort: 'code',
-					requestKey: null
-				});
-			if (this._disposed || userId !== this._activeUserId || !this.sequence.isCurrent(token))
-				return;
+	// Realtime events and reconnects are pure invalidation signals: both mark the store stale and
+	// schedule this full refetch, so a reconnect converges on any events missed while disconnected.
+	private async refreshAll(token: number) {
+		const userId = this._activeUserId;
+		const list = await this._pb.authedClient
+			.collection('currencies')
+			.getFullList<CurrenciesResponse>({
+				sort: 'code',
+				requestKey: null
+			});
+		if (userId !== this._activeUserId || !this.sync.isCurrent(token)) return;
 
-			this._records = list;
-			this._isLoaded = true;
-		} catch (error) {
-			if (userId !== this._activeUserId) return;
-			this._pb.handleConnectionError(error, 'currencies', 'refresh');
-		}
+		this._records = list;
+		this._isLoaded = true;
 	}
 
 	private realtimeSubscribe(userId: string) {
@@ -96,7 +86,7 @@ class CurrenciesContext {
 		this._isSubscribed = true;
 		this._pb.authedClient
 			.collection('currencies')
-			.subscribe('*', () => this.invalidate())
+			.subscribe('*', () => this.sync.invalidate())
 			.catch((error) => {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'currencies', 'subscribe');
@@ -110,13 +100,6 @@ class CurrenciesContext {
 		if (!this._isSubscribed) return;
 		this._isSubscribed = false;
 		this._pb.authedClient.collection('currencies').unsubscribe('*');
-	}
-
-	// Realtime events and reconnects are pure invalidation signals: both schedule a debounced full
-	// refetch, so a reconnect converges on any events missed while the socket was disconnected.
-	private invalidate() {
-		if (!this._activeUserId) return;
-		this.debouncer.schedule(() => void this.refresh(this._activeUserId));
 	}
 
 	get currencies() {
@@ -144,12 +127,10 @@ class CurrenciesContext {
 	}
 
 	dispose() {
-		this._disposed = true;
-		this.debouncer.cancel();
+		this.sync.cancel();
 		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
-		this._pb.unregisterRealtimeReconnect(this._reconnectCallback);
+		this._pb.unregisterRealtimeSync(this.sync);
 		this.unsubscribeRealtime();
-		this.sequence.bump();
 	}
 }
 

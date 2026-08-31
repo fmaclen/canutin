@@ -13,7 +13,7 @@ import {
 	type AssetsResponse
 } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
-import { Debouncer, RequestSequence } from './realtime-sync';
+import { StaleSync } from './realtime-sync';
 import { participantExcluded, projectAssetFinancials } from './sharing';
 import { toPocketBaseDateString } from './utils';
 
@@ -53,8 +53,6 @@ const DEFAULT_BALANCE_DATA: LatestAssetBalance = {
 	balanceAsOf: ''
 };
 
-const DEBOUNCE_MS = 200;
-
 export type AssetWithBalance = AssetsResponse &
 	AssetDisplayBalanceData & {
 		isOwner: boolean;
@@ -85,12 +83,10 @@ class AssetsContext {
 	private _auth: ReturnType<typeof getAuthContext>;
 	private _fx: ReturnType<typeof getExchangeRatesContext>;
 	private balanceTypesContext: ReturnType<typeof setBalanceTypesContext>;
-	private sequence = new RequestSequence();
-	private debouncer = new Debouncer(DEBOUNCE_MS);
+	private sync: StaleSync;
 	private _activeUserId = '';
 	private _isSubscribed = false;
 	private _teardownCallback = () => this.unsubscribeRealtime();
-	private _reconnectCallback = () => this.invalidate();
 
 	constructor(
 		pb: PocketBaseContext,
@@ -99,7 +95,8 @@ class AssetsContext {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
-		this._pb.registerRealtimeReconnect(this._reconnectCallback);
+		this.sync = new StaleSync(pb, 'assets', 'refresh', (token) => this.refreshAll(token));
+		this._pb.registerRealtimeSync(this.sync);
 		this._fx = getExchangeRatesContext();
 		this.balanceTypesContext = balanceTypesContext;
 		this.init();
@@ -143,17 +140,17 @@ class AssetsContext {
 			recipientEmail,
 			perspective
 		});
-		await this.refreshForCurrentUser();
+		await this.sync.refreshNow();
 	}
 
 	async updateShareIncludeInNetWorth(shareId: string, includeInNetWorth: boolean) {
 		await this._pb.authedClient.collection('assetShares').update(shareId, { includeInNetWorth });
-		await this.refreshForCurrentUser();
+		await this.sync.refreshNow();
 	}
 
 	async revokeShare(shareId: string) {
 		await this._pb.authedClient.collection('assetShares').delete(shareId);
-		await this.refreshForCurrentUser();
+		await this.sync.refreshNow();
 	}
 
 	private init() {
@@ -161,8 +158,7 @@ class AssetsContext {
 			const userId = this.currentUserId;
 			if (userId === this._activeUserId) return;
 			this.unsubscribeRealtime();
-			this.debouncer.cancel();
-			this.sequence.bump();
+			this.sync.cancel();
 			this._activeUserId = userId;
 			if (!userId) {
 				this.rawAssets = [];
@@ -175,20 +171,16 @@ class AssetsContext {
 			this.isLoading = true;
 			this.lastBalanceEvent = 0;
 			this.realtimeSubscribe(userId);
-			void this.refreshForCurrentUser();
+			void this.sync.refreshNow();
 		});
 	}
 
 	// Realtime events and reconnects are pure invalidation signals: they never patch a payload into
-	// state, they only schedule a full refetch. Deletes, share membership changes, and cross-asset
-	// balance reassignments all resolve for free because the fresh snapshot reflects the database as-is.
-	private invalidate() {
-		this.debouncer.schedule(() => void this.refreshForCurrentUser());
-	}
-
-	async refreshForCurrentUser() {
+	// state, they only mark the store stale and schedule a full refetch. Deletes, share membership
+	// changes, and cross-asset balance reassignments all resolve for free because the fresh snapshot
+	// reflects the database as-is.
+	private async refreshAll(token: number) {
 		const userId = this.currentUserId;
-		const token = this.sequence.next();
 		try {
 			const [shares, assets, balances] = await Promise.all([
 				this._pb.authedClient.collection('assetShares').getFullList<AssetSharesResponse>({
@@ -209,11 +201,11 @@ class AssetsContext {
 					requestKey: null
 				})
 			]);
-			if (userId !== this.currentUserId || !this.sequence.isCurrent(token)) return;
+			if (userId !== this.currentUserId || !this.sync.isCurrent(token)) return;
 			for (const asset of assets) {
 				await this.balanceTypesContext.ensureLoaded(asset.balanceType);
 			}
-			if (userId !== this.currentUserId || !this.sequence.isCurrent(token)) return;
+			if (userId !== this.currentUserId || !this.sync.isCurrent(token)) return;
 
 			this.shares = shares.toSorted((a, b) => a.recipientEmail.localeCompare(b.recipientEmail));
 			this.latestBalanceByAsset.clear();
@@ -227,11 +219,8 @@ class AssetsContext {
 			}
 			this.rawAssets = assets;
 			this.lastBalanceEvent = Date.now();
-		} catch (error) {
-			if (userId !== this.currentUserId || !this.sequence.isCurrent(token)) return;
-			this._pb.handleConnectionError(error, 'assets', 'refresh');
 		} finally {
-			if (userId === this.currentUserId && this.sequence.isCurrent(token)) this.isLoading = false;
+			if (userId === this.currentUserId && this.sync.isCurrent(token)) this.isLoading = false;
 		}
 	}
 
@@ -273,7 +262,7 @@ class AssetsContext {
 
 	private onRealtimeEvent(userId: string) {
 		if (!userId || userId !== this._activeUserId) return;
-		this.invalidate();
+		this.sync.invalidate();
 	}
 
 	private unsubscribeRealtime() {
@@ -355,11 +344,10 @@ class AssetsContext {
 	}
 
 	dispose() {
-		this.debouncer.cancel();
+		this.sync.cancel();
 		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
-		this._pb.unregisterRealtimeReconnect(this._reconnectCallback);
+		this._pb.unregisterRealtimeSync(this.sync);
 		this.unsubscribeRealtime();
-		this.sequence.bump();
 	}
 }
 

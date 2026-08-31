@@ -7,14 +7,10 @@ import { browser } from '$app/environment';
 import { logError } from './logger';
 import { m } from './paraglide/messages';
 import type { TypedPocketBase } from './pocketbase.schema';
+import type { StaleSync } from './realtime-sync';
 import { getBackendUrl } from './utils';
 
 export type SetupStatus = 'checking' | 'ready' | 'needs-setup' | 'unreachable';
-
-// Waits between backend health probes during a recovery attempt. The list doubles as the attempt
-// budget: after the last delay the attempt gives up and waits for the next trigger, so a user who
-// stays offline for an hour is probed a handful of times, not continuously.
-const RECOVERY_PROBE_DELAYS_MS = [1000, 2000, 4000, 8000, 16000, 30000];
 
 enum ToastId {
 	CONNECTION_ERROR = 'connection-error',
@@ -28,17 +24,15 @@ export class PocketBaseContext {
 	onAuthInvalidated?: () => void;
 
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- never read in a reactive context
-	private _reconnectCallbacks = new Set<() => void>();
-	private _reconnectListening = false;
-	private _pendingReconnect = false;
-	private _recovering = false;
-	private _pendingRecovery = false;
+	private _syncs = new Set<StaleSync>();
+	private _syncListening = false;
+	private _probe: Promise<boolean> | null = null;
 	// Fires on the two browser signals that a dead connection may be usable again: the network
 	// coming back, and the tab becoming visible after a sleep/wake or a backgrounded stretch. While
 	// hidden the tab is left alone - the visibility signal picks it up when the user returns.
-	private _recoveryTrigger = () => {
+	private _retryTrigger = () => {
 		if (document.visibilityState !== 'visible') return;
-		void this.recoverRealtime();
+		for (const sync of this._syncs) sync.retryNow();
 	};
 
 	constructor() {
@@ -47,81 +41,58 @@ export class PocketBaseContext {
 
 	// NOTE: the SDK resubmits subscriptions on realtime reconnect but never replays events emitted
 	// while disconnected, so records shared to the user during that gap (e.g. a laptop wake or
-	// network blip) stay invisible until a full re-init. Registered stores refetch on reconnect so a
-	// session converges with what the backend allows without a logout/login.
+	// network blip) stay invisible until a full re-init. The registry marks every store stale the
+	// moment the socket drops, and the store stays stale until a refresh actually commits - so a
+	// session converges without a logout/login even if the first few attempts fail.
 	//
 	// The SDK only reconnects when the EventSource reports a transport error, and EventSource has no
 	// liveness detection: an offline network or a slept laptop routinely leaves the socket in an OPEN
-	// state that never errors, so `onDisconnect` never fires and nothing would ever refetch. The
-	// browser's `online` and `visibilitychange` signals are therefore part of the recovery contract,
-	// not a nicety - they are the only trigger in the failing case.
-	registerRealtimeReconnect(callback: () => void) {
-		this._reconnectCallbacks.add(callback);
-		if (this._reconnectListening) return;
-		this._reconnectListening = true;
+	// state that never errors, so `onDisconnect` never fires and nothing would mark the stores stale.
+	// The browser's `online` and `visibilitychange` signals are therefore part of the recovery
+	// contract, not a nicety - they are the only trigger in the failing case.
+	registerRealtimeSync(sync: StaleSync) {
+		this._syncs.add(sync);
+		if (this._syncListening) return;
+		this._syncListening = true;
 		this.authedClient.realtime.onDisconnect = (activeSubscriptions) => {
-			this._pendingReconnect = activeSubscriptions.length > 0;
+			// Only a drop that had live subscriptions can have missed events; the SDK also reports this
+			// while negotiating the very first connection, which has nothing to miss yet.
+			if (activeSubscriptions.length === 0) return;
+			for (const sync of this._syncs) sync.markStale();
 		};
+		// PB_CONNECT is the most precise "the backend is reachable again" signal available, but it
+		// carries no correctness of its own: it only pokes stores that already know they missed
+		// something, and a store that is not stale ignores it.
 		void this.authedClient.realtime
 			.subscribe('PB_CONNECT', () => {
-				if (!this._pendingReconnect) return;
-				this._pendingReconnect = false;
-				void this.recoverRealtime();
+				for (const sync of this._syncs) sync.retryNow();
 			})
 			.catch((error) => logError('pocketbase', 'reconnect_subscribe', error));
 		if (!browser) return;
-		window.addEventListener('online', this._recoveryTrigger);
-		document.addEventListener('visibilitychange', this._recoveryTrigger);
+		window.addEventListener('online', this._retryTrigger);
+		document.addEventListener('visibilitychange', this._retryTrigger);
 	}
 
-	unregisterRealtimeReconnect(callback: () => void) {
-		this._reconnectCallbacks.delete(callback);
+	unregisterRealtimeSync(sync: StaleSync) {
+		this._syncs.delete(sync);
 	}
 
-	// A refetch issued the instant a trigger fires can still hit a network that is not usable yet (an
-	// `online` event precedes real connectivity, and a store refetch that fails is discarded), so
-	// recovery is latched: it probes the backend on a bounded backoff and only invalidates the stores
-	// once the backend actually answers. `_recovering` coalesces a burst of triggers - an SDK
-	// reconnect, `online`, and `visibilitychange` typically arrive together - into a single refetch.
-	// A trigger that lands while a round is already running is not dropped: the running round may
-	// have read state from before whatever prompted the new trigger (a PB_CONNECT can arrive while a
-	// visibility-triggered round is mid-flight), so it latches `_pendingRecovery` and a follow-up
-	// round runs when the current one settles - the same follow-up rule stores apply to events that
-	// arrive mid-fetch.
-	private async recoverRealtime() {
-		if (!this.authedClient.authStore.isValid) return;
-		if (this._recovering) {
-			this._pendingRecovery = true;
-			return;
-		}
-		this._recovering = true;
-		try {
-			for (let attempt = 0; ; attempt++) {
-				try {
-					await this.authedClient.health.check({ requestKey: null });
-					break;
-				} catch (error) {
-					if (attempt === RECOVERY_PROBE_DELAYS_MS.length) {
-						logError('pocketbase', 'recovery_unreachable', error);
-						return;
-					}
-					await new Promise((resolve) => setTimeout(resolve, RECOVERY_PROBE_DELAYS_MS[attempt]));
-				}
-			}
-			for (const reconnect of this._reconnectCallbacks) {
-				try {
-					reconnect();
-				} catch (error) {
-					logError('pocketbase', 'reconnect_callback', error);
-				}
-			}
-		} finally {
-			this._recovering = false;
-			if (this._pendingRecovery) {
-				this._pendingRecovery = false;
-				void this.recoverRealtime();
-			}
-		}
+	// Shared reachability gate for stale-store retries. An `online` event precedes real connectivity
+	// and a slept laptop's socket lies about being open, so a retry round asks this first: one small
+	// request answers for every store, instead of a dozen doomed refetches per tick. It is a gate the
+	// retries await, not a latch - marking a store stale is idempotent and the flag outlives any
+	// round, so a trigger landing mid-round is coalesced rather than dropped.
+	probeBackend() {
+		this._probe ??= this.authedClient.health
+			.check({ requestKey: null })
+			.then(
+				() => true,
+				() => false
+			)
+			.finally(() => {
+				this._probe = null;
+			});
+		return this._probe;
 	}
 
 	get backendUrl(): string {

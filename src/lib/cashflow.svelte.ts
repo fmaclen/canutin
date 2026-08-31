@@ -14,9 +14,7 @@ import { getExchangeRatesContext } from './exchange-rates.svelte';
 import { logError } from './logger';
 import { AccountSharesPerspectiveOptions, type TransactionsResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
-import { Debouncer, RequestSequence } from './realtime-sync';
-
-const DEBOUNCE_MS = 200;
+import { StaleSync } from './realtime-sync';
 
 class CashflowContext {
 	avg3m: CashflowAverages = $state({
@@ -51,25 +49,24 @@ class CashflowContext {
 	private _auth: ReturnType<typeof getAuthContext>;
 	private _fx: ReturnType<typeof getExchangeRatesContext>;
 	private _accountsContext: ReturnType<typeof getAccountsContext>;
-	private debouncer = new Debouncer(DEBOUNCE_MS);
+	private sync: StaleSync;
 	private _unsubscribe: (() => void) | null = null;
 	private _disposed = false;
 	private _activeUserId = '';
 	private _isSubscribed = false;
-	private sequence = new RequestSequence();
 	private _recomputeAllInFlight = 0;
 	private _transactionsById = new SvelteMap<string, TransactionsResponse>();
 	private _activeWindow: CashflowWindow | null = null;
 	private _hasTransactionSnapshot = false;
 	private _watchedAccountsKey: string | null = null;
 	private _teardownCallback = () => this.unsubscribeRealtime();
-	private _reconnectCallback = () => this.invalidate();
 
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
-		this._pb.registerRealtimeReconnect(this._reconnectCallback);
+		this.sync = new StaleSync(pb, 'cashflow', 'refresh', (token) => this.recomputeAll(token));
+		this._pb.registerRealtimeSync(this.sync);
 		this._fx = getExchangeRatesContext();
 		this._accountsContext = getAccountsContext();
 		this.init();
@@ -80,8 +77,7 @@ class CashflowContext {
 			const userId = this._auth.currentUserId;
 			if (userId === this._activeUserId) return;
 			this.unsubscribeRealtime();
-			this.debouncer.cancel();
-			this.sequence.bump();
+			this.sync.cancel();
 			this._activeUserId = userId;
 			if (!userId) {
 				this._transactionsById = new SvelteMap();
@@ -153,11 +149,10 @@ class CashflowContext {
 				}
 			}
 
+			// The key is recorded before the fetch so a balance-only tick can't re-trigger it; if the
+			// fetch fails the sync keeps the store stale and owns the retry, so the key stays put.
 			this._watchedAccountsKey = watchedAccountsKey;
-			void this.recomputeAll(accounts).catch((error) => {
-				if (this._watchedAccountsKey === watchedAccountsKey) this._watchedAccountsKey = null;
-				this._pb.handleConnectionError(error, 'cashflow', 'init');
-			});
+			void this.sync.refreshNow();
 		});
 	}
 
@@ -201,24 +196,15 @@ class CashflowContext {
 
 	private onRealtimeEvent(userId: string) {
 		if (!userId || userId !== this._activeUserId) return;
-		this.invalidate();
+		this.sync.invalidate();
 	}
 
 	// A transaction event (or a reconnect) is a pure invalidation signal: instead of patching the
-	// in-memory transaction map from the event payload, it schedules a debounced full refetch of the
-	// windowed transactions via recomputeAll. Projection (recomputeFromTransactionMap driven by the
+	// in-memory transaction map from the event payload, it marks the store stale and schedules a full
+	// refetch of the windowed transactions. Projection (recomputeFromTransactionMap driven by the
 	// accounts effect) stays incremental and network-free; only this sync path was ever a refetch.
-	private invalidate() {
-		this.debouncer.schedule(
-			() =>
-				void this.recomputeAll(this._accountsContext.accounts).catch((error) =>
-					this._pb.handleConnectionError(error, 'cashflow', 'refresh')
-				)
-		);
-	}
-
-	private async recomputeAll(accounts: AccountWithBalance[]) {
-		const token = this.sequence.next();
+	private async recomputeAll(token: number) {
+		const accounts = this._accountsContext.accounts;
 		const cashflowWindow = this.getCashflowWindow();
 
 		this._recomputeAllInFlight++;
@@ -231,7 +217,7 @@ class CashflowContext {
 					requestKey: null
 				});
 
-			if (!this.sequence.isCurrent(token)) return;
+			if (!this.sync.isCurrent(token)) return;
 
 			this._transactionsById = new SvelteMap(
 				txns.map((transaction) => [transaction.id, transaction])
@@ -242,7 +228,7 @@ class CashflowContext {
 			this.recomputeFromTransactionMap(accounts, cashflowWindow);
 		} finally {
 			this._recomputeAllInFlight--;
-			if (!this._disposed && this.sequence.isCurrent(token)) this.isLoading = false;
+			if (!this._disposed && this.sync.isCurrent(token)) this.isLoading = false;
 		}
 	}
 
@@ -281,10 +267,9 @@ class CashflowContext {
 
 	dispose() {
 		this._disposed = true;
-		this.sequence.bump();
-		this.debouncer.cancel();
+		this.sync.cancel();
 		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
-		this._pb.unregisterRealtimeReconnect(this._reconnectCallback);
+		this._pb.unregisterRealtimeSync(this.sync);
 		this.unsubscribeRealtime();
 	}
 }

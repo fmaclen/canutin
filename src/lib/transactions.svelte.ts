@@ -17,7 +17,7 @@ import type {
 	TransactionsResponse
 } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
-import { Debouncer } from './realtime-sync';
+import { StaleSync } from './realtime-sync';
 import {
 	createSortComparator,
 	sumPartial,
@@ -26,7 +26,8 @@ import {
 	type SortState
 } from './utils';
 
-const REFRESH_DEBOUNCE_MS = 200;
+const TRANSACTION_FIELDS =
+	'id,date,description,value,excluded,account,labels,expand.account.id,expand.account.name,expand.labels.id,expand.labels.name';
 
 type TransactionSortColumn = 'date' | 'description' | 'account' | 'amount';
 
@@ -98,17 +99,20 @@ class TransactionsContext {
 	private _customLabel: string | null = $state(null);
 	private _searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 	private _loadingDelayTimer: ReturnType<typeof setTimeout> | null = null;
-	private _refreshDebouncer = new Debouncer(REFRESH_DEBOUNCE_MS);
+	// Staleness is two-dimensional here: a transaction event can never change the label dictionary,
+	// so the two collections track it separately and a transaction burst never refetches labels.
+	// Both are registered with the realtime registry, so a reconnect marks each of them stale.
+	private sync: StaleSync;
+	private labelsSync: StaleSync;
 	private _activeUserId = '';
 	private _isSubscribed = false;
 	private _teardownCallback = () => this.unsubscribeRealtime();
-	private _reconnectCallback = () => this.invalidate(true);
 	private _unsubscribe: (() => void) | null = null;
 	private _unsubscribeLabels: (() => void) | null = null;
-	private _refreshSequence = 0;
+	// Latest-wins guards for the two result slots a refresh commits into. They are separate because a
+	// page-only refetch must not discard an in-flight full refresh's summary commit.
 	private _pageRefreshSequence = 0;
 	private _summaryRefreshSequence = 0;
-	private _labelRefreshSequence = 0;
 
 	private static readonly LOADING_DELAY_MS = 150;
 	private static readonly SEARCH_DEBOUNCE_MS = 300;
@@ -134,7 +138,14 @@ class TransactionsContext {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
-		this._pb.registerRealtimeReconnect(this._reconnectCallback);
+		this.sync = new StaleSync(pb, 'transactions', 'refresh', (token) =>
+			this.refreshTransactions(token)
+		);
+		this.labelsSync = new StaleSync(pb, 'transactionLabels', 'refresh', (token) =>
+			this.refreshLabels(token)
+		);
+		this._pb.registerRealtimeSync(this.sync);
+		this._pb.registerRealtimeSync(this.labelsSync);
 		this._accountsContext = getAccountsContext();
 		this._fx = getExchangeRatesContext();
 		this.syncFromUrl(false);
@@ -216,7 +227,7 @@ class TransactionsContext {
 
 		if (shouldRefresh) {
 			this.page = 1;
-			this.refreshTransactions();
+			void this.sync.refreshNow();
 		}
 	}
 
@@ -272,12 +283,9 @@ class TransactionsContext {
 			const userId = this._auth.currentUserId;
 			if (userId === this._activeUserId) return;
 			this.unsubscribeRealtime();
-			this._refreshSequence++;
-			this._refreshDebouncer.cancel();
-			if (this._loadingDelayTimer) {
-				clearTimeout(this._loadingDelayTimer);
-				this._loadingDelayTimer = null;
-			}
+			this.sync.cancel();
+			this.labelsSync.cancel();
+			this.clearLoadingDelay();
 			this._activeUserId = userId;
 
 			if (!userId) {
@@ -300,28 +308,23 @@ class TransactionsContext {
 		this.realtimeSubscribe(userId);
 		this.realtimeSubscribeLabels(userId);
 		this.syncFromUrl(false);
-		await this.refreshLabels(userId);
+		await this.labelsSync.refreshNow();
 		if (userId !== this._activeUserId) return;
-		await this.refreshTransactions(userId);
+		await this.sync.refreshNow();
 	}
 
-	private async refreshLabels(userId = this._activeUserId) {
-		if (!userId || userId !== this._activeUserId) return;
+	private async refreshLabels(token: number) {
+		const userId = this._activeUserId;
+		if (!userId) return;
 
-		const labelRefreshId = ++this._labelRefreshSequence;
-		try {
-			const labels = await this._pb.authedClient
-				.collection('transactionLabels')
-				.getFullList<TransactionLabelsResponse>({
-					sort: 'name',
-					requestKey: null
-				});
-			if (userId !== this._activeUserId || labelRefreshId !== this._labelRefreshSequence) return;
-			this.transactionLabels = labels;
-		} catch (error) {
-			if (userId !== this._activeUserId || labelRefreshId !== this._labelRefreshSequence) return;
-			this._pb.handleConnectionError(error, 'transactionLabels', 'refresh');
-		}
+		const labels = await this._pb.authedClient
+			.collection('transactionLabels')
+			.getFullList<TransactionLabelsResponse>({
+				sort: 'name',
+				requestKey: null
+			});
+		if (userId !== this._activeUserId || !this.labelsSync.isCurrent(token)) return;
+		this.transactionLabels = labels;
 	}
 
 	setSearch(query: string) {
@@ -334,7 +337,7 @@ class TransactionsContext {
 		}
 
 		this._searchDebounceTimer = setTimeout(() => {
-			this.refreshTransactions();
+			void this.sync.refreshNow();
 		}, TransactionsContext.SEARCH_DEBOUNCE_MS);
 	}
 
@@ -424,8 +427,42 @@ class TransactionsContext {
 		return this.sortColumn === 'amount' || this.kind === 'credits' || this.kind === 'debits';
 	}
 
-	async refreshTransactions(userId = this._activeUserId, includeSummary = true) {
-		if (userId && userId !== this._activeUserId) return;
+	// The spinner only appears if a refresh is still running after a beat, so a fast refetch doesn't
+	// flash it. The delayed flip is dropped once a newer refresh has taken over.
+	private startLoadingDelay(userId: string, token: number, pageRefreshId: number) {
+		this.clearLoadingDelay();
+		this._loadingDelayTimer = setTimeout(() => {
+			if (
+				userId !== this._activeUserId ||
+				!this.sync.isCurrent(token) ||
+				pageRefreshId !== this._pageRefreshSequence
+			)
+				return;
+			this.isLoading = true;
+		}, TransactionsContext.LOADING_DELAY_MS);
+	}
+
+	private clearLoadingDelay() {
+		if (this._loadingDelayTimer) clearTimeout(this._loadingDelayTimer);
+		this._loadingDelayTimer = null;
+	}
+
+	private fetchPage() {
+		return this._pb.authedClient
+			.collection('transactions')
+			.getList<TransactionsResponse<TransactionExpand>>(this.page, this.pageSize, {
+				sort: this.activeSort,
+				expand: 'account,labels',
+				fields: TRANSACTION_FIELDS,
+				filter: this.activeFilter,
+				requestKey: null
+			});
+	}
+
+	// A full refresh fills both result slots from one round of requests. Errors propagate to the sync,
+	// which keeps the store marked stale and retries until a refresh actually commits.
+	private async refreshTransactions(token: number) {
+		const userId = this._activeUserId;
 		if (!userId) {
 			this.rawTransactions = [];
 			this.summaryTransactions = [];
@@ -433,110 +470,78 @@ class TransactionsContext {
 			this.isLoading = false;
 			return;
 		}
-		const refreshId = this._refreshSequence;
 		const pageRefreshId = ++this._pageRefreshSequence;
-		const summaryRefreshId = includeSummary
-			? ++this._summaryRefreshSequence
-			: this._summaryRefreshSequence;
-
-		if (this._loadingDelayTimer) {
-			clearTimeout(this._loadingDelayTimer);
-			this._loadingDelayTimer = null;
-		}
-
-		this._loadingDelayTimer = setTimeout(() => {
-			if (
-				userId !== this._activeUserId ||
-				refreshId !== this._refreshSequence ||
-				pageRefreshId !== this._pageRefreshSequence
-			)
-				return;
-			this.isLoading = true;
-		}, TransactionsContext.LOADING_DELAY_MS);
+		const summaryRefreshId = ++this._summaryRefreshSequence;
+		this.startLoadingDelay(userId, token, pageRefreshId);
 
 		try {
-			const fields =
-				'id,date,description,value,excluded,account,labels,expand.account.id,expand.account.name,expand.labels.id,expand.labels.name';
-			const filter = this.activeFilter;
-			const sort = this.activeSort;
-			const usesClientPagination = this.usesClientPagination;
-			if (includeSummary) {
-				const summaryRequest = this._pb.authedClient
-					.collection('transactions')
-					.getFullList<TransactionsResponse<TransactionExpand>>({
-						sort,
-						expand: 'account,labels',
-						fields,
-						filter,
-						batch: 200,
-						requestKey: null
-					});
-				if (usesClientPagination) {
-					const summaryList = await summaryRequest;
-					if (
-						userId !== this._activeUserId ||
-						refreshId !== this._refreshSequence ||
-						summaryRefreshId !== this._summaryRefreshSequence
-					)
-						return;
-					this.summaryTransactions = summaryList;
-					return;
-				}
-				const pageRequest = this._pb.authedClient
-					.collection('transactions')
-					.getList<TransactionsResponse<TransactionExpand>>(this.page, this.pageSize, {
-						sort,
-						expand: 'account,labels',
-						fields,
-						filter,
-						requestKey: null
-					});
-				const [pageList, summaryList] = await Promise.all([pageRequest, summaryRequest]);
-				if (
-					userId !== this._activeUserId ||
-					refreshId !== this._refreshSequence ||
-					summaryRefreshId !== this._summaryRefreshSequence
-				)
-					return;
-				if (pageRefreshId === this._pageRefreshSequence) {
-					this.rawTransactions = pageList.items;
-					this.serverTotalItems = pageList.totalItems;
-				}
-				this.summaryTransactions = summaryList;
-				return;
-			}
-			if (usesClientPagination) return;
-			const pageRequest = this._pb.authedClient
+			const summaryRequest = this._pb.authedClient
 				.collection('transactions')
-				.getList<TransactionsResponse<TransactionExpand>>(this.page, this.pageSize, {
-					sort,
+				.getFullList<TransactionsResponse<TransactionExpand>>({
+					sort: this.activeSort,
 					expand: 'account,labels',
-					fields,
-					filter,
+					fields: TRANSACTION_FIELDS,
+					filter: this.activeFilter,
+					batch: 200,
 					requestKey: null
 				});
-			const pageList = await pageRequest;
-			if (userId !== this._activeUserId || refreshId !== this._refreshSequence) return;
-			if (pageRefreshId === this._pageRefreshSequence) {
+			// Client-paginated views slice the summary in memory, so there is no page request to make.
+			const pageRequest = this.usesClientPagination ? null : this.fetchPage();
+			const [pageList, summaryList] = await Promise.all([pageRequest, summaryRequest]);
+			if (
+				userId !== this._activeUserId ||
+				!this.sync.isCurrent(token) ||
+				summaryRefreshId !== this._summaryRefreshSequence
+			)
+				return;
+			if (pageList && pageRefreshId === this._pageRefreshSequence) {
 				this.rawTransactions = pageList.items;
 				this.serverTotalItems = pageList.totalItems;
 			}
-		} catch (error) {
-			if (userId !== this._activeUserId || refreshId !== this._refreshSequence) return;
-			if (
-				pageRefreshId !== this._pageRefreshSequence &&
-				(!includeSummary || summaryRefreshId !== this._summaryRefreshSequence)
-			)
-				return;
-			this._pb.handleConnectionError(error, 'transactions', 'refresh');
+			this.summaryTransactions = summaryList;
 		} finally {
-			if (this._loadingDelayTimer) {
-				clearTimeout(this._loadingDelayTimer);
-				this._loadingDelayTimer = null;
-			}
+			this.clearLoadingDelay();
 			if (
 				userId === this._activeUserId &&
-				refreshId === this._refreshSequence &&
+				this.sync.isCurrent(token) &&
+				pageRefreshId === this._pageRefreshSequence
+			)
+				this.isLoading = false;
+		}
+	}
+
+	// A server-paginated page change refetches only the page slot: the summary already spans the whole
+	// filtered range, so re-running its full-list query on every page click would be pure waste. Paging
+	// is a user action rather than a sync signal, so it stays outside the staleness ladder.
+	private async refreshPage() {
+		const userId = this._activeUserId;
+		const token = this.sync.current;
+		const pageRefreshId = ++this._pageRefreshSequence;
+		this.startLoadingDelay(userId, token, pageRefreshId);
+
+		try {
+			const pageList = await this.fetchPage();
+			if (
+				userId !== this._activeUserId ||
+				!this.sync.isCurrent(token) ||
+				pageRefreshId !== this._pageRefreshSequence
+			)
+				return;
+			this.rawTransactions = pageList.items;
+			this.serverTotalItems = pageList.totalItems;
+		} catch (error) {
+			if (
+				userId !== this._activeUserId ||
+				!this.sync.isCurrent(token) ||
+				pageRefreshId !== this._pageRefreshSequence
+			)
+				return;
+			this._pb.handleConnectionError(error, 'transactions', 'page');
+		} finally {
+			this.clearLoadingDelay();
+			if (
+				userId === this._activeUserId &&
+				this.sync.isCurrent(token) &&
 				pageRefreshId === this._pageRefreshSequence
 			)
 				this.isLoading = false;
@@ -573,7 +578,7 @@ class TransactionsContext {
 
 		this._pb.authedClient
 			.collection('transactionLabels')
-			.subscribe('*', () => this.refreshLabels(userId))
+			.subscribe('*', () => this.labelsSync.invalidate())
 			.then((unsubscribe) => {
 				if (userId !== this._activeUserId) {
 					unsubscribe();
@@ -599,29 +604,16 @@ class TransactionsContext {
 		this._unsubscribeLabels = null;
 	}
 
+	// A transaction event is a pure invalidation signal: it marks the store stale and schedules the
+	// page/summary refetch rather than patching the event payload. It never touches the label
+	// dictionary, which no transaction mutation can change - a reconnect covers that separately.
 	private onTransactionEvent(
 		e: RecordSubscription<TransactionsResponse<TransactionExpand>>,
 		userId: string
 	) {
 		if (!userId || userId !== this._activeUserId) return;
 		if (!e.action) return;
-		this.invalidate(false);
-	}
-
-	// A transaction event or a realtime reconnect is a pure invalidation signal: it schedules the
-	// debounced page/summary refetch rather than patching the event payload. A reconnect may also
-	// have missed transactionLabels events, so it refreshes labels too; a plain transaction event
-	// cannot change labels and skips them.
-	private invalidate(includeLabels: boolean) {
-		const userId = this._activeUserId;
-		if (!userId) return;
-		this._refreshDebouncer.schedule(() => {
-			if (userId !== this._activeUserId) return;
-			if (includeLabels) void this.refreshLabels(userId);
-			this.refreshTransactions(userId).catch((error) =>
-				this._pb.handleConnectionError(error, 'transactions', 'realtime_refresh')
-			);
-		});
+		this.sync.invalidate();
 	}
 
 	private getPeriodRange(option: PeriodOption) {
@@ -860,7 +852,7 @@ class TransactionsContext {
 
 		this.updateUrl(params);
 		this.page = 1;
-		this.refreshTransactions();
+		void this.sync.refreshNow();
 	}
 
 	setPresetPeriod(option: PeriodOption) {
@@ -879,7 +871,7 @@ class TransactionsContext {
 
 		this.updateUrl(params);
 		this.page = 1;
-		this.refreshTransactions();
+		void this.sync.refreshNow();
 	}
 
 	setKind(option: KindFilter) {
@@ -890,7 +882,7 @@ class TransactionsContext {
 		this.syncFiltersToParams(params);
 
 		this.updateUrl(params);
-		this.refreshTransactions();
+		void this.sync.refreshNow();
 	}
 
 	setAccountFilter(accountId: string | null) {
@@ -901,7 +893,7 @@ class TransactionsContext {
 		this.syncFiltersToParams(params);
 
 		this.updateUrl(params);
-		this.refreshTransactions();
+		void this.sync.refreshNow();
 	}
 
 	private applyLabelFilters(labelIds: string[]) {
@@ -912,7 +904,7 @@ class TransactionsContext {
 		this.syncFiltersToParams(params);
 
 		this.updateUrl(params);
-		this.refreshTransactions();
+		void this.sync.refreshNow();
 	}
 
 	toggleLabelFilter(labelId: string) {
@@ -951,7 +943,7 @@ class TransactionsContext {
 		params.set('dir', this.sortDirection);
 
 		this.updateUrl(params);
-		this.refreshTransactions();
+		void this.sync.refreshNow();
 	}
 
 	setPage(page: number) {
@@ -959,7 +951,7 @@ class TransactionsContext {
 		if (nextPage === this.page) return;
 		this.page = nextPage;
 		if (this.usesClientPagination) return;
-		this.refreshTransactions(this._activeUserId, false);
+		void this.refreshPage();
 	}
 
 	get selectedIds() {
@@ -1026,10 +1018,12 @@ class TransactionsContext {
 
 	dispose() {
 		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
-		this._pb.unregisterRealtimeReconnect(this._reconnectCallback);
+		this._pb.unregisterRealtimeSync(this.sync);
+		this._pb.unregisterRealtimeSync(this.labelsSync);
 		if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
-		if (this._loadingDelayTimer) clearTimeout(this._loadingDelayTimer);
-		this._refreshDebouncer.cancel();
+		this.clearLoadingDelay();
+		this.sync.cancel();
+		this.labelsSync.cancel();
 		this.unsubscribeRealtime();
 	}
 }

@@ -7,7 +7,7 @@ import { getExchangeRatesContext } from './exchange-rates.svelte';
 import { logError } from './logger';
 import type { SecuritiesResponse, SecurityBalancesResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
-import { Debouncer, RequestSequence } from './realtime-sync';
+import { StaleSync } from './realtime-sync';
 import {
 	compareByValueDescThenName,
 	resolveSecurityBalanceValues,
@@ -83,8 +83,6 @@ type PositionsAccumulator = {
 	missingCurrency: string | null;
 };
 
-const DEBOUNCE_MS = 200;
-
 class SecuritiesContext {
 	securities: SecuritiesResponse[] = $state([]);
 	isLoading = $state(true);
@@ -139,18 +137,17 @@ class SecuritiesContext {
 	private _auth: ReturnType<typeof getAuthContext>;
 	private _accounts: ReturnType<typeof getAccountsContext>;
 	private _fx: ReturnType<typeof getExchangeRatesContext>;
-	private sequence = new RequestSequence();
-	private debouncer = new Debouncer(DEBOUNCE_MS);
+	private sync: StaleSync;
 	private _activeUserId = '';
 	private _isSubscribed = false;
 	private _teardownCallback = () => this.unsubscribeRealtime();
-	private _reconnectCallback = () => this.invalidate();
 
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
-		this._pb.registerRealtimeReconnect(this._reconnectCallback);
+		this.sync = new StaleSync(pb, 'securities', 'refresh', (token) => this.refreshAll(token));
+		this._pb.registerRealtimeSync(this.sync);
 		this._accounts = getAccountsContext();
 		this._fx = getExchangeRatesContext();
 		this.init();
@@ -182,7 +179,7 @@ class SecuritiesContext {
 		});
 		// Refresh directly rather than via the debounce so the user's own write shows immediately;
 		// refreshAll notifies accounts of the new balances on commit.
-		await this.refreshForCurrentUser();
+		await this.sync.refreshNow();
 	}
 
 	private init() {
@@ -190,8 +187,7 @@ class SecuritiesContext {
 			const userId = this._auth.currentUserId;
 			if (userId === this._activeUserId) return;
 			this.unsubscribeRealtime();
-			this.debouncer.cancel();
-			this.sequence.bump();
+			this.sync.cancel();
 			this._activeUserId = userId;
 			if (!userId) {
 				this.securities = [];
@@ -203,59 +199,46 @@ class SecuritiesContext {
 			this.isLoading = true;
 			this.positionsLoaded = false;
 			this.realtimeSubscribe(userId);
-			void this.refreshForCurrentUser();
+			void this.sync.refreshNow();
 		});
 	}
 
 	// Realtime events and reconnects are pure invalidation signals: they never patch a payload into
-	// state, they only schedule a full refetch. A security delete cascades to its securityBalances
-	// server-side, so the deleted rows are simply absent from the next snapshot - no epoch guard or
-	// buffered replay is needed to keep them gone.
-	private invalidate() {
-		this.debouncer.schedule(() => void this.refreshForCurrentUser());
-	}
-
-	private async refreshForCurrentUser() {
+	// state, they only mark the store stale and schedule a full refetch. A security delete cascades
+	// to its securityBalances server-side, so the deleted rows are simply absent from the next
+	// snapshot - no epoch guard or buffered replay is needed to keep them gone.
+	private async refreshAll(token: number) {
 		const userId = this._auth.currentUserId;
-		const token = this.sequence.next();
 		try {
-			await this.refreshAll(userId, token);
-		} catch (error) {
-			if (userId !== this._auth.currentUserId || !this.sequence.isCurrent(token)) return;
-			this._pb.handleConnectionError(error, 'securities', 'refresh');
-			this.resolvePositionsLoaded();
+			const [securities, securityBalances] = await Promise.all([
+				this._pb.authedClient.collection('securities').getFullList<SecuritiesResponse>({
+					sort: 'name',
+					requestKey: null
+				}),
+				this._pb.authedClient.collection('securityBalances').getFullList<SecurityBalance>({
+					sort: 'security,account,-asOf,-created,-id',
+					requestKey: null
+				})
+			]);
+			if (userId !== this._auth.currentUserId || !this.sync.isCurrent(token)) return;
+
+			this.securities = securities.toSorted((a, b) =>
+				a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+			);
+			this.currentPositions.clear();
+			for (const [key, position] of resolveSecurityBalanceValues(securityBalances)) {
+				this.currentPositions.set(key, position);
+			}
 		} finally {
-			if (userId === this._auth.currentUserId && this.sequence.isCurrent(token))
+			// "We tried" is what unblocks the accounts projection, not "we succeeded": a failed refresh
+			// must not leave every account's balance waiting on positions forever. Whether the refresh
+			// actually caught up is tracked separately by the sync's stale flag, which keeps retrying.
+			if (userId === this._auth.currentUserId && this.sync.isCurrent(token)) {
+				this.positionsLoaded = true;
+				this._accounts.notifyBalancesChanged();
 				this.isLoading = false;
+			}
 		}
-	}
-
-	private resolvePositionsLoaded() {
-		this.positionsLoaded = true;
-		this._accounts.notifyBalancesChanged();
-	}
-
-	private async refreshAll(userId: string, token: number) {
-		const [securities, securityBalances] = await Promise.all([
-			this._pb.authedClient.collection('securities').getFullList<SecuritiesResponse>({
-				sort: 'name',
-				requestKey: null
-			}),
-			this._pb.authedClient.collection('securityBalances').getFullList<SecurityBalance>({
-				sort: 'security,account,-asOf,-created,-id',
-				requestKey: null
-			})
-		]);
-		if (userId !== this._auth.currentUserId || !this.sequence.isCurrent(token)) return;
-
-		this.securities = securities.toSorted((a, b) =>
-			a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
-		);
-		this.currentPositions.clear();
-		for (const [key, position] of resolveSecurityBalanceValues(securityBalances)) {
-			this.currentPositions.set(key, position);
-		}
-		this.resolvePositionsLoaded();
 	}
 
 	private realtimeSubscribe(userId = this._activeUserId) {
@@ -286,7 +269,7 @@ class SecuritiesContext {
 
 	private onRealtimeEvent(userId: string) {
 		if (!userId || userId !== this._activeUserId) return;
-		this.invalidate();
+		this.sync.invalidate();
 	}
 
 	private unsubscribeRealtime() {
@@ -409,11 +392,10 @@ class SecuritiesContext {
 	}
 
 	dispose() {
-		this.debouncer.cancel();
+		this.sync.cancel();
 		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
-		this._pb.unregisterRealtimeReconnect(this._reconnectCallback);
+		this._pb.unregisterRealtimeSync(this.sync);
 		this.unsubscribeRealtime();
-		this.sequence.bump();
 	}
 }
 
