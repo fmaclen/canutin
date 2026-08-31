@@ -255,16 +255,16 @@ function getMergeEvidence(primaryCheckout: string, branch: string, head: string)
 	if (mergeEvidenceCache.has(cacheKey)) return mergeEvidenceCache.get(cacheKey) ?? null;
 	const ancestry = run(
 		'git',
-		['merge-base', '--is-ancestor', '--', head, 'next'],
+		['merge-base', '--is-ancestor', '--', head, 'master'],
 		primaryCheckout,
 		true
 	);
 	if (ancestry.status === 0) {
-		mergeEvidenceCache.set(cacheKey, 'merged into next');
-		return 'merged into next';
+		mergeEvidenceCache.set(cacheKey, 'merged into master');
+		return 'merged into master';
 	}
 	if (ancestry.status !== 1) {
-		fail(`Unable to compare ${branch} with next${ancestry.stderr ? `: ${ancestry.stderr}` : ''}`);
+		fail(`Unable to compare ${branch} with master${ancestry.stderr ? `: ${ancestry.stderr}` : ''}`);
 	}
 	try {
 		const result = run(
@@ -316,7 +316,7 @@ function printHelp() {
 	console.log(`Usage: bun run worktree <command> [options]
 
 Commands:
-  create <branch> [--base <base>]  Create or reuse a worktree (default base: next)
+  create <branch> [--base <base>]  Create or reuse a worktree (default base: master)
   list                             List managed worktrees and their status
   remove <branch|slot|path>        Safely remove a managed worktree
   sweep                            Report merged, clean worktrees that can be removed
@@ -357,7 +357,7 @@ async function createWorktree(args: string[], primaryCheckout: string, worktrees
 		console.log('Usage: bun run worktree:create <branch> [--base <base>]');
 		return;
 	}
-	let base = 'next';
+	let base = 'master';
 	const positional: string[] = [];
 	for (let index = 0; index < args.length; index += 1) {
 		const argument = args[index];
@@ -717,7 +717,7 @@ async function removeWorktree(args: string[], primaryCheckout: string, worktrees
 		branchEvidence = getMergeEvidence(primaryCheckout, branch, inspectedOid);
 		if (!branchEvidence) {
 			fail(
-				`Cannot delete branch ${branch}; no merged GitHub PR or ancestry into next was established`
+				`Cannot delete branch ${branch}; no merged GitHub PR or ancestry into master was established`
 			);
 		}
 	}
