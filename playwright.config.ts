@@ -38,9 +38,6 @@ export default defineConfig({
 			command: 'bun run pb',
 			port: PB_PORT,
 			reuseExistingServer: true,
-			// `bun run pb` compiles the Go backend whenever the build hash is stale, which it
-			// always is on a fresh CI runner. Playwright's 60s default cuts that off mid-build.
-			timeout: 180_000,
 			// The Plaid values come last on purpose: they must beat whatever credentials the
 			// developer's .env holds so a test can never reach a real Plaid environment.
 			env: {
@@ -56,9 +53,6 @@ export default defineConfig({
 		{
 			command: 'bun run build && bun run preview',
 			port: VITE_PORT,
-			// A cold production build on a CI runner runs close to Playwright's 60s default,
-			// which fails as an opaque launch timeout rather than a build error.
-			timeout: 180_000,
 			env: {
 				...process.env,
 				PUBLIC_PLAYWRIGHT_TESTING: 'true',
