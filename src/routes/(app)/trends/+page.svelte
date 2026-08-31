@@ -27,7 +27,7 @@
 		SecurityBalancesResponse
 	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
-	import { Debouncer, RequestSequence } from '$lib/realtime-sync';
+	import { StaleSync } from '$lib/realtime-sync';
 	import { getSecuritiesContext } from '$lib/securities.svelte';
 	import { projectSignedValue } from '$lib/sharing';
 	import { toNumber } from '$lib/utils';
@@ -243,189 +243,179 @@
 		});
 	}
 
-	const sequence = new RequestSequence();
-	const debouncer = new Debouncer(200);
+	const sync = new StaleSync(pb, 'trends', 'refresh_balances', (token) => refresh(token));
 	let disposed = false;
 	let lastIncludedSignature = '';
 
-	async function refresh() {
-		if (disposed) return;
-		const token = sequence.next();
-		try {
-			const start = computeBoundedHistoryStart('5y');
-			if (!start) return;
-			// Snapshot the signature this refresh reflects; the signature effect treats any later
-			// divergence - including one committed while this refresh is in flight - as a change.
-			lastIncludedSignature = includedSignature;
-			const accountIds = Array.from(includedAccounts.keys());
-			const assetIds = Array.from(includedAssets.keys());
-			const accountFilter = filterByIds('account', accountIds);
-			const assetFilter = filterByIds('asset', assetIds);
-			const accountHistoryFilter = historyFilter(accountFilter, start);
-			const assetHistoryFilter = historyFilter(assetFilter, start);
-			try {
-				const [
-					accountBalancesRange,
-					securityBalancesRangeRaw,
-					assetBalancesRange,
-					accountBalancesFullHistory,
-					securityBalancesFullHistoryRaw,
-					assetBalancesFullHistory
-				] = await Promise.all([
-					listAccountBalances(accountHistoryFilter),
-					listSecurityBalances(accountHistoryFilter),
-					listAssetBalances(assetHistoryFilter),
-					listAccountBalances(accountFilter),
-					listSecurityBalances(accountFilter),
-					listAssetBalances(assetFilter)
-				]);
+	async function refresh(token: number) {
+		const start = computeBoundedHistoryStart('5y');
+		if (!start) return;
+		// Claim the signature this refresh reads before issuing it, so the signature effect treats the
+		// set as already covered instead of scheduling a duplicate refresh on top of the bootstrap one.
+		// A refresh that fails does not have to give the claim back: the sync keeps the page stale and
+		// its retry re-reads `includedSignature`, so recovery never depends on this value.
+		lastIncludedSignature = includedSignature;
+		const accountIds = Array.from(includedAccounts.keys());
+		const assetIds = Array.from(includedAssets.keys());
+		const accountFilter = filterByIds('account', accountIds);
+		const assetFilter = filterByIds('asset', assetIds);
+		const accountHistoryFilter = historyFilter(accountFilter, start);
+		const assetHistoryFilter = historyFilter(assetFilter, start);
+		const [
+			accountBalancesRange,
+			securityBalancesRangeRaw,
+			assetBalancesRange,
+			accountBalancesFullHistory,
+			securityBalancesFullHistoryRaw,
+			assetBalancesFullHistory
+		] = await Promise.all([
+			listAccountBalances(accountHistoryFilter),
+			listSecurityBalances(accountHistoryFilter),
+			listAssetBalances(assetHistoryFilter),
+			listAccountBalances(accountFilter),
+			listSecurityBalances(accountFilter),
+			listAssetBalances(assetFilter)
+		]);
 
-				const securityBalancesRange = securityBalancesRangeRaw
-					.map(projectSecurityBalance)
-					.filter(isDefined);
-				const securityBalancesFullHistory = securityBalancesFullHistoryRaw
-					.map(projectSecurityBalance)
-					.filter(isDefined);
-				const [accountBalancesPrevious, securityBalancesPrevious, assetBalancesPrevious] =
-					await Promise.all([
-						Promise.all(
-							accountIds.map(async (accountId) => {
-								const result = await pb.authedClient
-									.collection('accountBalances')
-									.getList<AccountBalancesResponse>(1, 1, {
-										filter: `account='${quoteFilterValue(accountId)}' && asOf<'${start.toISOString()}'`,
-										sort: '-asOf,-created,-id',
-										fields: 'id,account,value,asOf,created',
-										requestKey: null
-									});
-								return result.items[0] ?? null;
-							})
-						),
-						(async () => {
-							if (!accountFilter) return [];
-							const balances = await pb.authedClient
-								.collection('securityBalances')
-								.getFullList<SecurityBalancesResponse<number, number, number, number>>({
-									filter: `(${accountFilter}) && asOf<'${start.toISOString()}'`,
-									sort: 'account,security,asOf,created,id',
-									fields: 'id,account,security,value,quantity,asOf,created',
-									requestKey: null
-								});
+		const securityBalancesRange = securityBalancesRangeRaw
+			.map(projectSecurityBalance)
+			.filter(isDefined);
+		const securityBalancesFullHistory = securityBalancesFullHistoryRaw
+			.map(projectSecurityBalance)
+			.filter(isDefined);
+		const [accountBalancesPrevious, securityBalancesPrevious, assetBalancesPrevious] =
+			await Promise.all([
+				Promise.all(
+					accountIds.map(async (accountId) => {
+						const result = await pb.authedClient
+							.collection('accountBalances')
+							.getList<AccountBalancesResponse>(1, 1, {
+								filter: `account='${quoteFilterValue(accountId)}' && asOf<'${start.toISOString()}'`,
+								sort: '-asOf,-created,-id',
+								fields: 'id,account,value,asOf,created',
+								requestKey: null
+							});
+						return result.items[0] ?? null;
+					})
+				),
+				(async () => {
+					if (!accountFilter) return [];
+					const balances = await pb.authedClient
+						.collection('securityBalances')
+						.getFullList<SecurityBalancesResponse<number, number, number, number>>({
+							filter: `(${accountFilter}) && asOf<'${start.toISOString()}'`,
+							sort: 'account,security,asOf,created,id',
+							fields: 'id,account,security,value,quantity,asOf,created',
+							requestKey: null
+						});
 
-							const latestByKey = new SvelteMap<
-								string,
-								{
-									balance: SecurityBalancesResponse<number, number, number, number>;
-									lastKnownValue: number | null;
-									soldOut: boolean;
-								}
-							>();
-							for (const balance of balances) {
-								const key = `${balance.account}:${balance.security}`;
-								const existing = latestByKey.get(key) ?? {
-									balance,
-									lastKnownValue: null,
-									soldOut: false
-								};
-								if (toNumber(balance.quantity) === 0) {
-									existing.lastKnownValue = 0;
-									existing.soldOut = true;
-								} else {
-									const value = toNumber(balance.value);
-									if (value !== null) {
-										existing.lastKnownValue = value;
-										existing.soldOut = false;
-									}
-								}
-								existing.balance = balance;
-								latestByKey.set(key, existing);
+					const latestByKey = new SvelteMap<
+						string,
+						{
+							balance: SecurityBalancesResponse<number, number, number, number>;
+							lastKnownValue: number | null;
+							soldOut: boolean;
+						}
+					>();
+					for (const balance of balances) {
+						const key = `${balance.account}:${balance.security}`;
+						const existing = latestByKey.get(key) ?? {
+							balance,
+							lastKnownValue: null,
+							soldOut: false
+						};
+						if (toNumber(balance.quantity) === 0) {
+							existing.lastKnownValue = 0;
+							existing.soldOut = true;
+						} else {
+							const value = toNumber(balance.value);
+							if (value !== null) {
+								existing.lastKnownValue = value;
+								existing.soldOut = false;
 							}
-							return Array.from(latestByKey.values()).map(
-								({ balance, lastKnownValue, soldOut }) => ({
-									...balance,
-									value: soldOut ? balance.value : lastKnownValue
-								})
-							);
-						})(),
-						Promise.all(
-							assetIds.map(async (assetId) => {
-								const result = await pb.authedClient
-									.collection('assetBalances')
-									.getList<AssetBalancesResponse>(1, 1, {
-										filter: `asset='${quoteFilterValue(assetId)}' && asOf<'${start.toISOString()}'`,
-										sort: '-asOf,-created,-id',
-										fields: 'id,asset,marketValue,asOf,created',
-										requestKey: null
-									});
-								return result.items[0] ?? null;
-							})
-						)
-					]);
+						}
+						existing.balance = balance;
+						latestByKey.set(key, existing);
+					}
+					return Array.from(latestByKey.values()).map(({ balance, lastKnownValue, soldOut }) => ({
+						...balance,
+						value: soldOut ? balance.value : lastKnownValue
+					}));
+				})(),
+				Promise.all(
+					assetIds.map(async (assetId) => {
+						const result = await pb.authedClient
+							.collection('assetBalances')
+							.getList<AssetBalancesResponse>(1, 1, {
+								filter: `asset='${quoteFilterValue(assetId)}' && asOf<'${start.toISOString()}'`,
+								sort: '-asOf,-created,-id',
+								fields: 'id,asset,marketValue,asOf,created',
+								requestKey: null
+							});
+						return result.items[0] ?? null;
+					})
+				)
+			]);
 
-				if (disposed || !sequence.isCurrent(token)) return;
+		if (disposed || !sync.isCurrent(token)) return;
 
-				const accountBalances = trimBalances(
-					[...accountBalancesPrevious, ...accountBalancesRange]
-						.map((balance) => (balance ? projectAccountBalance(balance) : null))
-						.filter(isDefined),
-					start,
-					(balance) => balance.account
-				);
-				const securityBalances = trimBalances(
-					[
-						...securityBalancesPrevious
-							.map((balance) => (balance ? projectSecurityBalance(balance) : null))
-							.filter(isDefined),
-						...securityBalancesRange
-					],
-					start,
-					(balance) => `${balance.account}:${balance.security}`
-				);
-				const assetBalances = trimBalances(
-					[...assetBalancesPrevious, ...assetBalancesRange]
-						.map((balance) => (balance ? projectAssetBalance(balance) : null))
-						.filter(isDefined),
-					start,
-					(balance) => balance.asset
-				);
-				rawAccounts = Array.from(includedAccounts.values());
-				rawAssets = Array.from(includedAssets.values());
-				rawAccountBalances = accountBalances;
-				rawSecurityBalances = securityBalances;
-				rawAssetBalances = assetBalances;
-				rawFullHistoryAccountBalances = trimBalances(
-					accountBalancesFullHistory.map(projectAccountBalance).filter(isDefined),
-					null,
-					(balance) => balance.account
-				);
-				rawFullHistorySecurityBalances = trimBalances(
-					securityBalancesFullHistory,
-					null,
-					(balance) => `${balance.account}:${balance.security}`
-				);
-				rawFullHistoryAssetBalances = trimBalances(
-					assetBalancesFullHistory.map(projectAssetBalance).filter(isDefined),
-					null,
-					(balance) => balance.asset
-				);
-			} catch (error) {
-				if (!disposed && sequence.isCurrent(token))
-					pb.handleConnectionError(error, 'trends', 'refresh_balances');
-			}
-		} finally {
-			if (!disposed && sequence.isCurrent(token)) bootstrapped = true;
-		}
+		const accountBalances = trimBalances(
+			[...accountBalancesPrevious, ...accountBalancesRange]
+				.map((balance) => (balance ? projectAccountBalance(balance) : null))
+				.filter(isDefined),
+			start,
+			(balance) => balance.account
+		);
+		const securityBalances = trimBalances(
+			[
+				...securityBalancesPrevious
+					.map((balance) => (balance ? projectSecurityBalance(balance) : null))
+					.filter(isDefined),
+				...securityBalancesRange
+			],
+			start,
+			(balance) => `${balance.account}:${balance.security}`
+		);
+		const assetBalances = trimBalances(
+			[...assetBalancesPrevious, ...assetBalancesRange]
+				.map((balance) => (balance ? projectAssetBalance(balance) : null))
+				.filter(isDefined),
+			start,
+			(balance) => balance.asset
+		);
+		rawAccounts = Array.from(includedAccounts.values());
+		rawAssets = Array.from(includedAssets.values());
+		rawAccountBalances = accountBalances;
+		rawSecurityBalances = securityBalances;
+		rawAssetBalances = assetBalances;
+		rawFullHistoryAccountBalances = trimBalances(
+			accountBalancesFullHistory.map(projectAccountBalance).filter(isDefined),
+			null,
+			(balance) => balance.account
+		);
+		rawFullHistorySecurityBalances = trimBalances(
+			securityBalancesFullHistory,
+			null,
+			(balance) => `${balance.account}:${balance.security}`
+		);
+		rawFullHistoryAssetBalances = trimBalances(
+			assetBalancesFullHistory.map(projectAssetBalance).filter(isDefined),
+			null,
+			(balance) => balance.asset
+		);
+		// Only a committed refresh clears the loading state: a failed bootstrap must not render empty
+		// charts as if they were the answer while the sync is still retrying.
+		bootstrapped = true;
 	}
 
 	function invalidate() {
 		if (disposed) return;
-		sequence.bump();
-		debouncer.schedule(() => void refresh());
+		sync.invalidate();
 	}
 
 	$effect(() => {
 		const unsubscribes: Array<() => void> = [];
-		pb.registerRealtimeReconnect(invalidate);
+		pb.registerRealtimeSync(sync);
 		function addSubscription(subscription: Promise<() => void>) {
 			subscription
 				.then((unsubscribe) => {
@@ -447,9 +437,8 @@
 
 		return () => {
 			disposed = true;
-			sequence.bump();
-			debouncer.cancel();
-			pb.unregisterRealtimeReconnect(invalidate);
+			sync.cancel();
+			pb.unregisterRealtimeSync(sync);
 			for (const unsubscribe of unsubscribes) unsubscribe();
 		};
 	});
@@ -461,14 +450,14 @@
 		if (bootstrapped) return;
 		if (accountsCtx?.isLoading || assetsCtx?.isLoading) return;
 		untrack(() => {
-			void refresh();
+			void sync.refreshNow();
 		});
 	});
 
 	$effect(() => {
 		const signature = includedSignature;
 		if (signature === lastIncludedSignature) return;
-		const refreshStarted = sequence.current > 0;
+		const refreshStarted = sync.current > 0;
 		lastIncludedSignature = signature;
 		if (!bootstrapped && !refreshStarted) return;
 		invalidate();

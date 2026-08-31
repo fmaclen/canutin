@@ -7,9 +7,7 @@ import { interfacePreferences } from './interface-preferences.svelte';
 import { logError } from './logger';
 import type { ExchangeRatesResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
-import { Debouncer, RequestSequence } from './realtime-sync';
-
-const DEBOUNCE_MS = 200;
+import { StaleSync } from './realtime-sync';
 
 export type CurrencyConversion = {
 	value: number;
@@ -58,20 +56,18 @@ class ExchangeRatesContext {
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
 	private _currencies: ReturnType<typeof setCurrenciesContext>;
-	private sequence = new RequestSequence();
-	private debouncer = new Debouncer(DEBOUNCE_MS);
+	private sync: StaleSync;
 	private _activeUserId = '';
 	private _isSubscribed = false;
-	private _disposed = false;
 	private _teardownCallback = () => this.unsubscribeRealtime();
-	private _reconnectCallback = () => this.invalidate();
 
 	constructor(pb: PocketBaseContext, currencies: ReturnType<typeof setCurrenciesContext>) {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._currencies = currencies;
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
-		this._pb.registerRealtimeReconnect(this._reconnectCallback);
+		this.sync = new StaleSync(pb, 'exchange_rates', 'refresh', (token) => this.refreshAll(token));
+		this._pb.registerRealtimeSync(this.sync);
 		this.init();
 	}
 
@@ -80,8 +76,7 @@ class ExchangeRatesContext {
 			const userId = this._auth.currentUserId;
 			if (userId === this._activeUserId) return;
 			this.unsubscribeRealtime();
-			this.debouncer.cancel();
-			this.sequence.bump();
+			this.sync.cancel();
 			this._activeUserId = userId;
 			if (!userId) {
 				this._records = [];
@@ -90,26 +85,22 @@ class ExchangeRatesContext {
 			}
 			this._isLoaded = false;
 			this.realtimeSubscribe(userId);
-			void this.refresh(userId);
+			void this.sync.refreshNow();
 		});
 	}
 
-	private async refresh(userId: string) {
-		if (!userId) return;
-		const token = this.sequence.next();
-		try {
-			const list = await this._pb.authedClient
-				.collection('exchangeRates')
-				.getFullList<ExchangeRatesResponse>({ requestKey: null });
-			if (this._disposed || userId !== this._activeUserId || !this.sequence.isCurrent(token))
-				return;
+	// NOTE: the ensure-rates worker writes many rows per entity, so coalesce the burst into a single
+	// refetch rather than maintaining the sorted index incrementally on each event. Reconnects route
+	// here too, converging on any events missed while the socket was disconnected.
+	private async refreshAll(token: number) {
+		const userId = this._activeUserId;
+		const list = await this._pb.authedClient
+			.collection('exchangeRates')
+			.getFullList<ExchangeRatesResponse>({ requestKey: null });
+		if (userId !== this._activeUserId || !this.sync.isCurrent(token)) return;
 
-			this._records = list;
-			this._isLoaded = true;
-		} catch (error) {
-			if (userId !== this._activeUserId) return;
-			this._pb.handleConnectionError(error, 'exchange_rates', 'refresh');
-		}
+		this._records = list;
+		this._isLoaded = true;
 	}
 
 	private realtimeSubscribe(userId: string) {
@@ -117,7 +108,7 @@ class ExchangeRatesContext {
 		this._isSubscribed = true;
 		this._pb.authedClient
 			.collection('exchangeRates')
-			.subscribe('*', () => this.invalidate())
+			.subscribe('*', () => this.sync.invalidate())
 			.catch((error) => {
 				if (userId === this._activeUserId) {
 					this._pb.handleSubscriptionError(error, 'exchange_rates', 'subscribe');
@@ -131,14 +122,6 @@ class ExchangeRatesContext {
 		if (!this._isSubscribed) return;
 		this._isSubscribed = false;
 		this._pb.authedClient.collection('exchangeRates').unsubscribe('*');
-	}
-
-	// NOTE: the ensure-rates worker writes many rows per entity, so coalesce the burst into a
-	// single refetch rather than maintaining the sorted index incrementally on each event. Reconnects
-	// route here too, converging on any events missed while the socket was disconnected.
-	private invalidate() {
-		if (!this._activeUserId) return;
-		this.debouncer.schedule(() => void this.refresh(this._activeUserId));
 	}
 
 	get records() {
@@ -203,12 +186,10 @@ class ExchangeRatesContext {
 	}
 
 	dispose() {
-		this._disposed = true;
-		this.debouncer.cancel();
+		this.sync.cancel();
 		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
-		this._pb.unregisterRealtimeReconnect(this._reconnectCallback);
+		this._pb.unregisterRealtimeSync(this.sync);
 		this.unsubscribeRealtime();
-		this.sequence.bump();
 	}
 }
 

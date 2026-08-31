@@ -4,9 +4,7 @@ import { getAuthContext } from './auth.svelte';
 import { logError } from './logger';
 import type { ImportSessionsResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
-import { Debouncer, RequestSequence } from './realtime-sync';
-
-const DEBOUNCE_MS = 200;
+import { StaleSync } from './realtime-sync';
 
 class ImportSessionsContext {
 	sessions: ImportSessionsResponse[] = $state([]);
@@ -14,18 +12,17 @@ class ImportSessionsContext {
 
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
-	private sequence = new RequestSequence();
-	private debouncer = new Debouncer(DEBOUNCE_MS);
+	private sync: StaleSync;
 	private _activeUserId = '';
 	private _isSubscribed = false;
 	private _teardownCallback = () => this.unsubscribeRealtime();
-	private _reconnectCallback = () => this.invalidate();
 
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
-		this._pb.registerRealtimeReconnect(this._reconnectCallback);
+		this.sync = new StaleSync(pb, 'importSessions', 'refresh', (token) => this.refreshAll(token));
+		this._pb.registerRealtimeSync(this.sync);
 		this.init();
 	}
 
@@ -38,8 +35,7 @@ class ImportSessionsContext {
 			const userId = this.currentUserId;
 			if (userId === this._activeUserId) return;
 			this.unsubscribeRealtime();
-			this.debouncer.cancel();
-			this.sequence.bump();
+			this.sync.cancel();
 			this._activeUserId = userId;
 			if (!userId) {
 				this.sessions = [];
@@ -48,30 +44,23 @@ class ImportSessionsContext {
 			}
 			this.isLoading = true;
 			this.realtimeSubscribe(userId);
-			void this.refreshForCurrentUser();
+			void this.sync.refreshNow();
 		});
 	}
 
-	// Realtime events and reconnects are pure invalidation signals: they schedule a debounced full
-	// refetch sorted '-created', which reproduces the newest-first order without patching the payload.
-	private invalidate() {
-		this.debouncer.schedule(() => void this.refreshForCurrentUser());
-	}
-
-	private async refreshForCurrentUser() {
+	// Realtime events and reconnects are pure invalidation signals: they mark the store stale and
+	// schedule a full refetch sorted '-created', which reproduces the newest-first order without
+	// patching the payload.
+	private async refreshAll(token: number) {
 		const userId = this.currentUserId;
-		const token = this.sequence.next();
 		try {
 			const sessions = await this._pb.authedClient
 				.collection('importSessions')
 				.getFullList<ImportSessionsResponse>({ sort: '-created', requestKey: null });
-			if (userId !== this.currentUserId || !this.sequence.isCurrent(token)) return;
+			if (userId !== this.currentUserId || !this.sync.isCurrent(token)) return;
 			this.sessions = sessions;
-		} catch (error) {
-			if (userId !== this.currentUserId || !this.sequence.isCurrent(token)) return;
-			this._pb.handleConnectionError(error, 'importSessions', 'refresh');
 		} finally {
-			if (userId === this.currentUserId && this.sequence.isCurrent(token)) this.isLoading = false;
+			if (userId === this.currentUserId && this.sync.isCurrent(token)) this.isLoading = false;
 		}
 	}
 
@@ -93,7 +82,7 @@ class ImportSessionsContext {
 
 	private onRealtimeEvent(userId: string) {
 		if (!userId || userId !== this._activeUserId) return;
-		this.invalidate();
+		this.sync.invalidate();
 	}
 
 	private unsubscribeRealtime() {
@@ -103,11 +92,10 @@ class ImportSessionsContext {
 	}
 
 	dispose() {
-		this.debouncer.cancel();
+		this.sync.cancel();
 		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
-		this._pb.unregisterRealtimeReconnect(this._reconnectCallback);
+		this._pb.unregisterRealtimeSync(this.sync);
 		this.unsubscribeRealtime();
-		this.sequence.bump();
 	}
 }
 

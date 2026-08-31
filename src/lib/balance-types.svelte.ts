@@ -4,27 +4,24 @@ import { getAuthContext } from './auth.svelte';
 import { logError } from './logger';
 import type { BalanceTypesResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
-import { Debouncer, RequestSequence } from './realtime-sync';
-
-const DEBOUNCE_MS = 200;
+import { StaleSync } from './realtime-sync';
 
 class BalanceTypesContext {
 	byId: Record<string, BalanceTypesResponse> = $state({});
 
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
-	private sequence = new RequestSequence();
-	private debouncer = new Debouncer(DEBOUNCE_MS);
+	private sync: StaleSync;
 	private _activeUserId = '';
 	private _isSubscribed = false;
 	private _teardownCallback = () => this.unsubscribeRealtime();
-	private _reconnectCallback = () => this.invalidate();
 
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
-		this._pb.registerRealtimeReconnect(this._reconnectCallback);
+		this.sync = new StaleSync(pb, 'balance_types', 'refresh', (token) => this.refreshAll(token));
+		this._pb.registerRealtimeSync(this.sync);
 		this.init();
 	}
 
@@ -37,39 +34,28 @@ class BalanceTypesContext {
 			const userId = this.currentUserId;
 			if (userId === this._activeUserId) return;
 			this.unsubscribeRealtime();
-			this.debouncer.cancel();
-			this.sequence.bump();
+			this.sync.cancel();
 			this._activeUserId = userId;
 			if (!userId) {
 				this.byId = {};
 				return;
 			}
 			this.realtimeSubscribe(userId);
-			void this.refreshForCurrentUser();
+			void this.sync.refreshNow();
 		});
 	}
 
-	// Realtime events and reconnects are pure invalidation signals: they schedule a debounced full
-	// refetch of the dictionary rather than patching a single record from the event payload.
-	private invalidate() {
-		this.debouncer.schedule(() => void this.refreshForCurrentUser());
-	}
-
-	private async refreshForCurrentUser() {
+	// Realtime events and reconnects are pure invalidation signals: they mark the store stale and
+	// schedule a full refetch of the dictionary rather than patching a single record from the payload.
+	private async refreshAll(token: number) {
 		const userId = this.currentUserId;
-		const token = this.sequence.next();
-		try {
-			const list = await this._pb.authedClient
-				.collection('balanceTypes')
-				.getFullList<BalanceTypesResponse>({ requestKey: null });
-			if (userId !== this.currentUserId || !this.sequence.isCurrent(token)) return;
-			const map: Record<string, BalanceTypesResponse> = {};
-			for (const bt of list) map[bt.id] = bt;
-			this.byId = map;
-		} catch (error) {
-			if (userId !== this.currentUserId || !this.sequence.isCurrent(token)) return;
-			this._pb.handleConnectionError(error, 'balance_types', 'refresh');
-		}
+		const list = await this._pb.authedClient
+			.collection('balanceTypes')
+			.getFullList<BalanceTypesResponse>({ requestKey: null });
+		if (userId !== this.currentUserId || !this.sync.isCurrent(token)) return;
+		const map: Record<string, BalanceTypesResponse> = {};
+		for (const bt of list) map[bt.id] = bt;
+		this.byId = map;
 	}
 
 	private realtimeSubscribe(userId = this._activeUserId) {
@@ -89,7 +75,7 @@ class BalanceTypesContext {
 
 	private onRealtimeEvent(userId: string) {
 		if (!userId || userId !== this._activeUserId) return;
-		this.invalidate();
+		this.sync.invalidate();
 	}
 
 	private unsubscribeRealtime() {
@@ -103,16 +89,15 @@ class BalanceTypesContext {
 		return this.byId[id]?.name ?? '(Unknown)';
 	}
 
+	// Awaited inside the accounts and assets refresh loops, so a failure here must propagate: a
+	// swallowed one would let those stores commit a snapshot whose type names all read "(Unknown)"
+	// and clear their stale flag on it.
 	async ensureLoaded(id: string) {
 		if (!id || this.byId[id]) return;
-		try {
-			const bt = await this._pb.authedClient
-				.collection('balanceTypes')
-				.getOne<BalanceTypesResponse>(id);
-			this.byId = { ...this.byId, [bt.id]: bt };
-		} catch (error) {
-			logError('balanceTypes', 'ensure_loaded', error);
-		}
+		const bt = await this._pb.authedClient
+			.collection('balanceTypes')
+			.getOne<BalanceTypesResponse>(id, { requestKey: null });
+		this.byId = { ...this.byId, [bt.id]: bt };
 	}
 
 	async getOrCreate(name: string, ownerId: string): Promise<string> {
@@ -131,11 +116,10 @@ class BalanceTypesContext {
 	}
 
 	dispose() {
-		this.debouncer.cancel();
+		this.sync.cancel();
 		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
-		this._pb.unregisterRealtimeReconnect(this._reconnectCallback);
+		this._pb.unregisterRealtimeSync(this.sync);
 		this.unsubscribeRealtime();
-		this.sequence.bump();
 	}
 }
 

@@ -9,9 +9,13 @@ description: PocketBase realtime subscriptions, debouncing, subscription lifecyc
 
 PocketBase realtime subscriptions drive live data updates. Context stores in `src/lib/*.svelte.ts`
 subscribe to collection changes and refresh UI state accordingly. Every realtime store follows one
-model: **realtime events and reconnects are pure invalidation signals** — each schedules a debounced,
-latest-request-wins full refetch, and the fresh snapshot replaces the whole cache. Events are never
-patched into local state.
+model: **realtime events and reconnects are pure invalidation signals** — each marks the store stale
+and schedules a debounced, latest-request-wins full refetch, and the fresh snapshot replaces the
+whole cache. Events are never patched into local state.
+
+Staleness is **durable**: a store that missed an update stays marked stale until a refetch actually
+commits. A refetch that fails is never discarded — it keeps the flag and retries on a backoff. No
+signal carries correctness on its own; signals only mark stores stale and poke their retries.
 
 ## Store sync contract
 
@@ -37,28 +41,36 @@ sync, and only it invalidates.
 ### The seven obligations
 
 Every realtime store must satisfy all seven. `src/lib/securities.svelte.ts` is the reference shape;
-`src/lib/realtime-sync.ts` holds the two canonical helpers (`RequestSequence`, `Debouncer`).
+`src/lib/realtime-sync.ts` holds the one canonical helper, `StaleSync`.
 
 1. **Subscribe before the initial fetch.** Subscribe in the `init()` effect _before_ issuing the first
    refresh, so no event is missed during the fetch window. The initial fetch is guarded by `userId`.
-2. **Event → debounced invalidate.** A realtime event calls `invalidate()`, which schedules the
-   refetch through the shared `Debouncer` (200ms trailing). Bursts coalesce to one refetch.
-3. **Reconnect → same invalidate.** Register one `registerRealtimeReconnect(() => this.invalidate())`
-   callback per store so a restored connection triggers the identical corrective refetch. The
-   registry decides _when_ that fires — see "Connection recovery" below.
-4. **Latest-request-wins commit.** Take a `RequestSequence` token with `sequence.next()` before the
-   await; on _every_ path that touches state — the success commit, `catch`, and `finally` — re-check
-   both `sequence.isCurrent(token)` and `userId === auth.currentUserId` and bail if either fails. This
-   is what makes an event arriving mid-fetch safe: the stale in-flight fetch is discarded and the
-   follow-up refetch wins.
+2. **Event → `sync.invalidate()`.** A realtime event marks the store stale and schedules the refetch
+   on the shared 200ms trailing debounce. Bursts coalesce to one refetch.
+3. **One `StaleSync` per independently-stale collection, registered with the registry.** Construct it
+   with `new StaleSync(pb, context, operation, (token) => this.refreshAll(token))` and register it via
+   `pb.registerRealtimeSync(sync)`, so a dropped socket marks it stale and a restored one retries it.
+   Most stores need exactly one; add a second only when two collections go stale independently
+   (`transactions.svelte.ts` keeps its label dictionary separate, because a transaction mutation can
+   never change labels).
+4. **Latest-request-wins commit.** The refresh function receives the run's token; on _every_ path that
+   touches state — the success commit and any `finally` — re-check both `sync.isCurrent(token)` and
+   `userId === auth.currentUserId` and bail if either fails. This is what makes an event arriving
+   mid-fetch safe: the stale in-flight fetch is discarded and the follow-up refetch wins.
+   **The refresh must throw on failure** — never swallow the error. `StaleSync` catches it, routes it
+   through `pb.handleConnectionError`, keeps the store stale and retries. A superseded run is dropped
+   without re-marking, because the newer run owns the outcome.
 5. **Whole-cache replace, never event-payload patching.** A refresh replaces the entire cache from the
    fresh snapshot. Never upsert, merge, or read `e.record` into state. Deletes and cascades are handled
    for free — the removed rows are simply absent from the next snapshot.
-6. **Complete dispose.** `dispose()` must: cancel the debounce, unregister _both_ the teardown and the
-   reconnect callback, unsubscribe the specific collection topics (never `realtime.unsubscribe()`), and
-   bump the sequence to supersede any in-flight refresh.
+6. **Complete dispose.** `dispose()` must: call `sync.cancel()` (cancels the pending run, supersedes
+   any in-flight refresh, clears the flag), unregister _both_ the teardown callback and the sync, and
+   unsubscribe the specific collection topics (never `realtime.unsubscribe()`).
 7. **`isLoading` lives only in `init()`.** Set it `true` when the effect starts loading for a user and
    `false` on the guarded commit; invalidations refetch silently.
+
+A user's own write, or an initial load, calls `sync.refreshNow()`: it skips the debounce, and a
+successful run clears the stale flag just like a scheduled one.
 
 ### Auth is the sole exemption
 
@@ -69,37 +81,38 @@ it into the contract.
 
 ## Connection recovery
 
-Reference: `src/lib/pocketbase.svelte.ts` (`registerRealtimeReconnect`, `recoverRealtime`).
+Reference: `src/lib/pocketbase.svelte.ts` (`registerRealtimeSync`, `probeBackend`).
 
 **EventSource has no liveness detection.** A dropped network or a slept laptop routinely leaves the
 socket in `readyState === OPEN` forever: no `error` event, no `onDisconnect`, no `PB_CONNECT`, and
 therefore no reconnect from the SDK — which only reconnects on a transport error. The socket can even
-keep delivering events while the network is down, and every refetch they schedule fails and is
-discarded (stores have no retry). A session in that state stays stale indefinitely. The SDK's
+keep delivering events while the network is down, and every refetch they schedule fails. The SDK's
 reconnect path is real but covers only the cases where the transport actually errors.
 
-So recovery has **three triggers**, all funneled through the registry:
+That is why staleness is durable rather than trigger-driven: a failed refetch keeps the store marked
+stale and retries on its own backoff (first at ~1s, doubling, capped at 30s, paused while the tab is
+hidden). The registry's triggers only make convergence _faster_; none of them is load-bearing for
+correctness.
 
-1. `PB_CONNECT` after an `onDisconnect` with active subscriptions — the SDK's own path.
-2. `window` `online` — the network came back.
-3. `document` `visibilitychange` → visible — covers sleep/wake and long-backgrounded tabs, which
-   `online` alone misses. A hidden tab is deliberately left alone; this trigger picks it up when the
-   user returns.
+- **`onDisconnect` with active subscriptions → mark every registered store stale.** The moment the
+  socket drops, everything is possibly stale, and the flag survives until a refetch commits.
+- **`PB_CONNECT` → retry the stale stores.** The most precise "backend is reachable again" signal
+  there is. A store that is not stale ignores it, so the initial connect costs nothing.
+- **`window` `online` → retry the stale stores**, and reset their backoff — the network just changed.
+- **`document` `visibilitychange` → visible → same.** Covers sleep/wake and long-backgrounded tabs,
+  which `online` alone misses; retries are paused while hidden and picked back up here.
 
-Triggers 2 and 3 are browser-only, so they are registered behind `browser` from `$app/environment`.
+The last two are browser-only, so they are registered behind `browser` from `$app/environment`.
 
-Recovery is **latched, not fire-and-forget**. A refetch issued the instant a trigger fires can still
-hit an unusable network (`online` precedes real connectivity), and a store's failed refetch vanishes.
-So the registry probes `health.check()` on a bounded backoff and fires the registered callbacks only
-once the backend actually answers; after the last delay it gives up and waits for the next trigger,
-so an hour offline costs a handful of probes rather than a hot loop. A single `_recovering` flag
-coalesces the burst — SDK reconnect, `online`, and `visibilitychange` usually arrive together — into
-one round of invalidations.
+An `online` event precedes real connectivity, so a retry round asks `pb.probeBackend()` first: one
+small `health.check` answers for every store, so a tick while the backend is down costs one request
+instead of a doomed refetch per store. It is a **gate the retry awaits, not a latch** — marking a
+store stale is idempotent, so triggers arriving mid-round coalesce for free and none can be dropped.
 
-Testing this: dispatching an `error` event on the EventSource only exercises trigger 1 — it injects
-the very signal whose absence is the real-world failure. A genuine offline needs CDP
+Testing this: dispatching an `error` event on the EventSource only exercises the SDK's own path — it
+injects the very signal whose absence is the real-world failure. A genuine offline needs CDP
 (`Network.emulateNetworkConditions`); Playwright's `context.setOffline()` tears the socket down and
-so exercises trigger 1 as well. Both cases are covered in `e2e/shared-records.test.ts`.
+so exercises the SDK path as well. Both cases are covered in `e2e/shared-records.test.ts`.
 
 ## Server-side debouncing (Go hooks)
 
@@ -125,8 +138,10 @@ refetches, not one per row.
   the sync/projection split above
 - **Dropping a mid-flight event as "already fetching"** — obligations 2 and 4 together require a
   follow-up refetch so the newer server state wins
-- **Treating the SDK's reconnect as the whole recovery story** — it never fires when the socket stays
-  OPEN, which is the common real-world drop; the browser triggers are part of the contract
+- **Swallowing a refresh failure** — a discarded refetch is exactly how a store goes quietly stale
+  forever; let it throw so the sync keeps the flag and retries
+- **Treating a signal as correctness** — the SDK's reconnect never fires when the socket stays OPEN,
+  and `online` fires before the network works. Signals only mark and poke; the durable flag decides
 - **`realtime.unsubscribe()`** — kills ALL subscriptions; unsubscribe the specific collection topics
 - **No debouncing** — causes UI flicker and excessive API calls during bulk operations
 

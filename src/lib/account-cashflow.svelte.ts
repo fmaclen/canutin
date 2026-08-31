@@ -7,9 +7,7 @@ import { getExchangeRatesContext } from './exchange-rates.svelte';
 import { logError } from './logger';
 import { AccountSharesPerspectiveOptions, type TransactionsResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
-import { Debouncer, RequestSequence } from './realtime-sync';
-
-const DEBOUNCE_MS = 200;
+import { StaleSync } from './realtime-sync';
 
 class AccountCashflowContext {
 	isLoading: boolean = $state(true);
@@ -43,8 +41,7 @@ class AccountCashflowContext {
 	private _auth: ReturnType<typeof getAuthContext>;
 	private _fx: ReturnType<typeof getExchangeRatesContext>;
 	private _transactions: TransactionsResponse[] = $state([]);
-	private sequence = new RequestSequence();
-	private debouncer = new Debouncer(DEBOUNCE_MS);
+	private sync: StaleSync;
 	private _unsubscribe: (() => void) | null = null;
 	private _disposed = false;
 	private _activeUserId = '';
@@ -55,13 +52,15 @@ class AccountCashflowContext {
 		AccountSharesPerspectiveOptions.NORMAL
 	);
 	private _teardownCallback = () => this.unsubscribeRealtime();
-	private _reconnectCallback = () => this.invalidate();
 
 	constructor(pb: PocketBaseContext) {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
-		this._pb.registerRealtimeReconnect(this._reconnectCallback);
+		this.sync = new StaleSync(pb, 'accountCashflow', 'refresh', (token) =>
+			this.recomputeAll(token)
+		);
+		this._pb.registerRealtimeSync(this.sync);
 		this._fx = getExchangeRatesContext();
 		this.init();
 	}
@@ -71,18 +70,16 @@ class AccountCashflowContext {
 			const userId = this._auth.currentUserId;
 			if (userId === this._activeUserId) return;
 			this.unsubscribeRealtime();
+			this.reset();
 			this._activeUserId = userId;
 			if (!userId) {
-				this.reset();
 				this.isLoading = false;
 				return;
 			}
 			this.realtimeSubscribe(userId);
 			if (this._accountId) {
 				this.isLoading = true;
-				void this.recomputeAll().catch((error) => {
-					this._pb.handleConnectionError(error, 'accountCashflow', 'init');
-				});
+				void this.sync.refreshNow();
 			}
 		});
 	}
@@ -103,9 +100,7 @@ class AccountCashflowContext {
 			return;
 		}
 		this.isLoading = true;
-		void this.recomputeAll().catch((error) => {
-			this._pb.handleConnectionError(error, 'accountCashflow', 'set_account');
-		});
+		void this.sync.refreshNow();
 	}
 
 	private realtimeSubscribe(userId = this._activeUserId) {
@@ -139,28 +134,20 @@ class AccountCashflowContext {
 		this._unsubscribe = null;
 	}
 
+	// A transaction event is a pure invalidation signal: it marks the store stale and schedules the
+	// windowed refetch rather than patching the event payload. Events for other accounts are filtered
+	// out here because this store caches exactly one account's transactions.
 	private onTransactionEvent(e: RecordSubscription<TransactionsResponse>) {
 		if (!e.action) return;
 		if (e.record.account !== this._accountId) return;
-		this.invalidate();
+		this.sync.invalidate();
 	}
 
-	// A transaction event or a realtime reconnect is a pure invalidation signal: it schedules the
-	// debounced windowed refetch rather than patching the event payload. A reconnect carries no
-	// record, so it recomputes only when an account is active and someone is signed in.
-	private invalidate() {
-		if (!this._activeUserId || !this._accountId) return;
-		this.debouncer.schedule(
-			() =>
-				void this.recomputeAll().catch((error) =>
-					this._pb.handleConnectionError(error, 'accountCashflow', 'refresh')
-				)
-		);
-	}
-
-	private async recomputeAll() {
+	private async recomputeAll(token: number) {
 		const accountId = this._accountId;
-		const token = this.sequence.next();
+		// Staleness is scoped to the mounted account, so a mark that arrives while none is mounted is
+		// a successful no-op: setAccount always refetches, and until it runs there is nothing to sync.
+		if (!accountId || !this._activeUserId) return;
 		const window = computeCashflowWindow();
 
 		try {
@@ -172,26 +159,24 @@ class AccountCashflowContext {
 					requestKey: null
 				});
 
-			if (!this.sequence.isCurrent(token)) return;
+			if (!this.sync.isCurrent(token)) return;
 
 			this._transactions = transactions;
 		} finally {
-			if (!this._disposed && this.sequence.isCurrent(token)) this.isLoading = false;
+			if (!this._disposed && this.sync.isCurrent(token)) this.isLoading = false;
 		}
 	}
 
 	private reset() {
-		this.sequence.bump();
-		this.debouncer.cancel();
+		this.sync.cancel();
 		this._transactions = [];
 	}
 
 	dispose() {
 		this._disposed = true;
-		this.sequence.bump();
-		this.debouncer.cancel();
+		this.sync.cancel();
 		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
-		this._pb.unregisterRealtimeReconnect(this._reconnectCallback);
+		this._pb.unregisterRealtimeSync(this.sync);
 		this.unsubscribeRealtime();
 	}
 }

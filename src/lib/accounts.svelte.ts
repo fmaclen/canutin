@@ -13,7 +13,7 @@ import {
 	type AccountsResponse
 } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
-import { Debouncer, RequestSequence } from './realtime-sync';
+import { StaleSync } from './realtime-sync';
 import type { AccountPositionsValue } from './securities.svelte';
 import { sumOrUnknown } from './security-balance-values';
 import { participantExcluded, projectSignedValue } from './sharing';
@@ -49,8 +49,6 @@ type LatestCash = {
 	asOf: string;
 };
 
-const DEBOUNCE_MS = 200;
-
 class AccountsContext {
 	accounts: AccountWithBalance[] = $derived.by(() =>
 		this.rawAccounts.map((record) => {
@@ -80,12 +78,10 @@ class AccountsContext {
 	private _auth: ReturnType<typeof getAuthContext>;
 	private _fx: ReturnType<typeof getExchangeRatesContext>;
 	private balanceTypesContext: ReturnType<typeof setBalanceTypesContext>;
-	private sequence = new RequestSequence();
-	private debouncer = new Debouncer(DEBOUNCE_MS);
+	private sync: StaleSync;
 	private _activeUserId = '';
 	private _isSubscribed = false;
 	private _teardownCallback = () => this.unsubscribeRealtime();
-	private _reconnectCallback = () => this.invalidate();
 
 	constructor(
 		pb: PocketBaseContext,
@@ -94,7 +90,8 @@ class AccountsContext {
 		this._pb = pb;
 		this._auth = getAuthContext();
 		this._auth.registerRealtimeTeardown(this._teardownCallback);
-		this._pb.registerRealtimeReconnect(this._reconnectCallback);
+		this.sync = new StaleSync(pb, 'accounts', 'refresh', (token) => this.refreshAll(token));
+		this._pb.registerRealtimeSync(this.sync);
 		this._fx = getExchangeRatesContext();
 		this.balanceTypesContext = balanceTypesContext;
 		this.init();
@@ -152,17 +149,17 @@ class AccountsContext {
 			recipientEmail,
 			perspective
 		});
-		await this.refreshForCurrentUser();
+		await this.sync.refreshNow();
 	}
 
 	async updateShareIncludeInNetWorth(shareId: string, includeInNetWorth: boolean) {
 		await this._pb.authedClient.collection('accountShares').update(shareId, { includeInNetWorth });
-		await this.refreshForCurrentUser();
+		await this.sync.refreshNow();
 	}
 
 	async revokeShare(shareId: string) {
 		await this._pb.authedClient.collection('accountShares').delete(shareId);
-		await this.refreshForCurrentUser();
+		await this.sync.refreshNow();
 	}
 
 	private init() {
@@ -170,8 +167,7 @@ class AccountsContext {
 			const userId = this.currentUserId;
 			if (userId === this._activeUserId) return;
 			this.unsubscribeRealtime();
-			this.debouncer.cancel();
-			this.sequence.bump();
+			this.sync.cancel();
 			this._activeUserId = userId;
 			if (!userId) {
 				this.rawAccounts = [];
@@ -186,20 +182,22 @@ class AccountsContext {
 			this.accountsLoaded = false;
 			this.lastBalanceEvent = 0;
 			this.realtimeSubscribe(userId);
-			void this.refreshForCurrentUser();
+			void this.sync.refreshNow();
 		});
 	}
 
-	// Realtime events and reconnects are pure invalidation signals: they never patch a payload into
-	// state, they only schedule a full refetch. Deletes, share membership changes, and cross-account
-	// balance reassignments all resolve for free because the fresh snapshot reflects the database as-is.
-	private invalidate() {
-		this.debouncer.schedule(() => void this.refreshForCurrentUser());
+	// Refresh outside the debounce, for a caller that just wrote to the backend and needs its own
+	// change reflected immediately.
+	async refreshForCurrentUser() {
+		await this.sync.refreshNow();
 	}
 
-	async refreshForCurrentUser() {
+	// Realtime events and reconnects are pure invalidation signals: they never patch a payload into
+	// state, they only mark the store stale and schedule a full refetch. Deletes, share membership
+	// changes, and cross-account balance reassignments all resolve for free because the fresh
+	// snapshot reflects the database as-is.
+	private async refreshAll(token: number) {
 		const userId = this.currentUserId;
-		const token = this.sequence.next();
 		try {
 			const [shares, accounts, balances] = await Promise.all([
 				this._pb.authedClient.collection('accountShares').getFullList<AccountSharesResponse>({
@@ -220,11 +218,11 @@ class AccountsContext {
 					requestKey: null
 				})
 			]);
-			if (userId !== this.currentUserId || !this.sequence.isCurrent(token)) return;
+			if (userId !== this.currentUserId || !this.sync.isCurrent(token)) return;
 			for (const account of accounts) {
 				await this.balanceTypesContext.ensureLoaded(account.balanceType);
 			}
-			if (userId !== this.currentUserId || !this.sequence.isCurrent(token)) return;
+			if (userId !== this.currentUserId || !this.sync.isCurrent(token)) return;
 
 			this.shares = shares.toSorted((a, b) => a.recipientEmail.localeCompare(b.recipientEmail));
 			this.latestCashByAccount.clear();
@@ -238,11 +236,8 @@ class AccountsContext {
 			this.rawAccounts = accounts;
 			this.accountsLoaded = true;
 			this.notifyBalancesChanged();
-		} catch (error) {
-			if (userId !== this.currentUserId || !this.sequence.isCurrent(token)) return;
-			this._pb.handleConnectionError(error, 'accounts', 'refresh');
 		} finally {
-			if (userId === this.currentUserId && this.sequence.isCurrent(token)) this.isLoading = false;
+			if (userId === this.currentUserId && this.sync.isCurrent(token)) this.isLoading = false;
 		}
 	}
 
@@ -284,7 +279,7 @@ class AccountsContext {
 
 	private onRealtimeEvent(userId: string) {
 		if (!userId || userId !== this._activeUserId) return;
-		this.invalidate();
+		this.sync.invalidate();
 	}
 
 	private unsubscribeRealtime() {
@@ -351,11 +346,10 @@ class AccountsContext {
 	}
 
 	dispose() {
-		this.debouncer.cancel();
+		this.sync.cancel();
 		this._auth.unregisterRealtimeTeardown(this._teardownCallback);
-		this._pb.unregisterRealtimeReconnect(this._reconnectCallback);
+		this._pb.unregisterRealtimeSync(this.sync);
 		this.unsubscribeRealtime();
-		this.sequence.bump();
 	}
 }
 
