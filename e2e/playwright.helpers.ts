@@ -100,6 +100,11 @@ export async function goToEditTab(page: Page) {
 	// Detail pages expose Overview/Edit as a SubNav of links; exact match keeps this
 	// from catching the batch editor's "Edit N transactions" link on index pages.
 	await page.getByRole('link', { name: 'Edit', exact: true }).click();
+	// Wait for the edit route to actually be reached. The overview and edit views share
+	// accessible names ("Market value" is both a KeyValue region and a form input), so a
+	// caller that queries immediately after a click that never navigated locks onto the
+	// overview element and times out with a misleading error.
+	await page.waitForURL(/\/edit(\?|$)/);
 }
 
 export async function goToAddPage(page: Page, sidebarLabel: string) {

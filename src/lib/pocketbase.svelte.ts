@@ -32,6 +32,7 @@ export class PocketBaseContext {
 	private _reconnectListening = false;
 	private _pendingReconnect = false;
 	private _recovering = false;
+	private _pendingRecovery = false;
 	// Fires on the two browser signals that a dead connection may be usable again: the network
 	// coming back, and the tab becoming visible after a sleep/wake or a backgrounded stretch. While
 	// hidden the tab is left alone - the visibility signal picks it up when the user returns.
@@ -82,8 +83,17 @@ export class PocketBaseContext {
 	// recovery is latched: it probes the backend on a bounded backoff and only invalidates the stores
 	// once the backend actually answers. `_recovering` coalesces a burst of triggers - an SDK
 	// reconnect, `online`, and `visibilitychange` typically arrive together - into a single refetch.
+	// A trigger that lands while a round is already running is not dropped: the running round may
+	// have read state from before whatever prompted the new trigger (a PB_CONNECT can arrive while a
+	// visibility-triggered round is mid-flight), so it latches `_pendingRecovery` and a follow-up
+	// round runs when the current one settles - the same follow-up rule stores apply to events that
+	// arrive mid-fetch.
 	private async recoverRealtime() {
-		if (this._recovering || !this.authedClient.authStore.isValid) return;
+		if (!this.authedClient.authStore.isValid) return;
+		if (this._recovering) {
+			this._pendingRecovery = true;
+			return;
+		}
 		this._recovering = true;
 		try {
 			for (let attempt = 0; ; attempt++) {
@@ -107,6 +117,10 @@ export class PocketBaseContext {
 			}
 		} finally {
 			this._recovering = false;
+			if (this._pendingRecovery) {
+				this._pendingRecovery = false;
+				void this.recoverRealtime();
+			}
 		}
 	}
 
