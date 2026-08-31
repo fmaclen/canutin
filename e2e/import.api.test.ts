@@ -109,7 +109,7 @@ test('description normalization handles whitespace and casing', async () => {
 	expect(result.transactions.created).toBe(0);
 });
 
-test('revert rejects injection-like session IDs', async () => {
+test('revert rejects injection-like session IDs and unknown sessions', async () => {
 	const user = await seedUser('tanya');
 	const REVERT_PATH = '/api/canutin/import/revert';
 
@@ -123,15 +123,8 @@ test('revert rejects injection-like session IDs', async () => {
 		const response = await pbSend(REVERT_PATH, { sessionId: malicious }, user.email);
 		expect(response.status).not.toBe(200);
 	}
-});
 
-test('revert non-existent session returns 404', async () => {
-	const user = await seedUser('ursula');
-	const response = await pbSend(
-		'/api/canutin/import/revert',
-		{ sessionId: 'nonexistent00000' },
-		user.email
-	);
+	const response = await pbSend(REVERT_PATH, { sessionId: 'nonexistent00000' }, user.email);
 	expect(response.status).toBe(404);
 });
 
@@ -398,12 +391,10 @@ test('revert cleans up orphaned labels and balance types', async () => {
 	expect(balanceTypesAfter.length).toBe(0);
 });
 
-test('import rejects requests without auth', async () => {
-	const response = await pbSend(IMPORT_PATH, importPayload('no-auth-test'));
-	expect(response.status).toBe(401);
-});
+test('import rejects unauthenticated requests and empty payloads and creates no session', async () => {
+	const unauthenticated = await pbSend(IMPORT_PATH, importPayload('no-auth-test'));
+	expect(unauthenticated.status).toBe(401);
 
-test('import rejects empty payload and creates no session', async () => {
 	const user = await seedUser('rachel');
 	const response = await pbSend(IMPORT_PATH, { sessionLabel: 'empty-import' }, user.email);
 	expect(response.status).toBe(400);
@@ -514,50 +505,6 @@ test('import rejects an oversized body and creates no session', async () => {
 		filter: `owner = "${user.id}"`
 	});
 	expect(sessions.length).toBe(0);
-});
-
-test('mixed valid and invalid rows complete with errors and persist the valid rows', async () => {
-	const user = await seedUser('ricardo');
-	const response = await pbSend(
-		IMPORT_PATH,
-		{
-			sessionLabel: 'ricardo-partial',
-			accounts: [{ name: 'Ricardo Checking', balanceGroup: 'CASH', balanceType: 'Checking' }],
-			transactions: [
-				{
-					accountName: 'Ricardo Checking',
-					date: '2025-06-10T00:00:00.000Z',
-					description: 'Valid deposit',
-					value: 100
-				},
-				{
-					accountName: 'Ghost Account',
-					date: '2025-06-11T00:00:00.000Z',
-					description: 'Unresolvable account',
-					value: -50
-				}
-			]
-		},
-		user.email
-	);
-	const result = await response.json();
-
-	expect(response.status).toBe(200);
-	expect(result.status).toBe('completed_with_errors');
-	expect(result.recordsFailed).toBe(1);
-	expect(result.transactions.created).toBe(1);
-
-	const pb = await getUserPB(user.email);
-	const session = await pb.collection('importSessions').getOne(result.sessionId);
-	expect(session.status).toBe('completed_with_errors');
-	expect(session.recordsFailed).toBe(1);
-	expect(session.recordsCreated).toBeGreaterThan(0);
-
-	const transactions = await pb.collection('transactions').getFullList({
-		filter: `owner = "${user.id}"`
-	});
-	expect(transactions.length).toBe(1);
-	expect(transactions[0].description).toBe('Valid deposit');
 });
 
 test('import accepts security and cryptocurrency balance types in assets payload', async () => {

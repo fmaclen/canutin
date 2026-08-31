@@ -142,6 +142,21 @@ test('imports page shows the completed-with-errors status and failed count', asy
 		)
 	).json();
 	expect(result.status).toBe('completed_with_errors');
+	expect(result.recordsFailed).toBe(1);
+	expect(result.transactions.created).toBe(1);
+
+	// The unresolvable row must fail without taking the valid row down with it.
+	const pb = await getUserPB(user.email);
+	const session = await pb.collection('importSessions').getOne(result.sessionId);
+	expect(session.status).toBe('completed_with_errors');
+	expect(session.recordsFailed).toBe(1);
+	expect(session.recordsCreated).toBeGreaterThan(0);
+
+	const transactions = await pb.collection('transactions').getFullList({
+		filter: `owner = "${user.id}"`
+	});
+	expect(transactions.length).toBe(1);
+	expect(transactions[0].description).toBe('Valid deposit');
 
 	await page.goto('/');
 	await signIn(page, user.email);

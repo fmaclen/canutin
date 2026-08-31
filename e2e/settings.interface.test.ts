@@ -80,20 +80,6 @@ test('settings switches theme only after clicking Save and persists after reload
 	await expect(page.getByLabel('Theme')).toContainText('Dark');
 });
 
-test('settings exposes default currency without the old exchange-rate toggle', async ({ page }) => {
-	const user = await seedUser('diego');
-
-	await page.goto('/');
-	await signIn(page, user.email);
-	await goToPageViaSidebar(page, 'Settings');
-
-	await expect(page.getByText('Interface')).toBeVisible();
-	await expect(page.getByLabel('Default currency')).toContainText('USD');
-	await expect(page.getByText('Exchange rates', { exact: true })).toHaveCount(0);
-	await expect(page.getByText('About', { exact: true })).toBeVisible();
-	await expect(page.getByLabel('Version')).toHaveValue(/^v\d+\.\d+\.\d+/);
-});
-
 test('settings switches display currency only after clicking Save and persists after reload', async ({
 	page
 }) => {
@@ -104,8 +90,12 @@ test('settings switches display currency only after clicking Save and persists a
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Settings');
 
+	// Currency is a plain default now; the exchange-rate toggle that used to sit beside it is gone.
 	const defaultCurrency = page.getByLabel('Default currency');
 	await expect(defaultCurrency).toContainText('USD');
+	await expect(page.getByText('Exchange rates', { exact: true })).toHaveCount(0);
+	await expect(page.getByText('About', { exact: true })).toBeVisible();
+	await expect(page.getByLabel('Version')).toHaveValue(/^v\d+\.\d+\.\d+/);
 	await expect(page.getByRole('button', { name: 'Save' })).toBeDisabled();
 
 	await defaultCurrency.click();
