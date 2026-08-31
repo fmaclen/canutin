@@ -18,6 +18,10 @@ const isCI = process.env.CI === 'true';
 // own trace or there is nothing left to debug.
 const trace = isCI ? 'on-first-retry' : 'retain-on-failure';
 
+// API-tier specs assert over HTTP and never open a browser, so a viewport cannot change
+// their outcome. They run once under the api project; desktop and mobile ignore them.
+const API_TESTS = '**/*.api.test.ts';
+
 const PB_PORT = Number(process.env.PB_PORT ?? 42070);
 const VITE_PORT = Number(process.env.VITE_PREVIEW_PORT ?? process.env.VITE_PORT ?? 42069);
 const BASE_URL = `http://localhost:${VITE_PORT}`;
@@ -70,7 +74,12 @@ export default defineConfig({
 	workers: isCI ? 2 : undefined,
 	projects: [
 		{
+			name: 'api',
+			testMatch: API_TESTS
+		},
+		{
 			name: 'desktop',
+			testIgnore: API_TESTS,
 			use: {
 				...devices['Desktop Chrome'],
 				baseURL: BASE_URL,
@@ -80,6 +89,7 @@ export default defineConfig({
 		},
 		{
 			name: 'mobile',
+			testIgnore: API_TESTS,
 			use: {
 				...devices['iPhone 13'],
 				baseURL: BASE_URL,
