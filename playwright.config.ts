@@ -13,6 +13,15 @@ if (existsSync(envFile)) process.loadEnvFile(envFile);
 
 const isCI = process.env.CI === 'true';
 
+// Recording a trace for every test costs time across the whole CI matrix, where only a
+// retried test is worth inspecting. Locally retries are off, so a failure has to keep its
+// own trace or there is nothing left to debug.
+const trace = isCI ? 'on-first-retry' : 'retain-on-failure';
+
+// API-tier specs assert over HTTP and never open a browser, so a viewport cannot change
+// their outcome. They run once under the api project; desktop and mobile ignore them.
+const API_TESTS = '**/*.api.test.ts';
+
 const PB_PORT = Number(process.env.PB_PORT ?? 42070);
 const VITE_PORT = Number(process.env.VITE_PREVIEW_PORT ?? process.env.VITE_PORT ?? 42069);
 const BASE_URL = `http://localhost:${VITE_PORT}`;
@@ -53,22 +62,32 @@ export default defineConfig({
 	],
 	testDir: 'e2e',
 	retries: isCI ? 2 : 0,
+	// Two is what an ubuntu-latest runner sustains. Four oversubscribes its 4 vCPUs: the
+	// headed WebKit mobile project starves against the preview server, PocketBase, and
+	// xvfb, and mobile specs start failing on 30s action timeouts.
+	workers: isCI ? 2 : undefined,
 	projects: [
 		{
+			name: 'api',
+			testMatch: API_TESTS
+		},
+		{
 			name: 'desktop',
+			testIgnore: API_TESTS,
 			use: {
 				...devices['Desktop Chrome'],
 				baseURL: BASE_URL,
-				trace: 'retain-on-failure',
+				trace,
 				permissions: ['clipboard-read', 'clipboard-write']
 			}
 		},
 		{
 			name: 'mobile',
+			testIgnore: API_TESTS,
 			use: {
 				...devices['iPhone 13'],
 				baseURL: BASE_URL,
-				trace: 'retain-on-failure',
+				trace,
 				// WebKit crashes on headless Linux CI (EGL_NOT_INITIALIZED at page.goto); run it
 				// headed under xvfb instead (see .github/workflows/test.yml).
 				headless: !isCI

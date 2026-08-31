@@ -566,6 +566,13 @@ test('account overview charts an auto-calculated account from its transaction hi
 	await goToRecordDetail(page, 'Accounts', 'Auto Checking');
 	await expect(page.getByRole('heading', { name: 'Balance history' })).toBeVisible();
 	await expect(page.getByRole('img', { name: 'Balance' })).toBeVisible();
+
+	// The charted series is the running transaction total, so the two points are $500 and
+	// $1,250 - dragging between them reports the $750 paycheck as a 150% gain
+	await dragChart(page, page.getByRole('img', { name: 'Balance' }), 0.25, 0.75, 0.5, 0);
+	await expect(page.getByText('2025-01-01 → 2025-02-01')).toBeVisible();
+	await expect(page.getByText('+$750.00')).toBeVisible();
+	await expect(page.getByText('+150.0%')).toBeVisible();
 });
 
 test('account overview charts an investment account from its security positions', async ({
@@ -603,6 +610,13 @@ test('account overview charts an investment account from its security positions'
 	await signIn(page, user.email);
 	await goToRecordDetail(page, 'Accounts', 'Index Brokerage');
 	await expect(page.getByRole('img', { name: 'Balance' })).toBeVisible();
+
+	// The charted series is the position's market value, so the two points are $1,000 and
+	// $1,800 - dragging between them reports the $800 gain from more shares at a higher price
+	await dragChart(page, page.getByRole('img', { name: 'Balance' }), 0.25, 0.75, 0.5, 0);
+	await expect(page.getByText('2025-01-01 → 2025-02-01')).toBeVisible();
+	await expect(page.getByText('+$800.00')).toBeVisible();
+	await expect(page.getByText('+80.0%')).toBeVisible();
 });
 
 test('account overview blanks the balance history when it holds a foreign-currency security', async ({

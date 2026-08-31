@@ -6,7 +6,7 @@ package main
 // Playwright cannot intercept the Go server's outbound requests, and the e2e run sets
 // FX_FETCH_DISABLED=true so live fetching never happens, so this classification has no surface
 // Playwright reaches. Do not add Go tests here for anything a Playwright test could cover; the
-// owner-immutability rules that once lived here moved to e2e/rates-api.test.ts.
+// owner-immutability rules that once lived here moved to e2e/rates.api.test.ts.
 
 import (
 	"errors"

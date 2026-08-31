@@ -12,7 +12,7 @@ Prefer real systems over mocks. Tests that exercise the actual stack - real Pock
 In order of preference:
 
 1. **E2E** (`e2e/*.test.ts`) - UI-reachable flow exercised through Playwright against the real local PocketBase backend.
-2. **API/backend tests** - backend behavior with no UI, real PocketBase through the test helpers. Add this tier only when the behavior has no useful UI surface.
+2. **API/backend tests** (`e2e/*.api.test.ts`) - backend behavior with no UI, real PocketBase through the test helpers. The `.api` suffix is what routes a file to the `api` Playwright project, which runs it once; the desktop and mobile projects ignore these files, so a test that never opens a browser is not paid for twice. A spec in this tier takes no Playwright fixtures (`async () => {...}`); if a test needs `page`, it belongs in tier 1 and in a plain `*.test.ts` file. Add this tier only when the behavior has no useful UI surface.
 3. **Unit tests** - pure logic with no DB. Only when none of the above apply.
 
 Pick the most-preferred tier the behavior reaches. If a feature is UI-driven, write an E2E even when the bug is in backend-adjacent data code - the E2E proves the end-to-end fix and the lower-level code is covered transitively.
@@ -22,7 +22,7 @@ Playwright (`e2e/`) is the only test suite. The Go tests under `pocketbase/` are
 Top-level commands:
 
 ```bash
-bun run test                         # All Playwright tests (desktop + mobile)
+bun run test                         # All Playwright tests (api + desktop + mobile)
 bun run test -- e2e/file.test.ts     # Single file - desktop and mobile in one run
 bun run test -- -g 'test name'       # By name pattern
 ```

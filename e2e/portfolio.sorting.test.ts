@@ -3,8 +3,14 @@ import { expect, test } from '@playwright/test';
 import { goToPageViaSidebar, signIn } from './playwright.helpers';
 import { seedPortfolio, seedUser } from './pocketbase.helpers';
 
-function seedSortingPortfolio(userId: string) {
-	return seedPortfolio(userId, {
+test('portfolio: aggregate table sorts by every column and persists across reload', async ({
+	page
+}) => {
+	const user = await seedUser('fatima');
+	// Symbols run counter to the names (Alpha/ZZZ, Bravo/WWW, Charlie/YYY, Delta/XXX) so a
+	// symbol sort can never be satisfied by a name sort. Delta's unknown market value pins the
+	// null-handling assertions: last when descending by value, first when ascending.
+	await seedPortfolio(user.id, {
 		accounts: ['Main Brokerage', 'Second Brokerage', 'Third Brokerage'],
 		securities: [
 			{ name: 'Alpha Holdings', symbol: 'ZZZ' },
@@ -63,30 +69,6 @@ function seedSortingPortfolio(userId: string) {
 			}
 		]
 	});
-}
-
-test('portfolio: aggregate table defaults to market value descending with unknown values last', async ({
-	page
-}) => {
-	const user = await seedUser('fatima');
-	await seedSortingPortfolio(user.id);
-
-	await page.goto('/');
-	await signIn(page, user.email);
-	await goToPageViaSidebar(page, 'Portfolio');
-	const rows = page.getByRole('table').getByRole('row');
-	await expect(rows.nth(1)).toContainText('Alpha Holdings');
-	await expect(rows.nth(2)).toContainText('Charlie Holdings');
-	await expect(rows.nth(3)).toContainText('Bravo Holdings');
-	await expect(rows.nth(4)).toContainText('Delta Holdings');
-	await expect(rows.nth(4).locator('td').last()).toHaveText('~');
-});
-
-test('portfolio: aggregate table sorts by security name descending then ascending', async ({
-	page
-}) => {
-	const user = await seedUser('fatima');
-	await seedSortingPortfolio(user.id);
 
 	await page.goto('/');
 	await signIn(page, user.email);
@@ -94,129 +76,53 @@ test('portfolio: aggregate table sorts by security name descending then ascendin
 	const rows = page.getByRole('table').getByRole('row');
 	await expect(rows.nth(1)).toContainText('Alpha Holdings');
 
-	const securityHeader = page.getByRole('button', { name: 'Security', exact: true });
-	await securityHeader.click();
-	await expect(page).toHaveURL(/sort=name/);
-	await expect(page).toHaveURL(/dir=desc/);
-	await expect(rows.nth(1)).toContainText('Delta Holdings');
-	await expect(rows.nth(2)).toContainText('Charlie Holdings');
-	await expect(rows.nth(3)).toContainText('Bravo Holdings');
-	await expect(rows.nth(4)).toContainText('Alpha Holdings');
-
-	await securityHeader.click();
-	await expect(page).toHaveURL(/dir=asc/);
-	await expect(rows.nth(1)).toContainText('Alpha Holdings');
-	await expect(rows.nth(2)).toContainText('Bravo Holdings');
-	await expect(rows.nth(3)).toContainText('Charlie Holdings');
-	await expect(rows.nth(4)).toContainText('Delta Holdings');
-});
-
-test('portfolio: aggregate table sorts by symbol', async ({ page }) => {
-	const user = await seedUser('fatima');
-	await seedSortingPortfolio(user.id);
-
-	await page.goto('/');
-	await signIn(page, user.email);
-	await goToPageViaSidebar(page, 'Portfolio');
-	const rows = page.getByRole('table').getByRole('row');
-	await expect(rows.nth(1)).toContainText('Alpha Holdings');
-
-	const symbolHeader = page.getByRole('button', { name: 'Symbol', exact: true });
-	await symbolHeader.click();
-	await expect(page).toHaveURL(/sort=symbol/);
-	await expect(page).toHaveURL(/dir=desc/);
-	await expect(rows.nth(1)).toContainText('Alpha Holdings');
-	await expect(rows.nth(2)).toContainText('Charlie Holdings');
-	await expect(rows.nth(3)).toContainText('Delta Holdings');
-	await expect(rows.nth(4)).toContainText('Bravo Holdings');
-});
-
-test('portfolio: aggregate table sorts by market value ascending with unknown values first', async ({
-	page
-}) => {
-	const user = await seedUser('fatima');
-	await seedSortingPortfolio(user.id);
-
-	await page.goto('/');
-	await signIn(page, user.email);
-	await goToPageViaSidebar(page, 'Portfolio');
-	const rows = page.getByRole('table').getByRole('row');
-	await expect(rows.nth(1)).toContainText('Alpha Holdings');
-
-	const valueHeader = page.getByRole('button', { name: 'Market value', exact: true });
-	await valueHeader.click();
+	// Market value is the active column on arrival, so its first click flips to ascending and
+	// moves the unknown value from last to first.
+	const valueButton = page.getByRole('button', { name: 'Market value', exact: true });
+	const valueHeader = valueButton.locator('xpath=..');
+	await valueButton.click();
 	await expect(page).toHaveURL(/sort=value/);
 	await expect(page).toHaveURL(/dir=asc/);
 	await expect(rows.nth(1)).toContainText('Delta Holdings');
 	await expect(rows.nth(2)).toContainText('Bravo Holdings');
 	await expect(rows.nth(3)).toContainText('Charlie Holdings');
 	await expect(rows.nth(4)).toContainText('Alpha Holdings');
-});
 
-test('portfolio: aggregate table marks the active sort column with aria-sort', async ({ page }) => {
-	const user = await seedUser('fatima');
-	await seedPortfolio(user.id, {
-		accounts: ['Main Brokerage'],
-		securities: [{ name: 'Alpha Holdings', symbol: 'ZZZ' }],
-		balances: [
-			{
-				account: 'Main Brokerage',
-				security: 'Alpha Holdings',
-				quantity: 5,
-				price: 300,
-				value: 1500,
-				costBasis: 1200
-			}
-		]
-	});
-
-	await page.goto('/');
-	await signIn(page, user.email);
-	await goToPageViaSidebar(page, 'Portfolio');
-	await expect(page.getByRole('table').getByRole('row').nth(1)).toContainText('Alpha Holdings');
-
+	// Security sorts alphabetically in both directions and takes over the aria-sort marker.
 	const securityButton = page.getByRole('button', { name: 'Security', exact: true });
 	const securityHeader = securityButton.locator('xpath=..');
-	const valueButton = page.getByRole('button', { name: 'Market value', exact: true });
-	const valueHeader = valueButton.locator('xpath=..');
 	await securityButton.click();
-
+	await expect(page).toHaveURL(/sort=name/);
+	await expect(page).toHaveURL(/dir=desc/);
 	await expect(securityHeader).toHaveAttribute('aria-sort', 'descending');
 	await expect(valueHeader).not.toHaveAttribute('aria-sort');
-});
+	await expect(rows.nth(1)).toContainText('Delta Holdings');
+	await expect(rows.nth(2)).toContainText('Charlie Holdings');
+	await expect(rows.nth(3)).toContainText('Bravo Holdings');
+	await expect(rows.nth(4)).toContainText('Alpha Holdings');
 
-test('portfolio: aggregate table sort state persists across reload', async ({ page }) => {
-	const user = await seedUser('fatima');
-	await seedPortfolio(user.id, {
-		accounts: ['Main Brokerage'],
-		securities: [{ name: 'Alpha Holdings', symbol: 'ZZZ' }],
-		balances: [
-			{
-				account: 'Main Brokerage',
-				security: 'Alpha Holdings',
-				quantity: 5,
-				price: 300,
-				value: 1500,
-				costBasis: 1200
-			}
-		]
-	});
-
-	await page.goto('/');
-	await signIn(page, user.email);
-	await goToPageViaSidebar(page, 'Portfolio');
-	await expect(page.getByRole('table').getByRole('row').nth(1)).toContainText('Alpha Holdings');
-
-	const securityHeader = page.getByRole('button', { name: 'Security', exact: true });
-	await securityHeader.click();
-	await securityHeader.click();
-	await expect(page).toHaveURL(/sort=name/);
+	await securityButton.click();
 	await expect(page).toHaveURL(/dir=asc/);
+	await expect(securityHeader).toHaveAttribute('aria-sort', 'ascending');
+	await expect(rows.nth(1)).toContainText('Alpha Holdings');
+	await expect(rows.nth(2)).toContainText('Bravo Holdings');
+	await expect(rows.nth(3)).toContainText('Charlie Holdings');
+	await expect(rows.nth(4)).toContainText('Delta Holdings');
+
+	const symbolButton = page.getByRole('button', { name: 'Symbol', exact: true });
+	await symbolButton.click();
+	await expect(page).toHaveURL(/sort=symbol/);
+	await expect(page).toHaveURL(/dir=desc/);
+	await expect(rows.nth(1)).toContainText('Alpha Holdings');
+	await expect(rows.nth(2)).toContainText('Charlie Holdings');
+	await expect(rows.nth(3)).toContainText('Delta Holdings');
+	await expect(rows.nth(4)).toContainText('Bravo Holdings');
 
 	await page.reload();
-
-	await expect(page).toHaveURL(/sort=name/);
-	await expect(page).toHaveURL(/dir=asc/);
+	await expect(page).toHaveURL(/sort=symbol/);
+	await expect(page).toHaveURL(/dir=desc/);
+	await expect(rows.nth(1)).toContainText('Alpha Holdings');
+	await expect(rows.nth(4)).toContainText('Bravo Holdings');
 });
 
 test('portfolio: aggregate table does not make the Accounts column sortable', async ({ page }) => {
