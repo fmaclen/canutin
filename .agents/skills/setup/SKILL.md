@@ -7,14 +7,14 @@ description: Managed worktree creation, recovery, inspection, and safe removal
 
 ## Control Plane
 
-The checkout at the repository root is the primary worktree and control plane. Keep it on `next`; do feature work only in managed linked worktrees. `scripts/worktree.ts` discovers the primary checkout through Git, so its commands work from the primary checkout or any linked worktree.
+The checkout at the repository root is the primary worktree and control plane. Keep it on `master`; do feature work only in managed linked worktrees. `scripts/worktree.ts` discovers the primary checkout through Git, so its commands work from the primary checkout or any linked worktree.
 
 Managed worktrees are nested under the ignored `/.worktrees/` directory:
 
 > **Warning:** Never run double-force Git clean with ignored files from the primary checkout, such as `git clean -ffdx`. It can delete every nested managed checkout under `/.worktrees/`.
 
 ```text
-<repo>/                              # primary worktree on next
+<repo>/                              # primary worktree on master
 └── .worktrees/
     ├── 01--feat-new-feature/        # feat/new-feature
     └── 02--fix-bug-123/             # fix/bug-123
@@ -26,12 +26,12 @@ The directory name is the slot padded to at least two digits, followed by `--` a
 
 The package aliases map directly to `scripts/worktree.ts`:
 
-| Command                                                                    | Behavior                                                                 |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `bun run worktree:create <branch> [--base <base>]`                         | Create, reuse, or recover a managed worktree; the default base is `next` |
-| `bun run worktree:list`                                                    | List managed worktrees and their status                                  |
-| `bun run worktree:remove <branch\|slot\|path> [--force] [--delete-branch]` | Safely remove one managed worktree                                       |
-| `bun run worktree:sweep`                                                   | Report removable merged, clean worktrees without changing them           |
+| Command                                                                    | Behavior                                                                   |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `bun run worktree:create <branch> [--base <base>]`                         | Create, reuse, or recover a managed worktree; the default base is `master` |
+| `bun run worktree:list`                                                    | List managed worktrees and their status                                    |
+| `bun run worktree:remove <branch\|slot\|path> [--force] [--delete-branch]` | Safely remove one managed worktree                                         |
+| `bun run worktree:sweep`                                                   | Report removable merged, clean worktrees without changing them             |
 
 `bun run worktree <command>` exposes the same `create`, `list`, `remove`, and `sweep` commands.
 
@@ -39,7 +39,7 @@ The package aliases map directly to `scripts/worktree.ts`:
 
 ```bash
 bun run worktree:create feat/new-feature
-bun run worktree:create fix/bug-123 --base origin/next
+bun run worktree:create fix/bug-123 --base origin/master
 ```
 
 The manager serializes concurrent creates, recovering an allocator lock left stale by a process that is no longer running, then chooses the lowest unoccupied slot whose deterministic port pair is available. Slots and ports are not user inputs:
@@ -49,7 +49,7 @@ The manager serializes concurrent creates, recovering an allocator lock left sta
 
 For example, slot 1 uses Vite port `42169` and PocketBase port `42170`. If a free slot's pair is already in use, creation continues to the next eligible slot in the same run.
 
-For a new branch, the manager creates it from `next` or `--base`. If the local branch already exists but is not checked out, it checks out that branch and does not use the base. If the branch is already at its valid managed path, creation reuses a complete checkout or finishes interrupted initialization. It refuses to adopt the branch from an unmanaged or inconsistent path.
+For a new branch, the manager creates it from `master` or `--base`. If the local branch already exists but is not checked out, it checks out that branch and does not use the base. If the branch is already at its valid managed path, creation reuses a complete checkout or finishes interrupted initialization. It refuses to adopt the branch from an unmanaged or inconsistent path.
 
 Initialization writes:
 
@@ -89,13 +89,13 @@ bun run worktree:remove .worktrees/01--feat-new-feature
 
 The identifier may be a branch, slot, managed directory name, or path. By default removal keeps the local branch and refuses a dirty worktree or commits not reachable from any remote. `--force` overrides those two worktree-removal checks; a merged GitHub PR whose recorded head exactly matches the worktree head also protects otherwise unpushed commits.
 
-Add `--delete-branch` to delete the local branch after removing the worktree. Branch deletion requires the exact reviewed worktree head to be either an ancestor of local `next` or the head of a merged GitHub PR. The manager rechecks that the branch still points to that exact commit before deletion and refuses to delete a branch that moved. `--force` does not bypass these requirements. Removal without `--delete-branch` does not require the branch to be merged, and the manager never deletes the remote branch.
+Add `--delete-branch` to delete the local branch after removing the worktree. Branch deletion requires the exact reviewed worktree head to be either an ancestor of local `master` or the head of a merged GitHub PR. The manager rechecks that the branch still points to that exact commit before deletion and refuses to delete a branch that moved. `--force` does not bypass these requirements. Removal without `--delete-branch` does not require the branch to be merged, and the manager never deletes the remote branch.
 
 Before removal, the manager sends `TERM` only to listeners whose working directory belongs to the worktree. After two seconds it sends `KILL` only to owned listeners still running. It leaves foreign listeners untouched and reports them.
 
 ## Sweep and Post-Merge Cleanup
 
-`bun run worktree:sweep` makes no changes. It reports registered worktrees that are clean and whose exact head is merged into local `next` or belongs to a merged GitHub PR. A candidate with commits unreachable from remotes is reported only when exact merged-PR evidence protects that head. Active owned and foreign listeners are included in the report.
+`bun run worktree:sweep` makes no changes. It reports registered worktrees that are clean and whose exact head is merged into local `master` or belongs to a merged GitHub PR. A candidate with commits unreachable from remotes is reported only when exact merged-PR evidence protects that head. Active owned and foreign listeners are included in the report.
 
 After merge:
 
