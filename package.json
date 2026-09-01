@@ -61,7 +61,7 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"format": "bun run prettier --write .",
 		"lint": "bun run prettier --check . && bun run eslint .",
-		"test": "playwright test",
+		"test": "IS_DEV=true PUBLIC_DEMO_ENABLED=true playwright test",
 		"verify": "bun run lint && bun run check && bun run build",
 		"quality": "bun run format && bun run eslint . && bun run check",
 		"pb": "IS_DEV=true PUBLIC_DEMO_ENABLED=true bun scripts/pb-server.ts",
