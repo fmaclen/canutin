@@ -14,17 +14,22 @@ import {
 const ARS_PER_USD = 1495;
 const EUR_PER_USD = 0.92;
 
-function utcIso(date: string) {
-	return `${date}T00:00:00.000Z`;
+// Dates stay relative to today so the transactions always fall inside the Transactions page's
+// default "Last 3 months" period, which starts on the first of the month two months back.
+function utcMidnightDaysAgo(days: number) {
+	const date = new Date();
+	date.setUTCHours(0, 0, 0, 0);
+	date.setUTCDate(date.getUTCDate() - days);
+	return date.toISOString();
 }
 
 test('foreign-currency records render in the display currency with FX indicators and follow the currency preference', async ({
 	page
 }) => {
 	const user = await seedUser('mateo');
-	const balanceDate = utcIso('2026-06-25');
-	const salaryDate = utcIso('2026-06-15');
-	const rentDate = utcIso('2026-06-05');
+	const balanceDate = utcMidnightDaysAgo(0);
+	const salaryDate = utcMidnightDaysAgo(10);
+	const rentDate = utcMidnightDaysAgo(20);
 
 	await seedCurrency({ owner: user.id, code: 'ARS', name: 'Argentine peso', autoUpdate: false });
 	await seedCurrency({ owner: user.id, code: 'EUR', name: 'Euro', autoUpdate: false });

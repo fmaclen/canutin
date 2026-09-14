@@ -69,7 +69,7 @@ export class AuthContext {
 		const userId = this._pb.authStore.record?.id;
 		if (!userId) return;
 
-		this._pb
+		return this._pb
 			.collection('users')
 			.unsubscribe(userId)
 			.catch((error) => logError('auth', 'unsubscribe', error));
@@ -165,7 +165,11 @@ export class AuthContext {
 		this.error = null;
 		try {
 			this.runRealtimeTeardowns();
-			this.unsubscribeFromCurrentUser();
+			// The SDK batches every unsubscribe above into one realtime request sent on a later
+			// microtask, and it attaches whatever token the auth store holds at that moment. The server
+			// rejects a subscription change whose auth differs from the connection's, so the token must
+			// outlive that request.
+			await this.unsubscribeFromCurrentUser();
 			this._pb.authStore.clear();
 		} finally {
 			this.currentUser = null;
