@@ -23,6 +23,7 @@ export class PocketBaseContext {
 	authedClient: TypedPocketBase;
 	setupStatus: SetupStatus = $state('checking');
 	onAuthInvalidated?: () => void;
+	onSessionResume?: () => Promise<boolean>;
 
 	private _syncs = new SvelteSet<StaleSync>();
 	private _syncListening = false;
@@ -30,8 +31,10 @@ export class PocketBaseContext {
 	// Fires on the two browser signals that a dead connection may be usable again: the network
 	// coming back, and the tab becoming visible after a sleep/wake or a backgrounded stretch. While
 	// hidden the tab is left alone - the visibility signal picks it up when the user returns.
-	private _retryTrigger = () => {
+	private _retryTrigger = async () => {
 		if (document.visibilityState !== 'visible') return;
+		if (!this.isSessionValid()) return;
+		if (this.onSessionResume && !(await this.onSessionResume())) return;
 		if (!this.isSessionValid()) return;
 		// A suspended connection can miss events without reporting a disconnect, so even stores
 		// whose last fetch succeeded need a fresh snapshot when the user returns.

@@ -105,6 +105,9 @@ correctness.
   pause while hidden and resume here.
 
 The last two are browser-only, so they are registered behind `browser` from `$app/environment`.
+They first await the auth context's session renewal, coalescing overlapping requests. An expired or
+rejected session returns to login instead of refetching financial records. See
+[saved sessions](../auth-system/SKILL.md#saved-sessions) for renewal and logout guarantees.
 
 An `online` event precedes real connectivity, so a retry round asks `pb.probeBackend()` first: one
 small `health.check` answers for every store, so a tick while the backend is down costs one request

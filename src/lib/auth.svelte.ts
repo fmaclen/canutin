@@ -1,6 +1,6 @@
 import PocketBase, {
+	BaseAuthStore,
 	ClientResponseError,
-	type BaseAuthStore,
 	type RecordSubscription
 } from 'pocketbase';
 import { getContext, setContext } from 'svelte';
@@ -20,6 +20,8 @@ export class AuthContext {
 
 	private _pb: PocketBase;
 	private _realtimeTeardowns = new SvelteSet<() => void>();
+	private _sessionVersion = 0;
+	private _sessionRefresh: Promise<boolean> | null = null;
 
 	constructor(pb: PocketBase) {
 		this._pb = pb;
@@ -36,24 +38,58 @@ export class AuthContext {
 		this.isLoading = false;
 	}
 
-	private async validateSession() {
+	async validateSession() {
 		if (!this._pb.authStore.isValid) {
 			this.teardownSession();
 			return false;
 		}
+		if (this._sessionRefresh) return this._sessionRefresh;
 
-		try {
-			await this._pb.collection('users').authRefresh();
-		} catch (error) {
-			if (error instanceof ClientResponseError && (error.status === 401 || error.status === 403)) {
-				this.teardownSession();
-				toast.error(m.error_auth_failed(), { id: 'auth-error' });
-				return false;
-			}
-		}
-		this.currentUser = this._pb.authStore;
-		this.currentUserId = this._pb.authStore.record?.id ?? '';
-		return true;
+		const version = this._sessionVersion;
+		const token = this._pb.authStore.token;
+		const userId = this._pb.authStore.record?.id;
+		// The SDK saves refreshed credentials before resolving. Isolate that save so a response
+		// arriving after logout cannot restore the shared session.
+		const refreshClient = new PocketBase(this._pb.baseURL, new BaseAuthStore(), this._pb.lang);
+		refreshClient.authStore.save(token, this._pb.authStore.record);
+		const refresh = refreshClient
+			.collection('users')
+			.authRefresh()
+			.then((session) => {
+				if (version !== this._sessionVersion) return false;
+				if (token !== this._pb.authStore.token) {
+					return this._pb.authStore.isValid && this._pb.authStore.record?.id === userId;
+				}
+				this._pb.authStore.save(session.token, session.record);
+				this.currentUser = this._pb.authStore;
+				this.currentUserId = session.record.id;
+				return true;
+			})
+			.catch((error) => {
+				if (version !== this._sessionVersion) return false;
+				if (token !== this._pb.authStore.token) {
+					return this._pb.authStore.isValid && this._pb.authStore.record?.id === userId;
+				}
+				if (
+					error instanceof ClientResponseError &&
+					(error.status === 401 || error.status === 403)
+				) {
+					this.teardownSession();
+					toast.error(m.error_auth_failed(), { id: 'auth-error' });
+					return false;
+				}
+				logError('auth', 'refresh', error);
+				if (!this._pb.authStore.isValid) {
+					this.teardownSession();
+					return false;
+				}
+				return true;
+			})
+			.finally(() => {
+				if (this._sessionRefresh === refresh) this._sessionRefresh = null;
+			});
+		this._sessionRefresh = refresh;
+		return refresh;
 	}
 
 	private subscribeToCurrentUser() {
@@ -95,6 +131,8 @@ export class AuthContext {
 	}
 
 	private teardownSession() {
+		this._sessionVersion++;
+		this._sessionRefresh = null;
 		this.runRealtimeTeardowns();
 		this.unsubscribeFromCurrentUser();
 		this._pb.authStore.clear();
@@ -108,7 +146,7 @@ export class AuthContext {
 		}
 	}
 
-	private getErrorMessage(err: unknown, fallback: string): string {
+	private getErrorMessage(err: unknown, fallback: string) {
 		if (typeof err === 'string') return err;
 		if (err && typeof err === 'object') {
 			const maybe = err as { message?: unknown; response?: { message?: unknown } };
@@ -120,6 +158,8 @@ export class AuthContext {
 	}
 
 	async login(email: string, password: string) {
+		this._sessionVersion++;
+		this._sessionRefresh = null;
 		this.error = null;
 		this.isSubmitting = true;
 		try {
@@ -163,6 +203,8 @@ export class AuthContext {
 	}
 
 	async logout() {
+		this._sessionVersion++;
+		this._sessionRefresh = null;
 		this.error = null;
 		try {
 			this.runRealtimeTeardowns();
