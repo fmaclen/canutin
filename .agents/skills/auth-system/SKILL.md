@@ -43,6 +43,23 @@ Types are generated in `src/lib/pocketbase.schema.ts`.
 1. User submits email + password + confirmation.
 2. `pb.collection('users').create(...)` then `authWithPassword` to immediately log in.
 
+## Saved sessions
+
+An expired saved token must clear both the SDK auth store and `currentUserId` before startup
+finishes. Otherwise the route guard admits an unauthenticated session and presents incomplete
+financial totals. The guard waits for auth loading to finish before mounting protected routes.
+Foreground and online recovery also check token expiry. Every `StaleSync` refresh checks again
+before fetching financial records, including refreshes triggered by realtime events.
+
+New user tokens last 14 days. Startup and visible/online returns renew a still-valid session through
+the same `validateSession()` path before the return-triggered financial refetch. Overlapping signals
+share one renewal request. Expired sessions require login; renewal does not revive expired tokens.
+
+Renewal uses an isolated SDK auth store, then commits only if the original token and session version
+still match. Logout, teardown, and a new login invalidate pending renewal results. Network failures
+retain a still-valid session and log the failure, allowing data sync to retry when connectivity returns.
+A newer valid token for the same user, received from another tab, also allows data sync to continue.
+
 ## Dev Credentials
 
 - Superadmin (auto-upserted by `scripts/pb-server.ts`): `superadmin@example.com` / `123qweasdzxc`

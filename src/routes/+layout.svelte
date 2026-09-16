@@ -28,6 +28,7 @@
 	setDemoContext(auth);
 
 	pb.onAuthInvalidated = () => auth.invalidateSession();
+	pb.onSessionResume = () => auth.validateSession();
 
 	if (browser) {
 		initializeDisplayCurrency();
