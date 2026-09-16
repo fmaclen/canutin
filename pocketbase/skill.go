@@ -38,6 +38,10 @@ POST /api/collections/users/auth-with-password
 The response includes a ` + "`token`" + `. Send it as ` + "`Authorization: Bearer <token>`" + ` on every
 subsequent request. Tokens are scoped to the authenticated user; the API rules below
 decide what that user can see and change.
+
+Owned and shared financial records require valid authentication. Missing or expired
+tokens cannot read them. Collection list rules filter out inaccessible records, so
+an empty list does not establish that a session is valid.
 `
 
 const skillConventionsSection = `## CRUD, filtering & expand conventions

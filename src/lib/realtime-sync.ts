@@ -31,9 +31,10 @@ const DEBOUNCE_MS = 200;
 const FIRST_RETRY_MS = 1000;
 const MAX_RETRY_MS = 30000;
 
-// The slice of PocketBaseContext a sync needs: a shared reachability probe and the deduped
-// connection-error toast. Structural so this module stays free of context imports.
+// The slice of PocketBaseContext a sync needs: session validation, a shared reachability probe,
+// and the deduped connection-error toast. Structural so this module stays free of context imports.
 type SyncClient = {
+	isSessionValid: () => boolean;
 	probeBackend: () => Promise<boolean>;
 	handleConnectionError: (error: unknown, context: string, operation: string) => void;
 };
@@ -136,6 +137,8 @@ export class StaleSync {
 			}
 		}
 
+		// Expired tokens can produce successful empty lists, which must never replace financial data.
+		if (!this.client.isSessionValid()) return;
 		const marksAtStart = this.markCount;
 		const token = this.sequence.next();
 		try {

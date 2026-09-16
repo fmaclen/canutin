@@ -33,6 +33,12 @@ Core collections: `users`, `accounts`, `transactions`, `assets`, `accountBalance
 - Regular users are scoped via collection API rules (see the admin UI)
 - Filter syntax: `field='value'`, `&&`, `||`, `>=`, etc.
 
+List and view rules that authorize through reverse relations must begin with
+`@request.auth.id != '' && (...)`, wrapping the entire owner/sharing expression.
+PocketBase treats a missing relation and missing auth ID as equal, so an unguarded
+sharing clause can admit anonymous reads of records with no shares. Cover both
+list and direct-record access when changing these rules.
+
 ## Available APIs
 
 All PocketBase APIs are available to authenticated clients with the appropriate scope:

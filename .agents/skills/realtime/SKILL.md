@@ -98,9 +98,11 @@ correctness.
   socket drops, everything is possibly stale, and the flag survives until a refetch commits.
 - **`PB_CONNECT` → retry the stale stores.** The most precise "backend is reachable again" signal
   there is. A store that is not stale ignores it, so the initial connect costs nothing.
-- **`window` `online` → retry the stale stores**, and reset their backoff — the network just changed.
-- **`document` `visibilitychange` → visible → same.** Covers sleep/wake and long-backgrounded tabs,
-  which `online` alone misses; retries are paused while hidden and picked back up here.
+- **`window` `online` while visible → mark every registered store stale and retry**, resetting
+  backoff. A silent socket can miss events without marking any store stale.
+- **`document` `visibilitychange` → visible → same.** Returning to the app always fetches a fresh
+  snapshot, even if the last fetch succeeded and the socket never reported a disconnect. Retries
+  pause while hidden and resume here.
 
 The last two are browser-only, so they are registered behind `browser` from `$app/environment`.
 
@@ -113,6 +115,8 @@ Testing this: dispatching an `error` event on the EventSource only exercises the
 injects the very signal whose absence is the real-world failure. A genuine offline needs CDP
 (`Network.emulateNetworkConditions`); Playwright's `context.setOffline()` tears the socket down and
 so exercises the SDK path as well. Both cases are covered in `e2e/shared-records.test.ts`.
+`e2e/realtime-foreground.test.ts` covers missed events with no disconnect or failed refetch, so
+foreground and online recovery cannot rely on stores already being marked stale.
 
 ## Server-side debouncing (Go hooks)
 

@@ -32,7 +32,7 @@ export const DEMO_EMAIL = 'demo@canutin.com';
 // client also collapses concurrent first calls into a single sign-in.
 let adminPB: Promise<TypedPocketBase> | null = null;
 
-function getAdminPB() {
+export function getAdminPB() {
 	if (!adminPB) {
 		const pb = new PocketBase(PB_URL) as TypedPocketBase;
 		adminPB = pb

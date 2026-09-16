@@ -38,6 +38,7 @@ export class AuthContext {
 
 	private async validateSession() {
 		if (!this._pb.authStore.isValid) {
+			this.teardownSession();
 			return false;
 		}
 
