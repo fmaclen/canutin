@@ -52,7 +52,7 @@
 	{/if}
 </svelte:head>
 
-<ModeWatcher />
+<ModeWatcher disableHeadScriptInjection />
 <Sonner />
 
 {#if pb.setupStatus === 'ready'}
