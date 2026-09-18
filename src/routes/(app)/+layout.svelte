@@ -15,6 +15,7 @@
 	import { setSecuritiesContext } from '$lib/securities.svelte';
 
 	import AppSidebar from './app-sidebar.svelte';
+	import PullToReload from './pull-to-reload.svelte';
 
 	let { children } = $props();
 	let progressState = $state<'idle' | 'starting' | 'pending' | 'complete' | 'fading'>('idle');
@@ -98,7 +99,9 @@
 	{/if}
 	<Sidebar.Inset aria-busy={isNavigating}>
 		{#if auth.currentUserId}
-			{@render children?.()}
+			<PullToReload>
+				{@render children?.()}
+			</PullToReload>
 		{/if}
 	</Sidebar.Inset>
 </Sidebar.Provider>

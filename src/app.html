@@ -13,6 +13,19 @@
 		     in sync with light and dark `--muted` in app.css. -->
 		<meta name="theme-color" content="#f8f8f8" media="(prefers-color-scheme: light)" />
 		<meta name="theme-color" content="#282828" media="(prefers-color-scheme: dark)" />
+		<!-- mode-watcher only applies the theme class once the app boots, so without this every load
+		     flashes white in dark mode. This applies the stored choice before the first paint,
+		     mirroring mode-watcher's storage key and its `system` fallback. -->
+		<script>
+			(function () {
+				var mode = localStorage.getItem('mode-watcher-mode') || 'system';
+				var dark =
+					mode === 'dark' ||
+					(mode === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+				document.documentElement.classList.toggle('dark', dark);
+				document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+			})();
+		</script>
 		<link rel="manifest" href="/manifest.webmanifest" />
 		<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
