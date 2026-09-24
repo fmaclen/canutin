@@ -5,12 +5,14 @@ import {
 	AccountsBalanceGroupOptions,
 	AssetsBalanceGroupOptions
 } from '../src/lib/pocketbase.schema';
-import { signIn } from './playwright.helpers';
+import { goToPageViaSidebar, signIn } from './playwright.helpers';
 import {
 	seedAccount,
 	seedAccountBalance,
 	seedAsset,
 	seedAssetBalance,
+	seedCurrency,
+	seedExchangeRate,
 	seedSecurity,
 	seedSecurityBalance,
 	seedTransaction,
@@ -319,4 +321,67 @@ test('big picture summary updates holdings in realtime without reloading', async
 	await expect(netWorth).toContainText('$750');
 	await expect(investments).toContainText('$750');
 	await expect(netWorth).not.toHaveAttribute('data-went-busy');
+});
+
+test('big picture and balance sheet show totals while currencies and exchange rates fail, then convert once they load', async ({
+	page
+}) => {
+	const user = await seedUser('florencia');
+	await seedCurrency({ owner: user.id, code: 'ARS', name: 'Argentine peso', autoUpdate: false });
+	await seedExchangeRate({
+		owner: user.id,
+		currency: 'ARS',
+		date: subDays(new Date(), 1).toISOString(),
+		rate: 1000
+	});
+	const pesoAccount = await seedAccount({
+		name: 'Cuenta Corriente',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking',
+		currency: 'ARS'
+	});
+	await seedAccountBalance({
+		account: pesoAccount.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 100_000
+	});
+	const dollarAccount = await seedAccount({
+		name: 'Willow Everyday',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: dollarAccount.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 200
+	});
+
+	// Once loaded, the rate converts the pesos to $100 for a $300 total. With both requests failing,
+	// the totals should still appear, falling back to the dollar balance marked as partial.
+	await page.route('**/api/collections/currencies/records**', (route) => route.abort('failed'));
+	await page.route('**/api/collections/exchangeRates/records**', (route) => route.abort('failed'));
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Balance sheet');
+	const cash = page.getByRole('region', { name: 'Cash' });
+	await expect(cash).toContainText('~ $200');
+
+	// Each sidebar navigation is a full page load, so the big picture starts a fresh load that fails
+	// and schedules its first retry a second later. Letting the requests through before that retry
+	// fires means the stores recover on their own, with no reload or navigation.
+	await goToPageViaSidebar(page, 'Big picture');
+	const netWorth = page.getByRole('region', { name: 'Net worth' });
+	await expect(netWorth).toContainText('~ $200');
+	await expect(cash).toContainText('~ $200');
+
+	await page.unrouteAll();
+	await expect(netWorth).toContainText('$300');
+	await expect(netWorth).not.toContainText('~');
+	await expect(cash).toContainText('$300');
+	await expect(cash).not.toContainText('~');
 });
