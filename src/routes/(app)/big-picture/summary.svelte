@@ -22,8 +22,8 @@
 		accountsContext.isLoading ||
 			assetsContext.isLoading ||
 			securitiesContext.isLoading ||
-			!currenciesContext.isLoaded ||
-			!exchangeRatesContext.isLoaded
+			currenciesContext.isLoading ||
+			exchangeRatesContext.isLoading
 	);
 
 	type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';

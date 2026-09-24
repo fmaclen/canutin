@@ -33,8 +33,8 @@
 		accountsContext.isLoading ||
 			assetsContext.isLoading ||
 			securitiesContext.isLoading ||
-			!currenciesContext.isLoaded ||
-			!exchangeRatesContext.isLoaded
+			currenciesContext.isLoading ||
+			exchangeRatesContext.isLoading
 	);
 
 	// NOTE: accounts/assets already carry their own display-currency conversion

@@ -66,9 +66,10 @@ Query parameters:
 - ` + "`sort=`" + ` — order results (e.g. ` + "`sort=-created`" + ` for newest first).
 - ` + "`page`" + ` / ` + "`perPage`" + ` — pagination controls.
 
-System fields present on every record: ` + "`id`" + ` (15-char identifier), ` + "`created`" + `, and
-` + "`updated`" + ` (timestamps). They are read-only and are not repeated in the per-collection
-tables below.
+System fields present on every record of a regular collection: ` + "`id`" + ` (15-char identifier),
+` + "`created`" + `, and ` + "`updated`" + ` (timestamps). They are read-only and are not repeated in the
+per-collection tables below. The ` + "`latest*Balances`" + ` views are the exception: their rows carry
+` + "`id`" + ` but no ` + "`created`" + ` or ` + "`updated`" + `, so sort them by ` + "`asOf`" + ` or ` + "`id`" + ` instead.
 
 Reading the rule strings below:
 

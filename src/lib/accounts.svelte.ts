@@ -213,6 +213,7 @@ class AccountsContext {
 					.collection('latestAccountBalances')
 					.getFullList<LatestAccountBalancesResponse>({
 						fields: 'account,value,asOf',
+						sort: 'id',
 						requestKey: null
 					})
 			]);

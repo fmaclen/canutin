@@ -197,6 +197,7 @@ class AssetsContext {
 					.collection('latestAssetBalances')
 					.getFullList<LatestAssetBalancesResponse>({
 						fields: 'asset,bookValue,marketValue,asOf',
+						sort: 'id',
 						requestKey: null
 					})
 			]);

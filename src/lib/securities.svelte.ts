@@ -130,7 +130,7 @@ class SecuritiesContext {
 	// One row per holding (account + security). The latestSecurityBalances view has already carried
 	// `value` and `costBasis` forward; like every securityBalances number, `null` means UNKNOWN,
 	// which is distinct from a known 0.
-	private latestBalances: LatestSecurityBalance[] = $state([]);
+	private latestBalances: LatestSecurityBalance[] = $state.raw([]);
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
 	private _accounts: ReturnType<typeof getAccountsContext>;
@@ -215,7 +215,7 @@ class SecuritiesContext {
 				}),
 				this._pb.authedClient
 					.collection('latestSecurityBalances')
-					.getFullList<LatestSecurityBalance>({ requestKey: null })
+					.getFullList<LatestSecurityBalance>({ sort: 'id', requestKey: null })
 			]);
 			if (userId !== this._auth.currentUserId || !this.sync.isCurrent(token)) return;
 

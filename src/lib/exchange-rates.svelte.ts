@@ -20,6 +20,7 @@ type RatePoint = { time: number; rate: number };
 
 class ExchangeRatesContext {
 	private _records: ExchangeRatesResponse[] = $state([]);
+	isLoading = $state(true);
 	private _isLoaded = $state(false);
 	private _visibleRecords: ExchangeRatesResponse[] = $derived.by(() => {
 		const byCurrencyDate = new SvelteMap<string, ExchangeRatesResponse>();
@@ -81,9 +82,11 @@ class ExchangeRatesContext {
 			if (!userId) {
 				this._records = [];
 				this._isLoaded = false;
+				this.isLoading = false;
 				return;
 			}
 			this._isLoaded = false;
+			this.isLoading = true;
 			this.realtimeSubscribe(userId);
 			void this.sync.refreshNow();
 		});
@@ -94,13 +97,19 @@ class ExchangeRatesContext {
 	// here too, converging on any events missed while the socket was disconnected.
 	private async refreshAll(token: number) {
 		const userId = this._activeUserId;
-		const list = await this._pb.authedClient
-			.collection('exchangeRates')
-			.getFullList<ExchangeRatesResponse>({ requestKey: null });
-		if (userId !== this._activeUserId || !this.sync.isCurrent(token)) return;
+		try {
+			const list = await this._pb.authedClient
+				.collection('exchangeRates')
+				.getFullList<ExchangeRatesResponse>({ requestKey: null });
+			if (userId !== this._activeUserId || !this.sync.isCurrent(token)) return;
 
-		this._records = list;
-		this._isLoaded = true;
+			this._records = list;
+			this._isLoaded = true;
+		} finally {
+			// A failed first load still ends isLoading, so totals show unconverted amounts instead of
+			// waiting out the retry backoff. isLoaded stays false until a fetch actually succeeds.
+			if (userId === this._activeUserId && this.sync.isCurrent(token)) this.isLoading = false;
+		}
 	}
 
 	private realtimeSubscribe(userId: string) {
