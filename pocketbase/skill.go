@@ -66,9 +66,10 @@ Query parameters:
 - ` + "`sort=`" + ` — order results (e.g. ` + "`sort=-created`" + ` for newest first).
 - ` + "`page`" + ` / ` + "`perPage`" + ` — pagination controls.
 
-System fields present on every record: ` + "`id`" + ` (15-char identifier), ` + "`created`" + `, and
-` + "`updated`" + ` (timestamps). They are read-only and are not repeated in the per-collection
-tables below.
+System fields present on every record of a regular collection: ` + "`id`" + ` (15-char identifier),
+` + "`created`" + `, and ` + "`updated`" + ` (timestamps). They are read-only and are not repeated in the
+per-collection tables below. The ` + "`latest*Balances`" + ` views are the exception: their rows carry
+` + "`id`" + ` but no ` + "`created`" + ` or ` + "`updated`" + `, so sort them by ` + "`asOf`" + ` or ` + "`id`" + ` instead.
 
 Reading the rule strings below:
 
@@ -78,6 +79,13 @@ Reading the rule strings below:
   superuser-only and not reachable through a normal user token.
 - ` + "`*_via_*`" + ` clauses walk a back-relation to authorize through a related record (for
   example, authorizing a balance through the account it belongs to).
+
+The read-only view collections ` + "`latestAccountBalances`" + `, ` + "`latestAssetBalances`" + `, and
+` + "`latestSecurityBalances`" + ` hold one row per account, asset, or holding (account + security): its
+newest balance by ` + "`asOf`" + `, then ` + "`created`" + `, then ` + "`id`" + `. ` + "`latestSecurityBalances`" + ` returns
+` + "`value`" + ` and ` + "`costBasis`" + ` already carried forward as described under behavioral constraints.
+Views support list and view requests only and emit no realtime events; subscribe to the base
+balance collection instead.
 `
 
 const skillSafetySection = `## Safe reads vs. writes that need approval
@@ -242,7 +250,7 @@ Backend hooks enforce invariants that are not visible in the access rules:
 // generated from the current PocketBase schema at request time. The route is public.
 func canutinSkillHandler(app core.App) func(*core.RequestEvent) error {
 	return func(re *core.RequestEvent) error {
-		collections, err := app.FindAllCollections(core.CollectionTypeBase, core.CollectionTypeAuth)
+		collections, err := app.FindAllCollections(core.CollectionTypeBase, core.CollectionTypeAuth, core.CollectionTypeView)
 		if err != nil {
 			return re.InternalServerError("Failed to read schema", err)
 		}

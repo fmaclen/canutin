@@ -11,17 +11,31 @@
 	import Section from '$lib/components/section.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import { getCurrenciesContext } from '$lib/currencies.svelte';
+	import { getExchangeRatesContext } from '$lib/exchange-rates.svelte';
 	import { m } from '$lib/paraglide/messages';
+	import { getSecuritiesContext } from '$lib/securities.svelte';
 	import { sumPartial } from '$lib/utils';
 
 	type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
 
 	const accountsContext = getAccountsContext();
 	const assetsContext = getAssetsContext();
+	const securitiesContext = getSecuritiesContext();
+	const currenciesContext = getCurrenciesContext();
+	const exchangeRatesContext = getExchangeRatesContext();
 
 	const balanceGroups: BalanceGroup[] = ['CASH', 'DEBT', 'INVESTMENT', 'OTHER'];
 	const balanceGroupMeta = getBalanceGroupMeta();
-	const isLoading = $derived(accountsContext.isLoading || assetsContext.isLoading);
+	// Investment balances include holdings and every total is converted, so showing one before all
+	// of these stores have loaded would flash a partial amount.
+	const isLoading = $derived(
+		accountsContext.isLoading ||
+			assetsContext.isLoading ||
+			securitiesContext.isLoading ||
+			currenciesContext.isLoading ||
+			exchangeRatesContext.isLoading
+	);
 
 	// NOTE: accounts/assets already carry their own display-currency conversion
 	// (displayBalance/displayMarketValue + isConverted/isUnconverted); this just groups and
@@ -163,6 +177,7 @@
 						value={grouped[balanceGroup].total}
 						variant={balanceGroupMeta[balanceGroup].variant}
 						isPartial={grouped[balanceGroup].isPartial}
+						{isLoading}
 					/>
 					{#if isLoading}
 						<Skeleton class="min-h-32" showSpinner />

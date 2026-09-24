@@ -128,6 +128,8 @@ class CashflowContext {
 			const userId = this._auth.currentUserId;
 			const accounts = this._accountsContext.accounts;
 			if (!userId || userId !== this._activeUserId) return;
+			// Wait for the accounts to land, or the empty list fetches once and the loaded list again.
+			if (this._accountsContext.isLoading) return;
 			const watchedAccountsKey = this.getWatchedAccountsKey(accounts);
 			const activeWindow = this._activeWindow;
 			const cashflowWindow = this.getCashflowWindow();

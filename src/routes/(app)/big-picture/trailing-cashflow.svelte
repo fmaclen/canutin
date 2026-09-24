@@ -10,4 +10,5 @@
 	avg6m={cashflow.avg6m}
 	avgYtd={cashflow.avgYtd}
 	avg1y={cashflow.avg1y}
+	isLoading={cashflow.isLoading}
 />

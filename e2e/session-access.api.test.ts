@@ -15,6 +15,7 @@ import {
 	seedAccountShare,
 	seedAsset,
 	seedAssetBalance,
+	seedAssetShare,
 	seedSecurity,
 	seedSecurityBalance,
 	seedTrade,
@@ -119,11 +120,14 @@ test('anonymous and expired sessions cannot list or view unshared financial reco
 	const records = [
 		['accounts', owned.id],
 		['accountBalances', accountBalance.id],
+		['latestAccountBalances', accountBalance.id],
 		['assets', asset.id],
 		['assetBalances', assetBalance.id],
+		['latestAssetBalances', assetBalance.id],
 		['balanceTypes', owned.balanceType],
 		['securities', security.id],
 		['securityBalances', securityBalance.id],
+		['latestSecurityBalances', securityBalance.id],
 		['securityTransactions', trade.id],
 		['transactionLabels', label.id],
 		['transactions', transaction.id]
@@ -149,5 +153,124 @@ test('anonymous and expired sessions cannot list or view unshared financial reco
 				});
 			}
 		});
+	}
+});
+
+test('latest balance views show share recipients only the shared records and strangers nothing', async () => {
+	const blanche = await seedUser('blanche');
+	const cosmo = await seedUser('cosmo');
+	const delphine = await seedUser('delphine');
+	const sharedAccount = await seedAccount({
+		name: 'Shared brokerage',
+		owner: blanche.id,
+		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+		balanceType: 'Brokerage'
+	});
+	const privateAccount = await seedAccount({
+		name: 'Private brokerage',
+		owner: blanche.id,
+		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+		balanceType: 'Brokerage'
+	});
+	const sharedAsset = await seedAsset({
+		name: 'Shared cabin',
+		owner: blanche.id,
+		balanceGroup: AssetsBalanceGroupOptions.OTHER,
+		balanceType: 'Real estate'
+	});
+	const privateAsset = await seedAsset({
+		name: 'Private cabin',
+		owner: blanche.id,
+		balanceGroup: AssetsBalanceGroupOptions.OTHER,
+		balanceType: 'Real estate'
+	});
+	const security = await seedSecurity({ name: 'Shared holding', owner: blanche.id });
+	await seedAccountShare({
+		account: sharedAccount.id,
+		recipient: cosmo.id,
+		recipientEmail: cosmo.email,
+		grantedBy: blanche.id,
+		accessRole: 'VIEWER',
+		perspective: 'NORMAL',
+		includeInNetWorth: true
+	});
+	await seedAssetShare({
+		asset: sharedAsset.id,
+		recipient: cosmo.id,
+		recipientEmail: cosmo.email,
+		grantedBy: blanche.id,
+		accessRole: 'VIEWER',
+		perspective: 'NORMAL',
+		includeInNetWorth: true
+	});
+
+	// Each shared record gets an older and a newer balance so only the newest may come through; each
+	// private record gets one balance that must stay hidden.
+	const accountBalances = [];
+	const assetBalances = [];
+	const securityBalances = [];
+	for (const asOf of ['2026-01-01 00:00:00.000Z', '2026-02-01 00:00:00.000Z']) {
+		accountBalances.push(
+			await seedAccountBalance({ account: sharedAccount.id, owner: blanche.id, asOf, value: 100 })
+		);
+		assetBalances.push(
+			await seedAssetBalance({ asset: sharedAsset.id, owner: blanche.id, asOf, marketValue: 100 })
+		);
+		securityBalances.push(
+			await seedSecurityBalance({
+				account: sharedAccount.id,
+				security: security.id,
+				owner: blanche.id,
+				asOf,
+				quantity: 1,
+				price: 100,
+				value: 100
+			})
+		);
+	}
+	const privateAccountBalance = await seedAccountBalance({
+		account: privateAccount.id,
+		owner: blanche.id,
+		asOf: '2026-02-01 00:00:00.000Z',
+		value: 300
+	});
+	await seedAssetBalance({
+		asset: privateAsset.id,
+		owner: blanche.id,
+		asOf: '2026-02-01 00:00:00.000Z',
+		marketValue: 300
+	});
+	await seedSecurityBalance({
+		account: privateAccount.id,
+		security: security.id,
+		owner: blanche.id,
+		asOf: '2026-02-01 00:00:00.000Z',
+		quantity: 3,
+		price: 100,
+		value: 300
+	});
+
+	const recipient = await getUserPB(cosmo.email);
+	const recipientAccountBalances = await recipient
+		.collection('latestAccountBalances')
+		.getFullList();
+	expect(recipientAccountBalances.map((balance) => balance.id)).toEqual([accountBalances[1].id]);
+	const recipientAssetBalances = await recipient.collection('latestAssetBalances').getFullList();
+	expect(recipientAssetBalances.map((balance) => balance.id)).toEqual([assetBalances[1].id]);
+	const recipientSecurityBalances = await recipient
+		.collection('latestSecurityBalances')
+		.getFullList();
+	expect(recipientSecurityBalances.map((balance) => balance.id)).toEqual([securityBalances[1].id]);
+	await expect(
+		recipient.collection('latestAccountBalances').getOne(privateAccountBalance.id)
+	).rejects.toMatchObject({ status: 404 });
+
+	const stranger = await getUserPB(delphine.email);
+	for (const collection of [
+		'latestAccountBalances',
+		'latestAssetBalances',
+		'latestSecurityBalances'
+	] as const) {
+		expect(await stranger.collection(collection).getFullList(), collection).toEqual([]);
 	}
 });

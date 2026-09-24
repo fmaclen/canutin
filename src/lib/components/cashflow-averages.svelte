@@ -10,13 +10,15 @@
 		avg6m,
 		avgYtd,
 		avg1y,
-		title = m.trailing_cashflow_section_title()
+		title = m.trailing_cashflow_section_title(),
+		isLoading = false
 	}: {
 		avg3m: CashflowAverages;
 		avg6m: CashflowAverages;
 		avgYtd: CashflowAverages;
 		avg1y: CashflowAverages;
 		title?: string;
+		isLoading?: boolean;
 	} = $props();
 </script>
 
@@ -39,16 +41,19 @@
 				title={m.trailing_cashflow_income_label()}
 				value={avg3m.income}
 				isUnconverted={avg3m.isUnconverted}
+				{isLoading}
 			/>
 			<KeyValue
 				title={m.trailing_cashflow_expenses_label()}
 				value={Math.abs(avg3m.expenses)}
 				isUnconverted={avg3m.isUnconverted}
+				{isLoading}
 			/>
 			<KeyValue
 				title={m.trailing_cashflow_surplus_label()}
 				value={avg3m.surplus}
 				isUnconverted={avg3m.isUnconverted}
+				{isLoading}
 			/>
 		</div>
 	</Tabs.Content>
@@ -59,16 +64,19 @@
 				title={m.trailing_cashflow_income_label()}
 				value={avg6m.income}
 				isUnconverted={avg6m.isUnconverted}
+				{isLoading}
 			/>
 			<KeyValue
 				title={m.trailing_cashflow_expenses_label()}
 				value={Math.abs(avg6m.expenses)}
 				isUnconverted={avg6m.isUnconverted}
+				{isLoading}
 			/>
 			<KeyValue
 				title={m.trailing_cashflow_surplus_label()}
 				value={avg6m.surplus}
 				isUnconverted={avg6m.isUnconverted}
+				{isLoading}
 			/>
 		</div>
 	</Tabs.Content>
@@ -79,16 +87,19 @@
 				title={m.trailing_cashflow_income_label()}
 				value={avgYtd.income}
 				isUnconverted={avgYtd.isUnconverted}
+				{isLoading}
 			/>
 			<KeyValue
 				title={m.trailing_cashflow_expenses_label()}
 				value={Math.abs(avgYtd.expenses)}
 				isUnconverted={avgYtd.isUnconverted}
+				{isLoading}
 			/>
 			<KeyValue
 				title={m.trailing_cashflow_surplus_label()}
 				value={avgYtd.surplus}
 				isUnconverted={avgYtd.isUnconverted}
+				{isLoading}
 			/>
 		</div>
 	</Tabs.Content>
@@ -99,16 +110,19 @@
 				title={m.trailing_cashflow_income_label()}
 				value={avg1y.income}
 				isUnconverted={avg1y.isUnconverted}
+				{isLoading}
 			/>
 			<KeyValue
 				title={m.trailing_cashflow_expenses_label()}
 				value={Math.abs(avg1y.expenses)}
 				isUnconverted={avg1y.isUnconverted}
+				{isLoading}
 			/>
 			<KeyValue
 				title={m.trailing_cashflow_surplus_label()}
 				value={avg1y.surplus}
 				isUnconverted={avg1y.isUnconverted}
+				{isLoading}
 			/>
 		</div>
 	</Tabs.Content>

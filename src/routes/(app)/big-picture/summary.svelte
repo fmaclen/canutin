@@ -3,11 +3,28 @@
 	import { getAssetsContext } from '$lib/assets.svelte';
 	import Currency from '$lib/components/currency.svelte';
 	import KeyValue from '$lib/components/key-value.svelte';
+	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+	import { getCurrenciesContext } from '$lib/currencies.svelte';
+	import { getExchangeRatesContext } from '$lib/exchange-rates.svelte';
 	import { m } from '$lib/paraglide/messages';
+	import { getSecuritiesContext } from '$lib/securities.svelte';
 	import { sumPartial } from '$lib/utils';
 
 	const accountsContext = getAccountsContext();
 	const assetsContext = getAssetsContext();
+	const securitiesContext = getSecuritiesContext();
+	const currenciesContext = getCurrenciesContext();
+	const exchangeRatesContext = getExchangeRatesContext();
+
+	// Every total sums values from all of these stores, so showing one before they have all loaded
+	// would flash a partial amount that climbs as the rest arrive.
+	const isLoading = $derived(
+		accountsContext.isLoading ||
+			assetsContext.isLoading ||
+			securitiesContext.isLoading ||
+			currenciesContext.isLoading ||
+			exchangeRatesContext.isLoading
+	);
 
 	type BalanceGroup = 'CASH' | 'DEBT' | 'INVESTMENT' | 'OTHER';
 
@@ -63,12 +80,15 @@
 		class="flex flex-col justify-between rounded-sm bg-stone-700 p-4 shadow-md md:row-span-2"
 		role="region"
 		aria-label={m.big_picture_summary_net_worth()}
+		aria-busy={isLoading}
 	>
 		<div class="text-sm leading-none font-semibold tracking-tight">
 			{m.big_picture_summary_net_worth()}
 		</div>
 		<div class="translate-y-1.5 text-4xl">
-			{#if totals.netWorth.total === null}
+			{#if isLoading}
+				<Skeleton class="h-lh w-48 bg-white/20" />
+			{:else if totals.netWorth.total === null}
 				<span class="text-white/70">~</span>
 			{:else}
 				<Currency
@@ -84,23 +104,27 @@
 		value={totals.totalsByGroup.CASH.total}
 		variant="cash"
 		isPartial={totals.totalsByGroup.CASH.isPartial}
+		{isLoading}
 	/>
 	<KeyValue
 		title={m.big_picture_summary_investments()}
 		value={totals.totalsByGroup.INVESTMENT.total}
 		variant="investment"
 		isPartial={totals.totalsByGroup.INVESTMENT.isPartial}
+		{isLoading}
 	/>
 	<KeyValue
 		title={m.big_picture_summary_debt()}
 		value={totals.totalsByGroup.DEBT.total}
 		variant="debt"
 		isPartial={totals.totalsByGroup.DEBT.isPartial}
+		{isLoading}
 	/>
 	<KeyValue
 		title={m.big_picture_summary_other_assets()}
 		value={totals.totalsByGroup.OTHER.total}
 		variant="other"
 		isPartial={totals.totalsByGroup.OTHER.isPartial}
+		{isLoading}
 	/>
 </div>

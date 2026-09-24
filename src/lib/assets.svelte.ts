@@ -10,7 +10,8 @@ import {
 	AssetSharesPerspectiveOptions,
 	type AssetBalancesResponse,
 	type AssetSharesResponse,
-	type AssetsResponse
+	type AssetsResponse,
+	type LatestAssetBalancesResponse
 } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
 import { StaleSync } from './realtime-sync';
@@ -192,14 +193,13 @@ class AssetsContext {
 					filter: `owner='${userId}' || assetShares_via_asset.recipient ?= '${userId}'`,
 					requestKey: null
 				}),
-				// One query for every asset's latest balance instead of N point-queries: the
-				// 'asset,-asOf,-created,-id' sort groups by asset and orders each group newest-first,
-				// so the first row seen per asset wins - the same tiebreakers getList(1,1) used.
-				this._pb.authedClient.collection('assetBalances').getFullList<AssetBalancesResponse>({
-					sort: 'asset,-asOf,-created,-id',
-					fields: 'asset,bookValue,marketValue,asOf',
-					requestKey: null
-				})
+				this._pb.authedClient
+					.collection('latestAssetBalances')
+					.getFullList<LatestAssetBalancesResponse>({
+						fields: 'asset,bookValue,marketValue,asOf',
+						sort: 'id',
+						requestKey: null
+					})
 			]);
 			if (userId !== this.currentUserId || !this.sync.isCurrent(token)) return;
 			for (const asset of assets) {
@@ -210,7 +210,6 @@ class AssetsContext {
 			this.shares = shares.toSorted((a, b) => a.recipientEmail.localeCompare(b.recipientEmail));
 			this.latestBalanceByAsset.clear();
 			for (const balance of balances) {
-				if (this.latestBalanceByAsset.has(balance.asset)) continue;
 				this.latestBalanceByAsset.set(balance.asset, {
 					marketValue: balance.marketValue ?? 0,
 					bookValue: balance.bookValue ?? 0,
@@ -237,6 +236,7 @@ class AssetsContext {
 					logError('assetsStore', 'stale_subscription', error);
 				}
 			});
+		// Views emit no realtime events, so latestAssetBalances is refreshed off its base collection.
 		this._pb.authedClient
 			.collection('assetBalances')
 			.subscribe('*', () => this.onRealtimeEvent(userId))

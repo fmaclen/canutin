@@ -203,11 +203,23 @@ test('portfolio search and account filters update and restore the URL, rows, and
 	});
 	const alphaSecurity = await seedSecurity({ name: 'Alpha Fund', symbol: 'MELI', owner: user.id });
 	const betaSecurity = await seedSecurity({ name: 'Beta Fund', symbol: 'MELID', owner: user.id });
+	// Two same-day Alpha Fund balances: the one created later wins, so its $1,000 is the market value.
+	const alphaAsOf = new Date().toISOString();
 	await seedSecurityBalance({
 		account: alphaAccount.id,
 		owner: user.id,
 		security: alphaSecurity.id,
-		asOf: new Date().toISOString(),
+		asOf: alphaAsOf,
+		quantity: 10,
+		price: 90,
+		value: 900,
+		costBasis: 800
+	});
+	await seedSecurityBalance({
+		account: alphaAccount.id,
+		owner: user.id,
+		security: alphaSecurity.id,
+		asOf: alphaAsOf,
 		quantity: 10,
 		price: 100,
 		value: 1000,

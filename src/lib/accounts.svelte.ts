@@ -8,9 +8,9 @@ import { logError } from './logger';
 import {
 	AccountSharesAccessRoleOptions,
 	AccountSharesPerspectiveOptions,
-	type AccountBalancesResponse,
 	type AccountSharesResponse,
-	type AccountsResponse
+	type AccountsResponse,
+	type LatestAccountBalancesResponse
 } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
 import { StaleSync } from './realtime-sync';
@@ -209,14 +209,13 @@ class AccountsContext {
 					filter: `owner='${userId}' || accountShares_via_account.recipient ?= '${userId}'`,
 					requestKey: null
 				}),
-				// One query for every account's latest balance instead of N point-queries: the
-				// 'account,-asOf,-created,-id' sort groups by account and orders each group newest-first,
-				// so the first row seen per account wins - the same tiebreakers getList(1,1) used.
-				this._pb.authedClient.collection('accountBalances').getFullList<AccountBalancesResponse>({
-					sort: 'account,-asOf,-created,-id',
-					fields: 'account,value,asOf',
-					requestKey: null
-				})
+				this._pb.authedClient
+					.collection('latestAccountBalances')
+					.getFullList<LatestAccountBalancesResponse>({
+						fields: 'account,value,asOf',
+						sort: 'id',
+						requestKey: null
+					})
 			]);
 			if (userId !== this.currentUserId || !this.sync.isCurrent(token)) return;
 			for (const account of accounts) {
@@ -227,7 +226,6 @@ class AccountsContext {
 			this.shares = shares.toSorted((a, b) => a.recipientEmail.localeCompare(b.recipientEmail));
 			this.latestCashByAccount.clear();
 			for (const balance of balances) {
-				if (this.latestCashByAccount.has(balance.account)) continue;
 				this.latestCashByAccount.set(balance.account, {
 					value: balance.value ?? 0,
 					asOf: balance.asOf
@@ -254,6 +252,7 @@ class AccountsContext {
 					logError('accountsStore', 'stale_subscription', error);
 				}
 			});
+		// Views emit no realtime events, so latestAccountBalances is refreshed off its base collection.
 		this._pb.authedClient
 			.collection('accountBalances')
 			.subscribe('*', () => this.onRealtimeEvent(userId))
