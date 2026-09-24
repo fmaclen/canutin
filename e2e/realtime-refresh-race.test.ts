@@ -210,7 +210,7 @@ test('accounts store keeps a realtime balance that lands during the initial snap
 	await page.goto('/');
 	const { settled } = await holdFirstFetch(
 		page,
-		'**/api/collections/accountBalances/records**',
+		'**/api/collections/latestAccountBalances/records**',
 		() =>
 			seedAccountBalance({
 				account: account.id,
@@ -325,13 +325,16 @@ test('assets store keeps a realtime balance that lands during the initial snapsh
 	});
 
 	await page.goto('/');
-	const { settled } = await holdFirstFetch(page, '**/api/collections/assetBalances/records**', () =>
-		seedAssetBalance({
-			asset: asset.id,
-			owner: user.id,
-			asOf: new Date().toISOString(),
-			marketValue: 8888
-		})
+	const { settled } = await holdFirstFetch(
+		page,
+		'**/api/collections/latestAssetBalances/records**',
+		() =>
+			seedAssetBalance({
+				asset: asset.id,
+				owner: user.id,
+				asOf: new Date().toISOString(),
+				marketValue: 8888
+			})
 	);
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Assets');

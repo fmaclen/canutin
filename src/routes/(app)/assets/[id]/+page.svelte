@@ -7,7 +7,6 @@
 	import Section from '$lib/components/section.svelte';
 	import SharedRecordReadonlyBanner from '$lib/components/shared-record-readonly-banner.svelte';
 	import TimeSeriesChart from '$lib/components/time-series-chart.svelte';
-	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import { AssetsBalanceGroupOptions, type AssetBalancesResponse } from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
@@ -77,33 +76,28 @@
 
 <Section>
 	<SectionTitle title={m.assets_overview_section_summary()} />
-	{#if !loaded || !asset}
-		<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-			<Skeleton class="h-14" />
-			<Skeleton class="h-14" />
-		</div>
-	{:else}
-		<div
-			role="region"
-			aria-label={m.assets_overview_section_summary()}
-			class="grid grid-cols-1 gap-2 sm:grid-cols-2"
-		>
-			<KeyValue
-				title={m.assets_label_market_value()}
-				value={asset.displayMarketValue}
-				variant="outline"
-				decimalScale={2}
-				isUnconverted={asset.isUnconverted}
-			/>
-			<KeyValue
-				title={m.assets_label_book_value()}
-				value={asset.displayBookValue}
-				variant="outline"
-				decimalScale={2}
-				isUnconverted={asset.isUnconverted}
-			/>
-		</div>
-	{/if}
+	<div
+		role="region"
+		aria-label={m.assets_overview_section_summary()}
+		class="grid grid-cols-1 gap-2 sm:grid-cols-2"
+	>
+		<KeyValue
+			title={m.assets_label_market_value()}
+			value={asset?.displayMarketValue ?? null}
+			variant="outline"
+			decimalScale={2}
+			isUnconverted={asset?.isUnconverted}
+			isLoading={!loaded}
+		/>
+		<KeyValue
+			title={m.assets_label_book_value()}
+			value={asset?.displayBookValue ?? null}
+			variant="outline"
+			decimalScale={2}
+			isUnconverted={asset?.isUnconverted}
+			isLoading={!loaded}
+		/>
+	</div>
 </Section>
 
 <Section>

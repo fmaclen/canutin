@@ -5,19 +5,14 @@ import { getAccountsContext } from './accounts.svelte';
 import { getAuthContext } from './auth.svelte';
 import { getExchangeRatesContext } from './exchange-rates.svelte';
 import { logError } from './logger';
-import type { SecuritiesResponse, SecurityBalancesResponse } from './pocketbase.schema';
+import type { LatestSecurityBalancesResponse, SecuritiesResponse } from './pocketbase.schema';
 import type { PocketBaseContext } from './pocketbase.svelte';
 import { StaleSync } from './realtime-sync';
-import {
-	compareByValueDescThenName,
-	resolveSecurityBalanceValues,
-	sumOrUnknown,
-	type SecurityBalanceResolvedValue
-} from './security-balance-values';
+import { compareByValueDescThenName, sumOrUnknown } from './security-balance-values';
 import { projectSignedValue } from './sharing';
 import { toNumber } from './utils';
 
-type SecurityBalance = SecurityBalancesResponse<number, number, number, number>;
+type LatestSecurityBalance = LatestSecurityBalancesResponse<number, number, number, number>;
 
 type SecurityBalanceInput = {
 	account: string;
@@ -96,12 +91,12 @@ class SecuritiesContext {
 		);
 		const securitiesById = this.securitiesById;
 		const accumulators = new SvelteMap<string, PositionsAccumulator>();
-		for (const resolved of this.currentPositions.values()) {
-			const accountId = resolved.balance.account;
+		for (const balance of this.latestBalances) {
+			const accountId = balance.account;
 			const accountCurrency = currencyByAccount.get(accountId);
 			if (accountCurrency === undefined) continue;
-			const currency = securitiesById.get(resolved.balance.security)?.currency ?? '';
-			const converted = this.convertOrNull(resolved.value, currency, resolved.balance.asOf);
+			const currency = securitiesById.get(balance.security)?.currency ?? '';
+			const converted = this.convertOrNull(balance.value, currency, balance.asOf);
 			const accumulator = accumulators.get(accountId) ?? {
 				displayValues: [],
 				nativeValues: [],
@@ -111,7 +106,7 @@ class SecuritiesContext {
 				missingCurrency: null
 			};
 			accumulator.displayValues.push(converted.isUnconverted ? 0 : converted.value);
-			accumulator.nativeValues.push(resolved.value);
+			accumulator.nativeValues.push(balance.value);
 			if (currency !== accountCurrency) accumulator.hasForeign = true;
 			accumulator.isConverted ||= converted.isConverted;
 			accumulator.isUnconverted ||= converted.isUnconverted;
@@ -132,7 +127,10 @@ class SecuritiesContext {
 		);
 	});
 
-	private currentPositions = new SvelteMap<string, SecurityBalanceResolvedValue>();
+	// One row per holding (account + security). The latestSecurityBalances view has already carried
+	// `value` and `costBasis` forward; like every securityBalances number, `null` means UNKNOWN,
+	// which is distinct from a known 0.
+	private latestBalances: LatestSecurityBalance[] = $state([]);
 	private _pb: PocketBaseContext;
 	private _auth: ReturnType<typeof getAuthContext>;
 	private _accounts: ReturnType<typeof getAccountsContext>;
@@ -191,7 +189,7 @@ class SecuritiesContext {
 			this._activeUserId = userId;
 			if (!userId) {
 				this.securities = [];
-				this.currentPositions.clear();
+				this.latestBalances = [];
 				this.positionsLoaded = false;
 				this.isLoading = false;
 				return;
@@ -210,25 +208,21 @@ class SecuritiesContext {
 	private async refreshAll(token: number) {
 		const userId = this._auth.currentUserId;
 		try {
-			const [securities, securityBalances] = await Promise.all([
+			const [securities, latestBalances] = await Promise.all([
 				this._pb.authedClient.collection('securities').getFullList<SecuritiesResponse>({
 					sort: 'name',
 					requestKey: null
 				}),
-				this._pb.authedClient.collection('securityBalances').getFullList<SecurityBalance>({
-					sort: 'security,account,-asOf,-created,-id',
-					requestKey: null
-				})
+				this._pb.authedClient
+					.collection('latestSecurityBalances')
+					.getFullList<LatestSecurityBalance>({ requestKey: null })
 			]);
 			if (userId !== this._auth.currentUserId || !this.sync.isCurrent(token)) return;
 
 			this.securities = securities.toSorted((a, b) =>
 				a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
 			);
-			this.currentPositions.clear();
-			for (const [key, position] of resolveSecurityBalanceValues(securityBalances)) {
-				this.currentPositions.set(key, position);
-			}
+			this.latestBalances = latestBalances;
 		} finally {
 			// "We tried" is what unblocks the accounts projection, not "we succeeded": a failed refresh
 			// must not leave every account's balance waiting on positions forever. Whether the refresh
@@ -254,6 +248,7 @@ class SecuritiesContext {
 					logError('securitiesStore', 'stale_subscription', error);
 				}
 			});
+		// Views emit no realtime events, so latestSecurityBalances is refreshed off its base collection.
 		this._pb.authedClient
 			.collection('securityBalances')
 			.subscribe('*', () => this.onRealtimeEvent(userId))
@@ -287,18 +282,17 @@ class SecuritiesContext {
 		);
 		const securitiesById = this.securitiesById;
 		const rows: SecurityAccountBalance[] = [];
-		for (const resolved of this.currentPositions.values()) {
-			const balance = resolved.balance;
+		for (const balance of this.latestBalances) {
 			const account = accounts.get(balance.account);
 			if (!account) continue;
 
 			const currency = securitiesById.get(balance.security)?.currency ?? '';
-			const valueConversion = this.convertOrNull(resolved.value, currency, balance.asOf);
-			const costBasisConversion = this.convertOrNull(resolved.costBasis, currency, balance.asOf);
+			const valueConversion = this.convertOrNull(balance.value, currency, balance.asOf);
+			const costBasisConversion = this.convertOrNull(balance.costBasis, currency, balance.asOf);
 			const value = projectSignedValue(valueConversion.value, account.perspective);
 			const costBasis = projectSignedValue(costBasisConversion.value, account.perspective);
-			const nativeValue = projectSignedValue(resolved.value, account.perspective);
-			const nativeCostBasis = projectSignedValue(resolved.costBasis, account.perspective);
+			const nativeValue = projectSignedValue(balance.value, account.perspective);
+			const nativeCostBasis = projectSignedValue(balance.costBasis, account.perspective);
 			rows.push({
 				id: balance.id,
 				accountId: account.id,
@@ -326,9 +320,8 @@ class SecuritiesContext {
 		return new Map(this.securities.map((security) => [security.id, security]));
 	}
 
-	// NOTE: securityBalances' value/costBasis are JSON-typed where `null` means UNKNOWN (see
-	// resolveSecurityBalanceValues) - conversion must leave that `null` untouched rather than
-	// coercing it into a native-vs-converted value.
+	// NOTE: securityBalances' value/costBasis are JSON-typed where `null` means UNKNOWN - conversion
+	// must leave that `null` untouched rather than coercing it into a native-vs-converted value.
 	private convertOrNull(value: number | null, currency: string, date: string) {
 		if (value === null)
 			return { value: null, isConverted: false, isUnconverted: false, missingCurrency: null };

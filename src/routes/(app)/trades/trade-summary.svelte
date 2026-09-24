@@ -17,6 +17,10 @@
 			})
 		);
 	});
+
+	// Matches the table's skeleton: only the first load hides the figures, so a filter change keeps
+	// showing the previous totals instead of flashing placeholders.
+	const isLoading = $derived(tradesContext.isLoading && tradesContext.rawTransactions.length === 0);
 </script>
 
 <div
@@ -28,12 +32,14 @@
 		title={m.trades_summary_count_label()}
 		value={tradesContext.totalItems}
 		variant="outline"
+		{isLoading}
 		format="number"
 	/>
 	<KeyValue
 		title={m.summary_net_amount()}
 		value={netAmount.total}
 		variant="outline"
+		{isLoading}
 		decimalScale={2}
 		isPartial={netAmount.isPartial}
 	/>

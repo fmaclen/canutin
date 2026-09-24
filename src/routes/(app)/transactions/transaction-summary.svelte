@@ -16,6 +16,10 @@
 				? 'grid-cols-1 lg:grid-cols-3'
 				: 'grid-cols-1 sm:grid-cols-2'
 	);
+
+	// Matches the table's skeleton: only the first load hides the figures, so a filter change keeps
+	// showing the previous totals instead of flashing placeholders.
+	const isLoading = $derived(txContext.isLoading && txContext.rawTransactions.length === 0);
 </script>
 
 <div
@@ -27,6 +31,7 @@
 		title={m.transactions_summary_count_label()}
 		value={txContext.totalItems}
 		variant="outline"
+		{isLoading}
 		format="number"
 	/>
 	{#if showCredits}
@@ -35,6 +40,7 @@
 			value={txContext.creditsTotal.total}
 			isPartial={txContext.creditsTotal.isPartial}
 			variant="outline"
+			{isLoading}
 			decimalScale={2}
 		/>
 	{/if}
@@ -44,6 +50,7 @@
 			value={txContext.debitsTotal.total}
 			isPartial={txContext.debitsTotal.isPartial}
 			variant="outline"
+			{isLoading}
 			decimalScale={2}
 		/>
 	{/if}
@@ -52,6 +59,7 @@
 		value={txContext.netBalance.total}
 		isPartial={txContext.netBalance.isPartial}
 		variant="outline"
+		{isLoading}
 		decimalScale={2}
 	/>
 </div>

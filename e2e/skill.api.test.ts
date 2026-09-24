@@ -14,6 +14,7 @@ test('skill route serves live markdown schema reference', async () => {
 	const accountsSection = body.slice(body.indexOf('### accounts'));
 	const nameRow = accountsSection.split('\n').find((line) => line.startsWith('| name |'));
 	expect(nameRow).toContain('| name | text |');
+	expect(body).toContain('### latestSecurityBalances (view)');
 
 	expect(body).not.toContain('| created |');
 	expect(body).not.toContain('| updated |');

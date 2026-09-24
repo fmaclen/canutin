@@ -10,6 +10,8 @@ import {
 	seedAccountBalance,
 	seedAsset,
 	seedAssetBalance,
+	seedSecurity,
+	seedSecurityBalance,
 	seedTransaction,
 	seedUser
 } from './pocketbase.helpers';
@@ -198,4 +200,67 @@ test('big picture summary', async ({ page }) => {
 	await expect(investments).toContainText('$1,000');
 	await expect(debt).toContainText('-$1,000');
 	await expect(other).toContainText('$1,000');
+});
+
+test('big picture summary waits for every balance before showing totals', async ({ page }) => {
+	const user = await seedUser('ambrose');
+	const checkingAccount = await seedAccount({
+		name: 'Willow Everyday',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: checkingAccount.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 1000
+	});
+	const brokerageAccount = await seedAccount({
+		name: 'Orchard Growth',
+		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+		owner: user.id,
+		balanceType: 'Brokerage'
+	});
+	const security = await seedSecurity({ name: 'Orchard Index Fund', owner: user.id });
+	await seedSecurityBalance({
+		account: brokerageAccount.id,
+		security: security.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		quantity: 5,
+		price: 100,
+		value: 500
+	});
+
+	// Hold the holdings request until the cash balances have arrived, so a summary that rendered
+	// early would show the cash-only $1,000.
+	let releaseSecurityBalances!: () => void;
+	const securityBalancesReleased = new Promise<void>((resolve) => {
+		releaseSecurityBalances = resolve;
+	});
+	await page.route('**/api/collections/latestSecurityBalances/records**', async (route) => {
+		await securityBalancesReleased;
+		await route.continue();
+	});
+	const accountBalancesLoaded = page.waitForResponse(
+		'**/api/collections/latestAccountBalances/records**'
+	);
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await accountBalancesLoaded;
+	const netWorth = page.getByRole('region', { name: 'Net worth' });
+	const cash = page.getByRole('region', { name: 'Cash' });
+	const investments = page.getByRole('region', { name: 'Investments' });
+	await expect(netWorth).toHaveAttribute('aria-busy', 'true');
+	await expect(netWorth).not.toContainText('$');
+	await expect(cash).not.toContainText('$');
+	await expect(investments).not.toContainText('$');
+
+	releaseSecurityBalances();
+	await expect(netWorth).toHaveAttribute('aria-busy', 'false');
+	await expect(netWorth).toContainText('$1,500');
+	await expect(cash).toContainText('$1,000');
+	await expect(investments).toContainText('$500');
 });

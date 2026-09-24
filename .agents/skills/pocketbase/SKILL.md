@@ -39,6 +39,11 @@ PocketBase treats a missing relation and missing auth ID as equal, so an unguard
 sharing clause can admit anonymous reads of records with no shares. Cover both
 list and direct-record access when changing these rules.
 
+The `latestAccountBalances`, `latestAssetBalances`, and `latestSecurityBalances`
+views copy the list and view rules of `accountBalances`, `assetBalances`, and
+`securityBalances`. When a balance collection's rule changes, change its view's
+rule in the same migration flow.
+
 ## Available APIs
 
 All PocketBase APIs are available to authenticated clients with the appropriate scope:

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Currency from '$lib/components/currency.svelte';
 	import Number from '$lib/components/number.svelte';
+	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
@@ -15,7 +16,8 @@
 		format = 'currency',
 		decimalScale = 0,
 		isUnconverted = false,
-		isPartial = false
+		isPartial = false,
+		isLoading = false
 	}: {
 		title: string;
 		value: number | null;
@@ -24,6 +26,7 @@
 		decimalScale?: number;
 		isUnconverted?: boolean;
 		isPartial?: boolean;
+		isLoading?: boolean;
 	} = $props();
 
 	const variantClasses: Record<Variant, string> = {
@@ -44,10 +47,13 @@
 	class="flex items-center justify-between rounded-sm px-4 py-3.5 {variantClasses[variant]}"
 	role="region"
 	aria-label={title}
+	aria-busy={isLoading}
 >
 	<div class="text-sm font-semibold tracking-tight text-balance">{title}</div>
-	<div class="font-mono text-lg tabular-nums">
-		{#if value === null}
+	<div class="flex-1 text-right font-mono text-lg tabular-nums">
+		{#if isLoading}
+			<Skeleton class="ml-auto h-lh w-24 {onColoredSurface ? 'bg-white/20' : ''}" />
+		{:else if value === null}
 			<span class="text-muted-foreground">~</span>
 		{:else if format === 'percent'}
 			{#if isPartial}

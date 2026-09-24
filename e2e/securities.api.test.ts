@@ -4,7 +4,14 @@ import {
 	AccountsBalanceGroupOptions,
 	SecurityTransactionsTypeOptions
 } from '../src/lib/pocketbase.schema';
-import { getUserPB, pbSend, seedAccount, seedSecurity, seedUser } from './pocketbase.helpers';
+import {
+	getUserPB,
+	pbSend,
+	seedAccount,
+	seedSecurity,
+	seedSecurityBalance,
+	seedUser
+} from './pocketbase.helpers';
 
 const PATH = '/api/canutin/securities/with-initial-transaction';
 
@@ -142,4 +149,119 @@ test('duplicate security names return a field code on every create path', async 
 	expect(collectionResponse.status).toBe(400);
 	const collectionPayload = await collectionResponse.json();
 	expect(collectionPayload.data.name.code).toBe('security_name_exists');
+});
+
+test('latest security balances resolve carry-forward per holding', async () => {
+	const elowen = await seedUser('elowen');
+	const account = await seedAccount({
+		name: 'Carry Forward Brokerage',
+		balanceGroup: AccountsBalanceGroupOptions.INVESTMENT,
+		owner: elowen.id,
+		balanceType: 'Brokerage'
+	});
+	// Each security's rows are listed oldest first; only its newest row comes back from the view.
+	const histories = {
+		'Carried Fund': [
+			{ asOf: '2026-01-01', quantity: 10, price: 100, value: 1000, costBasis: 900 },
+			{ asOf: '2026-02-01', quantity: 10, price: null, value: null, costBasis: null },
+			{ asOf: '2026-03-01', quantity: 10, price: null, value: null, costBasis: null }
+		],
+		'Rebought Fund': [
+			{ asOf: '2026-01-01', quantity: 5, price: 100, value: 500, costBasis: 450 },
+			{ asOf: '2026-02-01', quantity: 0, price: 110, value: 0, costBasis: 0 },
+			{ asOf: '2026-03-01', quantity: 5, price: null, value: null, costBasis: null }
+		],
+		'Sold Fund': [
+			{ asOf: '2026-01-01', quantity: 4, price: 100, value: 400, costBasis: 350 },
+			{ asOf: '2026-02-01', quantity: 0, price: null, value: null, costBasis: null }
+		],
+		'Resized Fund': [
+			{ asOf: '2026-01-01', quantity: 10, price: 100, value: 1000, costBasis: 900 },
+			{ asOf: '2026-02-01', quantity: 12, price: 110, value: 1320, costBasis: null }
+		],
+		'Unknown Fund': [
+			{ asOf: '2026-01-01', quantity: 2, price: null, value: null, costBasis: null }
+		],
+		// Two balances on the same day: the one created later wins.
+		'Same Day Fund': [
+			{ asOf: '2026-01-01', quantity: 1, price: 100, value: 100, costBasis: 100 },
+			{ asOf: '2026-01-01', quantity: 1, price: 120, value: 120, costBasis: 100 }
+		]
+	};
+	const newestIds = new Map<string, string>();
+	for (const [name, history] of Object.entries(histories)) {
+		const security = await seedSecurity({ name, owner: elowen.id });
+		for (const balance of history) {
+			const created = await seedSecurityBalance({
+				...balance,
+				asOf: `${balance.asOf} 00:00:00.000Z`,
+				account: account.id,
+				security: security.id,
+				owner: elowen.id
+			});
+			newestIds.set(security.id, created.id);
+		}
+	}
+
+	const pb = await getUserPB(elowen.email);
+	const securities = await pb.collection('securities').getFullList();
+	const nameById = new Map(securities.map((security) => [security.id, security.name]));
+	const latest = await pb.collection('latestSecurityBalances').getFullList();
+	for (const balance of latest) expect(balance.id).toBe(newestIds.get(balance.security));
+	const resolved = Object.fromEntries(
+		latest.map((balance) => [
+			nameById.get(balance.security),
+			{
+				asOf: balance.asOf,
+				quantity: balance.quantity,
+				price: balance.price,
+				value: balance.value,
+				costBasis: balance.costBasis
+			}
+		])
+	);
+	expect(resolved).toEqual({
+		'Carried Fund': {
+			asOf: '2026-03-01 00:00:00.000Z',
+			quantity: 10,
+			price: null,
+			value: 1000,
+			costBasis: 900
+		},
+		'Rebought Fund': {
+			asOf: '2026-03-01 00:00:00.000Z',
+			quantity: 5,
+			price: null,
+			value: null,
+			costBasis: null
+		},
+		'Sold Fund': {
+			asOf: '2026-02-01 00:00:00.000Z',
+			quantity: 0,
+			price: null,
+			value: 0,
+			costBasis: 0
+		},
+		'Resized Fund': {
+			asOf: '2026-02-01 00:00:00.000Z',
+			quantity: 12,
+			price: 110,
+			value: 1320,
+			costBasis: null
+		},
+		'Unknown Fund': {
+			asOf: '2026-01-01 00:00:00.000Z',
+			quantity: 2,
+			price: null,
+			value: null,
+			costBasis: null
+		},
+		'Same Day Fund': {
+			asOf: '2026-01-01 00:00:00.000Z',
+			quantity: 1,
+			price: 120,
+			value: 120,
+			costBasis: 100
+		}
+	});
 });

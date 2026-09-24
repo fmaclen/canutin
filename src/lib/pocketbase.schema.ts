@@ -21,6 +21,9 @@ export enum Collections {
 	Currencies = "currencies",
 	ExchangeRates = "exchangeRates",
 	ImportSessions = "importSessions",
+	LatestAccountBalances = "latestAccountBalances",
+	LatestAssetBalances = "latestAssetBalances",
+	LatestSecurityBalances = "latestSecurityBalances",
 	PlaidConnections = "plaidConnections",
 	Securities = "securities",
 	SecurityBalances = "securityBalances",
@@ -275,6 +278,35 @@ export type ImportSessionsRecord = {
 	updated: IsoAutoDateString
 }
 
+export type LatestAccountBalancesRecord = {
+	account: RecordIdString
+	asOf: IsoDateString
+	id: string
+	owner: RecordIdString
+	value?: number
+}
+
+export type LatestAssetBalancesRecord = {
+	asOf: IsoDateString
+	asset: RecordIdString
+	bookValue?: number
+	id: string
+	marketValue?: number
+	owner: RecordIdString
+}
+
+export type LatestSecurityBalancesRecord<TcostBasis = unknown, Tprice = unknown, Tquantity = unknown, Tvalue = unknown> = {
+	account: RecordIdString
+	asOf: IsoDateString
+	costBasis?: null | TcostBasis
+	id: string
+	owner: RecordIdString
+	price?: null | Tprice
+	quantity?: null | Tquantity
+	security: RecordIdString
+	value?: null | Tvalue
+}
+
 export enum PlaidConnectionsStatusOptions {
 	"ok" = "ok",
 	"error" = "error",
@@ -401,6 +433,9 @@ export type BalanceTypesResponse<Texpand = unknown> = Required<BalanceTypesRecor
 export type CurrenciesResponse<Texpand = unknown> = Required<CurrenciesRecord> & BaseSystemFields<Texpand>
 export type ExchangeRatesResponse<Texpand = unknown> = Required<ExchangeRatesRecord> & BaseSystemFields<Texpand>
 export type ImportSessionsResponse<Texpand = unknown> = Required<ImportSessionsRecord> & BaseSystemFields<Texpand>
+export type LatestAccountBalancesResponse<Texpand = unknown> = Required<LatestAccountBalancesRecord> & BaseSystemFields<Texpand>
+export type LatestAssetBalancesResponse<Texpand = unknown> = Required<LatestAssetBalancesRecord> & BaseSystemFields<Texpand>
+export type LatestSecurityBalancesResponse<TcostBasis = unknown, Tprice = unknown, Tquantity = unknown, Tvalue = unknown, Texpand = unknown> = Required<LatestSecurityBalancesRecord<TcostBasis, Tprice, Tquantity, Tvalue>> & BaseSystemFields<Texpand>
 export type PlaidConnectionsResponse<Texpand = unknown> = Required<PlaidConnectionsRecord> & BaseSystemFields<Texpand>
 export type SecuritiesResponse<Texpand = unknown> = Required<SecuritiesRecord> & BaseSystemFields<Texpand>
 export type SecurityBalancesResponse<TcostBasis = unknown, Tprice = unknown, Tquantity = unknown, Tvalue = unknown, Texpand = unknown> = Required<SecurityBalancesRecord<TcostBasis, Tprice, Tquantity, Tvalue>> & BaseSystemFields<Texpand>
@@ -427,6 +462,9 @@ export type CollectionRecords = {
 	currencies: CurrenciesRecord
 	exchangeRates: ExchangeRatesRecord
 	importSessions: ImportSessionsRecord
+	latestAccountBalances: LatestAccountBalancesRecord
+	latestAssetBalances: LatestAssetBalancesRecord
+	latestSecurityBalances: LatestSecurityBalancesRecord
 	plaidConnections: PlaidConnectionsRecord
 	securities: SecuritiesRecord
 	securityBalances: SecurityBalancesRecord
@@ -452,6 +490,9 @@ export type CollectionResponses = {
 	currencies: CurrenciesResponse
 	exchangeRates: ExchangeRatesResponse
 	importSessions: ImportSessionsResponse
+	latestAccountBalances: LatestAccountBalancesResponse
+	latestAssetBalances: LatestAssetBalancesResponse
+	latestSecurityBalances: LatestSecurityBalancesResponse
 	plaidConnections: PlaidConnectionsResponse
 	securities: SecuritiesResponse
 	securityBalances: SecurityBalancesResponse
