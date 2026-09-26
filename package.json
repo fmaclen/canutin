@@ -69,6 +69,7 @@
 		"pb:reset": "bun scripts/pb-reset.ts",
 		"worktree": "bun scripts/worktree.ts",
 		"worktree:create": "bun scripts/worktree.ts create",
+		"worktree:attach": "bun scripts/worktree.ts attach",
 		"worktree:list": "bun scripts/worktree.ts list",
 		"worktree:remove": "bun scripts/worktree.ts remove",
 		"worktree:sweep": "bun scripts/worktree.ts sweep"

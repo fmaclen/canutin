@@ -46,4 +46,4 @@ SCRATCHPAD.md
 .worktree.json
 
 # Managed worktrees
-/.worktrees/
+.worktrees/

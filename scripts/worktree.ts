@@ -317,6 +317,7 @@ function printHelp() {
 
 Commands:
   create <branch> [--base <base>]  Create or reuse a worktree (default base: master)
+  attach                           Adopt the git worktree at T3CODE_WORKTREE_PATH or the cwd
   list                             List managed worktrees and their status
   remove <branch|slot|path>        Safely remove a managed worktree
   sweep                            Report merged, clean worktrees that can be removed
@@ -352,34 +353,7 @@ function initializeManagedWorktree(path: string, config: WorktreeConfig) {
 	);
 }
 
-async function createWorktree(args: string[], primaryCheckout: string, worktreesRoot: string) {
-	if (args.includes('--help') || args.includes('-h')) {
-		console.log('Usage: bun run worktree:create <branch> [--base <base>]');
-		return;
-	}
-	let base = 'master';
-	const positional: string[] = [];
-	for (let index = 0; index < args.length; index += 1) {
-		const argument = args[index];
-		if (argument === '--base') {
-			base = args[index + 1] ?? '';
-			if (!base) fail('--base requires a value');
-			index += 1;
-		} else if (argument.startsWith('-')) {
-			fail(`Unknown create option: ${argument}`);
-		} else {
-			positional.push(argument);
-		}
-	}
-	if (positional.length !== 1) fail('Usage: bun run worktree:create <branch> [--base <base>]');
-	const branch = positional[0];
-	const validBranch = run('git', ['check-ref-format', '--branch', branch], primaryCheckout, true);
-	if (validBranch.status !== 0) fail(`Invalid branch name: ${branch}`);
-	const sanitizedBranch = branch
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, '-')
-		.replace(/^-|-$/g, '');
-	if (!sanitizedBranch) fail(`Branch name cannot produce a safe worktree path: ${branch}`);
+async function withCreateLock<T>(primaryCheckout: string, action: () => Promise<T>) {
 	const commonDirectory = run(
 		'git',
 		['rev-parse', '--path-format=absolute', '--git-common-dir'],
@@ -436,132 +410,7 @@ async function createWorktree(args: string[], primaryCheckout: string, worktrees
 		rmSync(lockCandidate, { force: true });
 	}
 	try {
-		const gitWorktrees = getGitWorktrees(primaryCheckout);
-		const managedWorktrees = getManagedWorktrees(worktreesRoot);
-		const existing = gitWorktrees.find((worktree) => worktree.branch === branch);
-		if (existing) {
-			if (dirname(existing.path) !== worktreesRoot) {
-				fail(`${branch} is already checked out at unmanaged location ${existing.path}`);
-			}
-			const pathMatch = basename(existing.path).match(/^(\d+)--(.+)$/);
-			if (
-				!pathMatch ||
-				Number(pathMatch[1]) < 1 ||
-				basename(existing.path) !==
-					`${String(Number(pathMatch[1])).padStart(2, '0')}--${sanitizedBranch}`
-			) {
-				fail(`${branch} is checked out at an invalid managed path ${existing.path}`);
-			}
-			const slot = Number(pathMatch[1]);
-			const vite = 42069 + slot * 100;
-			const pocketbase = 42070 + slot * 100;
-			if (pocketbase > 65535) fail(`${existing.path} has no valid deterministic port pair`);
-			const managed = managedWorktrees.find(
-				(worktree) => resolve(worktree.path) === resolve(existing.path)
-			);
-			if (
-				managed &&
-				(managed.config.slot !== slot ||
-					managed.config.branch !== branch ||
-					managed.config.ports.vite !== vite ||
-					managed.config.ports.pocketbase !== pocketbase)
-			) {
-				fail(`${existing.path} config does not match its branch, slot, and deterministic ports`);
-			}
-			if (
-				managedWorktrees.some((worktree) => worktree !== managed && worktree.config.slot === slot)
-			) {
-				fail(`Multiple managed worktrees claim slot ${slot}`);
-			}
-			const slotConflict = readdirSync(worktreesRoot, { withFileTypes: true }).find((entry) => {
-				const match = entry.name.match(/^(\d+)--/);
-				return match && Number(match[1]) === slot && entry.name !== basename(existing.path);
-			});
-			if (slotConflict) fail(`Multiple worktree directories claim slot ${slot}`);
-			if (
-				managed?.config.initialized &&
-				existsSync(join(existing.path, '.env')) &&
-				existsSync(join(existing.path, 'node_modules'))
-			) {
-				log(`Reusing ${branch} at ${existing.path}`);
-				return;
-			}
-			log(`Completing managed initialization for ${branch} at ${existing.path}`);
-			initializeManagedWorktree(existing.path, {
-				slot,
-				branch,
-				initialized: false,
-				ports: { vite, pocketbase }
-			});
-			log(`Ready: ${existing.path}`);
-			log(`Ports: Vite ${vite}, PocketBase ${pocketbase}`);
-			return;
-		}
-		const baseCheck = run(
-			'git',
-			['rev-parse', '--verify', '--quiet', '--end-of-options', `${base}^{commit}`],
-			primaryCheckout,
-			true
-		);
-		if (baseCheck.status !== 0) fail(`Base does not resolve to a commit: ${base}`);
-		if (!existsSync(worktreesRoot)) mkdirSync(worktreesRoot, { recursive: true });
-		const occupiedSlots = new Set<number>();
-		for (const worktree of gitWorktrees) {
-			if (dirname(worktree.path) !== worktreesRoot) continue;
-			const match = basename(worktree.path).match(/^(\d+)--/);
-			if (match) occupiedSlots.add(Number(match[1]));
-		}
-		for (const worktree of managedWorktrees) occupiedSlots.add(worktree.config.slot);
-		for (const entry of readdirSync(worktreesRoot, { withFileTypes: true })) {
-			const match = entry.name.match(/^(\d+)--/);
-			if (match) occupiedSlots.add(Number(match[1]));
-		}
-		let slot = 1;
-		for (; ; slot += 1) {
-			if (occupiedSlots.has(slot)) continue;
-			const vite = 42069 + slot * 100;
-			const pocketbase = 42070 + slot * 100;
-			if (pocketbase > 65535)
-				fail('No available worktree slot has a valid deterministic port pair');
-			const portsAreFree = await Promise.all(
-				[vite, pocketbase].map(
-					(port) =>
-						new Promise<boolean>((resolvePromise) => {
-							const server = createServer();
-							server.once('error', () => resolvePromise(false));
-							server.once('listening', () => server.close(() => resolvePromise(true)));
-							server.listen(port, '127.0.0.1');
-						})
-				)
-			);
-			if (portsAreFree.every(Boolean)) break;
-		}
-		const vite = 42069 + slot * 100;
-		const pocketbase = 42070 + slot * 100;
-		const worktreePath = join(
-			worktreesRoot,
-			`${String(slot).padStart(2, '0')}--${sanitizedBranch}`
-		);
-		if (localBranchExists(branch, primaryCheckout)) {
-			log(`Checking out existing branch ${branch} in slot ${slot}`);
-			run('git', ['worktree', 'add', '--', worktreePath, branch], primaryCheckout, false);
-		} else {
-			log(`Creating branch ${branch} from ${base} in slot ${slot}`);
-			run(
-				'git',
-				['worktree', 'add', '-b', branch, '--', worktreePath, base],
-				primaryCheckout,
-				false
-			);
-		}
-		initializeManagedWorktree(worktreePath, {
-			slot,
-			branch,
-			initialized: false,
-			ports: { vite, pocketbase }
-		});
-		log(`Ready: ${worktreePath}`);
-		log(`Ports: Vite ${vite}, PocketBase ${pocketbase}`);
+		return await action();
 	} finally {
 		let existingOwner: string | null = null;
 		try {
@@ -584,6 +433,152 @@ async function createWorktree(args: string[], primaryCheckout: string, worktrees
 			}
 		}
 	}
+}
+
+function slotPorts(slot: number) {
+	return { vite: 42069 + slot * 100, pocketbase: 42070 + slot * 100 };
+}
+
+// Lowest slot claimed by no .worktree.json or NN-- directory whose port pair is free.
+async function findFreeSlot(worktreesRoot: string) {
+	const occupiedSlots = new Set<number>();
+	for (const worktree of getManagedWorktrees(worktreesRoot))
+		occupiedSlots.add(worktree.config.slot);
+	for (const entry of readdirSync(worktreesRoot, { withFileTypes: true })) {
+		const match = entry.name.match(/^(\d+)--/);
+		if (match) occupiedSlots.add(Number(match[1]));
+	}
+	for (let slot = 1; ; slot += 1) {
+		if (occupiedSlots.has(slot)) continue;
+		const ports = slotPorts(slot);
+		if (ports.pocketbase > 65535)
+			fail('No available worktree slot has a valid deterministic port pair');
+		const portsAreFree = await Promise.all(
+			[ports.vite, ports.pocketbase].map(
+				(port) =>
+					new Promise<boolean>((resolvePromise) => {
+						const server = createServer();
+						server.once('error', () => resolvePromise(false));
+						server.once('listening', () => server.close(() => resolvePromise(true)));
+						server.listen(port, '127.0.0.1');
+					})
+			)
+		);
+		if (portsAreFree.every(Boolean)) return slot;
+	}
+}
+
+// Adopt a registered git worktree under .worktrees/, whatever its directory name:
+// keep the slot its .worktree.json already records, otherwise take the lowest free one.
+async function adoptWorktree(path: string, primaryCheckout: string, worktreesRoot: string) {
+	const realPath = realpathSync(path);
+	const gitWorktree = getGitWorktrees(primaryCheckout).find(
+		(worktree) => existsSync(worktree.path) && realpathSync(worktree.path) === realPath
+	);
+	if (!gitWorktree) fail(`${path} is not a registered git worktree`);
+	if (realpathSync(dirname(realPath)) !== realpathSync(worktreesRoot)) {
+		fail(`${path} is outside ${worktreesRoot}`);
+	}
+	if (!gitWorktree.branch) fail(`${path} is detached; attach needs a branch`);
+	const branch = gitWorktree.branch;
+	const managed = getManagedWorktrees(worktreesRoot).find(
+		(worktree) => realpathSync(worktree.path) === realPath
+	);
+	if (
+		managed?.config.initialized &&
+		existsSync(join(realPath, '.env')) &&
+		existsSync(join(realPath, 'node_modules'))
+	) {
+		log(`Reusing ${branch} at ${realPath} in slot ${managed.config.slot}`);
+		return;
+	}
+	const slot = managed?.config.slot ?? (await findFreeSlot(worktreesRoot));
+	log(`Attaching ${branch} at ${realPath} in slot ${slot}`);
+	initializeManagedWorktree(realPath, { slot, branch, initialized: false, ports: slotPorts(slot) });
+	const ports = slotPorts(slot);
+	log(`Ready: ${realPath}`);
+	log(`Ports: Vite ${ports.vite}, PocketBase ${ports.pocketbase}`);
+}
+
+async function attachWorktree(args: string[], primaryCheckout: string, worktreesRoot: string) {
+	if (args.includes('--help') || args.includes('-h')) {
+		console.log('Usage: bun run worktree:attach  (adopts $T3CODE_WORKTREE_PATH or the cwd)');
+		return;
+	}
+	if (args.length) fail('Usage: bun run worktree:attach');
+	const path = resolve(process.env.T3CODE_WORKTREE_PATH || process.cwd());
+	await withCreateLock(primaryCheckout, () => adoptWorktree(path, primaryCheckout, worktreesRoot));
+}
+
+async function createWorktree(args: string[], primaryCheckout: string, worktreesRoot: string) {
+	if (args.includes('--help') || args.includes('-h')) {
+		console.log('Usage: bun run worktree:create <branch> [--base <base>]');
+		return;
+	}
+	let base = 'master';
+	const positional: string[] = [];
+	for (let index = 0; index < args.length; index += 1) {
+		const argument = args[index];
+		if (argument === '--base') {
+			base = args[index + 1] ?? '';
+			if (!base) fail('--base requires a value');
+			index += 1;
+		} else if (argument.startsWith('-')) {
+			fail(`Unknown create option: ${argument}`);
+		} else {
+			positional.push(argument);
+		}
+	}
+	if (positional.length !== 1) fail('Usage: bun run worktree:create <branch> [--base <base>]');
+	const branch = positional[0];
+	const validBranch = run('git', ['check-ref-format', '--branch', branch], primaryCheckout, true);
+	if (validBranch.status !== 0) fail(`Invalid branch name: ${branch}`);
+	const sanitizedBranch = branch
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-|-$/g, '');
+	if (!sanitizedBranch) fail(`Branch name cannot produce a safe worktree path: ${branch}`);
+	if (!existsSync(worktreesRoot)) mkdirSync(worktreesRoot, { recursive: true });
+	await withCreateLock(primaryCheckout, async () => {
+		const existing = getGitWorktrees(primaryCheckout).find(
+			(worktree) => worktree.branch === branch
+		);
+		if (existing) {
+			if (realpathSync(dirname(existing.path)) !== realpathSync(worktreesRoot)) {
+				fail(`${branch} is already checked out at unmanaged location ${existing.path}`);
+			}
+			await adoptWorktree(existing.path, primaryCheckout, worktreesRoot);
+			return;
+		}
+		const baseCheck = run(
+			'git',
+			['rev-parse', '--verify', '--quiet', '--end-of-options', `${base}^{commit}`],
+			primaryCheckout,
+			true
+		);
+		if (baseCheck.status !== 0) fail(`Base does not resolve to a commit: ${base}`);
+		const slot = await findFreeSlot(worktreesRoot);
+		const ports = slotPorts(slot);
+		const worktreePath = join(
+			worktreesRoot,
+			`${String(slot).padStart(2, '0')}--${sanitizedBranch}`
+		);
+		if (localBranchExists(branch, primaryCheckout)) {
+			log(`Checking out existing branch ${branch} in slot ${slot}`);
+			run('git', ['worktree', 'add', '--', worktreePath, branch], primaryCheckout, false);
+		} else {
+			log(`Creating branch ${branch} from ${base} in slot ${slot}`);
+			run(
+				'git',
+				['worktree', 'add', '-b', branch, '--', worktreePath, base],
+				primaryCheckout,
+				false
+			);
+		}
+		initializeManagedWorktree(worktreePath, { slot, branch, initialized: false, ports });
+		log(`Ready: ${worktreePath}`);
+		log(`Ports: Vite ${ports.vite}, PocketBase ${ports.pocketbase}`);
+	});
 }
 
 function listWorktrees(primaryCheckout: string, worktreesRoot: string) {
@@ -786,6 +781,7 @@ async function main() {
 	const primaryCheckout = getPrimaryCheckout();
 	const worktreesRoot = join(primaryCheckout, '.worktrees');
 	if (command === 'create') await createWorktree(args, primaryCheckout, worktreesRoot);
+	else if (command === 'attach') await attachWorktree(args, primaryCheckout, worktreesRoot);
 	else if (command === 'list') {
 		if (args.includes('--help') || args.includes('-h')) {
 			console.log('Usage: bun run worktree:list');

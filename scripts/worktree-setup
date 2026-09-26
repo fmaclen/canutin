@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# T3 Code runs this in a worktree it just created; the manager adopts it.
+set -euo pipefail
+cd "${T3CODE_WORKTREE_PATH:-$PWD}" && exec bun scripts/worktree.ts attach

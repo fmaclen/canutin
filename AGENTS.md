@@ -4,7 +4,7 @@ Canutin is a personal finance application: SvelteKit on the frontend, PocketBase
 
 > `AGENTS.md` is canonical - `CLAUDE.md` is a symlink to it. Edit `AGENTS.md`.
 
-Feature work happens in managed worktrees under `/.worktrees/` - see the [setup skill](./.agents/skills/setup/SKILL.md).
+T3 opens each thread in a worktree under `/.worktrees/` and runs `scripts/worktree-setup`, which gives it a port slot and installs dependencies - see the [setup skill](./.agents/skills/setup/SKILL.md). Servers, the tailnet link, and retiring the worktree: the fleet `worktree-dev` skill.
 
 ## Skills
 
@@ -48,8 +48,8 @@ Each skill lives at `.agents/skills/<slug>/SKILL.md`. Read the ones that match t
 
 | Synopsis                                               | Slug               |
 | ------------------------------------------------------ | ------------------ |
-| How to create and reuse worktrees for autonomous work  | setup              |
-| Local server ownership, ports, and start/stop rules    | local-servers      |
+| Worktrees: T3 attach, hand-made create, list, remove   | setup              |
+| Local server ownership, ports, and tailnet publishing  | local-servers      |
 | How to verify changes locally before requesting review | verify             |
 | How to diagnose failed checks and avoid wasting CI     | failure-discipline |
 | How to change PocketBase schema safely                 | pb-migrate         |
@@ -63,7 +63,7 @@ Each skill lives at `.agents/skills/<slug>/SKILL.md`. Read the ones that match t
 
 ## Checks
 
-`bun run quality` already runs Prettier, ESLint, and svelte-check. Run it once at the end of a chunk of work - never the pieces separately.
+`bun run quality` already runs Prettier, ESLint, and svelte-check. Run it once at the end of a chunk of work - never the pieces separately. `bun run test` runs Playwright against its own preview server; failures leave traces under `test-results/`.
 
 ## Served skill reference
 

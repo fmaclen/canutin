@@ -1,9 +1,15 @@
+import { existsSync } from 'node:fs';
 import { paraglideVitePlugin } from '@inlang/paraglide-js';
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 
 import pkg from './package.json';
+
+// Vite runs under Node, which never sees the ports a worktree pinned in .env; load it
+// here like playwright.config.ts does. Variables already in the environment still win.
+const envFile = new URL('.env', import.meta.url);
+if (existsSync(envFile)) process.loadEnvFile(envFile);
 
 export default defineConfig({
 	define: {
@@ -19,10 +25,18 @@ export default defineConfig({
 			outdir: './src/lib/paraglide'
 		})
 	],
+	// Loopback IPv4 with strict ports: a slot collision fails instead of drifting, and
+	// `dev-link` can proxy the port to the tailnet, whose Host header Vite must accept.
 	server: {
-		port: Number(process.env.VITE_PORT ?? 5173)
+		host: '127.0.0.1',
+		port: Number(process.env.VITE_PORT ?? 5173),
+		strictPort: true,
+		allowedHosts: ['.ts.net']
 	},
 	preview: {
-		port: Number(process.env.VITE_PREVIEW_PORT ?? process.env.VITE_PORT ?? 42069)
+		host: '127.0.0.1',
+		port: Number(process.env.VITE_PREVIEW_PORT ?? process.env.VITE_PORT ?? 42069),
+		strictPort: true,
+		allowedHosts: ['.ts.net']
 	}
 });
