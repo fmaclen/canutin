@@ -12,6 +12,7 @@ const envFile = new URL('.env', import.meta.url);
 if (existsSync(envFile)) process.loadEnvFile(envFile);
 
 export default defineConfig({
+	envPrefix: ['VITE_', 'PUBLIC_PLAYWRIGHT_TESTING'],
 	define: {
 		// The Docker build checks out the commit before semantic-release bumps package.json,
 		// so the release workflow passes the published version through APP_VERSION.
@@ -31,12 +32,10 @@ export default defineConfig({
 		host: '127.0.0.1',
 		port: Number(process.env.VITE_PORT ?? 5173),
 		strictPort: true,
-		allowedHosts: ['.ts.net']
-	},
-	preview: {
-		host: '127.0.0.1',
-		port: Number(process.env.VITE_PREVIEW_PORT ?? process.env.VITE_PORT ?? 42069),
-		strictPort: true,
-		allowedHosts: ['.ts.net']
+		allowedHosts: ['.ts.net'],
+		proxy: {
+			'/api': `http://127.0.0.1:${process.env.PB_PORT ?? 42070}`,
+			'^/_($|/)': `http://127.0.0.1:${process.env.PB_PORT ?? 42070}`
+		}
 	}
 });

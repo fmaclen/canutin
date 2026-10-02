@@ -528,8 +528,6 @@
 	"setup_title": "Configuración requerida",
 	"setup_description": "Revisa los registros del servidor para obtener el enlace de configuración",
 	"setup_server": "Servidor",
-	"setup_unreachable_title": "Sin conexión",
-	"setup_unreachable_description": "No se pudo conectar al servidor de base de datos",
 	"settings_page_title": "Configuración",
 	"settings_interface_section_title": "Interfaz",
 	"settings_interface_theme_label": "Tema",

@@ -5,91 +5,37 @@ description: Docker-based deployment, release workflow, semantic-release
 
 # Deployment
 
-## Overview
-
-Canutin ships as a Docker image that bundles the SvelteKit Node server and the custom PocketBase binary. Releases are cut by semantic-release based on conventional commits.
-
-## Files
-
-| File                 | Purpose                                                                   |
-| -------------------- | ------------------------------------------------------------------------- |
-| `Dockerfile`         | Multi-stage build: Go (PB) + Node (SK); takes the `APP_VERSION` build arg |
-| `docker-compose.yml` | Local / dev compose file                                                  |
-| `.releaserc.json`    | semantic-release config                                                   |
-| `.github/workflows/` | CI workflows (tests, release, image)                                      |
+Canutin ships as one Docker container running the custom PocketBase binary. It serves the static SvelteKit app, API, realtime updates, and admin UI on port `42070`. The runtime image needs no Node or Bun server.
 
 ## Build
 
-```bash
-bun run build
-```
-
-Produces the SvelteKit build output for the Node adapter. The Docker build additionally compiles the PocketBase Go binary from `pocketbase/`.
-
-## Release
-
-Handled by semantic-release via the release workflow. Conventional commits drive the version bump:
-
-- `feat:` → minor
-- `fix:` → patch
-- `feat!:` / `BREAKING CHANGE:` → major
-
-See [commits and PRs](../commits-and-prs/SKILL.md#type-prefix-decides-whether-the-change-deploys) for the supported types.
-
-## Updates
-
-Every release publishes a new image, but nothing in this repo updates a running deployment. Each host decides when to pull, and how it does that is host configuration, not repo configuration. The README documents the manual `docker compose pull` and an optional maintained Watchtower fork for anyone who wants updates applied automatically.
-
-New environment variables must stay optional with a safe default, because a host that pulls unattended gets the new image without anyone touching its `.env`. A variable that cannot degrade gracefully belongs in a breaking-change release, where the notes call it out.
+`bun run build` writes the static frontend to `build/`. The Dockerfile builds that frontend and the Go binary, then copies them into the runtime image. The optional `APP_VERSION` build argument sets the version displayed in Settings. Release builds pass the freshly published version; local builds default to `package.json`.
 
 ## Runtime
 
-At runtime the container:
+The container runs from `/app/pocketbase` and keeps its database at `/app/pocketbase/pb_data`. Preserve that volume across upgrades. The static frontend is in `/app/build`, matching the default `--publicDir ../build`.
 
-1. Starts the PocketBase binary (with the project's compiled Go hooks) on `:42070`
-2. Starts the SvelteKit Node adapter on `:42069` (or whatever `PORT` sets)
-3. Uses `PUBLIC_PB_URL` to point the frontend at the in-container PocketBase
+A reverse proxy forwards the whole app domain to port `42070`, including `/api/` and `/_/`, and supports long-lived realtime connections. Browser API requests use the same origin. Migration from the old two-service deployment, including volume and upstream-port handling, is documented in the [README](../../../README.md#migrating-an-existing-two-service-deployment).
 
-## Environment Variables
+Public settings are read by PocketBase at runtime and returned from `/api/canutin/config`:
 
-Minimum required at runtime:
+- `PUBLIC_DEMO_ENABLED` enables the demo account and its reset job.
+- `PUBLIC_PLAUSIBLE_DOMAIN` and `PUBLIC_PLAUSIBLE_SCRIPT_URL` enable analytics only when both are set.
 
-- `PUBLIC_PB_URL` — URL the frontend uses to reach PocketBase (may be the same host as the SvelteKit server or a dedicated subdomain)
-
-Optional Plausible analytics variables for the SvelteKit container:
-
-- `PUBLIC_PLAUSIBLE_DOMAIN` — site domain registered in Plausible
-- `PUBLIC_PLAUSIBLE_SCRIPT_URL` — full URL of the Plausible tracker script
-
-Analytics loads only when both the domain and script URL are set.
-
-At build time the image takes one optional build arg:
-
-- `APP_VERSION` — the version written to the runtime `package.json` and displayed in Settings. Defaults to `package.json`'s `version`; the release workflow passes the freshly published version because the Docker build checks out the commit before semantic-release bumps it.
-
-Additional variables depend on your deployment target and any custom Go hooks you've added. Check `.env.example` if one exists; otherwise inspect the compose files.
+All are optional. Compose forwards them to the `pocketbase` service. No browser backend URL or frontend origin variable is required.
 
 ### Plaid
 
-The PocketBase container reads the Plaid credentials. Set these in the `.env` file beside the deployment's `docker-compose.yml`:
+Set `PLAID_CLIENT_ID`, `PLAID_SECRET`, and `PLAID_ENV` in the `.env` beside the deployment's Compose file. Set all three to enable Plaid. Use `sandbox` for development and `production` for live data; credentials without an explicit environment are rejected.
 
-```dotenv
-PLAID_CLIENT_ID=<client-id>
-PLAID_SECRET=<secret>
-PLAID_ENV=production
-```
+Compose's `.env` provides substitution values; the `pocketbase.environment` mappings pass them into the container. Recreate the container after changing runtime settings.
 
-Set all three values to enable Plaid. Use `sandbox` for development and `production` for live data; credentials without an explicit environment are rejected.
+## Releases and updates
 
-Compose's `.env` file supplies substitution values; the `pocketbase.environment` mappings in the compose file pass them into the container. After changing them, recreate PocketBase with `docker compose up -d --force-recreate pocketbase`.
+The migration from separate frontend and backend services requires a breaking release and coordinated host cutover. Follow the README migration steps before updating existing hosts. Changes to live proxies, Cloudflare Access, and host services are separate deployment work. Keep external host documentation describing what is actually running until cutover; update it as part of that deployment.
 
-## Anti-patterns
+Semantic-release uses conventional commits to publish versions and images. See [commits and PRs](../commits-and-prs/SKILL.md#type-prefix-decides-whether-the-change-deploys) for the supported types. Each host decides when to pull updates. The README documents manual updates and an optional maintained Watchtower fork.
 
-- **Hand-editing production pb_data** — use the PocketBase admin UI or import API
-- **Skipping conventional commits** — breaks semantic-release version inference
-- **Shipping dev superadmin credentials** — override `PB_SUPERUSER_EMAIL` / `PB_SUPERUSER_PASSWORD` in production
+New environment variables must be optional with safe defaults, because unattended updates do not change a host's `.env`. A required new variable belongs in a breaking release with migration notes.
 
-## See Also
-
-- [pocketbase.md](../pocketbase/SKILL.md) - Backend runtime
-- [code-quality.md](../code-quality/SKILL.md) - Conventional commits
+Use the admin UI or import API to change production data. Development superuser credentials are only created by the local startup script, never by the production container.

@@ -17,13 +17,13 @@ T3 opens each thread in `.worktrees/<branch>` and runs `scripts/worktree-setup` 
 
 A slot is claimed by a `.worktree.json`, never by a directory name. Ports follow from the slot and are not inputs:
 
-- Vite dev and preview: `42069 + slot × 100`
-- PocketBase: `42070 + slot × 100`
+- Vite dev: `42069 + slot × 100`
+- PocketBase, including the built frontend and Playwright: `42070 + slot × 100`
 
-| File             | Content                                                                   |
-| ---------------- | ------------------------------------------------------------------------- |
-| `.env`           | `VITE_PORT`, matching `VITE_PREVIEW_PORT`, `PB_PORT`, and `PUBLIC_PB_URL` |
-| `.worktree.json` | Slot, branch, ports, initialization state                                 |
+| File             | Content                                   |
+| ---------------- | ----------------------------------------- |
+| `.env`           | `VITE_PORT` and `PB_PORT`                 |
+| `.worktree.json` | Slot, branch, ports, initialization state |
 
 Do not edit either by hand.
 

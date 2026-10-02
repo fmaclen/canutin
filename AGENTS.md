@@ -63,7 +63,7 @@ Each skill lives at `.agents/skills/<slug>/SKILL.md`. Read the ones that match t
 
 ## Checks
 
-`bun run quality` already runs Prettier, ESLint, and svelte-check. Run it once at the end of a chunk of work - never the pieces separately. `bun run test` runs Playwright against its own preview server; failures leave traces under `test-results/`.
+`bun run quality` already runs Prettier, ESLint, and svelte-check. Run it once at the end of a chunk of work - never the pieces separately. `bun run test` builds the static frontend and runs Playwright against PocketBase serving it; failures leave traces under `test-results/`.
 
 ## Served skill reference
 

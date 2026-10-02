@@ -17,7 +17,7 @@
 
 	const importSessionsContext = getImportSessionsContext();
 	const pb = getPocketBaseContext();
-	const agentAccessUrl = $derived(`${pb.backendUrl}/api/canutin/skill`);
+	const agentAccessUrl = $derived(pb.authedClient.buildURL('/api/canutin/skill'));
 
 	let revertingSessionId: string | null = $state(null);
 

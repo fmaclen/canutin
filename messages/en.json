@@ -528,8 +528,6 @@
 	"setup_title": "Setup required",
 	"setup_description": "Check your server logs for the setup link",
 	"setup_server": "Server",
-	"setup_unreachable_title": "Can't connect",
-	"setup_unreachable_description": "Unable to reach the database server",
 	"settings_page_title": "Settings",
 	"settings_interface_section_title": "Interface",
 	"settings_interface_theme_label": "Theme",

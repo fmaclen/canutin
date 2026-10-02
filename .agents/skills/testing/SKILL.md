@@ -27,6 +27,8 @@ bun run test -- e2e/file.test.ts     # Single file - desktop and mobile in one r
 bun run test -- -g 'test name'       # By name pattern
 ```
 
+Playwright builds the static app and starts PocketBase on `PB_PORT`. Browser pages and test helpers use that same origin. Server ownership and test-port preparation live in [local-servers](../local-servers/SKILL.md).
+
 ## E2E
 
 ### When to write
@@ -101,9 +103,9 @@ bun run test -- e2e/file.test.ts --repeat-each=10
 
 ### Never run two test commands at once
 
-Wait for each test run to finish before starting the next. Two test commands running at the same time fight over the same backend and preview server and produce false flake. To run several files together, pass them to a single Playwright invocation instead of launching multiple processes.
+Wait for each test run to finish before starting the next. Two test commands running at the same time fight over the same PocketBase server and produce false flake. To run several files together, pass them to a single Playwright invocation instead of launching multiple processes.
 
-If a previous run ended early (Ctrl-C, killed terminal, crashed reporter), the preview server may linger and the next run will fail to bind. Ownership rules for existing listeners: see [local-servers](../local-servers/SKILL.md).
+If a previous run ended early (Ctrl-C, killed terminal, crashed reporter), PocketBase may linger and the next run will fail to bind. Ownership rules for existing listeners: see [local-servers](../local-servers/SKILL.md).
 
 ### Local verification before push
 
@@ -140,6 +142,5 @@ Test code follows the same rules as production code (see [code-quality](../code-
 
 ## Troubleshooting
 
-- **Preview server port already in use** - check the port in `.env` or `.worktree.json`; follow the ownership rules in [local-servers](../local-servers/SKILL.md) before stopping anything.
-- **PocketBase port already in use** - check `.env` or `.worktree.json` for the actual `PB_PORT` and reuse a healthy listener per [local-servers](../local-servers/SKILL.md).
+- **PocketBase port already in use** - follow the test-port preparation and ownership rules in [local-servers](../local-servers/SKILL.md).
 - **Generated messages missing** - run the relevant quality/build command so Paraglide regenerates output; do not hand-edit generated files.

@@ -2,14 +2,11 @@ import { clsx, type ClassValue } from 'clsx';
 import { ClientResponseError } from 'pocketbase';
 import { twMerge } from 'tailwind-merge';
 
-import { env } from '$env/dynamic/public';
 import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 
 export function cn(...inputs: ClassValue[]) {
 	return twMerge(clsx(inputs));
 }
-
-export const getBackendUrl = () => env.PUBLIC_PB_URL || 'http://127.0.0.1:42070';
 
 export function toNumber(value: unknown) {
 	if (value === null || value === undefined || value === '') return null;
@@ -60,10 +57,8 @@ export function toPocketBaseDateString(date: Date): string {
 	return date.toISOString().replace('T', ' ');
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type WithoutChild<T> = T extends { child?: any } ? Omit<T, 'child'> : T;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type WithoutChildren<T> = T extends { children?: any } ? Omit<T, 'children'> : T;
+export type WithoutChild<T> = T extends { child?: unknown } ? Omit<T, 'child'> : T;
+export type WithoutChildren<T> = T extends { children?: unknown } ? Omit<T, 'children'> : T;
 export type WithoutChildrenOrChild<T> = WithoutChildren<WithoutChild<T>>;
 export type WithElementRef<T, U extends HTMLElement = HTMLElement> = T & { ref?: U | null };
 

@@ -335,13 +335,7 @@ function initializeManagedWorktree(path: string, config: WorktreeConfig) {
 	);
 	writeFileSync(
 		join(path, '.env'),
-		[
-			`VITE_PORT=${config.ports.vite}`,
-			`VITE_PREVIEW_PORT=${config.ports.vite}`,
-			`PB_PORT=${config.ports.pocketbase}`,
-			`PUBLIC_PB_URL=http://127.0.0.1:${config.ports.pocketbase}`,
-			''
-		].join('\n')
+		[`VITE_PORT=${config.ports.vite}`, `PB_PORT=${config.ports.pocketbase}`, ''].join('\n')
 	);
 	log(`Running bun install in ${path}`);
 	const install = spawnSync('bun', ['install'], { cwd: path, stdio: 'inherit' });

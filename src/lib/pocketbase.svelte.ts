@@ -9,9 +9,6 @@ import { logError } from './logger';
 import { m } from './paraglide/messages';
 import type { TypedPocketBase } from './pocketbase.schema';
 import type { StaleSync } from './realtime-sync';
-import { getBackendUrl } from './utils';
-
-export type SetupStatus = 'checking' | 'ready' | 'needs-setup' | 'unreachable';
 
 enum ToastId {
 	CONNECTION_ERROR = 'connection-error',
@@ -21,7 +18,6 @@ enum ToastId {
 
 export class PocketBaseContext {
 	authedClient: TypedPocketBase;
-	setupStatus: SetupStatus = $state('checking');
 	onAuthInvalidated?: () => void;
 	onSessionResume?: () => Promise<boolean>;
 
@@ -45,7 +41,7 @@ export class PocketBaseContext {
 	};
 
 	constructor() {
-		this.authedClient = new PocketBase(getBackendUrl());
+		this.authedClient = new PocketBase('/');
 	}
 
 	isSessionValid() {
@@ -110,25 +106,6 @@ export class PocketBaseContext {
 		return this._probe;
 	}
 
-	get backendUrl(): string {
-		return getBackendUrl();
-	}
-
-	async checkSetup(): Promise<SetupStatus> {
-		try {
-			const response = await fetch(`${this.backendUrl}/api/setup-status`);
-			if (!response.ok) {
-				this.setupStatus = 'unreachable';
-			} else {
-				const data = await response.json();
-				this.setupStatus = data.ready ? 'ready' : 'needs-setup';
-			}
-		} catch {
-			this.setupStatus = 'unreachable';
-		}
-		return this.setupStatus;
-	}
-
 	async findOrCreateLabel(name: string, ownerId: string) {
 		const existing = await this.authedClient.collection('transactionLabels').getList(1, 1, {
 			filter: `name = "${name}" && owner = "${ownerId}"`
@@ -147,7 +124,7 @@ export class PocketBaseContext {
 
 	async postJson<T>(path: string, body: Record<string, unknown>) {
 		const token = this.authedClient.authStore.token;
-		const response = await fetch(`${this.backendUrl}${path}`, {
+		const response = await fetch(path, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',

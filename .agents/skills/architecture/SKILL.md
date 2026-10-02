@@ -5,7 +5,7 @@ description: 'How the codebase is organized: stack, structure, data flow, layout
 
 # Architecture
 
-Canutin is a SvelteKit + PocketBase personal finance application using Bun.
+Canutin is a SvelteKit + PocketBase personal finance application using Bun. SvelteKit builds a static SPA into `build/`; PocketBase serves it alongside the API and admin UI from one origin. There is no frontend runtime server.
 
 ## Backend: PocketBase
 
@@ -30,6 +30,8 @@ Route structure:
 
 - `src/routes/(app)/` - protected routes that require auth
 - `src/routes/(guest)/` - public routes, including auth pages
+
+The root layout loads runtime settings from `/api/canutin/config`. The PocketBase SDK uses the browser origin. Vite is only a development tool and proxies backend requests during hot reload.
 
 ## i18n
 

@@ -1,6 +1,5 @@
 import { getContext, setContext } from 'svelte';
 
-import { env } from '$env/dynamic/public';
 import type { AuthContext } from '$lib/auth.svelte';
 import { logError } from '$lib/logger';
 
@@ -9,13 +8,13 @@ const DEMO_PASSWORD = '123qweasdzxc';
 
 export class DemoContext {
 	isStarting = $state(false);
-	isEnabled = $state(false);
+	readonly isEnabled: boolean;
 
 	private _auth: AuthContext;
 
-	constructor(auth: AuthContext) {
+	constructor(auth: AuthContext, isEnabled: boolean) {
 		this._auth = auth;
-		this.isEnabled = env.PUBLIC_DEMO_ENABLED === 'true';
+		this.isEnabled = isEnabled;
 	}
 
 	async startDemo() {
@@ -51,8 +50,8 @@ export class DemoContext {
 
 const CONTEXT_KEY = 'demo';
 
-export function setDemoContext(auth: AuthContext) {
-	const store = new DemoContext(auth);
+export function setDemoContext(auth: AuthContext, isEnabled: boolean) {
+	const store = new DemoContext(auth, isEnabled);
 	setContext(CONTEXT_KEY, store);
 	return store;
 }

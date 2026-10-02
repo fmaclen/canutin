@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Unable to open Canutin | %sveltekit.status%</title>
+		<style>
+			:root {
+				font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+				color: #363636;
+				background: #f5f5f5;
+				color-scheme: light;
+			}
+			* {
+				box-sizing: border-box;
+			}
+			body {
+				margin: 0;
+				min-height: 100dvh;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				padding: 0 24px;
+			}
+			.brand {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				padding: 32px 0;
+				font-size: 15px;
+				font-weight: 900;
+				letter-spacing: -0.5px;
+				text-decoration: none;
+				color: inherit;
+			}
+			.brand svg {
+				width: 20px;
+				height: 20px;
+				fill: #036ce0;
+			}
+			main {
+				flex: 1;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				width: 100%;
+				max-width: 384px;
+				text-align: center;
+				padding-bottom: 32px;
+			}
+			h1 {
+				margin: 0;
+				font-size: 23px;
+				font-weight: 600;
+				line-height: 1.2;
+			}
+			p {
+				margin: 10px 0 24px;
+				font-size: 13px;
+				line-height: 1.5;
+				color: #737373;
+			}
+			.reload {
+				border-radius: 6px;
+				padding: 12px 20px;
+				background: #036ce0;
+				color: white;
+				font-size: 13px;
+				font-weight: 500;
+				text-decoration: none;
+			}
+			a:focus-visible {
+				outline: 2px solid #036ce0;
+				outline-offset: 4px;
+			}
+			@media (prefers-color-scheme: dark) {
+				:root {
+					color: #fafafa;
+					background: #262626;
+					color-scheme: dark;
+				}
+				p {
+					color: #a3a3a3;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<a class="brand" href="/" aria-label="Canutin">
+			<svg viewBox="0 0 40 40" aria-hidden="true">
+				<path
+					fill-rule="evenodd"
+					d="M3.4021 20.171C-1.13403 24.7071 -1.13403 32.0616 3.4021 36.5978C7.93823 41.1339 15.2928 41.1339 19.8289 36.5978L36.5979 19.8288C41.134 15.2926 41.134 7.93811 36.5979 3.40198C32.0618 -1.13415 24.7073 -1.13416 20.1711 3.40197L3.4021 20.171ZM33.3833 16.9278C36.2256 14.0855 36.2256 9.47724 33.3833 6.63496C30.541 3.79268 25.9328 3.79268 23.0905 6.63496C20.2482 9.47724 20.2482 14.0855 23.0905 16.9278C25.9328 19.77 30.541 19.77 33.3833 16.9278Z"
+				/>
+			</svg>
+			CANUTIN
+		</a>
+		<main>
+			<h1>Unable to open Canutin</h1>
+			<p>Something went wrong while loading the app</p>
+			<a class="reload" href="">Reload page</a>
+		</main>
+	</body>
+</html>

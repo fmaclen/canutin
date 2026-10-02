@@ -18,32 +18,22 @@ RUN bun install --frozen-lockfile
 COPY . .
 ARG APP_VERSION
 ENV APP_VERSION=$APP_VERSION
-ENV DOCKER_BUILD=true
-RUN if [ -n "$APP_VERSION" ]; then bun pm pkg set version="$APP_VERSION"; fi \
-	&& bun run build
+RUN bun run build
 
-FROM node:22-slim
+FROM alpine:3.22
 
 LABEL org.opencontainers.image.source=https://github.com/fmaclen/canutin
 LABEL org.opencontainers.image.description="Personal finance app"
 LABEL org.opencontainers.image.licenses=Apache-2.0
 
-RUN apt-get update \
-	&& apt-get install -y --no-install-recommends ca-certificates \
-	&& rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache ca-certificates tzdata
 
-WORKDIR /app
+WORKDIR /app/pocketbase
 
-COPY --from=builder /app/build ./build
-COPY --from=builder /app/package.json ./
-COPY --from=builder /app/pocketbase/pb_migrations ./pocketbase/pb_migrations
-COPY --from=go-builder /pocketbase/pocketbase-custom ./pocketbase/pocketbase-custom
+COPY --from=builder /app/build /app/build
+COPY --from=builder /app/pocketbase/pb_migrations ./pb_migrations
+COPY --from=go-builder /pocketbase/pocketbase-custom ./pocketbase-custom
 
-ENV NODE_ENV=production
-ENV HOST=0.0.0.0
-ENV PORT=42069
-
-EXPOSE 42069
 EXPOSE 42070
 
-CMD ["node", "build/index.js"]
+CMD ["./pocketbase-custom", "serve", "--http", "0.0.0.0:42070"]

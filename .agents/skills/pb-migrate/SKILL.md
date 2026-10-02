@@ -10,10 +10,11 @@ Generate PocketBase schema changes programmatically through the live collections
 - PocketBase running on this checkout's port — each checkout has its own, so read it from the generated `.env` rather than assuming the default (see [local-servers](../local-servers/SKILL.md))
 - Superadmin credentials (dev defaults are in the [pocketbase skill](../pocketbase/SKILL.md))
 
-Every example below reaches PocketBase through `$PUBLIC_PB_URL`, so export the checkout's `.env` first:
+Every example below reaches PocketBase through `$PB_URL`, so derive it from the checkout's `.env` first:
 
 ```bash
 set -a; source .env; set +a
+export PB_URL="http://127.0.0.1:$PB_PORT"
 ```
 
 ## How It Works
@@ -27,7 +28,7 @@ The key insight: the `migratecmd` plugin in `pocketbase/main.go` writes JS migra
 ## Authentication
 
 ```bash
-TOKEN=$(curl -s "$PUBLIC_PB_URL/api/collections/_superusers/auth-with-password" \
+TOKEN=$(curl -s "$PB_URL/api/collections/_superusers/auth-with-password" \
   -H 'Content-Type: application/json' \
   -d '{"identity":"superadmin@example.com","password":"123qweasdzxc"}' \
   | python3 -c 'import sys,json; print(json.load(sys.stdin)["token"])')
@@ -40,7 +41,7 @@ Every request below sends that token as `Authorization: Bearer $TOKEN`.
 Collection endpoints accept a collection name or ID, but relation fields need the target's ID. List the live schema to find one:
 
 ```bash
-curl -s "$PUBLIC_PB_URL/api/collections?perPage=200" \
+curl -s "$PB_URL/api/collections?perPage=200" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -49,7 +50,7 @@ curl -s "$PUBLIC_PB_URL/api/collections?perPage=200" \
 `POST /api/collections` with the full collection payload.
 
 ```bash
-curl -s "$PUBLIC_PB_URL/api/collections" \
+curl -s "$PB_URL/api/collections" \
   -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
@@ -90,7 +91,7 @@ curl -s "$PUBLIC_PB_URL/api/collections" \
 `PATCH /api/collections/<name_or_id>` with only the properties you want to change.
 
 ```bash
-curl -s "$PUBLIC_PB_URL/api/collections/myCollection" \
+curl -s "$PB_URL/api/collections/myCollection" \
   -X PATCH \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \

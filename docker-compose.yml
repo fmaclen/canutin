@@ -2,28 +2,17 @@ services:
   pocketbase:
     build: .
     container_name: canutin-pocketbase
-    working_dir: /app/pocketbase
-    command: ['./pocketbase-custom', 'serve', '--http', '0.0.0.0:42070']
     ports:
       - '42070:42070'
     volumes:
       - canutin-data:/app/pocketbase/pb_data
-    restart: unless-stopped
-
-  sveltekit:
-    build: .
-    container_name: canutin-sveltekit
-    command: ['node', 'build/index.js']
-    ports:
-      - '42069:42069'
     environment:
-      HOST: '0.0.0.0'
-      PORT: '42069'
-      PUBLIC_PB_URL: 'http://localhost:42070'
+      PUBLIC_DEMO_ENABLED: ${PUBLIC_DEMO_ENABLED:-false}
       PUBLIC_PLAUSIBLE_DOMAIN: ${PUBLIC_PLAUSIBLE_DOMAIN:-}
       PUBLIC_PLAUSIBLE_SCRIPT_URL: ${PUBLIC_PLAUSIBLE_SCRIPT_URL:-}
-    depends_on:
-      - pocketbase
+      PLAID_CLIENT_ID: ${PLAID_CLIENT_ID:-}
+      PLAID_SECRET: ${PLAID_SECRET:-}
+      PLAID_ENV: ${PLAID_ENV:-}
     restart: unless-stopped
 
 volumes:

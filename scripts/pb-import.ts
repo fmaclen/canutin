@@ -24,7 +24,7 @@ Arguments:
 Options:
   --email <email>       Email of the Canutin account to import into
   --password <pass>     Password of that account
-  --pb-url <url>        Canutin server URL (default: $PUBLIC_PB_URL)
+  --pb-url <url>        Canutin server URL (default: http://127.0.0.1:$PB_PORT, port 42070)
   --currency <code>     Currency of the vault's accounts and assets (default: USD).
                         Canutin v1 vaults hold a single currency; the code must already
                         exist in your Canutin currency settings
@@ -77,8 +77,7 @@ function parseArgs(args: string[]) {
 	const password = flags.get('--password');
 	if (!password) throw new Error('Missing --password (the password for that account)');
 
-	const pbUrl = flags.get('--pb-url') ?? process.env.PUBLIC_PB_URL;
-	if (!pbUrl) throw new Error('Missing --pb-url (the URL of your Canutin server)');
+	const pbUrl = flags.get('--pb-url') ?? `http://127.0.0.1:${process.env.PB_PORT ?? 42070}`;
 
 	const currency = (flags.get('--currency') ?? 'USD').toUpperCase();
 	if (!/^[A-Z0-9]{2,10}$/.test(currency)) {
