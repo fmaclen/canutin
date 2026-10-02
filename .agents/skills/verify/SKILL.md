@@ -7,11 +7,11 @@ description: Local verification workflow - quality checks, running Playwright te
 
 ## Overview
 
-Before handing work off (see [commits-and-prs.md](../commits-and-prs/SKILL.md)), verify against a local PocketBase and the local SvelteKit app. Canutin has no preview-deployment system; all verification is local.
+Before handing work off (see [commits-and-prs.md](../commits-and-prs/SKILL.md)), verify against PocketBase serving the built frontend. Canutin has no preview-deployment system; all verification is local.
 
 ## Local Servers
 
-Manual checks run against `bun run dev` plus a local PocketBase. Playwright brings up its own preview server as part of `bun run test` - never start one by hand. Ownership rules, ports, and start commands: see [local-servers](../local-servers/SKILL.md).
+Manual checks use `bun run build` followed by `bun run preview`. `bun run dev` starts PocketBase and Vite for hot reload. Playwright builds the frontend and starts its own PocketBase on `PB_PORT`. Server ownership, test-port preparation, and start commands: see [local-servers](../local-servers/SKILL.md).
 
 ## Quality Check
 

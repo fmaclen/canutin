@@ -5,7 +5,6 @@
 	import { Button } from '$lib/components/ui/button';
 	import { logError } from '$lib/logger';
 	import type { UsersResponse } from '$lib/pocketbase.schema';
-	import { getBackendUrl } from '$lib/utils';
 
 	const auth = getAuthContext();
 
@@ -31,7 +30,7 @@
 	}
 
 	$effect(() => {
-		const adminPb = new PocketBase(getBackendUrl());
+		const adminPb = new PocketBase('/');
 
 		adminPb
 			.collection('_superusers')

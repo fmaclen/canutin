@@ -4,8 +4,7 @@ import { defineConfig, devices } from '@playwright/test';
 import { plaidFakePort } from './e2e/plaid.helpers';
 
 // Worktrees pin their ports in a repo-local .env; load it here so an unsourced
-// shell still targets this checkout's servers instead of the defaults below
-// (which can attach to another checkout's PocketBase via reuseExistingServer).
+// shell still targets this checkout's servers instead of the defaults below.
 // loadEnvFile never overrides variables already in the environment, so explicit
 // exports still win.
 const envFile = new URL('.env', import.meta.url);
@@ -23,8 +22,7 @@ const trace = isCI ? 'on-first-retry' : 'retain-on-failure';
 const API_TESTS = '**/*.api.test.ts';
 
 const PB_PORT = Number(process.env.PB_PORT ?? 42070);
-const VITE_PORT = Number(process.env.VITE_PREVIEW_PORT ?? process.env.VITE_PORT ?? 42069);
-const BASE_URL = `http://localhost:${VITE_PORT}`;
+const BASE_URL = `http://127.0.0.1:${PB_PORT}`;
 
 export default defineConfig({
 	globalSetup: 'e2e/global.setup.ts',
@@ -35,13 +33,14 @@ export default defineConfig({
 			reuseExistingServer: true
 		},
 		{
-			command: 'bun run pb',
+			command: 'bun run build && bun run preview',
 			port: PB_PORT,
-			reuseExistingServer: true,
+			reuseExistingServer: false,
 			// The Plaid values come last on purpose: they must beat whatever credentials the
 			// developer's .env holds so a test can never reach a real Plaid environment.
 			env: {
 				...process.env,
+				PUBLIC_PLAYWRIGHT_TESTING: 'true',
 				PUBLIC_DEMO_ENABLED: 'true',
 				FX_FETCH_DISABLED: 'true',
 				PLAID_CLIENT_ID: 'fake-client-id',
@@ -49,21 +48,12 @@ export default defineConfig({
 				PLAID_ENV: 'sandbox',
 				PLAID_BASE_URL: `http://127.0.0.1:${plaidFakePort()}`
 			}
-		},
-		{
-			command: 'bun run build && bun run preview',
-			port: VITE_PORT,
-			env: {
-				...process.env,
-				PUBLIC_PLAYWRIGHT_TESTING: 'true',
-				PUBLIC_DEMO_ENABLED: 'true'
-			}
 		}
 	],
 	testDir: 'e2e',
 	retries: isCI ? 2 : 0,
 	// Two is what an ubuntu-latest runner sustains. Four oversubscribes its 4 vCPUs: the
-	// headed WebKit mobile project starves against the preview server, PocketBase, and
+	// headed WebKit mobile project starves against PocketBase and
 	// xvfb, and mobile specs start failing on 30s action timeouts.
 	workers: isCI ? 2 : undefined,
 	projects: [

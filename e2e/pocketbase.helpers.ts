@@ -22,7 +22,7 @@ import {
 
 export const DEFAULT_PASSWORD = '123qweasdzxc';
 
-export const PB_URL = process.env.PUBLIC_PB_URL ?? 'http://127.0.0.1:42070';
+export const PB_URL = `http://127.0.0.1:${process.env.PB_PORT ?? 42070}`;
 const SUPERADMIN_EMAIL = 'superadmin@example.com';
 export const DEMO_EMAIL = 'demo@canutin.com';
 

@@ -10,10 +10,11 @@ Manage bulk data imports into Canutin through the PocketBase custom API routes. 
 - PocketBase running on this checkout's port — each checkout has its own, so read it from the generated `.env` rather than assuming the default (see [local-servers](../local-servers/SKILL.md))
 - A user account must exist (email + password)
 
-Every example below reaches PocketBase through `$PUBLIC_PB_URL`, so export the checkout's `.env` first:
+Every example below reaches PocketBase through `$PB_URL`, so derive it from the checkout's `.env` first:
 
 ```bash
 set -a; source .env; set +a
+export PB_URL="http://127.0.0.1:$PB_PORT"
 ```
 
 ## Authentication
@@ -22,7 +23,7 @@ All API calls require a Bearer token from a regular user (not superadmin):
 
 ```bash
 # Get a token
-TOKEN=$(curl -s "$PUBLIC_PB_URL/api/collections/users/auth-with-password" \
+TOKEN=$(curl -s "$PB_URL/api/collections/users/auth-with-password" \
   -H 'Content-Type: application/json' \
   -d '{"identity":"user@example.com","password":"password"}' \
   | python3 -c 'import sys,json; print(json.load(sys.stdin)["token"])')
@@ -33,7 +34,7 @@ Or using the PocketBase JS SDK:
 ```typescript
 import PocketBase from 'pocketbase';
 
-const pb = new PocketBase(process.env.PUBLIC_PB_URL);
+const pb = new PocketBase(process.env.PB_URL);
 await pb.collection('users').authWithPassword(email, password);
 const token = pb.authStore.token;
 ```
@@ -271,7 +272,7 @@ The response `status` is one of `completed` | `completed_with_errors` | `failed`
 ### Example with curl
 
 ```bash
-curl -s "$PUBLIC_PB_URL/api/canutin/import" \
+curl -s "$PB_URL/api/canutin/import" \
   -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
@@ -292,7 +293,7 @@ const result = await pb.send('/api/canutin/import', {
 Use the standard PocketBase collection API:
 
 ```bash
-curl -s "$PUBLIC_PB_URL/api/collections/importSessions/records?sort=-created" \
+curl -s "$PB_URL/api/collections/importSessions/records?sort=-created" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -321,7 +322,7 @@ Revert does **not** delete import-created `currencies` rows or their manual `exc
 ### Example
 
 ```bash
-curl -s "$PUBLIC_PB_URL/api/canutin/import/revert" \
+curl -s "$PB_URL/api/canutin/import/revert" \
   -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \

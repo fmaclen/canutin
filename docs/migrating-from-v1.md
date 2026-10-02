@@ -7,7 +7,7 @@ The import is tracked. It shows up under **Settings → Imports** in v2, and a *
 ## Before you start
 
 - A running Canutin v2 server. See the [README](../README.md) for self-hosting instructions.
-- A regular user account on that server. Sign up in the v2 app first; the import runs as you.
+- A regular user account on that server. Create one in the PocketBase admin UI first; the import runs as you.
 - Your v1 `.vault` file.
 - [Bun](https://bun.sh) installed on any machine that can reach your server. The script talks to the server over HTTP, so it doesn't need to run on the server itself.
 
@@ -22,10 +22,10 @@ bun install
 bun run pb:import /path/to/Canutin.vault \
   --email you@example.com \
   --password yourpassword \
-  --pb-url https://canutin-pb.example.com
+  --pb-url https://canutin.example.com
 ```
 
-`--pb-url` is the URL of your server's PocketBase service, the same value as `PUBLIC_PB_URL` in your Docker setup.
+`--pb-url` is the same URL you open to use Canutin. PocketBase serves both the app and its API.
 
 Two more options:
 

@@ -26,7 +26,8 @@ for reading and writing Canutin records programmatically.
 
 const skillAuthSection = `## Base URL & authentication
 
-The base URL is the PocketBase origin (for local development ` + "`http://127.0.0.1:42070`" + `).
+The base URL is the Canutin origin. PocketBase serves the frontend, API, and
+administrator dashboard at ` + "`/_/`" + ` from the same address.
 
 Authenticate a user with:
 
@@ -109,8 +110,10 @@ falls into.
 const skillCustomEndpointsSection = "## Custom endpoints\n\n" +
 	"Beyond the standard record endpoints, Canutin exposes a few custom routes. These are " +
 	"not derivable from the schema.\n\n" +
-	"- `GET /api/setup-status` — public, no body. Returns `{ \"ready\": bool }` indicating " +
-	"whether a superuser account has been provisioned.\n" +
+	"- `GET /api/canutin/config` — public, no body, not cached. Returns " +
+	"`{ setupReady, demoEnabled, plausibleDomain, plausibleScriptUrl }`. " +
+	"`setupReady` indicates whether an administrator has been provisioned. " +
+	"The remaining fields expose the demo flag and public analytics settings from the running server; no credentials are returned.\n" +
 	"- `POST /api/canutin/import` — requires any authenticated token. Body is an import " +
 	"payload with a required `sessionLabel` and optional per-collection arrays; the exact field " +
 	"shape of each array is generated under **Import payload shape** below. At least one quote is " +

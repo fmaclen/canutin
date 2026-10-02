@@ -7,11 +7,11 @@ description: PocketBase backend - schema, Go hooks, admin API, dev credentials, 
 
 ## Overview
 
-Backend runtime and database for canutin. Custom Go hooks extend PocketBase with balance-calculation logic and custom API routes. A single binary serves HTTP, realtime, and the admin UI.
+Backend runtime and database for canutin. Custom Go hooks extend PocketBase with balance-calculation logic and custom API routes. A single binary serves the static frontend, API, realtime, and admin UI. `--publicDir` defaults to `../build` relative to the PocketBase working directory. Application deep links fall back to `index.html`; API/admin paths and missing assets do not.
 
 ## Dev Environment
 
-- Base URL: `$PUBLIC_PB_URL` — each checkout has its own port, so read it from the generated `.env` rather than assuming the default
+- Local base URL: `http://127.0.0.1:$PB_PORT`. Read `PB_PORT` from the checkout's generated `.env`. Browser clients use the app origin.
 - Server ownership, ports, and start/reset commands: see [local-servers](../local-servers/SKILL.md)
 - Types auto-generated in `src/lib/pocketbase.schema.ts` on schema changes
 
@@ -59,6 +59,8 @@ All PocketBase APIs are available to authenticated clients with the appropriate 
 | Crons       | https://pocketbase.io/docs/api-crons/       |
 | Backups     | https://pocketbase.io/docs/api-backups/     |
 | Health      | https://pocketbase.io/docs/api-health/      |
+
+The public `/api/canutin/config` endpoint returns `setupReady`, `demoEnabled`, `plausibleDomain`, and `plausibleScriptUrl`. These are runtime values; secrets stay on the backend.
 
 ## Custom Go Hooks
 

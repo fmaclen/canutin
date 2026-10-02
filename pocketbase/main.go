@@ -9,6 +9,8 @@ import (
 	"math"
 	"os"
 	"os/signal"
+	"path"
+	"strings"
 	"syscall"
 	"time"
 
@@ -46,6 +48,8 @@ func deleteCurrencyExchangeRates(e *core.RecordEvent) error {
 
 func main() {
 	app := pocketbase.New()
+	var publicDir string
+	app.RootCmd.PersistentFlags().StringVar(&publicDir, "publicDir", "../build", "Directory containing the built frontend")
 
 	jsvm.MustRegister(app, jsvm.Config{
 		MigrationsDir: "pb_migrations",
@@ -91,19 +95,47 @@ func main() {
 		registerRates(e.App)
 		registerPlaid(e.App)
 
-		e.Router.GET("/api/setup-status", func(re *core.RequestEvent) error {
+		e.Router.GET("/api/canutin/config", func(re *core.RequestEvent) error {
 			superusers, err := e.App.FindAllRecords("_superusers")
 			if err != nil {
-				return re.JSON(200, map[string]bool{"ready": false})
+				return fmt.Errorf("check administrator setup: %w", err)
 			}
+			setupReady := false
 			for _, su := range superusers {
 				email := su.Email()
 				if email != "" && email != "__pbinstaller@example.com" {
-					return re.JSON(200, map[string]bool{"ready": true})
+					setupReady = true
+					break
 				}
 			}
-			return re.JSON(200, map[string]bool{"ready": false})
+			re.Response.Header().Set("Cache-Control", "no-store")
+			return re.JSON(200, map[string]any{
+				"setupReady":         setupReady,
+				"demoEnabled":        demoEnabled(),
+				"plausibleDomain":    os.Getenv("PUBLIC_PLAUSIBLE_DOMAIN"),
+				"plausibleScriptUrl": os.Getenv("PUBLIC_PLAUSIBLE_SCRIPT_URL"),
+			})
 		})
+
+		// Only app routes fall back to index.html. Missing API endpoints and assets
+		// must retain their 404s instead of returning a successful HTML response.
+		e.Router.GET("/{path...}", func(re *core.RequestEvent) error {
+			requestPath := re.Request.URL.Path
+			if requestPath == "/api" || strings.HasPrefix(requestPath, "/api/") {
+				return re.NotFoundError("Not found", nil)
+			}
+			if strings.HasPrefix(requestPath, "/_app/immutable/") {
+				re.Response.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			} else {
+				re.Response.Header().Set("Cache-Control", "no-cache")
+			}
+			fallback := path.Ext(requestPath) == "" && !strings.HasPrefix(requestPath, "/_app/")
+			if err := apis.Static(os.DirFS(publicDir), fallback)(re); err != nil {
+				re.Response.Header().Set("Cache-Control", "no-cache")
+				return err
+			}
+			return nil
+		}).Bind(apis.Gzip())
 
 		e.Router.GET("/api/canutin/skill", canutinSkillHandler(e.App))
 		e.Router.POST("/api/canutin/plaid/link-token", plaidLinkTokenHandler(e.App)).Bind(

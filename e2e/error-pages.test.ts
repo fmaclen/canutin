@@ -42,3 +42,19 @@ test('displays error 500 page when server error occurs', async ({ page }) => {
 	await expect(page.getByText('500', { exact: true })).toBeVisible();
 	await expect(page.getByText('Test server error for playwright')).toBeVisible();
 });
+
+test('configuration failure shows a friendly error and reload recovers', async ({
+	page
+}, testInfo) => {
+	await page.route('**/api/canutin/config', (route) => route.abort());
+	await page.goto('/');
+	await expect(page.getByRole('heading', { name: 'Unable to open Canutin' })).toBeVisible();
+	await expect(page.getByText('Something went wrong while loading the app')).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Log in' })).not.toBeVisible();
+	await page.screenshot({ path: testInfo.outputPath('configuration-error.png'), fullPage: true });
+
+	await page.unroute('**/api/canutin/config');
+	await page.getByRole('link', { name: 'Reload page' }).click();
+	await expect(page).toHaveURL('/auth');
+	await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible();
+});
