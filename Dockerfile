@@ -6,7 +6,8 @@ COPY pocketbase/go.mod pocketbase/go.sum ./
 RUN go mod download
 
 COPY pocketbase/*.go ./
-RUN CGO_ENABLED=0 go build -o pocketbase-custom .
+ARG APP_VERSION
+RUN CGO_ENABLED=0 go build -ldflags "-X main.appVersion=${APP_VERSION:-dev}" -o pocketbase-custom .
 
 FROM oven/bun:1 AS builder
 

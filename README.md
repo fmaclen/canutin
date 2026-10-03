@@ -33,6 +33,7 @@ services:
       PLAID_CLIENT_ID: ${PLAID_CLIENT_ID:-}
       PLAID_SECRET: ${PLAID_SECRET:-}
       PLAID_ENV: ${PLAID_ENV:-}
+      TELEMETRY_DISABLED: ${TELEMETRY_DISABLED:-}
     volumes:
       - canutin-data:/app/pocketbase/pb_data
     restart: unless-stopped
@@ -133,11 +134,22 @@ PUBLIC_PLAUSIBLE_DOMAIN=canutin.example.com
 PUBLIC_PLAUSIBLE_SCRIPT_URL=https://plausible.example.com/js/script.js
 ```
 
+### Usage stats
+
+Once a day, the server sends one anonymous ping with coarse counts and feature flags, never personal or financial data, so we can see how Canutin is used. To turn it off for the whole server, add this to the same `.env` file:
+
+```dotenv
+TELEMETRY_DISABLED=true
+```
+
+See [exactly what's sent](docs/telemetry.md).
+
 ## Documentation
 
 - [Migrating from Canutin v1](docs/migrating-from-v1.md)
 - [Syncing banks with Plaid](docs/plaid.md)
 - [Using AI agents with Canutin](docs/ai-agents.md)
+- [Anonymous usage stats](docs/telemetry.md)
 
 ## Development
 
