@@ -90,6 +90,7 @@ func main() {
 		registerDemo(e.App)
 		registerRates(e.App)
 		registerPlaid(e.App)
+		registerTelemetry(e.App)
 
 		e.Router.GET("/api/setup-status", func(re *core.RequestEvent) error {
 			superusers, err := e.App.FindAllRecords("_superusers")

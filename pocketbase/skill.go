@@ -244,6 +244,10 @@ Backend hooks enforce invariants that are not visible in the access rules:
   (` + "`sandbox`" + ` or ` + "`production`" + `). Requests go to the selected host unless ` + "`PLAID_BASE_URL`" + `
   overrides it with another origin. The override lets automated tests run the whole linking and syncing flow
   against a local stand-in for the Plaid API.
+- Once a day, at a random time picked when the server starts, the server sends one anonymous usage ping
+  (coarse install-wide counts and feature flags, never personal or financial data) and retries a failed
+  ping after 1 minute, 10 minutes, and 1 hour. It never sends when ` + "`TELEMETRY_DISABLED=true`" + `, in demo
+  mode, or from builds without a release version unless ` + "`TELEMETRY_URL`" + ` overrides the endpoint.
 `
 
 // canutinSkillHandler serves a live, SKILL.md-formatted reference of the Canutin API,

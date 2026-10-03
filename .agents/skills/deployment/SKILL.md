@@ -66,6 +66,7 @@ Analytics loads only when both the domain and script URL are set.
 At build time the image takes one optional build arg:
 
 - `APP_VERSION` — the version written to the runtime `package.json` and displayed in Settings. Defaults to `package.json`'s `version`; the release workflow passes the freshly published version because the Docker build checks out the commit before semantic-release bumps it.
+  The same value is stamped into the PocketBase binary (`main.appVersion`); a build without it never sends anonymous usage stats to the default endpoint.
 
 Additional variables depend on your deployment target and any custom Go hooks you've added. Check `.env.example` if one exists; otherwise inspect the compose files.
 
@@ -82,6 +83,14 @@ PLAID_ENV=production
 Set all three values to enable Plaid. Use `sandbox` for development and `production` for live data; credentials without an explicit environment are rejected.
 
 Compose's `.env` file supplies substitution values; the `pocketbase.environment` mappings in the compose file pass them into the container. After changing them, recreate PocketBase with `docker compose up -d --force-recreate pocketbase`.
+
+### Usage stats
+
+Release builds ping `https://telemetry.canutin.com/ping` daily (`docs/telemetry.md`). That host is the `telemetry/` Cloudflare Worker on the fmaclen account, attached to the `canutin.com` zone as a custom domain. It forwards each ping to the self-hosted Plausible on Greyhound through the `management.fernando.is` proxy, as a `ping` event on the `telemetry.canutin.com` site (admin at `plausible.fernando.is`).
+
+- Deploy with `CLOUDFLARE_API_TOKEN=… bunx wrangler deploy` from `telemetry/`, using a short-lived token from the "Edit Cloudflare Workers" template scoped to the `canutin.com` zone. Delete the token afterwards.
+- A payload change touches four places at once: `telemetryPayload` in `pocketbase/telemetry.go`, the worker's schema, `docs/telemetry.md`, and the site's custom properties in Plausible. Released installs keep sending the old shape, so bump `schema`, keep the worker accepting the old one, and deploy the worker before the release.
+- The project's own instances on Greyhound (`~/projects/canutin/demo` and `next-canuto`) set `TELEMETRY_DISABLED: 'true'` in their compose files so they stay out of the numbers.
 
 ## Anti-patterns
 

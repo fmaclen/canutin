@@ -1,0 +1,13 @@
+# Receives the daily anonymous ping from Canutin installs and forwards it to Plausible.
+# Deploy from this directory with `bunx wrangler deploy`.
+name = "canutin-telemetry"
+main = "index.ts"
+compatibility_date = "2026-09-01"
+workers_dev = false
+
+# Release builds post to https://telemetry.canutin.com/ping (defaultTelemetryURL in pocketbase/telemetry.go)
+routes = [{ pattern = "telemetry.canutin.com", custom_domain = true }]
+
+[vars]
+PLAUSIBLE_URL = "https://management.fernando.is"
+PLAUSIBLE_DOMAIN = "telemetry.canutin.com"
