@@ -22,7 +22,12 @@ type PeriodOption =
 	| 'last-year'
 	| 'lifetime';
 
-test('transactions table responds to period filters', async ({ page }) => {
+test('transactions table responds to period filters', async ({ page, isMobile }) => {
+	// HACK: on the mobile project (headed WebKit under xvfb in CI) the sign-in page's animated
+	// backdrop slows every action until login lands, and the eight period round-trips with
+	// reloads push this test past the default 30s. The work is the coverage, so it can't shrink.
+	test.slow(isMobile, 'Eight period round-trips on headed mobile WebKit outrun 30s');
+
 	const { user, transactions, now } = await seedFilteringTransactions('taylor');
 
 	await page.goto('/');
