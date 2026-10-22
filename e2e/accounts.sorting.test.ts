@@ -220,7 +220,10 @@ test('reorders rows in place without resetting scroll when sorting a scrolled pa
 
 	// Toggling to ascending must reorder the rows in place: the row order flips, but the shallow
 	// route update means the scroll position stays exactly where it was.
-	await balanceButton.click();
+	// The click opts out of Playwright's own scroll-into-view: at 3x device pixels the header
+	// lands a fraction of a pixel under the sticky toolbar and past the right edge, so the
+	// actionability scroll would nudge the page by 1px before the app ever runs.
+	await balanceButton.click({ scroll: 'none' });
 	await expect(firstRow).toContainText('Account 01');
 	expect(await page.evaluate(() => window.scrollY)).toBe(scrolledY);
 });

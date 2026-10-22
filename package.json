@@ -10,7 +10,7 @@
 		"@inlang/paraglide-js": "^2.0.0",
 		"@internationalized/date": "^3.8.1",
 		"@lucide/svelte": "^0.515.0",
-		"@playwright/test": "^1.49.1",
+		"@playwright/test": "^1.64.1",
 		"@semantic-release/git": "^10.0.1",
 		"@sveltejs/adapter-auto": "^6.0.0",
 		"@sveltejs/adapter-node": "^5.5.4",

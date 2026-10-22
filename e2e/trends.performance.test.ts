@@ -15,7 +15,12 @@ import {
 	seedUser
 } from './pocketbase.helpers';
 
-test('trends performance table', async ({ page }) => {
+test('trends performance table', async ({ page, isMobile }) => {
+	// HACK: on the mobile project (headed WebKit under xvfb in CI) the sign-in page's animated
+	// backdrop slows every action until login lands, and this walk through every chart window and
+	// drag-to-compare pushes the test past the default 30s. The work is the coverage.
+	test.slow(isMobile, 'Every chart window and drag on headed mobile WebKit outruns 30s');
+
 	const user = await seedUser('steve');
 
 	await page.goto('/');
