@@ -42,7 +42,7 @@ export async function signIn(page: Page, email: string) {
 }
 
 // Label → route map used by goToPageViaSidebar. Keep in sync with app-sidebar.svelte,
-// nav-user.svelte, and settings/+layout.svelte (Imports lives in the settings SubNav).
+// nav-user.svelte, and settings/+layout.svelte (Imports and AI agents live in the settings SubNav).
 const SIDEBAR_ROUTES: Record<string, string> = {
 	Accounts: '/accounts',
 	Currencies: '/currencies',
@@ -55,6 +55,7 @@ const SIDEBAR_ROUTES: Record<string, string> = {
 	'Big picture': '/big-picture',
 	Trends: '/trends',
 	Imports: '/settings/imports',
+	'AI agents': '/settings/agents',
 	Settings: '/settings'
 };
 
