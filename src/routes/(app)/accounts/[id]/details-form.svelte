@@ -35,7 +35,7 @@
 	const bankOwned = $derived(disabled || isLinked);
 </script>
 
-<div class="border-border overflow-hidden rounded border">
+<div class="full-bleed border-border overflow-hidden rounded border">
 	<form
 		onsubmit={(e) => {
 			e.preventDefault();
@@ -61,7 +61,7 @@
 			     same name as a read-only field. -->
 			{#if !isLinked}
 				<FormFieldRow>
-					<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+					<div class="flex flex-row items-baseline gap-2 md:flex-col md:items-end md:gap-1">
 						<Label for="institution" class="justify-start pr-0 md:justify-end"
 							>{m.accounts_label_institution()}</Label
 						>
@@ -158,7 +158,7 @@
 			</FormFieldRow>
 
 			<FormFieldRow itemsAlignment="items-start">
-				<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1 md:pt-2">
+				<div class="flex flex-row items-baseline gap-2 md:flex-col md:items-end md:gap-1 md:pt-2">
 					<Label for="notes" class="justify-start pr-0 md:justify-end"
 						>{m.accounts_label_notes()}</Label
 					>
@@ -198,7 +198,7 @@
 		</Fieldset>
 
 		{#if !disabled}
-			<footer class="border-border bg-border border-t p-2">
+			<footer class="border-border bg-border border-t p-2 max-md:px-4">
 				<div class="flex justify-end">
 					<Button type="submit">{m.accounts_button_save()}</Button>
 				</div>

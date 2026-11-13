@@ -12,7 +12,7 @@
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import { getTransactionsContext } from '$lib/transactions.svelte';
-	import { cn } from '$lib/utils.js';
+	import { cn, formatDate } from '$lib/utils.js';
 
 	const txContext = getTransactionsContext();
 
@@ -39,7 +39,7 @@
 	</Empty>
 {:else}
 	<div class="full-bleed bg-background overflow-hidden rounded-sm shadow-md">
-		<Table.Root>
+		<Table.Root class="pin-last-column">
 			<Table.Header>
 				<Table.Row>
 					<Table.Head class="w-10">
@@ -119,7 +119,7 @@
 						<Table.Cell
 							class="text-muted-foreground font-mono whitespace-nowrap uppercase tabular-nums"
 						>
-							{row.date.toISOString().slice(0, 10)}
+							{formatDate(row.date)}
 						</Table.Cell>
 						<Table.Cell>
 							{#if row.description}

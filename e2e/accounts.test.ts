@@ -9,6 +9,7 @@ import {
 	goToEditTab,
 	goToPageViaSidebar,
 	goToRecordDetail,
+	openPageActions,
 	signIn
 } from './playwright.helpers';
 import {
@@ -172,6 +173,7 @@ test('user can add a new account', async ({ page }) => {
 	await expect(page.getByRole('row', { name: 'High Yield Savings' })).not.toBeVisible();
 	await expect(page.getByRole('row', { name: 'Credit Card' })).not.toBeVisible();
 
+	await openPageActions(page);
 	await page.getByRole('link', { name: 'Add account' }).click();
 	await expect(page).toHaveURL('/accounts/add');
 	await page.getByRole('link', { name: 'Add manually' }).click();
@@ -196,6 +198,7 @@ test('user can add a new account', async ({ page }) => {
 	await expect(savingsCells.nth(1)).toContainText('Chase Bank');
 	await expect(savingsCells.nth(6)).toContainText('$5,000.00');
 
+	await openPageActions(page);
 	await page.getByRole('link', { name: 'Add account' }).click();
 	await expect(page).toHaveURL('/accounts/add');
 	await page.getByRole('link', { name: 'Add manually' }).click();

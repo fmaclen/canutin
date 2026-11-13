@@ -56,19 +56,24 @@
 			<TransactionSummary />
 			{#if txContext.selectedCount > 0}
 				<div
-					class="bg-brand-secondary border-border flex h-12 items-center justify-between rounded-sm border pr-2 pl-4 max-sm:mb-4"
+					class="bg-brand-secondary border-border flex h-12 items-center justify-between gap-2 rounded-sm border pr-2 pl-4 max-sm:mb-4 max-sm:pl-2"
 					transition:slide={{ duration: 150 }}
 				>
-					<span class="text-sm font-semibold tracking-tight">
+					<span class="text-sm font-semibold tracking-tight max-sm:hidden">
 						{m.transactions_batch_page_title()}
 					</span>
-					<div class="flex gap-2">
+					<div class="flex gap-2 max-sm:flex-1">
 						{#if txContext.totalPages > 1 && !txContext.isAllFilteredSelected}
-							<Button variant="outline" size="sm" onclick={() => txContext.selectAllFiltered()}>
+							<Button
+								variant="outline"
+								size="sm"
+								class="max-sm:flex-auto"
+								onclick={() => txContext.selectAllFiltered()}
+							>
 								{m.transactions_batch_select_all_results({ count: txContext.filteredCount })}
 							</Button>
 						{/if}
-						<Button href={resolve('/transactions/batch')} size="sm">
+						<Button href={resolve('/transactions/batch')} size="sm" class="max-sm:flex-auto">
 							{txContext.selectedCount === 1
 								? m.transactions_batch_edit_button_one()
 								: m.transactions_batch_edit_button_other({ count: txContext.selectedCount })}

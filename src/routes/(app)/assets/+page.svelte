@@ -233,12 +233,12 @@
 							/>
 						</div>
 						{#if rowsForOption.length === 0}
-							<Empty>
+							<Empty class="full-bleed">
 								{option.empty}
 							</Empty>
 						{:else}
 							<div class="full-bleed bg-background overflow-hidden rounded-sm shadow-md">
-								<Table.Root>
+								<Table.Root class="pin-last-column">
 									<Table.Header>
 										<Table.Row>
 											<Table.SortableHead

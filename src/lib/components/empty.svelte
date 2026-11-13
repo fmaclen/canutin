@@ -8,7 +8,7 @@
 
 <div
 	class={cn(
-		'bg-border text-muted-foreground flex min-h-32 items-center justify-center rounded-sm border p-6 text-sm',
+		'bg-border text-muted-foreground flex min-h-32 items-center justify-center rounded-sm border p-6 text-center text-sm',
 		className
 	)}
 >

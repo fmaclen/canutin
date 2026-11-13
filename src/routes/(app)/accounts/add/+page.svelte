@@ -42,9 +42,9 @@
 	]}
 >
 	<!-- Negative margins cancel the page's own padding so the backdrop reaches the edges of the
-	     content area; the height allowance is the sticky breadcrumb bar plus the page header. -->
+	     content area, and flex-1 stretches it down to the bottom of the screen. -->
 	<div
-		class="relative -m-6 flex min-h-[calc(100dvh-10.5rem)] items-center justify-center p-6 sm:-m-8 sm:p-8"
+		class="relative -mx-4 -my-6 flex flex-1 items-center justify-center px-4 py-6 sm:-m-8 sm:p-8"
 	>
 		<GuestBackdrop contained />
 		<div class="relative grid w-full max-w-2xl gap-6 sm:grid-cols-2">

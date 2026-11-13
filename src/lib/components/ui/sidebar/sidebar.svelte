@@ -38,13 +38,30 @@
 		{@render children?.()}
 	</div>
 {:else if sidebar.isMobile}
+	<!-- A permanent icon rail keeps every section one tap away while the full Sheet is closed.
+	     It renders the same children in icon mode; the gap beside it offsets the page content.
+	     With `viewport-fit=cover` (app.html) the rail and the Sheet paint to the screen edges and
+	     pad their contents by the safe-area insets, so their backgrounds cover the status bar strip
+	     and the icons clear the home indicator and a landscape notch. -->
+	<div
+		data-slot="sidebar-gap"
+		class="w-[calc(var(--sidebar-width-icon)+env(safe-area-inset-left))] shrink-0"
+	></div>
+	<nav
+		aria-label={m.ui_sidebar_rail_label()}
+		class="group bg-sidebar text-sidebar-foreground fixed inset-y-0 left-0 z-10 flex w-[calc(var(--sidebar-width-icon)+env(safe-area-inset-left))] flex-col border-r pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]"
+		data-collapsible="icon"
+		data-slot="sidebar-rail"
+	>
+		{@render children?.()}
+	</nav>
 	<Sheet.Root bind:open={() => sidebar.openMobile, (v) => sidebar.setOpenMobile(v)} {...restProps}>
 		<Sheet.Content
 			aria-label={m.ui_sidebar_label()}
 			data-sidebar="sidebar"
 			data-slot="sidebar"
 			data-mobile="true"
-			class="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
+			class="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] [&>button]:hidden"
 			style="--sidebar-width: {SIDEBAR_WIDTH_MOBILE};"
 			{side}
 		>

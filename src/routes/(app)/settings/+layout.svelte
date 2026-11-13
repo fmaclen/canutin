@@ -7,9 +7,14 @@
 
 	const isImports = $derived(page.url.pathname.endsWith('/imports'));
 	const isConnections = $derived(page.url.pathname.endsWith('/connections'));
+	const isAgents = $derived(page.url.pathname.endsWith('/agents'));
 
 	const subNavItems = $derived([
-		{ label: m.nav_general(), href: resolve('/settings'), active: !isImports && !isConnections },
+		{
+			label: m.nav_general(),
+			href: resolve('/settings'),
+			active: !isImports && !isConnections && !isAgents
+		},
 		{
 			label: m.settings_imports_section_title(),
 			href: resolve('/settings/imports'),
@@ -19,6 +24,11 @@
 			label: m.settings_connections_nav_title(),
 			href: resolve('/settings/connections'),
 			active: isConnections
+		},
+		{
+			label: m.settings_agent_access_section_title(),
+			href: resolve('/settings/agents'),
+			active: isAgents
 		}
 	]);
 
@@ -27,7 +37,9 @@
 			? m.settings_imports_section_title()
 			: isConnections
 				? m.settings_connections_nav_title()
-				: null
+				: isAgents
+					? m.settings_agent_access_section_title()
+					: null
 	);
 
 	const crumbs = $derived(

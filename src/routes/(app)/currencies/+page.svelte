@@ -13,11 +13,10 @@
 	import * as Table from '$lib/components/ui/table/index';
 	import { getCurrenciesContext } from '$lib/currencies.svelte';
 	import { getExchangeRatesContext } from '$lib/exchange-rates.svelte';
-	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import type { ExchangeRatesResponse } from '$lib/pocketbase.schema';
 	import { TableSort } from '$lib/sorting.svelte';
-	import { createSortComparator, setSortInUrl, type SortState } from '$lib/utils';
+	import { createSortComparator, formatDate, setSortInUrl, type SortState } from '$lib/utils';
 
 	const currenciesContext = getCurrenciesContext();
 	const exchangeRatesContext = getExchangeRatesContext();
@@ -106,15 +105,6 @@
 		if (currentPage > totalPages) currentPage = totalPages;
 		if (currentPage < 1) currentPage = 1;
 	});
-
-	function formatDate(iso: string) {
-		return new Date(iso).toLocaleDateString(getFormattingLocale(), {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric',
-			timeZone: 'UTC'
-		});
-	}
 </script>
 
 <Page pageTitle={m.currencies_section_title()}>
@@ -126,12 +116,12 @@
 		{#if !currenciesContext.isLoaded || !exchangeRatesContext.isLoaded}
 			<Skeleton class="h-64" showSpinner />
 		{:else if sortedRows.length === 0}
-			<Empty>
+			<Empty class="full-bleed">
 				{m.currencies_empty()}
 			</Empty>
 		{:else}
 			<div class="full-bleed bg-background overflow-hidden rounded-sm shadow-md">
-				<Table.Root>
+				<Table.Root class="pin-last-column">
 					<Table.Header>
 						<Table.Row>
 							<Table.SortableHead

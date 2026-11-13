@@ -11,7 +11,7 @@
 		gainLossPercentOrNull,
 		sentiment
 	} from '$lib/security-balance-values';
-	import { formatPercent, type SortState } from '$lib/utils';
+	import { formatDate, formatPercent, type SortState } from '$lib/utils';
 
 	type PositionValueRow = {
 		id: string;
@@ -56,7 +56,7 @@
 </script>
 
 <div class="full-bleed bg-background overflow-hidden rounded-sm shadow-md">
-	<Table.Root>
+	<Table.Root class="pin-last-column">
 		<Table.Header>
 			<Table.Row>
 				{#if entity === 'aggregate'}
@@ -199,7 +199,7 @@
 						<Table.Cell
 							class="text-muted-foreground font-mono whitespace-nowrap uppercase tabular-nums"
 						>
-							{new Date(row.asOf).toISOString().slice(0, 10)}
+							{formatDate(row.asOf)}
 						</Table.Cell>
 						<Table.Cell>
 							<Link

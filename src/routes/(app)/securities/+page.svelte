@@ -40,7 +40,7 @@
 		{#if securitiesContext.isLoading}
 			<Skeleton class="h-64" showSpinner />
 		{:else if securitiesContext.securities.length === 0}
-			<Empty>{m.securities_empty()}</Empty>
+			<Empty class="full-bleed">{m.securities_empty()}</Empty>
 		{:else}
 			<div class="full-bleed bg-background overflow-hidden rounded-sm shadow-md">
 				<Table.Root>

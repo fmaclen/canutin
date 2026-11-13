@@ -32,11 +32,11 @@ test('settings switches language only after clicking Save and persists after rel
 	await expect(page.getByLabel('Idioma')).toContainText('Español');
 	await expect(page.getByRole('button', { name: 'Guardar' })).toBeDisabled();
 
-	await goToPageViaSidebar(page, 'Imports');
-	await expect(page.getByText('Agentes de IA', { exact: true })).toBeVisible();
+	await goToPageViaSidebar(page, 'AI agents');
+	await expect(page.getByLabel('Habilidad')).toBeVisible();
 
 	await page.reload();
-	await expect(page.getByText('Agentes de IA', { exact: true })).toBeVisible();
+	await expect(page.getByLabel('Habilidad')).toBeVisible();
 
 	await goToPageViaSidebar(page, 'Settings');
 	await expect(page.getByText('Interfaz')).toBeVisible();
@@ -50,11 +50,6 @@ test('settings switches theme only after clicking Save and persists after reload
 
 	await page.goto('/');
 	await signIn(page, user.email);
-	await goToPageViaSidebar(page, 'Imports');
-
-	await expect(page.getByText('AI agents')).toBeVisible();
-	await expect(page.getByLabel('Instructions URL')).toHaveValue(/\/api\/canutin\/skill$/);
-
 	await goToPageViaSidebar(page, 'Settings');
 
 	await expect(page.locator('html')).not.toHaveClass(/dark/);
@@ -164,4 +159,22 @@ test('settings shows the latest released version alongside the installed one', a
 
 	await expect(page.getByLabel('Current version')).toHaveValue(/^v\d+\.\d+\.\d+/);
 	await expect(page.getByLabel('Latest version')).toHaveValue('v99.0.0');
+});
+
+test('the AI agents tab copies the skill URL', async ({ page, isMobile }) => {
+	// Only the desktop project is granted clipboard access; WebKit has no clipboard permissions
+	test.skip(isMobile, 'clipboard permissions are Chromium-only');
+	const user = await seedUser('ines');
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'AI agents');
+
+	const url = page.getByLabel('Skill');
+	await expect(url).toHaveValue(/\/api\/canutin\/skill$/);
+
+	await page.getByRole('button', { name: 'Copy' }).click();
+	await expect(page.getByRole('button', { name: 'Copied' })).toBeVisible();
+	const copied = await page.evaluate(() => navigator.clipboard.readText());
+	expect(copied).toBe(await url.inputValue());
 });

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import PocketBase, { type RecordSubscription } from 'pocketbase';
+	import PocketBase, { BaseAuthStore, type RecordSubscription } from 'pocketbase';
 
 	import { getAuthContext } from '$lib/auth.svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -31,7 +31,9 @@
 	}
 
 	$effect(() => {
-		const adminPb = new PocketBase(getBackendUrl());
+		// The SDK's default auth store persists to the same localStorage key as the app's client, so
+		// the superuser session would be picked up as the visitor's own on the next page load.
+		const adminPb = new PocketBase(getBackendUrl(), new BaseAuthStore());
 
 		adminPb
 			.collection('_superusers')

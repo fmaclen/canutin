@@ -21,7 +21,10 @@
 
 <Sidebar.Menu>
 	<Sidebar.MenuItem>
-		<Sidebar.MenuButton isActive={isActive(resolve('/settings'))}>
+		<Sidebar.MenuButton
+			isActive={isActive(resolve('/settings'))}
+			tooltipContent={m.user_settings()}
+		>
 			{#snippet child({ props })}
 				<a href={resolve('/settings')} {...props}>
 					<SettingsIcon />
@@ -31,7 +34,7 @@
 		</Sidebar.MenuButton>
 	</Sidebar.MenuItem>
 	<Sidebar.MenuItem>
-		<Sidebar.MenuButton onclick={handleLogout}>
+		<Sidebar.MenuButton onclick={handleLogout} tooltipContent={m.user_logout()}>
 			<LogOutIcon />
 			<span>{m.user_logout()}</span>
 		</Sidebar.MenuButton>

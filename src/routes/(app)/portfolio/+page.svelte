@@ -276,7 +276,9 @@
 				{/snippet}
 			</FilterBar>
 			{#if rows.length === 0}
-				<Empty>{accountRows.length === 0 ? m.portfolio_empty() : m.portfolio_table_empty()}</Empty>
+				<Empty class="full-bleed"
+					>{accountRows.length === 0 ? m.portfolio_empty() : m.portfolio_table_empty()}</Empty
+				>
 			{:else}
 				<div class="grid grid-cols-1 gap-2 max-sm:mb-4 sm:grid-cols-3">
 					<KeyValue
@@ -345,9 +347,7 @@
 				{#if securitiesContext.isLoading}
 					<Skeleton class="full-bleed h-[30vh] min-h-96" showSpinner />
 				{:else if allocationRows.length === 0}
-					<div class="h-[30vh] min-h-96">
-						<Empty class="full-bleed h-full">{m.allocation_empty()}</Empty>
-					</div>
+					<Empty class="full-bleed">{m.allocation_empty()}</Empty>
 				{:else}
 					<div class="full-bleed bg-background overflow-hidden rounded-sm shadow-md">
 						<AllocationTreemap rows={allocationRows} mode={allocationMode} />

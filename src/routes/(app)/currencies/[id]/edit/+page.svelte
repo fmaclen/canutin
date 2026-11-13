@@ -156,7 +156,7 @@
 		{#if !currenciesContext.isLoaded || !currency}
 			<Skeleton class="h-32" />
 		{:else}
-			<div class="border-border overflow-hidden rounded border">
+			<div class="full-bleed border-border overflow-hidden rounded border">
 				<form
 					onsubmit={(event) => {
 						event.preventDefault();
@@ -186,7 +186,7 @@
 						</FormFieldRow>
 					</Fieldset>
 
-					<footer class="border-border bg-border border-t p-2">
+					<footer class="border-border bg-border border-t p-2 max-md:px-4">
 						<div class="flex justify-end">
 							<Button type="submit">{m.currencies_button_add_quote()}</Button>
 						</div>
@@ -202,7 +202,7 @@
 	{#if !currenciesContext.isLoaded || !currency}
 		<Skeleton class="h-64" />
 	{:else}
-		<div class="border-border overflow-hidden rounded border">
+		<div class="full-bleed border-border overflow-hidden rounded border">
 			<form
 				onsubmit={(event) => {
 					event.preventDefault();
@@ -219,7 +219,7 @@
 					</FormFieldRow>
 
 					<FormFieldRow>
-						<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+						<div class="flex flex-row items-baseline gap-2 md:flex-col md:items-end md:gap-1">
 							<Label for="name" class="justify-start pr-0 md:justify-end">
 								{m.currencies_label_name()}
 							</Label>
@@ -255,7 +255,7 @@
 					</Fieldset>
 				{/if}
 
-				<footer class="border-border bg-border border-t p-2">
+				<footer class="border-border bg-border border-t p-2 max-md:px-4">
 					<div class="flex justify-end">
 						<Button type="submit">{m.currencies_button_save()}</Button>
 					</div>
@@ -271,7 +271,7 @@
 		<Skeleton class="h-24" />
 	{:else}
 		<div
-			class="bg-muted border-border overflow-hidden rounded border md:grayscale md:hover:grayscale-0"
+			class="full-bleed bg-muted border-border overflow-hidden rounded border md:grayscale md:hover:grayscale-0"
 		>
 			<div class="flex items-center justify-between p-4">
 				<div>

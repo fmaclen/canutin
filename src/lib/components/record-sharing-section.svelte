@@ -67,7 +67,7 @@
 	{#if isLoading}
 		<Skeleton class="h-40" />
 	{:else if canWrite}
-		<div class="border-border overflow-hidden rounded border">
+		<div class="full-bleed border-border overflow-hidden rounded border">
 			<form
 				class="space-y-0"
 				onsubmit={(event) => {
@@ -138,7 +138,7 @@
 					</FormFieldRow>
 				</Fieldset>
 
-				<footer class="border-border bg-border border-t p-2">
+				<footer class="border-border bg-border border-t p-2 max-md:px-4">
 					<div class="flex justify-end">
 						<Button type="submit">{m.sharing_share_button()}</Button>
 					</div>
@@ -146,7 +146,7 @@
 			</form>
 		</div>
 	{:else}
-		<div class="border-border overflow-hidden rounded border">
+		<div class="full-bleed border-border overflow-hidden rounded border">
 			<form
 				class="space-y-0"
 				onsubmit={(event) => {
@@ -175,7 +175,7 @@
 					</FormFieldRow>
 				</Fieldset>
 
-				<footer class="border-border bg-border border-t p-2">
+				<footer class="border-border bg-border border-t p-2 max-md:px-4">
 					<div class="flex justify-end">
 						<Button type="submit">{m.sharing_button_save()}</Button>
 					</div>

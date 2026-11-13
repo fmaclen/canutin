@@ -3,7 +3,12 @@ import { subDays } from 'date-fns';
 
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
 import { setPlaidItem, stubPlaidWidget } from './plaid.helpers';
-import { formatDateForInput, goToPageViaSidebar, signIn } from './playwright.helpers';
+import {
+	formatDateForInput,
+	goToPageViaSidebar,
+	openPageActions,
+	signIn
+} from './playwright.helpers';
 import {
 	getUserPB,
 	listAccountBalances,
@@ -50,6 +55,7 @@ test('links a bank through the Plaid widget and syncs its transactions', async (
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Accounts');
+	await openPageActions(page);
 	await page.getByRole('link', { name: 'Add account' }).click();
 	await expect(page).toHaveURL('/accounts/add');
 	await expect(page.getByRole('link', { name: 'Link account' })).toBeVisible();
@@ -155,6 +161,7 @@ test('matches an existing account, adopts its transaction, and preserves derived
 	await expect(page.getByRole('row', { name: 'Fake Bookstore' })).toHaveCount(0);
 
 	await goToPageViaSidebar(page, 'Accounts');
+	await openPageActions(page);
 	await page.getByRole('link', { name: 'Add account' }).click();
 	await page.getByRole('link', { name: 'Link account' }).click();
 	await expect(page.getByText('Match accounts')).toBeVisible();
@@ -266,6 +273,7 @@ test('derives investment cash when linking to an existing account', async ({ pag
 	await goToPageViaSidebar(page, 'Accounts');
 	await expect(page.getByRole('row', { name: 'Retirement Fund' })).toContainText('$700.00');
 
+	await openPageActions(page);
 	await page.getByRole('link', { name: 'Add account' }).click();
 	await page.getByRole('link', { name: 'Link account' }).click();
 	await expect(page.getByText('Match accounts')).toBeVisible();
@@ -305,6 +313,7 @@ test('discarding the match step deletes the bank connection', async ({ page }) =
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Accounts');
+	await openPageActions(page);
 	await page.getByRole('link', { name: 'Add account' }).click();
 	await page.getByRole('link', { name: 'Link account' }).click();
 	await expect(page.getByText('Match accounts')).toBeVisible();
@@ -318,6 +327,7 @@ test('discarding the match step deletes the bank connection', async ({ page }) =
 	await expect(page).toHaveURL('/accounts');
 	await expect(page.getByText('No open accounts yet')).toBeVisible();
 
+	await openPageActions(page);
 	await page.getByRole('link', { name: 'Linked institutions' }).click();
 	await expect(page).toHaveURL('/settings/connections');
 	await expect(page.getByText('No banks connected yet')).toBeVisible();
@@ -340,11 +350,13 @@ test('account linking is unavailable when the server has no Plaid credentials', 
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Accounts');
+	await openPageActions(page);
 	await page.getByRole('link', { name: 'Linked institutions' }).click();
 	await expect(page.getByText('Account linking is not set up on this server')).toBeVisible();
 	await expect(page.getByText('No banks connected yet')).not.toBeVisible();
 
 	await goToPageViaSidebar(page, 'Accounts');
+	await openPageActions(page);
 	await page.getByRole('link', { name: 'Add account' }).click();
 	await expect(page.getByText('Account linking is not set up on this server')).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Link account' })).toHaveCount(0);

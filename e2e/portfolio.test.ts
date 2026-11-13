@@ -13,6 +13,8 @@ import {
 	goToEditTab,
 	goToPageViaSidebar,
 	goToRecordDetail,
+	openPageActions,
+	periodOption,
 	signIn
 } from './playwright.helpers';
 import {
@@ -152,12 +154,14 @@ test('portfolio and trades flow covers security creation, balances, filters, and
 	);
 
 	await goToRecordDetail(page, 'Securities', 'Vanguard Total Stock Market ETF');
+	await openPageActions(page);
 	await page.getByRole('main').getByRole('link', { name: 'Trades' }).click();
 	await expect(page).toHaveURL(`/trades?security=${securityId}`);
 	await expect(page.getByRole('button', { name: 'Security', exact: true })).toContainText(
 		'Vanguard Total Stock Market ETF'
 	);
 
+	await openPageActions(page);
 	await page.getByRole('link', { name: 'Add trade' }).click();
 	await expect(page).toHaveURL('/trades/add');
 	await page.getByLabel('Account').click();
@@ -689,7 +693,7 @@ test('portfolio hides sold-out positions while preserving activity history', asy
 
 	await goToPageViaSidebar(page, 'Trades');
 	await page.getByRole('button', { name: 'Period' }).click();
-	await page.getByRole('button', { name: 'Lifetime' }).click();
+	await periodOption(page, 'Lifetime').click();
 	await expect(page.getByRole('row', { name: /Exit Round Trip Stock/ })).toBeVisible();
 });
 

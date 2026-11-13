@@ -142,7 +142,7 @@
 		<div
 			role="region"
 			aria-label={m.securities_section_positions()}
-			class="grid grid-cols-1 gap-2 max-sm:-mt-0.5 max-sm:mb-4 sm:grid-cols-2"
+			class="grid grid-cols-1 gap-2 max-sm:mb-4 sm:grid-cols-2"
 		>
 			<KeyValue
 				title={m.securities_summary_count_label()}
@@ -165,6 +165,6 @@
 			onSort={sort.toggle}
 		/>
 	{:else}
-		<Empty>{m.securities_positions_empty()}</Empty>
+		<Empty class="full-bleed">{m.securities_positions_empty()}</Empty>
 	{/if}
 </Section>

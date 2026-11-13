@@ -38,7 +38,8 @@
 			const periodLabel = encodeURIComponent(p.periodLabel);
 			return {
 				...p,
-				label: isJanuary ? `${month} '${yearFormatter.format(p.month)}` : month,
+				monthLabel: month,
+				yearLabel: isJanuary ? `'${yearFormatter.format(p.month)}` : null,
 				transactionsUrl: `/transactions?periodFrom=${periodFrom}&periodTo=${periodTo}&periodLabel=${periodLabel}`
 			};
 		});
@@ -141,11 +142,11 @@
 									{...props}
 									href={period.transactionsUrl}
 									aria-label="{period.periodLabel}: {formatCurrency(period.surplus)}"
-									class="flex h-full flex-col pt-2 {!isLastColumn
+									class="flex h-full flex-col border-r pt-2 {!isLastColumn
 										? isDecember
-											? 'border-border border-r border-dashed'
-											: 'border-border border-r'
-										: ''} {isHovered ? 'bg-muted/50' : ''}"
+											? 'border-border border-dashed'
+											: 'border-border'
+										: 'border-transparent'} {isHovered ? 'bg-muted/50' : ''}"
 									onmouseenter={() => (hoveredIndex = i)}
 									onmouseleave={() => (hoveredIndex = null)}
 								>
@@ -207,10 +208,22 @@
 									</div>
 
 									<!-- X-axis label -->
+									<!-- January carries the year. A phone column is too narrow for "J '26" on one
+									     line, so there the year sits above the letter, leaving every month's
+									     letter on the same line -->
 									<div
 										class="text-muted-foreground flex h-8 shrink-0 items-center justify-center text-xs"
 									>
-										{period.label}
+										<span class="relative">
+											{period.monthLabel}
+											{#if period.yearLabel}
+												<span
+													class={isNarrowViewport.current
+														? 'absolute bottom-full left-1/2 -translate-x-1/2 text-[10px] leading-none whitespace-nowrap'
+														: 'ml-1'}>{period.yearLabel}</span
+												>
+											{/if}
+										</span>
 									</div>
 								</a>
 							{/snippet}

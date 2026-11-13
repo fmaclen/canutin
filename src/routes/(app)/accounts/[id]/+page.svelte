@@ -17,13 +17,12 @@
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import Section from '$lib/components/section.svelte';
 	import SharedRecordReadonlyBanner from '$lib/components/shared-record-readonly-banner.svelte';
-	import TableViewAllRow from '$lib/components/table-view-all-row.svelte';
+	import TableViewAll from '$lib/components/table-view-all.svelte';
 	import TimeSeriesChart from '$lib/components/time-series-chart.svelte';
 	import { badgeVariants } from '$lib/components/ui/badge/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Table from '$lib/components/ui/table/index';
 	import { getExchangeRatesContext } from '$lib/exchange-rates.svelte';
-	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import {
 		AccountsBalanceGroupOptions,
@@ -43,7 +42,7 @@
 	} from '$lib/security-balance-values';
 	import { projectSignedValue } from '$lib/sharing';
 	import { TableSort } from '$lib/sorting.svelte';
-	import { createSortComparator, toNumber, type SortState } from '$lib/utils';
+	import { createSortComparator, formatDate, toNumber, type SortState } from '$lib/utils';
 
 	const accountsContext = getAccountsContext();
 	const securitiesContext = getSecuritiesContext();
@@ -401,12 +400,6 @@
 		);
 		return positionsRows.filter((row) => topPositionIds.has(row.id));
 	});
-	const dateFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
-		year: 'numeric',
-		month: 'short',
-		day: 'numeric',
-		timeZone: 'UTC'
-	});
 	const showBanner = $derived(loaded && !canWrite);
 	// NOTE: avg1y spans the full 12-month window, so both figures being zero means the account has no
 	// trailing transactions to average - render the empty state rather than $0/$0/$0 tiles.
@@ -462,22 +455,17 @@
 					sortState={sort.state}
 					onSort={sort.toggle}
 				/>
-				<div class="bg-background overflow-hidden">
-					<Table.Root>
-						<TableViewAllRow
-							href={`${resolve('/portfolio')}?account=${account.id}`}
-							label={positionsRows.length === 1
-								? m.accounts_overview_view_all_positions_one()
-								: m.accounts_overview_view_all_positions_other({
-										count: positionsRows.length
-									})}
-							colspan={1}
-						/>
-					</Table.Root>
-				</div>
+				<TableViewAll
+					href={`${resolve('/portfolio')}?account=${account.id}`}
+					label={positionsRows.length === 1
+						? m.accounts_overview_view_all_positions_one()
+						: m.accounts_overview_view_all_positions_other({
+								count: positionsRows.length
+							})}
+				/>
 			</div>
 		{:else}
-			<Empty>{m.accounts_overview_positions_empty()}</Empty>
+			<Empty class="full-bleed">{m.accounts_overview_positions_empty()}</Empty>
 		{/if}
 	</Section>
 
@@ -487,7 +475,7 @@
 			<Skeleton class="h-64" showSpinner />
 		{:else if tradeRows.length > 0}
 			<div class="full-bleed bg-background overflow-hidden rounded-sm shadow-md">
-				<Table.Root>
+				<Table.Root class="pin-last-column">
 					<Table.Header>
 						<Table.Row>
 							<Table.Head class="text-left whitespace-nowrap">
@@ -510,7 +498,7 @@
 								<Table.Cell
 									class="text-muted-foreground font-mono whitespace-nowrap uppercase tabular-nums"
 								>
-									{dateFormatter.format(row.date)}
+									{formatDate(row.date)}
 								</Table.Cell>
 								<Table.Cell>
 									{#if row.description}
@@ -563,17 +551,16 @@
 							</Table.Row>
 						{/each}
 					</Table.Body>
-					<TableViewAllRow
-						href={`${resolve('/trades')}?account=${account.id}`}
-						label={tradeTotal === 1
-							? m.accounts_overview_view_all_trades_one()
-							: m.accounts_overview_view_all_trades_other({ count: tradeTotal })}
-						colspan={4}
-					/>
 				</Table.Root>
+				<TableViewAll
+					href={`${resolve('/trades')}?account=${account.id}`}
+					label={tradeTotal === 1
+						? m.accounts_overview_view_all_trades_one()
+						: m.accounts_overview_view_all_trades_other({ count: tradeTotal })}
+				/>
 			</div>
 		{:else}
-			<Empty>{m.accounts_overview_trades_empty()}</Empty>
+			<Empty class="full-bleed">{m.accounts_overview_trades_empty()}</Empty>
 		{/if}
 	</Section>
 {/snippet}
@@ -592,7 +579,7 @@
 			/>
 		{:else}
 			<SectionTitle title={m.trailing_cashflow_section_title()} />
-			<Empty>{m.accounts_overview_cashflow_empty()}</Empty>
+			<Empty class="full-bleed">{m.accounts_overview_cashflow_empty()}</Empty>
 		{/if}
 	</Section>
 
@@ -602,7 +589,7 @@
 			<Skeleton class="h-64" showSpinner />
 		{:else if transactionRows.length > 0}
 			<div class="full-bleed bg-background overflow-hidden rounded-sm shadow-md">
-				<Table.Root>
+				<Table.Root class="pin-last-column">
 					<Table.Header>
 						<Table.Row>
 							<Table.Head class="text-left whitespace-nowrap">
@@ -625,7 +612,7 @@
 								<Table.Cell
 									class="text-muted-foreground font-mono whitespace-nowrap uppercase tabular-nums"
 								>
-									{dateFormatter.format(row.date)}
+									{formatDate(row.date)}
 								</Table.Cell>
 								<Table.Cell>
 									{#if row.description}
@@ -669,17 +656,16 @@
 							</Table.Row>
 						{/each}
 					</Table.Body>
-					<TableViewAllRow
-						href={`${resolve('/transactions')}?account=${account.id}`}
-						label={transactionTotal === 1
-							? m.accounts_overview_view_all_transactions_one()
-							: m.accounts_overview_view_all_transactions_other({ count: transactionTotal })}
-						colspan={4}
-					/>
 				</Table.Root>
+				<TableViewAll
+					href={`${resolve('/transactions')}?account=${account.id}`}
+					label={transactionTotal === 1
+						? m.accounts_overview_view_all_transactions_one()
+						: m.accounts_overview_view_all_transactions_other({ count: transactionTotal })}
+				/>
 			</div>
 		{:else}
-			<Empty>{m.accounts_overview_transactions_empty()}</Empty>
+			<Empty class="full-bleed">{m.accounts_overview_transactions_empty()}</Empty>
 		{/if}
 	</Section>
 {/snippet}

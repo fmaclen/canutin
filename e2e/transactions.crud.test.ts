@@ -3,7 +3,13 @@ import { expect, test, type Page } from '@playwright/test';
 import { setHours, subDays } from 'date-fns';
 
 import { AccountsBalanceGroupOptions, type TypedPocketBase } from '../src/lib/pocketbase.schema';
-import { formatDateForInput, goToPageViaSidebar, signIn } from './playwright.helpers';
+import {
+	formatDateForInput,
+	goToPageViaSidebar,
+	openPageActions,
+	periodOption,
+	signIn
+} from './playwright.helpers';
 import {
 	getTransactionLabelsByName,
 	getUserPB,
@@ -59,6 +65,7 @@ test('user can add a new transaction', async ({ page }) => {
 	await expect(page.getByText('Freelance Design Project')).not.toBeVisible();
 
 	await waitForAccountFilterOption(page, 'Meridian Checking');
+	await openPageActions(page);
 	await page.getByRole('link', { name: 'Add transaction' }).click();
 	await expect(page).toHaveURL('/transactions/add');
 	await expect(page.getByLabel('Description')).toBeVisible();
@@ -87,6 +94,7 @@ test('user can add a new transaction', async ({ page }) => {
 	await expect(moonbeamRow.getByText('Personal')).toBeVisible();
 
 	await waitForAccountFilterOption(page, 'Apex Credit Card');
+	await openPageActions(page);
 	await page.getByRole('link', { name: 'Add transaction' }).click();
 	await expect(page).toHaveURL('/transactions/add');
 
@@ -166,6 +174,7 @@ test('add transaction lists only writable open accounts', async ({ page }) => {
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Transactions');
 
+	await openPageActions(page);
 	await page.getByRole('link', { name: 'Add transaction' }).click();
 	await expect(page).toHaveURL('/transactions/add');
 	await expect(page.getByLabel('Account')).toBeVisible();
@@ -414,7 +423,7 @@ test('transactions list updates in real-time when new transaction is added', asy
 			(response) =>
 				response.request().method() === 'GET' && isLastYearTransactionsResponse(response.url())
 		),
-		page.getByRole('button', { name: 'Last year' }).click()
+		periodOption(page, 'Last year').click()
 	]);
 	await expect(page.getByLabel('Period')).toContainText('Last year');
 
@@ -493,6 +502,7 @@ test('reuses existing labels instead of creating duplicates', async ({ page }) =
 	expect(await getTransactionLabelsByName(user.id, 'Dining')).toHaveLength(1);
 
 	await waitForAccountFilterOption(page, 'Pinewood Checking');
+	await openPageActions(page);
 	await page.getByRole('link', { name: 'Add transaction' }).click();
 	await page.getByLabel('Description').fill('Farmers Market');
 	await page.getByLabel('Amount').fill('-75');
