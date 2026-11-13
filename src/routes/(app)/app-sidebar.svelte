@@ -80,9 +80,7 @@
 	</Sidebar.Header>
 	<Sidebar.Content>
 		<NavGroup links={insights} />
-		<Sidebar.Group
-			class="border-t pt-6 pb-0 group-data-[collapsible=icon]:hidden first:border-t-0 first:pt-4"
-		>
+		<Sidebar.Group class="border-t pt-6 pb-0 first:border-t-0 first:pt-4">
 			<Sidebar.Menu>
 				<Sidebar.MenuItem>
 					<Sidebar.MenuButton isActive={isPrefixActive('/accounts')}>
@@ -106,9 +104,7 @@
 				</Sidebar.MenuItem>
 			</Sidebar.Menu>
 		</Sidebar.Group>
-		<Sidebar.Group
-			class="border-t pt-6 pb-0 group-data-[collapsible=icon]:hidden first:border-t-0 first:pt-4"
-		>
+		<Sidebar.Group class="border-t pt-6 pb-0 first:border-t-0 first:pt-4">
 			<Sidebar.Menu>
 				<Sidebar.MenuItem>
 					<Sidebar.MenuButton isActive={isPrefixActive('/transactions')}>

@@ -38,6 +38,17 @@
 		{@render children?.()}
 	</div>
 {:else if sidebar.isMobile}
+	<!-- A permanent icon rail keeps every section one tap away while the full Sheet is closed.
+	     It renders the same children in icon mode; the gap beside it offsets the page content. -->
+	<div data-slot="sidebar-gap" class="w-(--sidebar-width-icon) shrink-0"></div>
+	<nav
+		aria-label={m.ui_sidebar_rail_label()}
+		class="group bg-sidebar text-sidebar-foreground fixed inset-y-0 left-0 z-10 flex w-(--sidebar-width-icon) flex-col border-r"
+		data-collapsible="icon"
+		data-slot="sidebar-rail"
+	>
+		{@render children?.()}
+	</nav>
 	<Sheet.Root bind:open={() => sidebar.openMobile, (v) => sidebar.setOpenMobile(v)} {...restProps}>
 		<Sheet.Content
 			aria-label={m.ui_sidebar_label()}

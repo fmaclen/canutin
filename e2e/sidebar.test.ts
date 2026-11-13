@@ -112,4 +112,27 @@ test('sidebar shows pillars before subordinate records and highlights the active
 		'data-active',
 		'true'
 	);
+
+	// On mobile an icon rail stays on screen while the sheet is closed, so switching sections
+	// never needs the sheet. Desktop keeps the full sidebar and has no rail.
+	const rail = page.getByRole('navigation', { name: 'Sections' });
+	if (!isMobile) {
+		await expect(rail).toHaveCount(0);
+		return;
+	}
+	await page.keyboard.press('Escape');
+	await expect(sidebar).toBeHidden();
+	await expect(rail.getByRole('link', { name: 'Accounts' })).toHaveAttribute('data-active', 'true');
+	await expect(rail.getByRole('link', { name: 'Balance sheet' })).toHaveAttribute(
+		'data-active',
+		'false'
+	);
+
+	await rail.getByRole('link', { name: 'Balance sheet' }).click();
+	await expect(page).toHaveURL(/\/balance-sheet$/);
+	await expect(rail.getByRole('link', { name: 'Balance sheet' })).toHaveAttribute(
+		'data-active',
+		'true'
+	);
+	await expect(sidebar).toBeHidden();
 });

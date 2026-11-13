@@ -406,6 +406,7 @@
 	"auth_signup_success": "Account created, you can now log in",
 	"ui_sidebar_label": "Sidebar",
 	"ui_sidebar_description": "Displays the mobile sidebar",
+	"ui_sidebar_rail_label": "Sections",
 	"ui_toggle_sidebar": "Toggle Sidebar",
 	"ui_close": "Close",
 	"select_search_placeholder": "Search",

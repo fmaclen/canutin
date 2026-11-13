@@ -406,6 +406,7 @@
 	"auth_signup_success": "Cuenta creada, ya puedes iniciar sesión",
 	"ui_sidebar_label": "Barra lateral",
 	"ui_sidebar_description": "Muestra la barra lateral móvil",
+	"ui_sidebar_rail_label": "Secciones",
 	"ui_toggle_sidebar": "Alternar barra lateral",
 	"ui_close": "Cerrar",
 	"select_search_placeholder": "Buscar",
