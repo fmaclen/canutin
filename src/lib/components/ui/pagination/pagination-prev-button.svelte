@@ -16,7 +16,7 @@
 
 {#snippet Fallback()}
 	<ChevronLeftIcon class="size-4" />
-	<span>{m.pagination_previous_label()}</span>
+	<span class="hidden sm:block">{m.pagination_previous_label()}</span>
 {/snippet}
 
 <PaginationPrimitive.PrevButton

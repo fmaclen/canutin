@@ -37,7 +37,7 @@
 	</Empty>
 {:else}
 	<div class="full-bleed bg-background overflow-hidden rounded-sm shadow-md">
-		<Table.Root>
+		<Table.Root class="pin-last-column">
 			<Table.Header>
 				<Table.Row>
 					<Table.Head class="text-left whitespace-nowrap">

@@ -189,11 +189,24 @@
 		@apply bg-background text-foreground;
 		text-wrap: pretty;
 	}
-	/* Native date inputs: the calendar icon sits at the field's right edge like the select
-	   chevrons instead of right after the date, and iOS Safari's centered value is left-aligned
-	   like every other field's */
+	/* Date inputs show the Input component's calendar icon at their right edge. Chromium's own
+	   indicator turns invisible and covers that icon so clicking it still opens the picker, and iOS
+	   Safari, which has no indicator, left-aligns its centered value like every other field's */
+	input[type='date'] {
+		position: relative;
+	}
 	input[type='date']::-webkit-calendar-picker-indicator {
-		margin-inline-start: auto;
+		position: absolute;
+		inset-block: 0;
+		inset-inline-end: 0;
+		width: --spacing(9);
+		height: auto;
+		margin: 0;
+		padding: 0;
+		opacity: 0;
+	}
+	input[type='date']:enabled::-webkit-calendar-picker-indicator {
+		cursor: pointer;
 	}
 	input[type='date']::-webkit-date-and-time-value {
 		text-align: start;
@@ -266,6 +279,23 @@
 			text-overflow: ellipsis;
 			white-space: nowrap;
 			vertical-align: middle;
+		}
+	}
+
+	/* On a phone a wide table scrolls sideways and its amount column, always the last one, starts
+	   off screen. Below `sm` a table with this class pins that column to the scroll container's
+	   right edge so the other columns slide beneath it. `:where()` keeps the background below the
+	   row's striping, hover, and footer colors, so it only fills cells that would otherwise be
+	   transparent and let the scrolled columns show through. Full-width rows, like the one holding
+	   the pagination, have nothing to pin. */
+	@media (width < 40rem) {
+		.pin-last-column :where(tr > :last-child:not([colspan])) {
+			position: sticky;
+			right: 0;
+			background-color: var(--background);
+			box-shadow:
+				inset 1px 0 0 var(--border),
+				-6px 0 8px -6px oklch(0 0 0 / 0.15);
 		}
 	}
 }

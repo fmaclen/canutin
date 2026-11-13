@@ -52,6 +52,7 @@
 	let customRangeSheetOpen = $state(false);
 	let draftStart = $state<DateValue>();
 	let draftEnd = $state<DateValue>();
+	let draftMonth = $state<DateValue>();
 
 	function selectRange(value: { start?: DateValue; end?: DateValue } | undefined) {
 		if (!value?.start || !value?.end) return;
@@ -66,6 +67,7 @@
 	function openCustomRangeSheet() {
 		draftStart = calendarValue?.start;
 		draftEnd = calendarValue?.end;
+		draftMonth = calendarValue?.start;
 		customRangeSheetOpen = true;
 	}
 
@@ -97,15 +99,18 @@
 		lifetime: m.transactions_filter_period_lifetime
 	};
 
-	const periodTriggerText = $derived.by(() => {
-		if (!customRange) return period ? periodLabels[period]() : '';
-		if (customRange.label) return customRange.label;
-		const dateFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
+	const dateFormatter = $derived(
+		new Intl.DateTimeFormat(getFormattingLocale(), {
 			month: 'short',
 			day: 'numeric',
 			year: 'numeric',
 			timeZone: 'UTC'
-		});
+		})
+	);
+
+	const periodTriggerText = $derived.by(() => {
+		if (!customRange) return period ? periodLabels[period]() : '';
+		if (customRange.label) return customRange.label;
 		return `${dateFormatter.format(customRange.from)} – ${dateFormatter.format(subDays(customRange.to, 1))}`;
 	});
 </script>
@@ -174,8 +179,10 @@
 						{#each [{ label: m.transactions_filter_period_start(), value: draftStart }, { label: m.transactions_filter_period_end(), value: draftEnd }] as bound, index (index)}
 							<div class={['flex flex-col gap-1 px-4 py-3', index === 0 && 'border-r']}>
 								<dt class="text-muted-foreground">{bound.label}</dt>
-								<dd class={bound.value ? 'font-mono' : 'text-muted-foreground'}>
-									{bound.value?.toString() ?? m.transactions_filter_period_pick_day()}
+								<dd class={[!bound.value && 'text-muted-foreground']}>
+									{bound.value
+										? dateFormatter.format(bound.value.toDate('UTC'))
+										: m.transactions_filter_period_pick_day()}
 								</dd>
 							</div>
 						{/each}
@@ -185,7 +192,15 @@
 						onStartValueChange={(value) => (draftStart = value)}
 						onEndValueChange={(value) => (draftEnd = value)}
 						numberOfMonths={1}
-						placeholder={calendarValue?.start}
+						bind:placeholder={
+							() => draftMonth,
+							(value) => {
+								// Whenever its range changes the calendar shows the start's month again, by
+								// handing back that very start date, so picking an end in a later month would
+								// jump away from it; ignoring that keeps the month the person was tapping in
+								if (value !== draftStart) draftMonth = value;
+							}
+						}
 						disableDaysOutsideMonth
 						class="w-full [--cell-size:calc((100vw-(--spacing(6)))/7)]"
 					/>

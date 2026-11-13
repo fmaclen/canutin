@@ -287,7 +287,7 @@
 							</Empty>
 						{:else}
 							<div class="full-bleed bg-background overflow-hidden rounded-sm shadow-md">
-								<Table.Root>
+								<Table.Root class="pin-last-column">
 									<Table.Header>
 										<Table.Row>
 											<Table.SortableHead
@@ -382,7 +382,7 @@
 																			{status.label}
 																		</Badge>
 																	</Tooltip.Trigger>
-																	<Tooltip.Content sideOffset={6}>
+																	<Tooltip.Content sideOffset={6} collisionPadding={8}>
 																		<p class="text-xs leading-snug font-normal">
 																			{status.description}
 																		</p>
@@ -433,7 +433,7 @@
 																	showFxTooltip={false}
 																/>
 															</Tooltip.Trigger>
-															<Tooltip.Content sideOffset={6}>
+															<Tooltip.Content sideOffset={6} collisionPadding={8}>
 																<p class="text-xs leading-snug font-normal">
 																	{row.closed
 																		? m.accounts_balance_tooltip_closed()

@@ -1,7 +1,13 @@
 import { expect, test, type Locator } from '@playwright/test';
 
 import { AssetsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
-import { goToEditTab, goToPageViaSidebar, goToRecordDetail, signIn } from './playwright.helpers';
+import {
+	goToEditTab,
+	goToPageViaSidebar,
+	goToRecordDetail,
+	openPageActions,
+	signIn
+} from './playwright.helpers';
 import {
 	deleteAssetBalance,
 	recordExists,
@@ -294,6 +300,7 @@ test('user can add a new whole-valued asset', async ({ page }) => {
 
 	await expect(page.getByRole('row', { name: 'Gold Coins' })).not.toBeVisible();
 
+	await openPageActions(page);
 	await page.getByRole('link', { name: 'Add asset' }).click();
 	await expect(page).toHaveURL('/assets/add');
 	await expect(page.getByLabel('Symbol')).not.toBeVisible();
@@ -329,6 +336,7 @@ test('optional currency fields show placeholder when not set', async ({ page }) 
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Assets');
 
+	await openPageActions(page);
 	await page.getByRole('link', { name: 'Add asset' }).click();
 	await expect(page).toHaveURL('/assets/add');
 

@@ -63,8 +63,8 @@ test('user can select transactions and see selection toolbar', async ({ page }) 
 	await expect(page.getByRole('row', { name: 'Coastal Coffee' })).toBeVisible();
 	await expect(page.getByRole('row', { name: 'Harbor Groceries' })).toBeVisible();
 
-	// Initially no batch editor bar visible
-	await expect(page.getByText('Batch editor')).not.toBeVisible();
+	// Initially no batch editor bar visible; its title is hidden on phones, so its Edit link stands in for it
+	await expect(page.getByRole('link', { name: /^Edit \d+ transactions?$/ })).not.toBeVisible();
 
 	const tableHeader = page.getByRole('rowgroup').first();
 	const headerCheckbox = tableHeader.getByRole('checkbox');
@@ -81,7 +81,6 @@ test('user can select transactions and see selection toolbar', async ({ page }) 
 	// Select first transaction
 	await sunriseRow.getByRole('checkbox').check();
 	await expect(sunriseRow.getByRole('checkbox')).toBeChecked();
-	await expect(page.getByText('Batch editor')).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Edit 1 transaction' })).toBeVisible();
 
 	// Header checkbox should be indeterminate (partial selection)
@@ -109,7 +108,7 @@ test('user can select transactions and see selection toolbar', async ({ page }) 
 	await expect(sunriseRow.getByRole('checkbox')).not.toBeChecked();
 	await expect(coastalRow.getByRole('checkbox')).not.toBeChecked();
 	await expect(harborRow.getByRole('checkbox')).not.toBeChecked();
-	await expect(page.getByText('Batch editor')).not.toBeVisible();
+	await expect(page.getByRole('link', { name: /^Edit \d+ transactions?$/ })).not.toBeVisible();
 
 	// Clicking header checkbox when none selected should select all
 	await headerCheckbox.check();
@@ -258,7 +257,7 @@ test('user can select all results across pages', async ({ page }) => {
 	await tableHeader.getByRole('checkbox').uncheck();
 
 	await expect(page.getByRole('link', { name: 'Edit 60 transactions' })).not.toBeVisible();
-	await expect(page.getByText('Batch editor')).not.toBeVisible();
+	await expect(page.getByRole('link', { name: /^Edit \d+ transactions?$/ })).not.toBeVisible();
 	await expect(tx51Row.getByRole('checkbox')).not.toBeChecked();
 	await expect(tx60Row.getByRole('checkbox')).not.toBeChecked();
 
@@ -389,7 +388,7 @@ test('batch editor displays mixed values correctly', async ({ page }) => {
 	await expect(page.getByRole('row', { name: 'Amazon Purchase' })).toBeVisible();
 
 	// Selection should be cleared
-	await expect(page.getByText('Batch editor')).not.toBeVisible();
+	await expect(page.getByRole('link', { name: /^Edit \d+ transactions?$/ })).not.toBeVisible();
 });
 
 test('batch editor displays common values when transactions share them', async ({ page }) => {
@@ -560,7 +559,7 @@ test('user can batch update transaction fields', async ({ page }) => {
 	await expect(page).toHaveURL('/transactions');
 
 	// Selection should be cleared
-	await expect(page.getByText('Batch editor')).not.toBeVisible();
+	await expect(page.getByRole('link', { name: /^Edit \d+ transactions?$/ })).not.toBeVisible();
 
 	// Both transactions should have new description
 	await expect(page.getByRole('row', { name: 'Old Description One' })).not.toBeVisible();
@@ -658,7 +657,7 @@ test('user can batch delete transactions', async ({ page }) => {
 	await expect(page).toHaveURL('/transactions');
 
 	// Selection should be cleared
-	await expect(page.getByText('Batch editor')).not.toBeVisible();
+	await expect(page.getByRole('link', { name: /^Edit \d+ transactions?$/ })).not.toBeVisible();
 
 	// Deleted transactions should be gone
 	await expect(page.getByRole('row', { name: 'Transaction To Delete A' })).not.toBeVisible();

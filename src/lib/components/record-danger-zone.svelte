@@ -33,7 +33,7 @@
 		<div
 			class="full-bleed bg-muted border-border overflow-hidden rounded border md:grayscale md:hover:grayscale-0"
 		>
-			<div class="flex items-center justify-between p-4">
+			<div class="flex items-start justify-between gap-4 p-4">
 				<div>
 					<p class="text-sm">{action.description}</p>
 					<p class="text-destructive text-sm">{action.subtext}</p>

@@ -15,7 +15,7 @@
 </script>
 
 {#snippet Fallback()}
-	<span>{m.pagination_next_label()}</span>
+	<span class="hidden sm:block">{m.pagination_next_label()}</span>
 	<ChevronRightIcon class="size-4" />
 {/snippet}
 

@@ -475,7 +475,7 @@
 			<Skeleton class="h-64" showSpinner />
 		{:else if tradeRows.length > 0}
 			<div class="full-bleed bg-background overflow-hidden rounded-sm shadow-md">
-				<Table.Root>
+				<Table.Root class="pin-last-column">
 					<Table.Header>
 						<Table.Row>
 							<Table.Head class="text-left whitespace-nowrap">
@@ -589,7 +589,7 @@
 			<Skeleton class="h-64" showSpinner />
 		{:else if transactionRows.length > 0}
 			<div class="full-bleed bg-background overflow-hidden rounded-sm shadow-md">
-				<Table.Root>
+				<Table.Root class="pin-last-column">
 					<Table.Header>
 						<Table.Row>
 							<Table.Head class="text-left whitespace-nowrap">

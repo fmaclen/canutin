@@ -917,6 +917,44 @@ test('date range picker allows selecting custom range via calendar', async ({ pa
 	await expect(page.getByText('This Month Payment')).not.toBeVisible();
 });
 
+test('custom range sheet stays on the month of the last picked day', async ({ page, isMobile }) => {
+	test.skip(!isMobile, 'The custom range sheet only exists on phones');
+	await page.clock.setFixedTime(new Date('2025-06-15T12:00:00Z'));
+
+	const user = await seedUser('rangemonth');
+	const account = await seedAccount({
+		name: 'Range Month Checking',
+		balanceGroup: AccountsBalanceGroupOptions.CASH,
+		owner: user.id,
+		balanceType: 'Checking'
+	});
+	await seedAccountBalance({
+		account: account.id,
+		owner: user.id,
+		asOf: new Date().toISOString(),
+		value: 5000
+	});
+
+	await page.goto('/');
+	await signIn(page, user.email);
+	await goToPageViaSidebar(page, 'Transactions');
+
+	await page.getByLabel('Period').click();
+	await page.getByRole('option', { name: 'Custom range' }).click();
+	const sheet = page.getByRole('dialog');
+
+	// Start in June, then move to July for the end
+	await sheet.getByRole('button', { name: /June 10,/ }).click();
+	await sheet.getByRole('button', { name: 'Next' }).click();
+	await sheet.getByRole('button', { name: /July 20,/ }).click();
+
+	// Completing the range keeps July on screen instead of returning to the start's month, and
+	// the readouts use the same date format as the period select
+	await expect(sheet.getByText('July 2025')).toBeVisible();
+	await expect(sheet.getByText('Jun 10, 2025')).toBeVisible();
+	await expect(sheet.getByText('Jul 20, 2025')).toBeVisible();
+});
+
 test.describe('date range picker in a UTC+ timezone', () => {
 	test.use({ timezoneId: 'Asia/Tokyo' });
 
