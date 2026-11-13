@@ -191,9 +191,13 @@
 	}
 	/* Date inputs show the Input component's calendar icon at their right edge. Chromium's own
 	   indicator turns invisible and covers that icon so clicking it still opens the picker, and iOS
-	   Safari, which has no indicator, left-aligns its centered value like every other field's */
+	   Safari, which has no indicator, left-aligns its centered value like every other field's.
+	   iOS Safari also draws the native control at its own minimum size, wider and taller than the
+	   field's classes, unless its appearance is reset */
 	input[type='date'] {
 		position: relative;
+		-webkit-appearance: none;
+		appearance: none;
 	}
 	input[type='date']::-webkit-calendar-picker-indicator {
 		position: absolute;
