@@ -44,7 +44,7 @@
 	{#if importSessionsContext.isLoading}
 		<Skeleton class="h-64" showSpinner />
 	{:else if importSessionsContext.sessions.length === 0}
-		<Empty>
+		<Empty class="full-bleed">
 			{m.settings_imports_empty()}
 		</Empty>
 	{:else}
@@ -58,7 +58,7 @@
 
 <Section>
 	<SectionTitle title={m.settings_agent_access_section_title()} />
-	<div class="border-border overflow-hidden rounded border">
+	<div class="full-bleed border-border overflow-hidden rounded border">
 		<Fieldset isFirst={true}>
 			<FormFieldRow>
 				<Label for="agent-access-url" class="justify-start pr-0 md:justify-end"

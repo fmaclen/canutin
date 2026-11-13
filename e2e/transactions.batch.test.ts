@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import { setHours, subDays } from 'date-fns';
 
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
-import { goToPageViaSidebar, signIn } from './playwright.helpers';
+import { goToPageViaSidebar, periodOption, signIn } from './playwright.helpers';
 import {
 	seedAccount,
 	seedAccountBalance,
@@ -154,7 +154,7 @@ test('selection persists across pagination', async ({ page }) => {
 
 	// Lifetime keeps all 60 transactions available regardless of their dates.
 	await page.getByLabel('Period').click();
-	await page.getByRole('button', { name: 'Lifetime' }).click();
+	await periodOption(page, 'Lifetime').click();
 
 	// Verify we're on page 1 and have pagination
 	await expect(page.getByRole('row', { name: 'Transaction 01' })).toBeVisible();
@@ -222,7 +222,7 @@ test('user can select all results across pages', async ({ page }) => {
 	await goToPageViaSidebar(page, 'Transactions');
 
 	await page.getByLabel('Period').click();
-	await page.getByRole('button', { name: 'Lifetime' }).click();
+	await periodOption(page, 'Lifetime').click();
 
 	await expect(page.getByRole('row', { name: 'Bulk Transaction 01' })).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Go to next page' })).toBeVisible();

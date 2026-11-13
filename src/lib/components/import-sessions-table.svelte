@@ -27,14 +27,13 @@
 </script>
 
 <script lang="ts">
-	import TableViewAllRow from '$lib/components/table-view-all-row.svelte';
+	import TableViewAll from '$lib/components/table-view-all.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Table from '$lib/components/ui/table/index';
-	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { TableSort } from '$lib/sorting.svelte';
-	import { createSortComparator, type SortState } from '$lib/utils';
+	import { createSortComparator, formatDateTime, type SortState } from '$lib/utils';
 
 	type SessionSortColumn =
 		| 'label'
@@ -64,13 +63,6 @@
 	];
 	const defaultSort: SortState<SessionSortColumn> = { column: 'created', direction: 'desc' };
 	const sort = new TableSort<SessionSortColumn>(validSortColumns, defaultSort);
-	const dateFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
-		year: 'numeric',
-		month: 'short',
-		day: 'numeric',
-		hour: '2-digit',
-		minute: '2-digit'
-	});
 
 	const sortedRows = $derived(
 		rows.toSorted(
@@ -169,7 +161,7 @@
 						{row.recordsFailed ?? 0}
 					</Table.Cell>
 					<Table.Cell class="text-muted-foreground text-right text-sm">
-						{dateFormatter.format(new Date(row.created))}
+						{formatDateTime(row.created)}
 					</Table.Cell>
 					{#if onRevert}
 						<Table.Cell class="text-right">
@@ -207,8 +199,8 @@
 				</Table.Row>
 			{/each}
 		</Table.Body>
-		{#if viewAll}
-			<TableViewAllRow href={viewAll.href} label={viewAll.label} colspan={onRevert ? 7 : 6} />
-		{/if}
 	</Table.Root>
+	{#if viewAll}
+		<TableViewAll href={viewAll.href} label={viewAll.label} />
+	{/if}
 </div>

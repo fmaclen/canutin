@@ -6,6 +6,7 @@ import {
 	goToEditTab,
 	goToPageViaSidebar,
 	goToRecordDetail,
+	openPageActions,
 	signIn
 } from './playwright.helpers';
 import {
@@ -24,15 +25,6 @@ function uniqueCurrency(prefix: string) {
 
 function utcIso(date: string) {
 	return `${date}T00:00:00.000Z`;
-}
-
-function formatLedgerDate(date: string) {
-	return new Date(utcIso(date)).toLocaleDateString('en-US', {
-		year: 'numeric',
-		month: 'short',
-		day: 'numeric',
-		timeZone: 'UTC'
-	});
 }
 
 function formatRate(value: number, currency: string) {
@@ -103,6 +95,7 @@ test('the currencies ledger shows the USD pivot and seeded registry currencies',
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Currencies');
 
+	await openPageActions(page);
 	await expect(page.getByRole('link', { name: 'Add currency' })).toBeVisible();
 	await expect(page.getByText('Code', { exact: true })).toBeVisible();
 	await expect(page.getByText('Name', { exact: true })).toBeVisible();
@@ -121,14 +114,14 @@ test('the currencies ledger shows the USD pivot and seeded registry currencies',
 	await expect(manualRow).toBeVisible();
 	await expect(manualRow.getByText('Manual peso')).toBeVisible();
 	await expectCellText(manualRow, 2, 'Manual');
-	await expectCellText(manualRow, 3, formatLedgerDate(manualDate));
+	await expectCellText(manualRow, 3, manualDate);
 	await expectCellText(manualRow, 4, formatRate(1495, manualCode));
 
 	const automaticRow = currencyRow(page, automaticCode);
 	await expect(automaticRow).toBeVisible();
 	await expect(automaticRow.getByText('Automatic crown')).toBeVisible();
 	await expectCellText(automaticRow, 2, 'Automatic');
-	await expectCellText(automaticRow, 3, formatLedgerDate(automaticDate));
+	await expectCellText(automaticRow, 3, automaticDate);
 	await expectCellText(automaticRow, 4, formatRate(2.3456, automaticCode));
 });
 
@@ -177,7 +170,7 @@ test('adding a currency previews ISO and custom codes and lists the seeded quote
 	await expect(row).toBeVisible();
 	await expect(row.getByText('Euro-like credits')).toBeVisible();
 	await expectCellText(row, 2, 'Manual');
-	await expectCellText(row, 3, formatLedgerDate(today));
+	await expectCellText(row, 3, today);
 	await expectCellText(row, 4, formatRate(1495, 'EURO'));
 });
 
@@ -240,8 +233,7 @@ test('currency detail edits registry fields and upserts same-date manual quotes'
 	await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Updated detail coin');
 	await expect(page.getByLabel('Automatic updates', { exact: true })).toBeChecked();
 
-	const quotedDate = formatLedgerDate(quoteDate);
-	const quoteRow = page.getByRole('row', { name: quotedDate });
+	const quoteRow = page.getByRole('row', { name: quoteDate });
 	await page.getByLabel('Date', { exact: true }).fill(quoteDate);
 	await page.getByLabel('USD exchange rate', { exact: true }).fill('1.23');
 	await page.getByRole('button', { name: 'Add quote' }).click();
@@ -327,7 +319,7 @@ test('currency detail actions reached from the ledger redirect back with the led
 	await page.getByRole('button', { name: 'Add quote' }).click();
 
 	await expect(page).toHaveURL(ledgerUrl);
-	await expectCellText(currencyRow(page, code), 3, formatLedgerDate(quoteDate));
+	await expectCellText(currencyRow(page, code), 3, quoteDate);
 	await expectCellText(currencyRow(page, code), 4, formatRate(2.25, code));
 
 	await currencyRow(page, code).getByRole('link', { name: code }).click();

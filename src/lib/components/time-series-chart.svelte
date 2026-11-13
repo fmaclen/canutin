@@ -271,13 +271,9 @@
 {#if isLoading}
 	<Skeleton class="full-bleed h-[30vh] min-h-96" showSpinner />
 {:else if rows.length < 2}
-	<div class="h-[30vh] min-h-96">
-		<Empty class="full-bleed h-full">{emptyMessage}</Empty>
-	</div>
+	<Empty class="full-bleed">{emptyMessage}</Empty>
 {:else if windowedRows.length < 2}
-	<div class="h-[30vh] min-h-96">
-		<Empty class="full-bleed h-full">{m.chart_period_empty()}</Empty>
-	</div>
+	<Empty class="full-bleed">{m.chart_period_empty()}</Empty>
 {:else}
 	<div
 		class="full-bleed bg-background overflow-visible rounded-sm shadow-md"

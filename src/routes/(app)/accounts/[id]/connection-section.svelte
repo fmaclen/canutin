@@ -8,25 +8,17 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
-	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import {
 		PlaidConnectionsStatusOptions,
 		type PlaidConnectionsResponse
 	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+	import { formatDateTime } from '$lib/utils';
 
 	let { connectionId }: { connectionId: string } = $props();
 
 	const pb = getPocketBaseContext();
-
-	const dateTimeFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
-		year: 'numeric',
-		month: 'short',
-		day: 'numeric',
-		hour: '2-digit',
-		minute: '2-digit'
-	});
 
 	let connection = $state<PlaidConnectionsResponse | null>(null);
 	let isLoading = $state(true);
@@ -81,7 +73,7 @@
 		{#if isLoading || !connection}
 			<Skeleton class="h-48" />
 		{:else}
-			<div class="border-border overflow-hidden rounded border">
+			<div class="full-bleed border-border overflow-hidden rounded border">
 				<Fieldset isFirst={true}>
 					<FormFieldRow>
 						<Label for="connection-institution" class="justify-start pr-0 md:justify-end">
@@ -101,9 +93,7 @@
 						</Label>
 						<Input
 							id="connection-last-synced"
-							value={connection.lastSyncedAt
-								? dateTimeFormatter.format(new Date(connection.lastSyncedAt))
-								: '~'}
+							value={connection.lastSyncedAt ? formatDateTime(connection.lastSyncedAt) : '~'}
 							class={connection.lastSyncedAt ? undefined : 'text-muted-foreground'}
 							disabled
 						/>
@@ -118,7 +108,7 @@
 						<Input
 							id="connection-next-sync"
 							value={nextScheduledSync
-								? dateTimeFormatter.format(nextScheduledSync)
+								? formatDateTime(nextScheduledSync)
 								: m.accounts_connection_next_sync_paused()}
 							disabled
 						/>

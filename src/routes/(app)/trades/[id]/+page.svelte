@@ -236,7 +236,7 @@
 		{#if isLoading || !trade}
 			<Skeleton class="h-96" />
 		{:else}
-			<div class="border-border overflow-hidden rounded border">
+			<div class="full-bleed border-border overflow-hidden rounded border">
 				<form
 					onsubmit={(event) => {
 						event.preventDefault();
@@ -317,7 +317,7 @@
 						</FormFieldRow>
 
 						<FormFieldRow>
-							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+							<div class="flex flex-row items-baseline gap-2 md:flex-col md:items-end md:gap-1">
 								<Label for="subtype" class="justify-start pr-0 md:justify-end">
 									{m.trades_label_subtype()}
 								</Label>
@@ -329,7 +329,7 @@
 
 					<Fieldset>
 						<FormFieldRow>
-							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+							<div class="flex flex-row items-baseline gap-2 md:flex-col md:items-end md:gap-1">
 								<Label for="quantity" class="justify-start pr-0 md:justify-end">
 									{m.trades_label_quantity()}
 								</Label>
@@ -345,7 +345,7 @@
 						</FormFieldRow>
 
 						<FormFieldRow>
-							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+							<div class="flex flex-row items-baseline gap-2 md:flex-col md:items-end md:gap-1">
 								<Label for="price" class="justify-start pr-0 md:justify-end">
 									{m.trades_label_price()}
 								</Label>
@@ -361,7 +361,7 @@
 						</FormFieldRow>
 
 						<FormFieldRow>
-							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+							<div class="flex flex-row items-baseline gap-2 md:flex-col md:items-end md:gap-1">
 								<Label for="amount" class="justify-start pr-0 md:justify-end">
 									{m.transactions_label_amount()}
 								</Label>
@@ -377,7 +377,7 @@
 						</FormFieldRow>
 
 						<FormFieldRow>
-							<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+							<div class="flex flex-row items-baseline gap-2 md:flex-col md:items-end md:gap-1">
 								<Label for="fees" class="justify-start pr-0 md:justify-end">
 									{m.trades_label_fees()}
 								</Label>
@@ -396,7 +396,7 @@
 					<Fieldset>
 						<FormFieldRow itemsAlignment="items-start">
 							<div
-								class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1 md:pt-2"
+								class="flex flex-row items-baseline gap-2 md:flex-col md:items-end md:gap-1 md:pt-2"
 							>
 								<Label for="notes" class="justify-start pr-0 md:justify-end">
 									{m.transactions_label_notes()}
@@ -413,7 +413,7 @@
 					</Fieldset>
 
 					{#if canWrite}
-						<footer class="border-border bg-border border-t p-2">
+						<footer class="border-border bg-border border-t p-2 max-md:px-4">
 							<div class="flex justify-end">
 								<Button type="submit">{m.transactions_button_save()}</Button>
 							</div>
@@ -431,7 +431,7 @@
 				<Skeleton class="h-24" />
 			{:else}
 				<div
-					class="bg-muted border-border overflow-hidden rounded border md:grayscale md:hover:grayscale-0"
+					class="full-bleed bg-muted border-border overflow-hidden rounded border md:grayscale md:hover:grayscale-0"
 				>
 					<div class="flex items-center justify-between p-4">
 						<div>

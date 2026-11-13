@@ -126,7 +126,7 @@
 
 <Section>
 	<SectionTitle title={m.settings_interface_section_title()} />
-	<div class="border-border overflow-hidden rounded border">
+	<div class="full-bleed border-border overflow-hidden rounded border">
 		<form
 			onsubmit={(e) => {
 				e.preventDefault();
@@ -231,7 +231,7 @@
 				</FormFieldRow>
 			</Fieldset>
 
-			<footer class="border-border bg-border border-t p-2">
+			<footer class="border-border bg-border border-t p-2 max-md:px-4">
 				<div class="flex justify-end">
 					<Button type="submit" disabled={!interfaceIsDirty}
 						>{m.settings_interface_button_save()}</Button
@@ -244,7 +244,7 @@
 
 <Section>
 	<SectionTitle title={m.settings_about_section_title()} />
-	<div class="border-border overflow-hidden rounded border">
+	<div class="full-bleed border-border overflow-hidden rounded border">
 		<Fieldset isFirst={true}>
 			<FormFieldRow>
 				<Label for="app-version" class="justify-start pr-0 md:justify-end"

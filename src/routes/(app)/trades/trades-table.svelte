@@ -13,6 +13,7 @@
 	import { formatSecurityQuantity } from '$lib/security-balance-values';
 	import { tradeTypeLabel } from '$lib/trade-display';
 	import { getTradesContext } from '$lib/trades.svelte';
+	import { formatDate } from '$lib/utils';
 
 	const tradesContext = getTradesContext();
 	const fx = getExchangeRatesContext();
@@ -77,7 +78,7 @@
 						<Table.Cell
 							class="text-muted-foreground font-mono whitespace-nowrap uppercase tabular-nums"
 						>
-							{row.date.toISOString().slice(0, 10)}
+							{formatDate(row.date)}
 						</Table.Cell>
 						<Table.Cell>
 							{#if row.description}

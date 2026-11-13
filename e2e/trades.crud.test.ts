@@ -10,6 +10,7 @@ import {
 	formatDateForInput,
 	goToPageViaSidebar,
 	goToRecordDetail,
+	openPageActions,
 	signIn
 } from './playwright.helpers';
 import {
@@ -155,6 +156,7 @@ test('creating, editing, and deleting trades never changes a position market val
 	await expect(marketValue).toContainText('$3,500.00');
 
 	await goToPageViaSidebar(page, 'Trades');
+	await openPageActions(page);
 	await page.getByRole('link', { name: 'Add trade' }).click();
 	await expect(page).toHaveURL('/trades/add');
 	await page.getByLabel('Account').click();
@@ -216,6 +218,7 @@ test('user can create a new security inline while adding a trade', async ({ page
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Trades');
+	await openPageActions(page);
 	await page.getByRole('link', { name: 'Add trade' }).click();
 	await expect(page).toHaveURL('/trades/add');
 

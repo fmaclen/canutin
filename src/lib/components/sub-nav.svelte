@@ -6,7 +6,7 @@
 	let { items }: { items: SubNavItem[] } = $props();
 
 	const linkClass =
-		'hover:text-brand inline-flex items-center border-b-2 border-transparent pb-4 text-sm leading-none transition-colors';
+		'hover:text-brand inline-flex items-center border-b-2 border-transparent pb-4 text-sm leading-none transition-colors max-md:pb-3.5';
 	const activeClass = 'text-foreground border-brand';
 </script>
 

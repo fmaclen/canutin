@@ -282,7 +282,7 @@
 							/>
 						</div>
 						{#if rowsForOption.length === 0}
-							<Empty>
+							<Empty class="full-bleed">
 								{option.empty}
 							</Empty>
 						{:else}

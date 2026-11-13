@@ -96,6 +96,8 @@
 }
 
 .dark {
+	/* Native controls - the date input's calendar icon, scrollbars - follow the in-app theme */
+	color-scheme: dark;
 	--brand-secondary: hsl(212, 40%, 20%);
 
 	--background: oklch(0.31 0 0);
@@ -187,7 +189,21 @@
 		@apply bg-background text-foreground;
 		text-wrap: pretty;
 	}
-	/* Keeps scroll targets clear of the toolbar in page.svelte, which is sticky below `md`;
+	/* Native date inputs: the calendar icon sits at the field's right edge like the select
+	   chevrons instead of right after the date, and iOS Safari's centered value is left-aligned
+	   like every other field's */
+	input[type='date']::-webkit-calendar-picker-indicator {
+		margin-inline-start: auto;
+	}
+	input[type='date']::-webkit-date-and-time-value {
+		text-align: start;
+	}
+	/* Safari 26 draws the page under its floating toolbar and shows the body color past the end
+	   of the app shell, so inside the shell the body takes the content area's color. */
+	body:has([data-slot='sidebar-wrapper']) {
+		@apply bg-sidebar-accent;
+	}
+	/* Keeps scroll targets clear of the toolbar in page.svelte, which is fixed below `md`;
 	   without this, anchoring an element to the top of the viewport hides it behind the bar.
 	   Half a step taller than the bar's `h-12` so the target doesn't sit flush against it. */
 	@media (width < 48rem) {
@@ -214,14 +230,25 @@
 		vertical-align: baseline;
 	}
 
-	/* Charts and tables run to the viewport edges on phones: cancels the horizontal padding the
-	   page layout applies below `sm` (see page.svelte) so only the surface's own internal padding
-	   is left, and drops the corner radius that would otherwise sit on the screen edge. The
-	   `:not()` guard stops a surface nested inside another one from bleeding twice. */
+	/* Charts, tables, and form panels run to the viewport edges on phones: cancels the horizontal
+	   padding the page layout applies below `sm` (see page.svelte) so only the surface's own
+	   internal padding is left, and drops the corner radius and side borders that would otherwise
+	   sit on the screen edge. The `:not()` guard stops a surface nested inside another one from
+	   bleeding twice. */
 	@media (width < 40rem) {
 		.full-bleed:not(.full-bleed *) {
-			margin-inline: calc(--spacing(6) * -1);
+			margin-inline: calc(--spacing(4) * -1);
 			border-radius: 0;
+			border-inline-width: 0;
+		}
+
+		/* A page that ends in an edge-to-edge surface, directly or as the last thing in its last
+		   section, runs it flush to the bottom too instead of leaving a strip of page padding. */
+		[data-slot='page-content']:has(
+			> .full-bleed:last-child,
+			> :last-child > .full-bleed:last-child
+		) {
+			padding-bottom: 0;
 		}
 	}
 

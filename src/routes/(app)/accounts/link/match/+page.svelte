@@ -204,9 +204,9 @@
 			{#if accountsContext.isLoading}
 				<Skeleton class="h-64" showSpinner />
 			{:else if plaidAccounts.length === 0}
-				<Empty>{m.accounts_link_empty()}</Empty>
+				<Empty class="full-bleed">{m.accounts_link_empty()}</Empty>
 			{:else}
-				<div class="border-border overflow-hidden rounded border">
+				<div class="full-bleed border-border overflow-hidden rounded border">
 					<form
 						onsubmit={(event) => {
 							event.preventDefault();
@@ -313,7 +313,7 @@
 							</Fieldset>
 						{/each}
 
-						<footer class="border-border bg-border border-t p-2">
+						<footer class="border-border bg-border border-t p-2 max-md:px-4">
 							<div class="flex items-center justify-end gap-2">
 								{#if formError}
 									<p class="text-destructive mr-auto text-sm" role="alert">{formError}</p>

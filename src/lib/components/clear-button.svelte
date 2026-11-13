@@ -22,7 +22,8 @@
 	{onpointerdown}
 	{onpointerup}
 	aria-label={ariaLabel}
-	class="text-muted-foreground hover:text-foreground cursor-pointer {className ?? ''}"
+	class="text-muted-foreground hover:text-foreground flex cursor-pointer items-center {className ??
+		''}"
 >
 	<XIcon class="size-4" />
 </button>

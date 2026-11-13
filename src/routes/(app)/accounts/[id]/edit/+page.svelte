@@ -321,7 +321,7 @@
 		{#if importSessionsContext.isLoading}
 			<Skeleton class="h-64" showSpinner />
 		{:else if recentConnectionImports.length === 0}
-			<Empty>{m.settings_imports_empty()}</Empty>
+			<Empty class="full-bleed">{m.settings_imports_empty()}</Empty>
 		{:else}
 			<ImportSessionsTable
 				rows={recentConnectionImports}

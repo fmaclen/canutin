@@ -58,6 +58,14 @@ const SIDEBAR_ROUTES: Record<string, string> = {
 	Settings: '/settings'
 };
 
+// The period picker lists its presets as buttons beside the calendar on wider screens and as the
+// options of a select on phones, where "Custom range" opens the calendar in a sheet instead.
+export function periodOption(page: Page, name: string) {
+	return page
+		.getByRole('option', { name, exact: true })
+		.or(page.getByRole('button', { name, exact: true }));
+}
+
 export async function goToPageViaSidebar(page: Page, label: string) {
 	// Navigates directly instead of clicking the sidebar link. The mobile sidebar
 	// is a Sheet that animates in — clicking a link mid-animation detaches the
@@ -107,11 +115,20 @@ export async function goToEditTab(page: Page) {
 	await page.waitForURL(/\/edit(\?|$)/);
 }
 
+// Phones collect the page header's action links behind a "Page actions" menu (see page.svelte),
+// so open it before reaching for one; wider viewports show them inline. Below 768px is the
+// `md` breakpoint the app switches at.
+export async function openPageActions(page: Page) {
+	if ((page.viewportSize()?.width ?? 0) >= 768) return;
+	await page.getByRole('button', { name: 'Page actions' }).click();
+}
+
 export async function goToAddPage(page: Page, sidebarLabel: string) {
 	await goToPageViaSidebar(page, sidebarLabel);
 	const label = ADD_LINK_LABELS[sidebarLabel];
 	if (!label) {
 		throw new Error(`No add-link label mapped for sidebar label: ${sidebarLabel}`);
 	}
+	await openPageActions(page);
 	await page.getByRole('link', { name: label, exact: true }).click();
 }

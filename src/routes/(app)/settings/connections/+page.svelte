@@ -15,7 +15,6 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Table from '$lib/components/ui/table/index';
-	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { logError } from '$lib/logger';
 	import { m } from '$lib/paraglide/messages';
 	import {
@@ -23,6 +22,7 @@
 		type PlaidConnectionsResponse
 	} from '$lib/pocketbase.schema';
 	import { getPocketBaseContext } from '$lib/pocketbase.svelte';
+	import { formatDateTime } from '$lib/utils';
 
 	type SyncResponse = {
 		created: number;
@@ -44,14 +44,6 @@
 
 	const pb = getPocketBaseContext();
 	const accountsContext = getAccountsContext();
-
-	const dateTimeFormatter = new Intl.DateTimeFormat(getFormattingLocale(), {
-		year: 'numeric',
-		month: 'short',
-		day: 'numeric',
-		hour: '2-digit',
-		minute: '2-digit'
-	});
 
 	// The `plaidSync` cron runs at 06:00 UTC every day, so the next run is today's slot when it
 	// hasn't passed yet and tomorrow's otherwise.
@@ -189,11 +181,11 @@
 	{#if isLoading}
 		<Skeleton class="h-64" showSpinner />
 	{:else if notConfigured}
-		<Empty>
+		<Empty class="full-bleed">
 			{m.accounts_link_unavailable()}
 		</Empty>
 	{:else if connections.length === 0}
-		<Empty>
+		<Empty class="full-bleed">
 			{m.settings_connections_empty()}
 		</Empty>
 	{:else}
@@ -242,7 +234,7 @@
 							</Table.Cell>
 							<Table.Cell class="text-muted-foreground text-sm whitespace-nowrap">
 								{#if connection.lastSyncedAt}
-									{dateTimeFormatter.format(new Date(connection.lastSyncedAt))}
+									{formatDateTime(connection.lastSyncedAt)}
 								{:else}
 									<span class="text-muted-foreground">~</span>
 								{/if}
@@ -251,7 +243,7 @@
 								{#if connection.status === PlaidConnectionsStatusOptions.reauth_required}
 									<span class="text-muted-foreground">~</span>
 								{:else}
-									{dateTimeFormatter.format(nextAutoSyncAt)}
+									{formatDateTime(nextAutoSyncAt)}
 								{/if}
 							</Table.Cell>
 							<Table.Cell class="text-foreground/80 text-right text-sm tabular-nums">

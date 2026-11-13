@@ -26,7 +26,7 @@
 	<Sidebar.Menu>
 		{#each links as item (item.name)}
 			<Sidebar.MenuItem>
-				<Sidebar.MenuButton isActive={isActive(item.url)}>
+				<Sidebar.MenuButton isActive={isActive(item.url)} tooltipContent={item.name}>
 					{#snippet child({ props })}
 						<a href={resolve(item.url)} {...props}>
 							<item.icon />

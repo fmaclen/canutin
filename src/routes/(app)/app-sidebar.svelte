@@ -61,8 +61,10 @@
 	}
 </script>
 
-<Sidebar.Root bind:ref variant="sidebar" {...restProps}>
-	<Sidebar.Header class="h-12 border-b px-2 pt-1 pb-0">
+<Sidebar.Root bind:ref variant="sidebar" collapsible="icon" {...restProps}>
+	<Sidebar.Header
+		class="h-12 border-b px-2 pt-1 pb-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:pt-0"
+	>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
 				<Sidebar.MenuButton>
@@ -83,7 +85,10 @@
 		<Sidebar.Group class="border-t pt-6 pb-0 first:border-t-0 first:pt-4">
 			<Sidebar.Menu>
 				<Sidebar.MenuItem>
-					<Sidebar.MenuButton isActive={isPrefixActive('/accounts')}>
+					<Sidebar.MenuButton
+						isActive={isPrefixActive('/accounts')}
+						tooltipContent={m.sidebar_accounts()}
+					>
 						{#snippet child({ props })}
 							<a href={resolve('/accounts')} {...props}>
 								<WalletCardsIcon />
@@ -93,7 +98,10 @@
 					</Sidebar.MenuButton>
 				</Sidebar.MenuItem>
 				<Sidebar.MenuItem>
-					<Sidebar.MenuButton isActive={isPrefixActive('/assets')}>
+					<Sidebar.MenuButton
+						isActive={isPrefixActive('/assets')}
+						tooltipContent={m.sidebar_assets()}
+					>
 						{#snippet child({ props })}
 							<a href={resolve('/assets')} {...props}>
 								<LandmarkIcon />
@@ -107,7 +115,10 @@
 		<Sidebar.Group class="border-t pt-6 pb-0 first:border-t-0 first:pt-4">
 			<Sidebar.Menu>
 				<Sidebar.MenuItem>
-					<Sidebar.MenuButton isActive={isPrefixActive('/transactions')}>
+					<Sidebar.MenuButton
+						isActive={isPrefixActive('/transactions')}
+						tooltipContent={m.sidebar_transactions()}
+					>
 						{#snippet child({ props })}
 							<a href={resolve('/transactions')} {...props}>
 								<ArrowLeftRightIcon />
@@ -117,7 +128,10 @@
 					</Sidebar.MenuButton>
 				</Sidebar.MenuItem>
 				<Sidebar.MenuItem>
-					<Sidebar.MenuButton isActive={isPrefixActive('/trades')}>
+					<Sidebar.MenuButton
+						isActive={isPrefixActive('/trades')}
+						tooltipContent={m.trades_title()}
+					>
 						{#snippet child({ props })}
 							<a href={resolve('/trades')} {...props}>
 								<TrendingUpIcon />
@@ -127,7 +141,10 @@
 					</Sidebar.MenuButton>
 				</Sidebar.MenuItem>
 				<Sidebar.MenuItem>
-					<Sidebar.MenuButton isActive={isPrefixActive('/securities')}>
+					<Sidebar.MenuButton
+						isActive={isPrefixActive('/securities')}
+						tooltipContent={m.securities_title()}
+					>
 						{#snippet child({ props })}
 							<a href={resolve('/securities')} {...props}>
 								<ScrollTextIcon />
@@ -137,7 +154,10 @@
 					</Sidebar.MenuButton>
 				</Sidebar.MenuItem>
 				<Sidebar.MenuItem>
-					<Sidebar.MenuButton isActive={isPrefixActive('/currencies')}>
+					<Sidebar.MenuButton
+						isActive={isPrefixActive('/currencies')}
+						tooltipContent={m.sidebar_currencies()}
+					>
 						{#snippet child({ props })}
 							<a href={resolve('/currencies')} {...props}>
 								<CoinsIcon />

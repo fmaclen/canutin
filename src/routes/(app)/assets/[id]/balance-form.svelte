@@ -54,7 +54,7 @@
 	const isoAsOf = $derived(parsedAsOf ? parsedAsOf.toISOString() : '');
 </script>
 
-<div class="border-border overflow-hidden rounded border">
+<div class="full-bleed border-border overflow-hidden rounded border">
 	<form
 		onsubmit={(e) => {
 			e.preventDefault();
@@ -64,7 +64,7 @@
 	>
 		<Fieldset isFirst={true}>
 			<FormFieldRow>
-				<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+				<div class="flex flex-row items-baseline gap-2 md:flex-col md:items-end md:gap-1">
 					<Label for="market-value" class="justify-start pr-0 md:justify-end"
 						>{m.assets_label_market_value()}</Label
 					>
@@ -90,7 +90,7 @@
 			</FormFieldRow>
 
 			<FormFieldRow>
-				<div class="flex flex-row items-center gap-2 md:flex-col md:items-end md:gap-1">
+				<div class="flex flex-row items-baseline gap-2 md:flex-col md:items-end md:gap-1">
 					<Label for="book-value" class="justify-start pr-0 md:justify-end"
 						>{m.assets_label_book_value()}</Label
 					>
@@ -107,7 +107,7 @@
 		</Fieldset>
 
 		{#if !disabled}
-			<footer class="border-border bg-border border-t p-2">
+			<footer class="border-border bg-border border-t p-2 max-md:px-4">
 				<div class="flex justify-end">
 					<Button type="submit">{m.assets_button_add()}</Button>
 				</div>

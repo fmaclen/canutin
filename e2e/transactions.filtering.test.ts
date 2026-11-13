@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { addMonths, format, startOfMonth, startOfYear, subYears } from 'date-fns';
 
 import { AccountsBalanceGroupOptions } from '../src/lib/pocketbase.schema';
-import { goToPageViaSidebar, signIn } from './playwright.helpers';
+import { goToPageViaSidebar, periodOption, signIn } from './playwright.helpers';
 import {
 	seedAccount,
 	seedAccountBalance,
@@ -52,12 +52,12 @@ test('transactions table responds to period filters', async ({ page, isMobile })
 
 	for (const { label, value } of periodFilters) {
 		await page.getByLabel('Period').click();
-		await page.getByRole('button', { name: label }).click();
+		await periodOption(page, label).click();
 		await expect(page.getByLabel('Period')).toContainText(label);
 
 		// Reopening the picker must highlight the active preset.
 		await page.getByLabel('Period').click();
-		const selectedPresetButton = page.getByRole('button', { name: label, exact: true });
+		const selectedPresetButton = periodOption(page, label);
 		await expect(selectedPresetButton).toHaveAttribute('data-selected');
 		await page.keyboard.press('Escape');
 
@@ -96,7 +96,7 @@ test('transactions table responds to type filters', async ({ page }) => {
 
 	// Lifetime keeps date boundaries out of the type-filter cases.
 	await page.getByLabel('Period').click();
-	await page.getByRole('button', { name: 'Lifetime' }).click();
+	await periodOption(page, 'Lifetime').click();
 	await expect(page.getByLabel('Period')).toContainText('Lifetime');
 
 	const typeFilters: Array<{
@@ -269,7 +269,7 @@ test('credits filter paginates across pages client-side', async ({ page }) => {
 
 	// Lifetime keeps every seeded credit in range across month boundaries.
 	await page.getByLabel('Period').click();
-	await page.getByRole('button', { name: 'Lifetime' }).click();
+	await periodOption(page, 'Lifetime').click();
 	await expect(page.getByLabel('Period')).toContainText('Lifetime');
 
 	await page.getByLabel('Type').click();
@@ -723,7 +723,7 @@ test('"Last year" filter correctly handles period boundaries', async ({ page }) 
 
 	// Apply "Last year" filter
 	await page.getByLabel('Period').click();
-	await page.getByRole('button', { name: 'Last year' }).click();
+	await periodOption(page, 'Last year').click();
 	await expect(page.getByLabel('Period')).toContainText('Last year');
 
 	// Transactions OUTSIDE the period
@@ -737,7 +737,8 @@ test('"Last year" filter correctly handles period boundaries', async ({ page }) 
 });
 
 test('custom date range with periodLabel from URL displays the label and calendar shows selection', async ({
-	page
+	page,
+	isMobile
 }) => {
 	const user = await seedUser('riley');
 
@@ -794,8 +795,14 @@ test('custom date range with periodLabel from URL displays the label and calenda
 	await expect(page.getByText('Last Month Salary')).toBeVisible();
 	await expect(page.getByText('This Month Salary')).not.toBeVisible();
 
-	// Open the period picker - calendar should show the selected date range
+	// Open the period picker - calendar should show the selected date range. Phones list the
+	// presets with "Custom range" marked as the active choice, and show the calendar behind it.
 	await page.getByLabel('Period').click();
+	if (isMobile) {
+		const customRange = page.getByRole('option', { name: 'Custom range' });
+		await expect(customRange).toHaveAttribute('data-selected');
+		await customRange.click();
+	}
 
 	// The selected date range should be visually highlighted on the calendar
 	// Calendar button aria-labels use format "Friday, March 1, 2024"
@@ -807,7 +814,7 @@ test('custom date range with periodLabel from URL displays the label and calenda
 	await expect(day1Button).toHaveAttribute('data-selected');
 });
 
-test('date range picker allows selecting custom range via calendar', async ({ page }) => {
+test('date range picker allows selecting custom range via calendar', async ({ page, isMobile }) => {
 	const user = await seedUser('skyler');
 
 	const account = await seedAccount({
@@ -882,9 +889,11 @@ test('date range picker allows selecting custom range via calendar', async ({ pa
 	// Open the period picker popover
 	await page.getByLabel('Period').click();
 
-	// The popover should show both presets and a calendar
-	await expect(page.getByRole('button', { name: 'Last month' })).toBeVisible();
-	await expect(page.getByRole('button', { name: 'This month' })).toBeVisible();
+	// The picker opens on its presets; phones show the calendar in a sheet behind "Custom range",
+	// while desktop shows it beside the presets
+	await expect(periodOption(page, 'Last month')).toBeVisible();
+	await expect(periodOption(page, 'This month')).toBeVisible();
+	if (isMobile) await page.getByRole('option', { name: 'Custom range' }).click();
 
 	// Navigate to last month to select a date range
 	await page.getByRole('button', { name: 'Previous' }).click();
@@ -895,6 +904,8 @@ test('date range picker allows selecting custom range via calendar', async ({ pa
 	await page.getByRole('button', { name: /10,/ }).first().click();
 	// Click on day 20 of last month (end of range)
 	await page.getByRole('button', { name: /20,/ }).first().click();
+	// Phones hold the picked range in the sheet until it is applied
+	if (isMobile) await page.getByRole('button', { name: 'Apply' }).click();
 
 	// URL should be updated with periodFrom and periodTo
 	await expect(page).toHaveURL(/periodFrom=/);
@@ -909,7 +920,10 @@ test('date range picker allows selecting custom range via calendar', async ({ pa
 test.describe('date range picker in a UTC+ timezone', () => {
 	test.use({ timezoneId: 'Asia/Tokyo' });
 
-	test('picking the local day stores that local date, not the prior UTC day', async ({ page }) => {
+	test('picking the local day stores that local date, not the prior UTC day', async ({
+		page,
+		isMobile
+	}) => {
 		// 2025-06-14T20:00:00Z is June 15 in Tokyo (UTC+9) but June 14 in UTC.
 		await page.clock.setFixedTime(new Date('2025-06-14T20:00:00Z'));
 
@@ -933,6 +947,7 @@ test.describe('date range picker in a UTC+ timezone', () => {
 		await goToPageViaSidebar(page, 'Transactions');
 
 		await page.getByLabel('Period').click();
+		if (isMobile) await page.getByRole('option', { name: 'Custom range' }).click();
 		await page
 			.getByRole('button', { name: /June 15,/ })
 			.first()
@@ -941,6 +956,7 @@ test.describe('date range picker in a UTC+ timezone', () => {
 			.getByRole('button', { name: /June 16,/ })
 			.first()
 			.click();
+		if (isMobile) await page.getByRole('button', { name: 'Apply' }).click();
 
 		await expect(page).toHaveURL(/periodFrom=2025-06-15/);
 		await expect(page).toHaveURL(/periodTo=2025-06-17/);
@@ -950,7 +966,10 @@ test.describe('date range picker in a UTC+ timezone', () => {
 test.describe('date range picker in a UTC- timezone', () => {
 	test.use({ timezoneId: 'Pacific/Honolulu' });
 
-	test('picking the local day stores that local date, not the later UTC day', async ({ page }) => {
+	test('picking the local day stores that local date, not the later UTC day', async ({
+		page,
+		isMobile
+	}) => {
 		// 2025-06-16T05:00:00Z is June 15 in Honolulu (UTC-10) but June 16 in UTC.
 		await page.clock.setFixedTime(new Date('2025-06-16T05:00:00Z'));
 
@@ -974,6 +993,7 @@ test.describe('date range picker in a UTC- timezone', () => {
 		await goToPageViaSidebar(page, 'Transactions');
 
 		await page.getByLabel('Period').click();
+		if (isMobile) await page.getByRole('option', { name: 'Custom range' }).click();
 		await page
 			.getByRole('button', { name: /June 15,/ })
 			.first()
@@ -982,6 +1002,7 @@ test.describe('date range picker in a UTC- timezone', () => {
 			.getByRole('button', { name: /June 16,/ })
 			.first()
 			.click();
+		if (isMobile) await page.getByRole('button', { name: 'Apply' }).click();
 
 		await expect(page).toHaveURL(/periodFrom=2025-06-15/);
 		await expect(page).toHaveURL(/periodTo=2025-06-17/);
@@ -1030,7 +1051,7 @@ test.describe('period presets in a UTC+ timezone at a month boundary', () => {
 		await goToPageViaSidebar(page, 'Transactions');
 
 		await page.getByLabel('Period').click();
-		await page.getByRole('button', { name: 'This month' }).click();
+		await periodOption(page, 'This month').click();
 		await expect(page.getByLabel('Period')).toContainText('This month');
 
 		await expect(page.getByText('July Payment')).toBeVisible();
@@ -1128,7 +1149,7 @@ test('switching from custom range back to preset clears custom URL params and up
 
 	// Open period picker and select "Last 3 months" preset
 	await page.getByLabel('Period').click();
-	await page.getByRole('button', { name: 'Last 3 months' }).click();
+	await periodOption(page, 'Last 3 months').click();
 
 	// URL should now have period=last-3-months, not periodFrom/periodTo
 	await expect(page).toHaveURL(/period=last-3-months/);

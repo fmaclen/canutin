@@ -12,11 +12,10 @@
 	import * as Table from '$lib/components/ui/table/index';
 	import { getCurrenciesContext } from '$lib/currencies.svelte';
 	import { getExchangeRatesContext } from '$lib/exchange-rates.svelte';
-	import { getFormattingLocale } from '$lib/interface-preferences.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { ExchangeRatesSourceOptions, type ExchangeRatesResponse } from '$lib/pocketbase.schema';
 	import { TableSort } from '$lib/sorting.svelte';
-	import { createSortComparator, type SortState } from '$lib/utils';
+	import { createSortComparator, formatDate, type SortState } from '$lib/utils';
 
 	const currenciesContext = getCurrenciesContext();
 	const exchangeRatesContext = getExchangeRatesContext();
@@ -106,15 +105,6 @@
 		if (currentPage > totalPages) currentPage = totalPages;
 		if (currentPage < 1) currentPage = 1;
 	});
-
-	function formatDate(iso: string) {
-		return new Date(iso).toLocaleDateString(getFormattingLocale(), {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric',
-			timeZone: 'UTC'
-		});
-	}
 </script>
 
 {#if !isUsd}
@@ -148,7 +138,7 @@
 				<div
 					role="region"
 					aria-label={m.currencies_table_header_latest_quote()}
-					class="grid grid-cols-1 gap-2 max-sm:-mt-0.5 max-sm:mb-4"
+					class="grid grid-cols-1 gap-2 max-sm:mb-4"
 				>
 					<KeyValue
 						title={m.currencies_table_header_latest_quote()}
@@ -159,7 +149,7 @@
 				</div>
 			{/if}
 			{#if sortedRows.length === 0}
-				<Empty>{m.currencies_no_quotes()}</Empty>
+				<Empty class="full-bleed">{m.currencies_no_quotes()}</Empty>
 			{:else}
 				<div class="full-bleed bg-background overflow-hidden rounded-sm shadow-md">
 					<Table.Root>

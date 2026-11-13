@@ -6,6 +6,7 @@ import {
 	goToEditTab,
 	goToPageViaSidebar,
 	goToRecordDetail,
+	openPageActions,
 	signIn
 } from './playwright.helpers';
 import { seedUser } from './pocketbase.helpers';
@@ -58,6 +59,7 @@ test('a sync that needs re-authentication is flagged and cleared by reconnecting
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Accounts');
+	await openPageActions(page);
 	await page.getByRole('link', { name: 'Add account' }).click();
 	await page.getByRole('link', { name: 'Link account' }).click();
 	await expect(page.getByText('Match accounts')).toBeVisible();
@@ -77,6 +79,7 @@ test('a sync that needs re-authentication is flagged and cleared by reconnecting
 		errors: { '/transactions/sync': 'ITEM_LOGIN_REQUIRED' }
 	});
 	await goToPageViaSidebar(page, 'Accounts');
+	await openPageActions(page);
 	await page.getByRole('link', { name: 'Linked institutions' }).click();
 	await expect(page).toHaveURL('/settings/connections');
 	const connectionRow = page.getByRole('row', { name: 'Fake Bank' });
@@ -100,6 +103,7 @@ test('a sync that needs re-authentication is flagged and cleared by reconnecting
 		accounts: [checkingAccount],
 		transactionPages: [firstPage, secondPage]
 	});
+	await openPageActions(page);
 	await page.getByRole('link', { name: 'Linked institutions' }).click();
 	await connectionRow.getByRole('link', { name: 'Reconnect' }).click();
 	await expect(page.getByText('Sync complete: 1 created')).toBeVisible();
@@ -139,6 +143,7 @@ test('re-syncing adds no duplicates and unlinking leaves the account fully manua
 	await page.goto('/');
 	await signIn(page, user.email);
 	await goToPageViaSidebar(page, 'Accounts');
+	await openPageActions(page);
 	await page.getByRole('link', { name: 'Add account' }).click();
 	await page.getByRole('link', { name: 'Link account' }).click();
 	await expect(page.getByText('Match accounts')).toBeVisible();
@@ -150,6 +155,7 @@ test('re-syncing adds no duplicates and unlinking leaves the account fully manua
 	await expect(page.getByRole('row', { name: 'Fake Coffee Roasters' })).toHaveCount(1);
 
 	await goToPageViaSidebar(page, 'Accounts');
+	await openPageActions(page);
 	await page.getByRole('link', { name: 'Linked institutions' }).click();
 	const connectionRow = page.getByRole('row', { name: 'Fake Bank' });
 	await expect(connectionRow).toContainText('Connected');

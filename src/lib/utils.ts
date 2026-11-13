@@ -1,4 +1,5 @@
 import { clsx, type ClassValue } from 'clsx';
+import { format } from 'date-fns';
 import { ClientResponseError } from 'pocketbase';
 import { twMerge } from 'tailwind-merge';
 
@@ -16,6 +17,23 @@ export function toNumber(value: unknown) {
 	const numberValue =
 		typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN;
 	return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+// Every date in a table or list reads as YYYY-MM-DD so columns line up and sort by eye. Calendar
+// dates (transactions, trades, quotes, positions) are stored as UTC midnight, so their day is read
+// in UTC; a local reading would shift them a day west of Greenwich.
+export function formatDate(date: Date | string) {
+	return new Date(date).toISOString().slice(0, 10);
+}
+
+// Timestamps are moments rather than calendar days, so they show the reader's local date and time.
+export function formatDateTime(date: Date | string) {
+	const moment = new Date(date);
+	const time = new Intl.DateTimeFormat(getFormattingLocale(), {
+		hour: '2-digit',
+		minute: '2-digit'
+	}).format(moment);
+	return `${format(moment, 'yyyy-MM-dd')} ${time}`;
 }
 
 export function formatPercent(value: number) {

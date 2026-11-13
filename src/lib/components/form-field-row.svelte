@@ -8,12 +8,10 @@
 		itemsAlignment?: 'items-center' | 'items-start';
 		children: Snippet;
 	} = $props();
-
-	const gapClass = itemsAlignment === 'items-start' ? 'gap-4' : 'gap-1.5';
 </script>
 
 <div
-	class="mx-auto grid max-w-prose grid-cols-1 {itemsAlignment} {gapClass} md:grid-cols-[1.25fr_3fr] md:gap-4"
+	class="mx-auto grid max-w-prose grid-cols-1 {itemsAlignment} gap-1.5 md:grid-cols-[1.25fr_3fr] md:gap-4"
 >
 	{@render children()}
 </div>

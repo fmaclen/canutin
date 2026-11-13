@@ -7,7 +7,7 @@ import {
 	AccountSharesAccessRoleOptions,
 	AccountSharesPerspectiveOptions
 } from '../src/lib/pocketbase.schema';
-import { signIn } from './playwright.helpers';
+import { periodOption, signIn } from './playwright.helpers';
 import { seedAccount, seedAccountShare, seedTransaction, seedUser } from './pocketbase.helpers';
 
 type PeriodSeed = {
@@ -287,7 +287,7 @@ test('clicking cashflow chart bar navigates to transactions filtered by that mon
 
 	// Switch to a preset period - custom URL params should be cleared
 	await page.getByLabel('Period').click();
-	await page.getByRole('button', { name: 'Lifetime' }).click();
+	await periodOption(page, 'Lifetime').click();
 
 	await expect(page).toHaveURL(/period=lifetime/);
 	await expect(page).not.toHaveURL(/periodFrom=/);
