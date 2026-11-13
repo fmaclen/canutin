@@ -130,7 +130,7 @@
 	</div>
 
 	{#if subNav}
-		<div class="flex items-end justify-between gap-4 px-4 max-md:pt-3.25 sm:px-8">
+		<div class="flex items-end justify-between gap-4 px-4 sm:px-8">
 			{@render subNav()}
 			{#if actions}
 				<nav class="mb-0.5 flex items-center gap-4 pb-4 max-md:hidden">
